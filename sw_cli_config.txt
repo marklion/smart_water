@@ -1,0 +1,12 @@
+device
+return
+resource
+  farm
+    add farm a b c
+    add farm d e f
+  return
+  block
+    add block a f s
+    add block d f a
+  return
+return

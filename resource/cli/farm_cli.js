@@ -1,0 +1,73 @@
+import cli_utils from '../../public/lib/cli_utils.js';
+import resource_lib from '../lib/resource_lib.js';
+async function get_all_farms() {
+    let farms = [];
+    let pageNo = 0;
+    while (true) {
+        let result = await resource_lib.list_farm(pageNo);
+        if (result.farms.length === 0) {
+            break;
+        }
+        farms = farms.concat(result.farms);
+        pageNo++;
+    }
+    return farms;
+}
+export default {
+    command: 'farm',
+    name: '农场管理',
+    _vorpalInstance: null,
+    install: function (parent_prompt) {
+        let prompt = parent_prompt + 'farm> ';
+        let ins = this;
+        const vorpal = cli_utils.create_vorpal();
+        this._vorpalInstance = vorpal;
+        cli_utils.make_undo_cmd(vorpal,
+            'add farm <name> <location> [info]',
+            '添加一个农场',
+            '删除所有农场',
+            async (cmd_this, args) => {
+                let name = args.name;
+                let location = args.location;
+                let info = args.info || '';
+                let result = await resource_lib.add_farm(name, location, info);
+                if (result.result) {
+                    return `农场 ${name} 添加成功`;
+                } else {
+                    return `农场 ${name} 添加失败`;
+                }
+            }, async (cmd_this, args) => {
+                let farms = await get_all_farms();
+                for (let farm of farms) {
+                    await resource_lib.del_farm(farm.name);
+                }
+                return '所有农场已删除';
+            });
+        cli_utils.make_common_cmd(vorpal, 'del farm <name>', '删除一个农场', async (cmd_this, args) => {
+            let name = args.name;
+            let result = await resource_lib.del_farm(name);
+            if (result.result) {
+                return `农场 ${name} 删除成功`;
+            } else {
+                return `农场 ${name} 删除失败`;
+            }
+        });
+        vorpal.delimiter(prompt)
+        vorpal.command('bdr', '列出所有配置')
+            .action(async function (args) {
+                this.log((await ins.make_bdr()).join('\n'));
+            });
+        return vorpal;
+    },
+    make_bdr: async function () {
+        let ret = []
+        let farms = await get_all_farms()
+        for (let farm of farms) {
+            ret.push(`add farm ${farm.name} ${farm.location} ${farm.info || ''}`);
+        }
+        if (this._vorpalInstance) {
+            ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));
+        }
+        return ret;
+    },
+}
