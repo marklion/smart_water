@@ -15,7 +15,11 @@ export default {
         vorpal.delimiter(prompt)
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {
-                this.log((await ins.make_bdr()).join('\n'));
+                try {
+                    this.log((await ins.make_bdr()).join('\n'));
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
             });
         return vorpal;
     },

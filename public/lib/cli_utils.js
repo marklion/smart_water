@@ -48,8 +48,12 @@ export default {
             });
         sub_cli.command('clear', '清除当前配置')
             .action(async function (args) {
-                await ins.clear_config(sub_cli);
-                this.log('当前配置已清除');
+                try {
+                    await ins.clear_config(sub_cli);
+                    this.log('当前配置已清除');
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
             });
         if (!cli.sub_clies) {
             cli.sub_clies = [];
@@ -90,9 +94,13 @@ export default {
     make_common_cmd: function (vorpal, cmd, description, func) {
         let ret = vorpal.command(cmd, description)
             .action(async function (args) {
-                let result = await func(this, args);
-                if (result) {
-                    this.log(result);
+                try {
+                    let result = await func(this, args);
+                    if (result) {
+                        this.log(result);
+                    }
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
                 }
             });
         return ret;
@@ -100,17 +108,25 @@ export default {
     make_undo_cmd: function (vorpal, cmd, config_description, undo_description, config_func, undo_func) {
         let ret = vorpal.command(cmd, config_description)
             .action(async function (args) {
-                let result = await config_func(this, args);
-                if (result) {
-                    this.log(result);
+                try {
+                    let result = await config_func(this, args);
+                    if (result) {
+                        this.log(result);
+                    }
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
                 }
             });
         let undo_cmd_string = 'undo ' + cmd.split(/[<[]/)[0].trim();
         vorpal.command(undo_cmd_string, undo_description)
             .action(async function (args) {
-                let result = await undo_func(this, args);
-                if (result) {
-                    this.log(result);
+                try {
+                    let result = await undo_func(this, args);
+                    if (result) {
+                        this.log(result);
+                    }
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
                 }
             });
         if (vorpal.undo_cmd_array == undefined) {
@@ -122,26 +138,30 @@ export default {
     make_display_cmd: function (vorpal, cmd, description, func) {
         let ret = vorpal.command(cmd, description)
             .action(async function (args) {
-                let cur_page = 0;
-                let all_finished = false;
-                while (all_finished == false) {
-                    let got_count = await func(this, args, cur_page);
-                    if (got_count <= 0) {
-                        all_finished = true;
-                    } else {
-                        let result = await this.prompt(
-                            {
-                                type: 'confirm',
-                                name: 'continue',
-                                default: true,
-                                message: '是否继续显示？'
-                            }
-                        );
-                        if (result.continue == false) {
+                try {
+                    let cur_page = 0;
+                    let all_finished = false;
+                    while (all_finished == false) {
+                        let got_count = await func(this, args, cur_page);
+                        if (got_count <= 0) {
                             all_finished = true;
+                        } else {
+                            let result = await this.prompt(
+                                {
+                                    type: 'confirm',
+                                    name: 'continue',
+                                    default: true,
+                                    message: '是否继续显示？'
+                                }
+                            );
+                            if (result.continue == false) {
+                                all_finished = true;
+                            }
                         }
+                        cur_page++;
                     }
-                    cur_page++;
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
                 }
             })
         return ret;

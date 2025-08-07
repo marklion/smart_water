@@ -17,7 +17,11 @@ function get_vorpal() {
 
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {
-                this.log((await make_bdr()).join('\n'));
+                try {
+                    this.log((await make_bdr()).join('\n'));
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
             });
         cli_utils.add_sub_cli(vorpal, device_cli, prompt);
         cli_utils.add_sub_cli(vorpal, resource_cli, prompt);
@@ -32,21 +36,38 @@ export default {
         const vorpal = get_vorpal();
         vorpal.command('save [filename]', '保存当前配置到文件')
             .action(async function (args) {
-                await ins.save_config(args.filename);
+                try {
+                    await ins.save_config(args.filename);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
             });
         vorpal.command('clear', '清除当前配置')
             .action(async function (args) {
-                await cli_utils.clear_config(vorpal);
-                this.log('当前配置已清除');
+                try {
+                    await cli_utils.clear_config(vorpal);
+                    this.log('当前配置已清除');
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
             });
         vorpal.command('restore [filename]', '从文件恢复配置')
             .action(async function (args) {
-                await cli_utils.clear_config(vorpal);
-                await ins.restore_config(args.filename);
+                try {
+                    await cli_utils.clear_config(vorpal);
+                    await ins.restore_config(args.filename);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
             });
         vorpal.command('restart', '重启服务器')
             .action(async function (args) {
-                await call_remote('/restart', {}, '');
+                try {
+                    await call_remote('/restart', {});
+                    this.log('服务器已重启');
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
             });
         vorpal.show();
     },
