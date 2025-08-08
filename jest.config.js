@@ -2,6 +2,8 @@ export default {
   testEnvironment: 'node',
   transform: {},
   maxWorkers: 1,
+  testTimeout: 30000, // 30秒超时
+  setupFilesAfterEnv: [],
   reporters: [
     "default",
     "jest-github-actions-reporter",
