@@ -18,7 +18,7 @@ async function start_server() {
     return ret;
 }
 
-export default async function (processName) {
+export default async function create_cli (processName) {
     let ret = {};
 
     // 解析命令和参数
@@ -40,16 +40,21 @@ export default async function (processName) {
                 //console.log('ret.output:', ret.output);
                 // 找到 output 中包含 prompt 并且 prompt 是行末的行
                 let lines = ret.output.split('\n');
+                lines = lines.map(line => line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, ''));
                 let promptLine = lines.find(line => {
-                    line = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
                     return line.endsWith(prompt)
                 });
                 if (promptLine) {
                     lines = lines.slice(1);
+                    lines = lines.filter(line => line.trim() !== '');
                     ret.output = lines.join('\n');
                     clearInterval(checkOutput);
+                    let outputBeforePrompt = ''
                     let index = ret.output.indexOf(promptLine);
-                    let outputBeforePrompt = ret.output.substring(0, index);
+                    if (index > 0 && ret.output[index - 1] === '\n') {
+                        index--;
+                        outputBeforePrompt = ret.output.substring(0, index);
+                    }
                     ret.output = ret.output.substring(index + promptLine.length);
                     resolve(outputBeforePrompt);
                 }
@@ -66,6 +71,21 @@ export default async function (processName) {
         ret.server.kill();
     }
     ret.server = await start_server();
+    ret.save_config = async function() {
+        let new_cli = await create_cli(processName);
+        await new_cli.run_cmd('save');
+        await new_cli.close();
+    }
+    ret.clear_config = async function() {
+        let new_cli = await create_cli(processName);
+        await new_cli.run_cmd('clear');
+        await new_cli.close();
+    }
+    ret.restore_config = async function() {
+        let new_cli = await create_cli(processName);
+        await new_cli.run_cmd('restore');
+        await new_cli.close();
+    }
     await waitForPrompt('sw_cli> ');
 
     return ret;
