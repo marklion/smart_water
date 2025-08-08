@@ -3,18 +3,18 @@ import device_cli from '../../device/cli/device_management_cli.js';
 import resource_cli from '../../resource/cli/resource_cli.js';
 import call_remote from '../lib/call_remote.js';
 let g_vorpal = undefined;
-const default_config_file = 'sw_cli_config.txt';
+let default_config_file = 'sw_cli_config.txt';
 async function make_bdr() {
     let ret = [];
+    let sys_name = (await call_remote('/get_sys_name', {})).sys_name;
+    ret.push(`set_sys_name '${sys_name}'`);
     ret = ret.concat(await cli_utils.make_sub_bdr(g_vorpal));
     return ret;
 }
 function get_vorpal() {
     if (!g_vorpal) {
-
         const vorpal = cli_utils.create_vorpal();
         const prompt = 'sw_cli> ';
-
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {
                 try {
@@ -69,9 +69,21 @@ export default {
                     this.log('Error:', err.err_msg || '未知错误');
                 }
             });
+        vorpal.command('set_sys_name <sys_name>', '设置系统名称')
+            .action(async function (args) {
+                try {
+                    await call_remote('/set_sys_name', { sys_name: args.sys_name });
+                    this.log('系统名称已设置为：' + args.sys_name);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
+            });
         vorpal.show();
     },
-    save_config: async function (filename = default_config_file) {
+    save_config: async function (filename) {
+        if (!filename) {
+            filename = default_config_file;
+        }
         let all_config = await make_bdr();
         const fs = await import('fs');
         fs.writeFileSync(filename, '');
@@ -87,7 +99,10 @@ export default {
         }
         return ret;
     },
-    restore_config: async function (filename = default_config_file) {
+    restore_config: async function (filename) {
+        if (!filename) {
+            filename = default_config_file;
+        }
         const fs = await import('fs');
         if (!fs.existsSync(filename)) {
             throw new Error(`配置文件 ${filename} 不存在`);
@@ -99,7 +114,7 @@ export default {
             vorpal = await this.do_config(vorpal, command);
         }
     },
-    destroy:function() {
+    destroy: function () {
         let sub_clies = g_vorpal.sub_clies;
         for (let sub_cli of sub_clies) {
             if (sub_cli._vorpalInstance) {

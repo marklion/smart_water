@@ -67,7 +67,7 @@ export default {
         let ret = []
         let farms = await get_all_farms()
         for (let farm of farms) {
-            ret.push(`add farm ${farm.name} ${farm.location} ${farm.info || ''}`);
+            ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.info || ''}'`);
         }
         if (this._vorpalInstance) {
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));

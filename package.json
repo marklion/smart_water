@@ -2,7 +2,7 @@
     "name": "sw_public",
     "version": "1.0.0",
     "private": true,
-    "type":"module",
+    "type": "module",
     "engines": {
         "node": "^20.19.0 || >=22.12.0"
     },
@@ -10,7 +10,8 @@
         "dev_server": "cross-env NODE_ENV=development PORT=47147 nodemon --watch ./ --exec babel-node ./public/server/index.js",
         "dev_cli": "node ./public/cli/index.js",
         "dev_gui": "vite --config public/gui/vite.config.js",
-        "build_gui": "vite build --config public/gui/vite.config.js"
+        "build_gui": "vite build --config public/gui/vite.config.js",
+        "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles"
     },
     "author": "",
     "license": "ISC",
@@ -18,6 +19,9 @@
     "devDependencies": {
         "@babel/node": "^7.27.1",
         "@vitejs/plugin-vue": "^6.0.1",
+        "jest": "^30.0.5",
+        "jest-html-reporters": "^3.1.7",
+        "node-pty": "^1.0.0",
         "unplugin-auto-import": "^19.3.0",
         "unplugin-vue-components": "^28.8.0",
         "vite": "^7.0.6",

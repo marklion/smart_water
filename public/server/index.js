@@ -40,6 +40,20 @@ app.post('/api/v1/restart', async (req, res)=>{
         process.exit(-1);
     }, 1000);
 })
+var sys_name = 'no name';
+app.post('/api/v1/set_sys_name', async (req, res)=>{
+    sys_name = req.body.sys_name;
+    res.json({
+        err_msg: '',
+        result: {result:true}
+    });
+});
+app.post('/api/v1/get_sys_name', async (req, res)=>{
+    res.json({
+        err_msg: '',
+        result: {sys_name: sys_name}
+    });
+});
 app.get('/api/help', (req, res) => {
     let out_json = app.help_info;
 
@@ -125,10 +139,14 @@ app.get('/api/help', (req, res) => {
 });
 
 let server = app.listen(parseInt(process.env.PORT), async () => {
-    console.log('Server running on port ' + process.env.PORT)
     await init_super_user();
-    await cli_runtime_lib.restore_config();
+    try {
+        await cli_runtime_lib.restore_config();
+    } catch (error) {
+        console.log(error);
+    }
     cli_runtime_lib.destroy();
+    console.log('Server running on port ' + process.env.PORT)
 });
 process.on('uncaughtException', (err) => {
     console.error('An uncaught error occurred!');

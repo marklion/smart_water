@@ -74,7 +74,7 @@ export default {
         let ret = []
         let devices = await get_all_devices();
         for (let device of devices) {
-            ret.push(`add device ${device.device_name} ${device.driver_name} ${device.config_key} ${device.farm_name || ''} ${device.block_name || ''}`);
+            ret.push(`add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.farm_name || ''}' '${device.block_name || ''}'`);
         }
         if (this._vorpalInstance) {
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));

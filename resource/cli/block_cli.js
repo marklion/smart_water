@@ -68,7 +68,7 @@ export default {
         let ret = []
         let blocks = await get_all_blocks()
         for (let block of blocks) {
-            ret.push(`add block ${block.farm_name} ${block.name} ${block.info || ''}`);
+            ret.push(`add block '${block.farm_name}' '${block.name}' '${block.info || ''}'`);
         }
         if (this._vorpalInstance) {
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));
