@@ -1,5 +1,5 @@
 import pty from 'node-pty';
-
+let g_server = null;
 async function start_server() {
     let ret = {};
 
@@ -14,10 +14,17 @@ async function start_server() {
             }
         });
     });
-
-    return ret;
+    g_server = ret;
+    console.log('Server started successfully at ' + new Date().toLocaleTimeString());
 }
-let g_server = await start_server();
+async function close_server() {
+    if (g_server) {
+        g_server.kill();
+        g_server = null;
+    }
+    console.log('Server closed successfully at ' + new Date().toLocaleTimeString());
+
+}
 
 export default async function create_cli (processName) {
     let ret = {};
@@ -68,31 +75,27 @@ export default async function create_cli (processName) {
         ret.process.write(cmd + '\n');
         return await waitForPrompt('> ');
     }
-    ret.close = async function (only_cli = false) {
+    ret.close = async function () {
         ret.process.write('exit\n');
-        if (only_cli)
-        {
-            return;
-        }
-        g_server.kill();
     }
 
     ret.save_config = async function() {
         let new_cli = await create_cli(processName);
         await new_cli.run_cmd('save');
-        await new_cli.close(true);
+        await new_cli.close();
     }
     ret.clear_config = async function() {
         let new_cli = await create_cli(processName);
         await new_cli.run_cmd('clear');
-        await new_cli.close(true);
+        await new_cli.close();
     }
     ret.restore_config = async function() {
         let new_cli = await create_cli(processName);
         await new_cli.run_cmd('restore');
-        await new_cli.close(true);
+        await new_cli.close();
     }
     await waitForPrompt('sw_cli> ');
 
     return ret;
 }
+export { start_server, close_server };
