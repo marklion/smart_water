@@ -11,7 +11,8 @@
         "dev_cli": "node ./public/cli/index.js",
         "dev_gui": "vite --config public/gui/vite.config.js",
         "build": "rm -rf dist && vite build --config public/gui/vite.config.js && rollup -c rollup_server.config.js && rollup -c rollup_cli.config.js",
-        "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles"
+        "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles",
+        "citest": "NODE_OPTIONS=--experimental-vm-modules CI=true jest --detectOpenHandles --reporters=default --reporters=jest-github-actions-reporter"
     },
     "author": "",
     "license": "ISC",
@@ -24,6 +25,7 @@
         "@vitejs/plugin-vue": "^6.0.1",
         "babel-plugin-transform-import-meta": "^2.3.3",
         "jest": "^30.0.5",
+        "jest-github-actions-reporter": "^1.0.3",
         "jest-html-reporters": "^3.1.7",
         "node-pty": "^1.0.0",
         "pkg": "^5.8.1",
