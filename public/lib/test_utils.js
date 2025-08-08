@@ -17,7 +17,7 @@ async function start_server() {
 
     return ret;
 }
-var g_server = await start_server();
+let g_server = await start_server();
 
 export default async function create_cli (processName) {
     let ret = {};
