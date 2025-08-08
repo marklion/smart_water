@@ -27,3 +27,4 @@ dist-ssr
 *.sw?
 sw_cli_config.txt
 test_reports/
+public/server/web

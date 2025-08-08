@@ -4,12 +4,16 @@ import dotenv from 'dotenv';
 import MarkdownIt from 'markdown-it';
 import mdTocAndAnchor from 'markdown-it-toc-and-anchor';
 import cli_runtime_lib from '../cli/cli_runtime_lib.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import historyApiFallback from 'connect-history-api-fallback';
 const envFile = `.env.${process.env.NODE_ENV || 'development'}`;
 dotenv.config({ path: envFile });
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.help_info = [];
+app.use(historyApiFallback());
 
 import mkapi from './api_utils.js';
 async function module_install(app, module) {
@@ -30,6 +34,11 @@ async function init_super_user() {
     await module_install(app, (await import('../../device/server/device_management_module.js')).default);
     await module_install(app, (await import('../../resource/server/resource_module.js')).default);
 }
+// 托管前端静态文件
+let web_dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'web');
+console.log(`Web directory: ${web_dir}`);
+app.use(express.static(web_dir));
+
 app.post('/api/v1/restart', async (req, res)=>{
     res.json({
         err_msg: '',

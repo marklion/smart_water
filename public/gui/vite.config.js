@@ -10,6 +10,10 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 // https://vite.dev/config/
 export default defineConfig({
   root: './public/gui',
+  build:{
+    outDir: '../server/web',
+    emptyOutDir: true,
+  },
   server:{
     proxy:{
       '/api/v1': {
