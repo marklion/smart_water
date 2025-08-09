@@ -1,5 +1,5 @@
 import pty from 'node-pty';
-
+let g_server = null;
 async function start_server() {
     let ret = {};
 
@@ -14,8 +14,16 @@ async function start_server() {
             }
         });
     });
+    g_server = ret;
+    console.log('Server started successfully at ' + new Date().toLocaleTimeString());
+}
+async function close_server() {
+    if (g_server) {
+        g_server.kill();
+        g_server = null;
+    }
+    console.log('Server closed successfully at ' + new Date().toLocaleTimeString());
 
-    return ret;
 }
 
 export default async function create_cli (processName) {
@@ -47,6 +55,7 @@ export default async function create_cli (processName) {
                 if (promptLine) {
                     lines = lines.slice(1);
                     lines = lines.filter(line => line.trim() !== '');
+
                     ret.output = lines.join('\n');
                     clearInterval(checkOutput);
                     let outputBeforePrompt = ''
@@ -68,9 +77,8 @@ export default async function create_cli (processName) {
     }
     ret.close = async function () {
         ret.process.write('exit\n');
-        ret.server.kill();
     }
-    ret.server = await start_server();
+
     ret.save_config = async function() {
         let new_cli = await create_cli(processName);
         await new_cli.run_cmd('save');
@@ -90,3 +98,4 @@ export default async function create_cli (processName) {
 
     return ret;
 }
+export { start_server, close_server };
