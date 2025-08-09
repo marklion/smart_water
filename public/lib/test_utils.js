@@ -9,7 +9,6 @@ async function start_server() {
     });
     await new Promise(resolve => {
         ret.on('data', function (data) {
-            console.log(data);
             if (data.includes('Server running on port')) {
                 resolve();
             }
