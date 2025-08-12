@@ -33,3 +33,10 @@ jobs:
       env:
         CI: true
         DISPLAY: ':99.0'
+    - run: allure generate allure-results --clean -o allure-report
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-reports
+        path: |
+          allure-report/  # 如果生成了 Allure 报告
