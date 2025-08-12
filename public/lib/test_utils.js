@@ -10,11 +10,17 @@ async function start_server() {
     await new Promise(resolve => {
         ret.on('data', function (data) {
             if (data.includes('Server running on port')) {
+                ret.removeAllListeners('data');
                 resolve();
             }
         });
     });
     g_server = ret;
+    g_server.on('data', function (data) {
+        console.log(data);
+
+    })
+
     console.log('Server started successfully at ' + new Date().toLocaleTimeString());
 }
 async function close_server() {
@@ -26,7 +32,7 @@ async function close_server() {
 
 }
 
-export default async function create_cli (processName) {
+export default async function create_cli(processName) {
     let ret = {};
 
     // 解析命令和参数
@@ -73,23 +79,24 @@ export default async function create_cli (processName) {
     ret.run_cmd = async function (cmd) {
         ret.output = '';
         ret.process.write(cmd + '\n');
+        console.log(`Running command: ${cmd}`);
         return await waitForPrompt('> ');
     }
     ret.close = async function () {
         ret.process.write('exit\n');
     }
 
-    ret.save_config = async function() {
+    ret.save_config = async function () {
         let new_cli = await create_cli(processName);
         await new_cli.run_cmd('save');
         await new_cli.close();
     }
-    ret.clear_config = async function() {
+    ret.clear_config = async function () {
         let new_cli = await create_cli(processName);
         await new_cli.run_cmd('clear');
         await new_cli.close();
     }
-    ret.restore_config = async function() {
+    ret.restore_config = async function () {
         let new_cli = await create_cli(processName);
         await new_cli.run_cmd('restore');
         await new_cli.close();
