@@ -2,6 +2,8 @@ import test_utils from "../../public/lib/test_utils";
 import { start_server, close_server } from "../../public/lib/test_utils.js";
 let cli;
 beforeAll(async () => {
+    console.log('=======policy test======');
+
     cli = await test_utils('npm run dev_cli');
     await start_server()
     await cli.run_cmd('clear');
@@ -11,6 +13,8 @@ afterAll(async () => {
     await cli.run_cmd('save');
     await cli.close();
     await close_server();
+    console.log('=======stop policy test.=======');
+
 })
 
 describe('策略增删', () => {

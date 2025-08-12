@@ -3,6 +3,7 @@ import { start_server, close_server } from "../lib/test_utils.js";
 import fs from 'fs';
 let cli;
 beforeAll(async () => {
+    console.log('=======start system test======');
     cli = await test_utils('npm run dev_cli');
     await start_server();
 })
@@ -10,6 +11,7 @@ afterAll(async () => {
     await cli.close();
     fs.unlinkSync('tmp_config.txt');
     await close_server();
+    console.log('=======stop system test.=======');
 })
 
 test("根目录命令测试", async () => {
