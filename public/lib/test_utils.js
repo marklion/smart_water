@@ -1,32 +1,45 @@
 import pty from 'node-pty';
+import moment from 'moment';
 let g_server = null;
+function print_test_log(log) {
+    let now = moment().format('YYYY-MM-DD HH:mm:ss:SSS');
+    console.log(`[${now}] ${log}`);
+}
 async function start_server() {
     let ret = {};
 
-    ret = pty.spawn('npm', ['run', 'dev_server'], {
+    ret = pty.spawn('npm', ['run', 'start_server'], {
         cwd: process.cwd(),
         env: process.env
     });
     await new Promise(resolve => {
+        let start_log = ''
         ret.on('data', function (data) {
-            if (data.includes('Server running on port')) {
+            start_log += data;
+            if (start_log.includes('Server running on port')) {
+                ret.removeAllListeners('data');
                 resolve();
             }
         });
     });
     g_server = ret;
-    console.log('Server started successfully at ' + new Date().toLocaleTimeString());
+    print_test_log('Server started successfully at ' + new Date().toLocaleTimeString());
 }
 async function close_server() {
     if (g_server) {
-        g_server.kill();
+        await new Promise((resolve) => {
+            g_server.on('exit', () => {
+                resolve();
+            });
+            g_server.kill();
+        });
         g_server = null;
     }
-    console.log('Server closed successfully at ' + new Date().toLocaleTimeString());
 
+    print_test_log('Server closed successfully at ' + new Date().toLocaleTimeString());
 }
 
-export default async function create_cli (processName) {
+export default async function create_cli(processName) {
     let ret = {};
 
     // 解析命令和参数
@@ -45,8 +58,6 @@ export default async function create_cli (processName) {
     async function waitForPrompt(prompt) {
         return new Promise((resolve) => {
             const checkOutput = setInterval(() => {
-                //console.log('ret.output:', ret.output);
-                // 找到 output 中包含 prompt 并且 prompt 是行末的行
                 let lines = ret.output.split('\n');
                 lines = lines.map(line => line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, ''));
                 let promptLine = lines.find(line => {
@@ -65,37 +76,43 @@ export default async function create_cli (processName) {
                         outputBeforePrompt = ret.output.substring(0, index);
                     }
                     ret.output = ret.output.substring(index + promptLine.length);
-                    resolve(outputBeforePrompt);
+                    resolve({
+                        prompt: promptLine,
+                        content: outputBeforePrompt,
+                    });
                 }
             }, 100);
         });
     }
-    ret.run_cmd = async function (cmd) {
+    ret.run_cmd = async function (cmd, prompt = '> ') {
         ret.output = '';
         ret.process.write(cmd + '\n');
-        return await waitForPrompt('> ');
+        let resp = await waitForPrompt(prompt);
+        print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+
+        return resp.content;
     }
     ret.close = async function () {
         ret.process.write('exit\n');
     }
 
-    ret.save_config = async function() {
+    ret.save_config = async function () {
         let new_cli = await create_cli(processName);
-        await new_cli.run_cmd('save');
+        await new_cli.run_cmd('save', 'sw_cli> ');
         await new_cli.close();
     }
-    ret.clear_config = async function() {
+    ret.clear_config = async function () {
         let new_cli = await create_cli(processName);
-        await new_cli.run_cmd('clear');
+        await new_cli.run_cmd('clear', 'sw_cli> ');
         await new_cli.close();
     }
-    ret.restore_config = async function() {
+    ret.restore_config = async function () {
         let new_cli = await create_cli(processName);
-        await new_cli.run_cmd('restore');
+        await new_cli.run_cmd('restore', 'sw_cli> ');
         await new_cli.close();
     }
     await waitForPrompt('sw_cli> ');
 
     return ret;
 }
-export { start_server, close_server };
+export { start_server, close_server, print_test_log };

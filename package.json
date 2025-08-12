@@ -7,12 +7,13 @@
         "node": "^20.19.0 || >=22.12.0"
     },
     "scripts": {
+        "start_server": "cross-env NODE_ENV=development PORT=47147 node ./public/server/index.js",
         "dev_server": "cross-env NODE_ENV=development PORT=47147 nodemon --watch ./ --exec babel-node ./public/server/index.js",
         "dev_cli": "node ./public/cli/index.js",
         "dev_gui": "vite --config public/gui/vite.config.js",
         "build": "rm -rf dist && vite build --config public/gui/vite.config.js && rollup -c rollup_server.config.js && rollup -c rollup_cli.config.js",
         "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles --runInBand",
-        "citest": "NODE_OPTIONS=--experimental-vm-modules CI=true jest --runInBand --config jest.ci.config.js --detectOpenHandles --verbose --no-cache"
+        "citest": "NODE_OPTIONS=--experimental-vm-modules CI=true jest --config jest.ci.config.js --detectOpenHandles --runInBand --verbose"
     },
     "author": "",
     "license": "ISC",
@@ -23,8 +24,12 @@
         "@rollup/plugin-json": "^6.1.0",
         "@vercel/ncc": "^0.38.3",
         "@vitejs/plugin-vue": "^6.0.1",
+        "allure-commandline": "^2.34.1",
         "babel-plugin-transform-import-meta": "^2.3.3",
+        "jasmin": "^0.0.2",
+        "jasmine": "^5.9.0",
         "jest": "^30.0.5",
+        "jest-allure": "^0.1.3",
         "jest-github-actions-reporter": "^1.0.3",
         "jest-html-reporters": "^3.1.7",
         "node-pty": "^1.0.0",

@@ -1,6 +1,7 @@
 import cli_utils from '../lib/cli_utils.js';
 import device_cli from '../../device/cli/device_management_cli.js';
 import resource_cli from '../../resource/cli/resource_cli.js';
+import policy_cli from '../../policy/cli/policy_cli.js';
 import call_remote from '../lib/call_remote.js';
 let g_vorpal = undefined;
 let default_config_file = 'sw_cli_config.txt';
@@ -34,6 +35,7 @@ function get_vorpal() {
             });
         cli_utils.add_sub_cli(vorpal, device_cli, prompt);
         cli_utils.add_sub_cli(vorpal, resource_cli, prompt);
+        cli_utils.add_sub_cli(vorpal, policy_cli, prompt);
         vorpal.delimiter(prompt);
         g_vorpal = vorpal;
     }

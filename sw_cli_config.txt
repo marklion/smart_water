@@ -1,9 +1,0 @@
-set_sys_name 'no name'
-device
-return
-resource
-  farm
-  return
-  block
-  return
-return

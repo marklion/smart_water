@@ -33,6 +33,7 @@ async function module_install(app, module) {
 async function init_super_user() {
     await module_install(app, (await import('../../device/server/device_management_module.js')).default);
     await module_install(app, (await import('../../resource/server/resource_module.js')).default);
+    await module_install(app, (await import('../../policy/server/policy_module.js')).default);
 }
 // 托管前端静态文件
 let web_dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'web');
@@ -151,10 +152,10 @@ let server = app.listen(parseInt(process.env.PORT), async () => {
     await init_super_user();
     try {
         await cli_runtime_lib.restore_config();
+        cli_runtime_lib.destroy();
     } catch (error) {
         console.log(error);
     }
-    cli_runtime_lib.destroy();
     console.log('Server running on port ' + process.env.PORT)
 });
 process.on('uncaughtException', (err) => {
