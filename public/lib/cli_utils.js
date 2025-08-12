@@ -33,8 +33,28 @@ export default {
     add_sub_cli: function (cli, sub_cli_definition, parent_prompt) {
         let ins = this;
         let sub_cli = sub_cli_definition.install(parent_prompt);
-        cli.command(sub_cli_definition.command, '进入' + sub_cli_definition.name)
+        let enter_cmd = sub_cli_definition.command;
+        if (sub_cli_definition.enter_view_hook)
+        {
+            enter_cmd = enter_cmd + ' <view_name>';
+        }
+        if (sub_cli_definition.undo_hook) {
+            cli.command(`undo ${sub_cli_definition.command} <view_name>`, '删除视图')
+                .action(async function (args) {
+                    let resp = await sub_cli_definition.undo_hook(args);
+                    if (resp) {
+                        this.log(resp);
+                    }
+                })
+        }
+        cli.command(enter_cmd, '进入' + sub_cli_definition.name)
             .action(async function (args) {
+                if (sub_cli_definition.enter_view_hook) {
+                    let resp = await sub_cli_definition.enter_view_hook(args);
+                    if (resp) {
+                        this.log(resp);
+                    }
+                }
                 cli.hide();
                 sub_cli.show();
                 return sub_cli;
@@ -60,34 +80,59 @@ export default {
         }
         cli.sub_clies.push(sub_cli_definition);
     },
+    get_view_name_array:async function(sub_cli)
+    {
+        let ret = [];
+        if (sub_cli.get_all_views) {
+            ret = await sub_cli.get_all_views();
+        }
+        else
+        {
+            ret = [''];
+        }
+        return ret;
+    },
     make_sub_bdr: async function (cur_cli) {
         let ret = [];
         let sub_clies = cur_cli.sub_clies;
         if (sub_clies) {
             for (let sub_cli of sub_clies) {
-                ret.push(sub_cli.command);
-                let sub_bdr = await sub_cli.make_bdr();
-                sub_bdr.forEach(element => {
-                    ret.push('  ' + element);
-                });
-                ret.push('return');
+                let view_name_array = await this.get_view_name_array(sub_cli)
+                for (let view_name of view_name_array) {
+                    let enter_cmd = sub_cli.command;
+                    if (view_name) {
+                        enter_cmd = enter_cmd + ' ' + `'${view_name}'`;
+                    }
+                    ret.push(enter_cmd);
+                    let sub_bdr = await sub_cli.make_bdr(view_name);
+                    sub_bdr.forEach(element => {
+                        ret.push('  ' + element);
+                    });
+                    ret.push('return');
+                }
             }
         }
         return ret;
     },
     clear_config: async function (vorpal) {
+        let sub_clies = vorpal.sub_clies;
+        if (sub_clies != undefined) {
+            for (let sub_cli of sub_clies) {
+                let view_name_array = await this.get_view_name_array(sub_cli);
+                for (let view_name of view_name_array) {
+                    await vorpal.execSync(`${sub_cli.command} '${view_name}'`);
+                    await this.clear_config(sub_cli._vorpalInstance);
+                    await sub_cli._vorpalInstance.execSync('return');
+                    if (view_name != '') {
+                        await vorpal.execSync(`undo ${sub_cli.command} '${view_name}'`);
+                    }
+                }
+            }
+        }
         let undo_cmd_array = vorpal.undo_cmd_array;
         if (undo_cmd_array != undefined) {
             for (let undo_cmd of undo_cmd_array) {
                 await vorpal.execSync(undo_cmd);
-            }
-        }
-        let sub_clies = vorpal.sub_clies;
-        if (sub_clies != undefined) {
-            for (let sub_cli of sub_clies) {
-                await vorpal.execSync(sub_cli.command)
-                await this.clear_config(sub_cli._vorpalInstance);
-                await sub_cli._vorpalInstance.execSync('return');
             }
         }
     },

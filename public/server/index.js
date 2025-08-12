@@ -33,6 +33,7 @@ async function module_install(app, module) {
 async function init_super_user() {
     await module_install(app, (await import('../../device/server/device_management_module.js')).default);
     await module_install(app, (await import('../../resource/server/resource_module.js')).default);
+    await module_install(app, (await import('../../policy/server/policy_module.js')).default);
 }
 // 托管前端静态文件
 let web_dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'web');
