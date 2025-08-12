@@ -71,18 +71,21 @@ export default async function create_cli(processName) {
                         outputBeforePrompt = ret.output.substring(0, index);
                     }
                     ret.output = ret.output.substring(index + promptLine.length);
-                    resolve(outputBeforePrompt);
+                    resolve({
+                        prompt: promptLine,
+                        content: outputBeforePrompt,
+                    });
                 }
             }, 100);
         });
     }
-    ret.run_cmd = async function (cmd) {
+    ret.run_cmd = async function (cmd, prompt = '> ') {
         ret.output = '';
         ret.process.write(cmd + '\n');
-        console.log(`Running command: ${cmd}`);
-        let resp = await waitForPrompt('> ');
-        console.log(`Command output: ${resp}`);
-        return resp;
+        let resp = await waitForPrompt(prompt);
+        console.log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+
+        return resp.content;
     }
     ret.close = async function () {
         ret.process.write('exit\n');
@@ -90,17 +93,17 @@ export default async function create_cli(processName) {
 
     ret.save_config = async function () {
         let new_cli = await create_cli(processName);
-        await new_cli.run_cmd('save');
+        await new_cli.run_cmd('save', 'sw_cli> ');
         await new_cli.close();
     }
     ret.clear_config = async function () {
         let new_cli = await create_cli(processName);
-        await new_cli.run_cmd('clear');
+        await new_cli.run_cmd('clear', 'sw_cli> ');
         await new_cli.close();
     }
     ret.restore_config = async function () {
         let new_cli = await create_cli(processName);
-        await new_cli.run_cmd('restore');
+        await new_cli.run_cmd('restore', 'sw_cli> ');
         await new_cli.close();
     }
     await waitForPrompt('sw_cli> ');
