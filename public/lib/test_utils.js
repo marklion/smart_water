@@ -3,7 +3,7 @@ let g_server = null;
 async function start_server() {
     let ret = {};
 
-    ret = pty.spawn('npm', ['run', 'dev_server'], {
+    ret = pty.spawn('npm', ['run', 'start_server'], {
         cwd: process.cwd(),
         env: process.env
     });

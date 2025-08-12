@@ -7,6 +7,7 @@
         "node": "^20.19.0 || >=22.12.0"
     },
     "scripts": {
+        "start_server": "cross-env NODE_ENV=development PORT=47147 node ./public/server/index.js",
         "dev_server": "cross-env NODE_ENV=development PORT=47147 nodemon --watch ./ --exec babel-node ./public/server/index.js",
         "dev_cli": "node ./public/cli/index.js",
         "dev_gui": "vite --config public/gui/vite.config.js",
