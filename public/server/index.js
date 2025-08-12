@@ -152,10 +152,10 @@ let server = app.listen(parseInt(process.env.PORT), async () => {
     await init_super_user();
     try {
         await cli_runtime_lib.restore_config();
+        cli_runtime_lib.destroy();
     } catch (error) {
         console.log(error);
     }
-    cli_runtime_lib.destroy();
     console.log('Server running on port ' + process.env.PORT)
 });
 process.on('uncaughtException', (err) => {
