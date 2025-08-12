@@ -16,20 +16,20 @@ async function start_server() {
         });
     });
     g_server = ret;
-    g_server.on('data', function (data) {
-        console.log(data);
-
-    })
-
     console.log('Server started successfully at ' + new Date().toLocaleTimeString());
 }
 async function close_server() {
     if (g_server) {
-        g_server.kill();
+        await new Promise((resolve) => {
+            g_server.on('exit', () => {
+                resolve();
+            });
+            g_server.kill();
+        });
         g_server = null;
     }
-    console.log('Server closed successfully at ' + new Date().toLocaleTimeString());
 
+    console.log('Server closed successfully at ' + new Date().toLocaleTimeString());
 }
 
 export default async function create_cli(processName) {
@@ -80,7 +80,9 @@ export default async function create_cli(processName) {
         ret.output = '';
         ret.process.write(cmd + '\n');
         console.log(`Running command: ${cmd}`);
-        return await waitForPrompt('> ');
+        let resp = await waitForPrompt('> ');
+        console.log(`Command output: ${resp}`);
+        return resp;
     }
     ret.close = async function () {
         ret.process.write('exit\n');
