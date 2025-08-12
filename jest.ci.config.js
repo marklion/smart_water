@@ -10,5 +10,5 @@ export default {
     // 在CI环境中可能需要的额外配置
     clearMocks: true,
     resetMocks: true,
-    restoreMocks: true
+    restoreMocks: true,
 };

@@ -1,5 +1,10 @@
 import pty from 'node-pty';
+import moment from 'moment';
 let g_server = null;
+function print_test_log(log) {
+    let now = moment().format('YYYY-MM-DD HH:mm:ss:SSS');
+    console.log(`[${now}] ${log}`);
+}
 async function start_server() {
     let ret = {};
 
@@ -11,8 +16,6 @@ async function start_server() {
         let start_log = ''
         ret.on('data', function (data) {
             start_log += data;
-            console.log(data);
-
             if (start_log.includes('Server running on port')) {
                 ret.removeAllListeners('data');
                 resolve();
@@ -20,7 +23,7 @@ async function start_server() {
         });
     });
     g_server = ret;
-    console.log('Server started successfully at ' + new Date().toLocaleTimeString());
+    print_test_log('Server started successfully at ' + new Date().toLocaleTimeString());
 }
 async function close_server() {
     if (g_server) {
@@ -33,7 +36,7 @@ async function close_server() {
         g_server = null;
     }
 
-    console.log('Server closed successfully at ' + new Date().toLocaleTimeString());
+    print_test_log('Server closed successfully at ' + new Date().toLocaleTimeString());
 }
 
 export default async function create_cli(processName) {
@@ -55,8 +58,6 @@ export default async function create_cli(processName) {
     async function waitForPrompt(prompt) {
         return new Promise((resolve) => {
             const checkOutput = setInterval(() => {
-                //console.log('ret.output:', ret.output);
-                // 找到 output 中包含 prompt 并且 prompt 是行末的行
                 let lines = ret.output.split('\n');
                 lines = lines.map(line => line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, ''));
                 let promptLine = lines.find(line => {
@@ -87,7 +88,7 @@ export default async function create_cli(processName) {
         ret.output = '';
         ret.process.write(cmd + '\n');
         let resp = await waitForPrompt(prompt);
-        console.log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+        print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
 
         return resp.content;
     }
@@ -114,4 +115,4 @@ export default async function create_cli(processName) {
 
     return ret;
 }
-export { start_server, close_server };
+export { start_server, close_server, print_test_log };
