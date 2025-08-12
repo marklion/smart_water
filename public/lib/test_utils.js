@@ -8,8 +8,12 @@ async function start_server() {
         env: process.env
     });
     await new Promise(resolve => {
+        let start_log = ''
         ret.on('data', function (data) {
-            if (data.includes('Server running on port')) {
+            start_log += data;
+            console.log(data);
+
+            if (start_log.includes('Server running on port')) {
                 ret.removeAllListeners('data');
                 resolve();
             }
