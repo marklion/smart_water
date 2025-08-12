@@ -12,7 +12,7 @@
         "dev_gui": "vite --config public/gui/vite.config.js",
         "build": "rm -rf dist && vite build --config public/gui/vite.config.js && rollup -c rollup_server.config.js && rollup -c rollup_cli.config.js",
         "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles --runInBand",
-        "citest": "NODE_OPTIONS=--experimental-vm-modules CI=true jest --runInBand --config jest.ci.config.js --detectOpenHandles --verbose --no-cache"
+        "citest": "NODE_OPTIONS=--experimental-vm-modules CI=true jest --config jest.ci.config.js --detectOpenHandles --runInBand --verbose"
     },
     "author": "",
     "license": "ISC",
