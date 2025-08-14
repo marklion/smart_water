@@ -1,7 +1,10 @@
+import virtual_driver from './driver/virtual_driver.js';
 const driver_array = [
     {
         name: '虚拟设备',
-        config_method: '[log_file]'
+        config_method: '[log_file]',
+        capability:['open', 'close', 'readout', 'mock_readout'],
+        driver: virtual_driver,
     }
 ];
 const device_array = []
@@ -22,7 +25,7 @@ export default {
                     mean: '驱动列表',
                     explain: {
                         name: { type: String, mean: '驱动名称', example:'常闭电磁阀' },
-                        config_method: { type: String, mean: '配置方法', example:'<ip> <port> <id>' }
+                        config_method: { type: String, mean: '配置方法', example:'<ip> <port> <id>' },
                     }
                 },
             },
@@ -43,6 +46,7 @@ export default {
                 device_name:{ type: String, have_to:true, mean: '设备名称', example:'虚拟设备1' },
                 driver_name: { type: String, have_to:true, mean: '驱动名称', example:'虚拟设备' },
                 config_key:{ type: String, have_to:true, mean: '配置json', example:'log_file' },
+                capability:{ type: String, have_to:true, mean: '能力集', example:'[]' },
                 farm_name: { type: String, have_to:false, mean: '所属农场', example:'农场1' },
                 block_name: { type: String, have_to:false, mean: '所属区块', example:'区块1' },
             },
@@ -62,6 +66,7 @@ export default {
                 }
                 exist_device.driver_name = body.driver_name;
                 exist_device.config_key = body.config_key;
+                exist_device.capability = JSON.parse(body.capability);
                 if (body.farm_name && body.block_name) {
                     exist_device.block_name = body.block_name;
                     exist_device.farm_name = body.farm_name;
@@ -107,6 +112,7 @@ export default {
                         device_name: { type: String, mean: '设备名称', example:'虚拟设备1' },
                         driver_name: { type: String, mean: '驱动名称', example:'虚拟设备' },
                         config_key: { type: String, mean: '配置json', example:'log_file' },
+                        capability: { type: String, mean: '能力集', example:'[]' },
                         farm_name: { type: String, mean: '所属农场', example:'农场1' },
                         block_name: { type: String, mean: '所属区块', example:'区块1' }
                     }
@@ -117,13 +123,49 @@ export default {
                 device_array.forEach(device => {
                     if (body.farm_name && device.farm_name !== body.farm_name) return;
                     if (body.block_name && device.block_name !== body.block_name) return;
-                    filtered_devices.push(device);
+                    filtered_devices.push({
+                        device_name: device.device_name,
+                        driver_name: device.driver_name,
+                        config_key: device.config_key,
+                        capability: JSON.stringify(device.capability),
+                        farm_name: device.farm_name || '',
+                        block_name: device.block_name || ''
+                    });
                 });
                 let current_page_content = filtered_devices.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
                 return {
                     devices: current_page_content,
                     total: filtered_devices.length,
                 }
+            }
+        },
+        open_device:{
+            name: '打开阀门',
+            description: '打开指定设备的阀门',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+            },
+            result: {
+                result: { type: Boolean, mean: '打开结果', example: true }
+            },
+            func:async function(body, token) {
+                let device = device_array.find(device => device.device_name === body.device_name);
+                if (!device) {
+                    throw { err_msg: '设备不存在' };
+                }
+                if (!device.capability.includes('open')) {
+                    throw { err_msg: '设备不支持打开操作' };
+                }
+                let driver_config = driver_array.find(driver => driver.name === device.driver_name);
+                if (!driver_config)
+                {
+                    throw { err_msg: '驱动不存在' };
+                }
+                let driver = await driver_config.driver(device.config_key);
+                await driver.open();
+                return { result: true };
             }
         },
     }

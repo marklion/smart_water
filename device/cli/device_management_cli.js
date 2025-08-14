@@ -29,9 +29,9 @@ export default {
             }
             return drivers.length;
         });
-        cli_utils.make_undo_cmd(vorpal, 'add device <device_name> <driver_name> <config_key> [farm_name] [block_name]', '添加一个设备', '删除所有设备',
+        cli_utils.make_undo_cmd(vorpal, 'add device <device_name> <driver_name> <config_key> <capability> [farm_name] [block_name]', '添加一个设备', '删除所有设备',
             async (cmd_this, args) => {
-                let result = await device_management_lib.add_device(args.device_name, args.driver_name, args.config_key, args.farm_name, args.block_name);
+                let result = await device_management_lib.add_device(args.device_name, args.driver_name, args.config_key,args.capability, args.farm_name, args.block_name);
                 if (result.result) {
                     return `设备 ${args.device_name} 添加成功`;
                 } else {
@@ -55,10 +55,14 @@ export default {
         cli_utils.make_display_cmd(vorpal, 'list device [farm_name] [block_name]', '列出设备', async (cmd_this, args, pageNo) => {
             let devices = (await device_management_lib.list_device(pageNo, args.farm_name, args.block_name)).devices;
             if (devices.length > 0) {
-                cmd_this.log(devices.map(device => `${device.device_name} - ${device.driver_name} (${device.config_key})`).join('\n'));
+                cmd_this.log(devices.map(device => `${device.device_name} - ${device.driver_name} (${device.config_key}) : ${device.capability}`).join('\n'));
             }
             return devices.length;
         });
+        cli_utils.make_common_cmd(vorpal, 'open <device_name>', '打开阀门', async (cmd_this, args)=>{
+            await device_management_lib.open_device(args.device_name);
+            return `设备 ${args.device_name} 打开成功`;
+        })
         vorpal.delimiter(prompt)
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {
@@ -74,7 +78,7 @@ export default {
         let ret = []
         let devices = await get_all_devices();
         for (let device of devices) {
-            ret.push(`add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.farm_name || ''}' '${device.block_name || ''}'`);
+            ret.push(`add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.capability}' '${device.farm_name || ''}' '${device.block_name || ''}'`);
         }
         if (this._vorpalInstance) {
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));

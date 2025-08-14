@@ -2,7 +2,7 @@ import test_utils from "../../public/lib/test_utils";
 import {print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
 let cli;
 beforeAll(async () => {
-    print_test_log('=======policy test======');
+    print_test_log('policy curd test begin', true)
     cli = await test_utils('npm run dev_cli');
     await start_server()
     await cli.run_cmd('clear');
@@ -12,7 +12,7 @@ afterAll(async () => {
     await cli.run_cmd('save');
     await cli.close();
     await close_server();
-    print_test_log('=======stop policy test.=======');
+    print_test_log('policy curd test end', true)
 })
 
 describe('策略增删', () => {
