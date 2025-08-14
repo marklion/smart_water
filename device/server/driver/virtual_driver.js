@@ -4,7 +4,19 @@ import moment from 'moment';
 export default async function (log_file_path) {
     let ret = {
         log_file: log_file_path,
-        cur_readout: 0,
+        read_last_line:async function() {
+            return new Promise((resolve, reject) => {
+                fs.readFile(log_file_path, 'utf8', (err, data) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        const lines = data.trim().split('\n');
+                        const lastLine = lines[lines.length - 1];
+                        resolve(lastLine);
+                    }
+                });
+            });
+        },
         write_log: async function (text) {
             return new Promise((resolve, reject) => {
                 let timestamp = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -25,10 +37,12 @@ export default async function (log_file_path) {
             await this.write_log('关闭阀门');
         },
         readout: async function () {
-            return this.cur_readout;
+            let lastLine = await this.read_last_line();
+            lastLine = lastLine.replace(/\[.*?\]\s*/, '');
+            return parseFloat(lastLine);
         },
         mock_readout: async function (value) {
-            this.cur_readout = value;
+            await this.write_log(`${value}`)
         }
     }
     return ret;
