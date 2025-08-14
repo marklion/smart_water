@@ -1,9 +1,13 @@
 import pty from 'node-pty';
 import moment from 'moment';
 let g_server = null;
-function print_test_log(log) {
+function print_test_log(log, need_equal_sign = false) {
     let now = moment().format('YYYY-MM-DD HH:mm:ss:SSS');
-    console.log(`[${now}] ${log}`);
+    let real_log = log;
+    if (need_equal_sign) {
+        real_log = `=======${log}=======`;
+    }
+    console.log(`[${now}] ${real_log}`);
 }
 async function start_server() {
     let ret = {};
@@ -54,6 +58,9 @@ export default async function create_cli(processName) {
     ret.output = '';
     ret.process.on('data', function (data) {
         ret.output += data;
+        if (data.includes('是否继续显示')) {
+            ret.process.write('y\n');
+        }
     });
     async function waitForPrompt(prompt) {
         return new Promise((resolve) => {

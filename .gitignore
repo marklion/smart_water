@@ -28,3 +28,4 @@ dist-ssr
 sw_cli_config.txt
 test_reports/
 public/server/web
+/*.log

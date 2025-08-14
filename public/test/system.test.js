@@ -3,7 +3,7 @@ import {print_test_log,  start_server, close_server } from "../lib/test_utils.js
 import fs from 'fs';
 let cli;
 beforeAll(async () => {
-    print_test_log('=======start system test======');
+    print_test_log('system test begin', true);
     cli = await test_utils('npm run dev_cli');
     await start_server();
 })
@@ -11,7 +11,7 @@ afterAll(async () => {
     await cli.close();
     fs.unlinkSync('tmp_config.txt');
     await close_server();
-    print_test_log('=======stop system test.=======');
+    print_test_log('system test end', true);
 })
 
 test("根目录命令测试", async () => {
