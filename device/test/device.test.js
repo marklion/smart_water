@@ -3,7 +3,7 @@ import fs from 'fs';
 import { print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
 let cli;
 beforeAll(async () => {
-    print_test_log('device curd test begin', true)
+    print_test_log('device CRUD test begin', true)
     cli = await test_utils('npm run dev_cli');
     await start_server()
     await cli.run_cmd('clear');
