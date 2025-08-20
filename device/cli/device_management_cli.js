@@ -25,7 +25,7 @@ export default {
         cli_utils.make_display_cmd(vorpal, 'list driver', '列出当前系统支持的驱动', async (cmd_this, args, pageNo) => {
             let drivers = (await device_management_lib.get_driver_list(this.token, pageNo)).drivers;
             if (drivers.length > 0) {
-                cmd_this.log(drivers.map(driver => `${driver.name} - ${driver.config_method}`).join('\n'));
+                cmd_this.log(drivers.map(driver => `${driver.name} - ${driver.config_method} - ${driver.capability}`).join('\n'));
             }
             return drivers.length;
         });
@@ -55,9 +55,29 @@ export default {
         cli_utils.make_display_cmd(vorpal, 'list device [farm_name] [block_name]', '列出设备', async (cmd_this, args, pageNo) => {
             let devices = (await device_management_lib.list_device(pageNo, args.farm_name, args.block_name)).devices;
             if (devices.length > 0) {
-                cmd_this.log(devices.map(device => `${device.device_name} - ${device.driver_name} (${device.config_key})`).join('\n'));
+                cmd_this.log(devices.map(device => `${device.device_name} - ${device.driver_name} (${device.config_key}) : ${device.capability}`).join('\n'));
             }
             return devices.length;
+        });
+        cli_utils.make_common_cmd(vorpal, 'open <device_name>', '打开阀门', async (cmd_this, args)=>{
+            await device_management_lib.open_device(args.device_name);
+            return `设备 ${args.device_name} 打开成功`;
+        })
+        cli_utils.make_common_cmd(vorpal, 'close <device_name>', '关闭阀门', async (cmd_this, args)=>{
+            await device_management_lib.close_device(args.device_name);
+            return `设备 ${args.device_name} 关闭成功`;
+        })
+        cli_utils.make_common_cmd(vorpal, 'readout <device_name>', '读取设备读数', async (cmd_this, args) => {
+            let resp = await device_management_lib.readout_device(args.device_name);
+            if (resp!== null) {
+                return `设备 ${args.device_name} 当前读数为: ${resp.readout}`;
+            } else {
+                return `设备 ${args.device_name} 读取失败`;
+            }
+        });
+        cli_utils.make_common_cmd(vorpal, 'mock readout <device_name> <value>', '模拟设备读数', async (cmd_this, args) => {
+            await device_management_lib.mock_readout(args.device_name, parseFloat(args.value));
+            return `设备 ${args.device_name} 模拟读数为: ${args.value}`;
         });
         vorpal.delimiter(prompt)
         vorpal.command('bdr', '列出所有配置')
