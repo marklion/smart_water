@@ -1,5 +1,7 @@
 import cli_utils from '../../public/lib/cli_utils.js';
 import policy_lib from '../lib/policy_lib.js';
+import state_cli from './state_cli.js';
+
 export default {
     command: 'policy',
     name: '创建/进入策略',
@@ -10,6 +12,12 @@ export default {
         const vorpal = cli_utils.create_vorpal();
         this._vorpalInstance = vorpal;
         this.prompt_prefix = prompt;
+
+        // 注册状态命令
+        state_cli.policy_name = this.cur_view_name;
+        cli_utils.add_sub_cli(vorpal, state_cli, prompt);
+        state_cli.policy_view = ins;
+
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {
                 try {
@@ -46,8 +54,9 @@ export default {
         return `策略 ${args.view_name} 已删除`;
     },
     make_bdr: async function (view_name) {
-        let ret = []
+        let ret = [];
         if (this._vorpalInstance) {
+            this.cur_view_name = view_name;
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));
         }
         return ret;

@@ -3,6 +3,7 @@ import device_cli from '../../device/cli/device_management_cli.js';
 import resource_cli from '../../resource/cli/resource_cli.js';
 import policy_cli from '../../policy/cli/policy_cli.js';
 import call_remote from '../lib/call_remote.js';
+import events from 'events';
 let g_vorpal = undefined;
 let default_config_file = 'sw_cli_config.txt';
 async function make_bdr() {
@@ -14,6 +15,7 @@ async function make_bdr() {
 }
 function get_vorpal() {
     if (!g_vorpal) {
+        events.defaultMaxListeners = 1000;
         const vorpal = cli_utils.create_vorpal();
         const prompt = 'sw_cli> ';
         vorpal.command('bdr', '列出所有配置')
