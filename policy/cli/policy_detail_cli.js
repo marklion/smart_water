@@ -16,6 +16,7 @@ export default {
         // 注册状态命令
         state_cli.policy_name = this.cur_view_name;
         cli_utils.add_sub_cli(vorpal, state_cli, prompt);
+        state_cli.policy_view = ins;
 
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {
@@ -53,11 +54,11 @@ export default {
         return `策略 ${args.view_name} 已删除`;
     },
     make_bdr: async function (view_name) {
-        let ret = [`policy ${view_name}`];
+        let ret = [];
         if (this._vorpalInstance) {
+            this.cur_view_name = view_name;
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));
         }
-        ret.push('return');
         return ret;
     },
 }

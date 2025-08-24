@@ -115,7 +115,8 @@ export default {
             is_write: false,
             is_get_api: true,
             params: {
-                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true }
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                pageNo: { type: Number, mean: '页码', example: 0, have_to: true }
             },
             result: {
                 states: { 
@@ -132,8 +133,11 @@ export default {
                 if (!policy) {
                     throw { err_msg: '策略不存在' };
                 }
+                let states = policy.states ? policy.states.map(s => ({ name: s.name })) : [];
+                let current_page_content = states.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
                 return {
-                    states: policy.states ? policy.states.map(s => ({ name: s.name })) : []
+                    states: current_page_content,
+                    total: states.length,
                 };
             }
         },

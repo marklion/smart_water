@@ -12,8 +12,8 @@ export default {
     add_state: async function (policy_name, state_name, token) {
         return await call_remote('/policy/add_state', { policy_name, state_name }, token);
     },
-    list_states: async function (policy_name, token) {
-        return await call_remote('/policy/list_states', { policy_name }, token);
+    list_states: async function (policy_name, pageNo, token) {
+        return await call_remote('/policy/list_states', { policy_name, pageNo }, token);
     },
     del_state: async function (policy_name, state_name, token) {
         return await call_remote('/policy/del_state', { policy_name, state_name }, token);
