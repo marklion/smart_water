@@ -12,7 +12,7 @@ export default {
                 name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
             },
             result: {
-                result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
+                result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
                 try {
@@ -39,12 +39,11 @@ export default {
             is_write: false,
             is_get_api: true,
             params: {
-                pageNo: { type: Number, mean: '页码', example: 0, have_to: true }
             },
             result: {
                 policies: {
-                    type: Array, mean: '策略列表', example: [], explain: {
-                        name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                    type: Array, mean: '策略列表', explain: {
+                        name: { type: String, mean: '策略名称', example: '策略1'},
                     }
                 }
             },
@@ -65,7 +64,7 @@ export default {
                 name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
             },
             result: {
-                result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
+                result: { type: Boolean, mean: '操作结果', example: true}
             },
             func: async function (body, token) {
                 let index = policy_array.findIndex(policy => policy.name === body.name);
@@ -89,7 +88,7 @@ export default {
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true }
             },
             result: {
-                result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
+                result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
                 let policy = policy_array.find(p => p.name === body.policy_name);
@@ -116,15 +115,13 @@ export default {
             is_get_api: true,
             params: {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
-                pageNo: { type: Number, mean: '页码', example: 0, have_to: true }
             },
             result: {
                 states: { 
                     type: Array, 
                     mean: '状态列表', 
-                    example: [], 
                     explain: {
-                        name: { type: String, mean: '状态名称', example: 's1', have_to: true }
+                        name: { type: String, mean: '状态名称', example: 's1' }
                     }
                 }
             },
@@ -145,7 +142,7 @@ export default {
             name: '获取状态',
             description: '获取状态的详细信息',
             is_write: false,
-            is_get_api: true,
+            is_get_api: false,
             params: {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true }
@@ -154,16 +151,14 @@ export default {
                 state: { 
                     type: Object, 
                     mean: '状态信息', 
-                    example: { name: 's1', enter_actions: [] },
                     explain: {
-                        name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                        name: { type: String, mean: '状态名称', example: 's1'},
                         enter_actions: { 
                             type: Array, 
                             mean: '进入动作列表', 
-                            example: [],
                             explain: {
-                                device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
-                                action: { type: String, mean: '动作名称', example: '开启', have_to: true }
+                                device: { type: String, mean: '设备名称', example: '阀门1' },
+                                action: { type: String, mean: '动作名称', example: '开启' }
                             }
                         }
                     }
