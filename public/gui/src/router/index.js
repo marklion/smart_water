@@ -19,6 +19,20 @@ const router = createRouter({
         component: () => import('../../../../device/gui/device_management_gui.vue'),
         parent: '配置中心',
         icon: MenuIcons.SETTING
+      },
+      {
+        name: '农场配置',
+        path: '/config/farm_config',
+        component: () => import('../components/FarmConfigView.vue'),
+        parent: '配置中心',
+        icon: MenuIcons.HOUSE
+      },
+      {
+        name: '地块配置',
+        path: '/config/block_config',
+        component: () => import('../components/BlockConfigView.vue'),
+        parent: '配置中心',
+        icon: MenuIcons.GRID
       }
     ])
   ],

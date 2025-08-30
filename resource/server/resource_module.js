@@ -1,4 +1,36 @@
-const farms = []
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dataFile = path.join(__dirname, 'farms_data.json');
+
+// 加载农场数据
+function loadFarmsData() {
+    try {
+        if (fs.existsSync(dataFile)) {
+            const data = fs.readFileSync(dataFile, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (error) {
+        console.error('加载农场数据失败:', error);
+    }
+    return [];
+}
+
+// 保存农场数据
+function saveFarmsData(farms) {
+    try {
+        fs.writeFileSync(dataFile, JSON.stringify(farms, null, 2), 'utf8');
+    } catch (error) {
+        console.error('保存农场数据失败:', error);
+    }
+}
+
+const farms = loadFarmsData();
+
+
 export default {
     name: 'resource',
     description: '资源管理',
@@ -55,6 +87,7 @@ export default {
                     existingFarm.location = body.location;
                     existingFarm.info = body.info;
                 }
+                saveFarmsData(farms);
                 return { result: true };
             },
         },
@@ -73,6 +106,7 @@ export default {
                 let index = farms.findIndex(farm => farm.name === body.name);
                 if (index !== -1) {
                     farms.splice(index, 1);
+                    saveFarmsData(farms);
                     return { result: true };
                 }
                 return { result: false };
@@ -101,11 +135,15 @@ export default {
                     if (!existingBlock) {
                         farm.blocks.push({
                             name: body.block_name,
-                            info: body.info
+                            info: body.info,
+                            area: body.area || 0,
                         });
                     } else {
-                        existingBlock.info = body.info;
+                        existingBlock.area = body.area || existingBlock.area;
+                        existingBlock.info = body.info || existingBlock.info;
                     }
+                    // 保存数据到文件
+                    saveFarmsData(farms);
                     return { result: true };
                 }
                 return { result: false };
@@ -129,6 +167,7 @@ export default {
                     let index = farm.blocks.findIndex(block => block.name === body.block_name);
                     if (index !== -1) {
                         farm.blocks.splice(index, 1);
+                        saveFarmsData(farms);
                         return { result: true };
                     }
                 }
@@ -150,6 +189,7 @@ export default {
                     explain: {
                         farm_name: { type: String, mean: '农场名称', example: '农场1' },
                         name: { type: String, mean: '地块名称', example: '地块1' },
+                        area: { type: Number, mean: '地块面积(亩)', example: 10 },
                         info: { type: String, mean: '地块信息', example: '信息1' }
                     }
                 },
@@ -163,7 +203,8 @@ export default {
                                 ret_array.push({
                                     farm_name: farm.name,
                                     name: block.name,
-                                    info: block.info
+                                    area: block.area || 0,
+                                    info: block.info || ''
                                 });
                             }
                         }
