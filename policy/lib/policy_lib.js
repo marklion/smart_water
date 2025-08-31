@@ -29,5 +29,19 @@ export default {
             device, 
             action 
         }, token);
+    },
+    add_source: async function (policy_name, name, device, data_type, token) {
+        return await call_remote('/policy/add_source', { 
+            policy_name, 
+            name, 
+            device, 
+            data_type 
+        }, token);
+    },
+    list_sources: async function (policy_name, pageNo, token) {
+        return await call_remote('/policy/list_sources', { policy_name, pageNo }, token);
+    },
+    del_source: async function (policy_name, name, token) {
+        return await call_remote('/policy/del_source', { policy_name, name }, token);
     }
 }

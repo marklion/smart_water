@@ -210,5 +210,103 @@ export default {
                 return { result: true };
             }
         },
+        add_source: {
+            name: '添加数据源',
+            description: '向策略添加一个数据源',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                name: { type: String, mean: '数据源名称', example: '温度传感器1', have_to: true },
+                device: { type: String, mean: '设备名称', example: '传感器1', have_to: true },
+                data_type: { type: String, mean: '数据类型', example: 'temperature', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                if (!policy.sources) {
+                    policy.sources = [];
+                }
+                let existingSource = policy.sources.find(s => s.name === body.name);
+                if (!existingSource) {
+                    policy.sources.push({
+                        name: body.name,
+                        device: body.device,
+                        data_type: body.data_type
+                    });
+                }
+                return { result: true };
+            }
+        },
+        list_sources: {
+            name: '列出数据源',
+            description: '列出策略的所有数据源',
+            is_write: false,
+            is_get_api: true,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+            },
+            result: {
+                sources: { 
+                    type: Array, 
+                    mean: '数据源列表', 
+                    explain: {
+                        name: { type: String, mean: '数据源名称', example: '温度传感器1' },
+                        device: { type: String, mean: '设备名称', example: '传感器1' },
+                        data_type: { type: String, mean: '数据类型', example: 'temperature' }
+                    }
+                }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let sources = policy.sources ? policy.sources.map(s => ({ 
+                    name: s.name, 
+                    device: s.device, 
+                    data_type: s.data_type 
+                })) : [];
+                let current_page_content = sources.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                return {
+                    sources: current_page_content,
+                    total: sources.length,
+                };
+            }
+        },
+        del_source: {
+            name: '删除数据源',
+            description: '删除策略中的一个数据源',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                name: { type: String, mean: '数据源名称', example: '温度传感器1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                if (!policy.sources) {
+                    throw { err_msg: '数据源不存在' };
+                }
+                let index = policy.sources.findIndex(s => s.name === body.name);
+                if (index !== -1) {
+                    policy.sources.splice(index, 1);
+                    return { result: true };
+                } else {
+                    throw { err_msg: '数据源不存在' };
+                }
+            }
+        },
     }
 }

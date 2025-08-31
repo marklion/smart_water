@@ -18,6 +18,26 @@ export default {
         cli_utils.add_sub_cli(vorpal, state_cli, prompt);
         state_cli.policy_view = ins;
 
+        vorpal.command('source <name> <device> <data_type>', '创建一个数据源')
+            .action(async function (args) {
+                try {
+                    await policy_lib.add_source(ins.cur_view_name, args.name, args.device, args.data_type);
+                    this.log(`数据源 ${args.name} 创建成功`);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
+            });
+
+        vorpal.command('undo source <name>', '删除一个数据源')
+            .action(async function (args) {
+                try {
+                    await policy_lib.del_source(ins.cur_view_name, args.name);
+                    this.log(`数据源 ${args.name} 已删除`);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
+            });
+        
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {
                 try {
@@ -55,6 +75,22 @@ export default {
     },
     make_bdr: async function (view_name) {
         let ret = [];
+        try {
+            let pageNo = 0;
+            let total = 0;
+            do {
+                let resp = await policy_lib.list_sources(view_name, pageNo);
+                if (resp.sources.length == 0) {
+                    break;
+                }
+                ret = ret.concat(resp.sources.map(source => 
+                    `source ${source.name} ${source.device} ${source.data_type}`
+                ));
+                total = resp.total;
+                pageNo++;
+            } while (pageNo * 20 < total);
+        } catch (err) {
+        }
         if (this._vorpalInstance) {
             this.cur_view_name = view_name;
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));
