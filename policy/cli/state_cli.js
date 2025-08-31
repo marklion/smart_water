@@ -1,5 +1,6 @@
 import cli_utils from '../../public/lib/cli_utils.js';
 import policy_lib from '../lib/policy_lib.js';
+import transformer_cli from './transformer_cli.js';
 
 export default {
     command: 'state',
@@ -22,6 +23,9 @@ export default {
                     this.log('Error:', err.err_msg || '未知错误');
                 }
             });
+
+        transformer_cli.state_view = ins;
+        cli_utils.add_sub_cli(vorpal, transformer_cli, prompt);
 
         // 添加 bdr 命令
         vorpal.command('bdr', '列出所有配置')
@@ -70,6 +74,13 @@ export default {
                 }
             }
         }
+
+        if (this._vorpalInstance) {
+            this.cur_view_name = view_name;
+            let sub_bdr = await cli_utils.make_sub_bdr(this._vorpalInstance);
+            ret = ret.concat(sub_bdr);
+        }
+        
         return ret;
     }
 }

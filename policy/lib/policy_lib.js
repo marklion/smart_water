@@ -30,6 +30,43 @@ export default {
             action 
         }, token);
     },
+    add_transformer: async function (policy_name, state_name, transformer_name, token) {
+        return await call_remote('/policy/add_transformer', { 
+            policy_name, 
+            state_name, 
+            transformer_name 
+        }, token);
+    },
+    list_transformers: async function (policy_name, state_name, pageNo, token) {
+        return await call_remote('/policy/list_transformers', { 
+            policy_name, 
+            state_name, 
+            pageNo 
+        }, token);
+    },
+    del_transformer: async function (policy_name, state_name, transformer_name, token) {
+        return await call_remote('/policy/del_transformer', { 
+            policy_name, 
+            state_name, 
+            transformer_name 
+        }, token);
+    },
+    get_transformer: async function (policy_name, state_name, transformer_name, token) {
+        return await call_remote('/policy/get_transformer', { 
+            policy_name, 
+            state_name, 
+            transformer_name 
+        }, token);
+    },
+    add_transformer_rule: async function (policy_name, state_name, transformer_name, target_state, expression, token) {
+        return await call_remote('/policy/add_transformer_rule', { 
+            policy_name, 
+            state_name, 
+            transformer_name, 
+            target_state, 
+            expression 
+        }, token);
+    },
     add_source: async function (policy_name, name, device, data_type, token) {
         return await call_remote('/policy/add_source', { 
             policy_name, 

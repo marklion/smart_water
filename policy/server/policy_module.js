@@ -160,6 +160,21 @@ export default {
                                 device: { type: String, mean: '设备名称', example: '阀门1' },
                                 action: { type: String, mean: '动作名称', example: '开启' }
                             }
+                        },
+                        transformers: { 
+                            type: Array, 
+                            mean: '转换器列表', 
+                            explain: {
+                                name: { type: String, mean: '转换器名称', example: 't1' },
+                                rules: { 
+                                    type: Array, 
+                                    mean: '转移规则列表', 
+                                    explain: {
+                                        target_state: { type: String, mean: '目标状态', example: 's2' },
+                                        expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -206,6 +221,191 @@ export default {
                 state.enter_actions.push({
                     device: body.device,
                     action: body.action
+                });
+                return { result: true };
+            }
+        },
+        add_transformer: {
+            name: '添加转换器',
+            description: '向状态添加一个转换器',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                if (!state.transformers) {
+                    state.transformers = [];
+                }
+                let existingTransformer = state.transformers.find(t => t.name === body.transformer_name);
+                if (!existingTransformer) {
+                    state.transformers.push({
+                        name: body.transformer_name,
+                        rules: []
+                    });
+                }
+                return { result: true };
+            }
+        },
+        list_transformers: {
+            name: '列出转换器',
+            description: '列出状态的所有转换器',
+            is_write: false,
+            is_get_api: true,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true }
+            },
+            result: {
+                transformers: { 
+                    type: Array, 
+                    mean: '转换器列表', 
+                    explain: {
+                        name: { type: String, mean: '转换器名称', example: 't1' }
+                    }
+                }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                let transformers = state.transformers ? state.transformers.map(t => ({ name: t.name })) : [];
+                let current_page_content = transformers.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                return {
+                    transformers: current_page_content,
+                    total: transformers.length,
+                };
+            }
+        },
+        del_transformer: {
+            name: '删除转换器',
+            description: '删除一个转换器',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                if (!state.transformers) {
+                    throw { err_msg: '转换器不存在' };
+                }
+                let index = state.transformers.findIndex(t => t.name === body.transformer_name);
+                if (index !== -1) {
+                    state.transformers.splice(index, 1);
+                    return { result: true };
+                } else {
+                    throw { err_msg: '转换器不存在' };
+                }
+            }
+        },
+        get_transformer: {
+            name: '获取转换器',
+            description: '获取转换器的详细信息',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true }
+            },
+            result: {
+                transformer: { 
+                    type: Object, 
+                    mean: '转换器信息', 
+                    explain: {
+                        name: { type: String, mean: '转换器名称', example: 't1'},
+                        rules: { 
+                            type: Array, 
+                            mean: '转移规则列表', 
+                            explain: {
+                                target_state: { type: String, mean: '目标状态', example: 's2' },
+                                expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
+                            }
+                        }
+                    }
+                }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                let transformer = state.transformers ? state.transformers.find(t => t.name === body.transformer_name) : null;
+                if (!transformer) {
+                    throw { err_msg: '转换器不存在' };
+                }
+                return { transformer };
+            }
+        },
+        add_transformer_rule: {
+            name: '添加转换器规则',
+            description: '向转换器添加一个转移规则',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true },
+                target_state: { type: String, mean: '目标状态', example: 's2', have_to: true },
+                expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                let transformer = state.transformers ? state.transformers.find(t => t.name === body.transformer_name) : null;
+                if (!transformer) {
+                    throw { err_msg: '转换器不存在' };
+                }
+                if (!transformer.rules) {
+                    transformer.rules = [];
+                }
+                transformer.rules.push({
+                    target_state: body.target_state,
+                    expression: body.expression
                 });
                 return { result: true };
             }
