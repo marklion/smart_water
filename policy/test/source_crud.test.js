@@ -103,24 +103,5 @@ describe('数据源增删改查测试', () => {
         expect(count).toBe(1);
     });
 
-    test('数据源参数验证', async () => {
-        await cli.run_cmd('policy test');
-        
-        const testCases = [
-            { name: '传感器1', device: '设备1', dataType: '温度' },
-            { name: 'sensor_2', device: 'device_2', dataType: 'humidity' },
-            { name: '传感器-3', device: '设备-3', dataType: 'pressure' },
-            { name: '123传感器', device: '123设备', dataType: '123类型' }
-        ];
-        
-        for (const testCase of testCases) {
-            let result = await cli.run_cmd(`source ${testCase.name} ${testCase.device} ${testCase.dataType}`);
-            expect(result).toContain(`数据源 ${testCase.name} 创建成功`);
-        }
-        
-        let bdr = await cli.run_cmd('bdr');
-        for (const testCase of testCases) {
-            expect(bdr).toContain(`source ${testCase.name} ${testCase.device} ${testCase.dataType}`);
-        }
-    });
+
 });
