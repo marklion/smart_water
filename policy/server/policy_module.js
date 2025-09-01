@@ -25,6 +25,31 @@ function validateTransformerExists(state, transformer_name) {
     return transformer;
 }
 
+// 公共工具函数
+function ensureArrayExists(obj, arrayName) {
+    if (!obj[arrayName]) {
+        obj[arrayName] = [];
+    }
+    return obj[arrayName];
+}
+
+function getPaginatedResult(array, pageNo, pageSize = 20) {
+    let current_page_content = array.slice(pageNo * pageSize, (pageNo + 1) * pageSize);
+    return {
+        items: current_page_content,
+        total: array.length,
+    };
+}
+
+function findAndRemoveFromArray(array, predicate) {
+    let index = array.findIndex(predicate);
+    if (index !== -1) {
+        array.splice(index, 1);
+        return true;
+    }
+    return false;
+}
+
 export default {
     name: 'policy',
     description: '策略管理',
@@ -74,10 +99,10 @@ export default {
                 }
             },
             func: async function (body, token) {
-                let current_page_content = policy_array.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                let result = getPaginatedResult(policy_array, body.pageNo);
                 return {
-                    policies: current_page_content,
-                    total: policy_array.length,
+                    policies: result.items,
+                    total: result.total,
                 }
             },
         },
@@ -118,12 +143,10 @@ export default {
             },
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
-                if (!policy.states) {
-                    policy.states = [];
-                }
-                let existingState = policy.states.find(s => s.name === body.state_name);
+                let states = ensureArrayExists(policy, 'states');
+                let existingState = states.find(s => s.name === body.state_name);
                 if (!existingState) {
-                    policy.states.push({
+                    states.push({
                         name: body.state_name,
                         enter_actions: []
                     });
@@ -151,10 +174,10 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let states = policy.states ? policy.states.map(s => ({ name: s.name })) : [];
-                let current_page_content = states.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                let result = getPaginatedResult(states, body.pageNo);
                 return {
-                    states: current_page_content,
-                    total: states.length,
+                    states: result.items,
+                    total: result.total,
                 };
             }
         },
@@ -172,14 +195,8 @@ export default {
             },
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
-                if (!policy.states) {
-                    return { result: true };
-                }
-                // 找到并删除匹配的状态
-                let index = policy.states.findIndex(state => state.name === body.state_name);
-                if (index !== -1) {
-                    policy.states.splice(index, 1);
-                }
+                validateStateExists(policy, body.state_name);
+                findAndRemoveFromArray(policy.states, s => s.name === body.state_name);
                 return { result: true };
             }
         },
@@ -248,15 +265,12 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                if (!state.enter_actions) {
-                    state.enter_actions = [];
-                }
-                // 检查是否已存在相同的动作，避免重复添加
-                let existingAction = state.enter_actions.find(action => 
+                let enterActions = ensureArrayExists(state, 'enter_actions');
+                let existingAction = enterActions.find(action => 
                     action.device === body.device && action.action === body.action
                 );
                 if (!existingAction) {
-                    state.enter_actions.push({
+                    enterActions.push({
                         device: body.device,
                         action: body.action
                     });
@@ -286,12 +300,9 @@ export default {
                     return { result: true };
                 }
                 // 找到并删除匹配的动作
-                let index = state.enter_actions.findIndex(action => 
+                findAndRemoveFromArray(state.enter_actions, action => 
                     action.device === body.device && action.action === body.action
                 );
-                if (index !== -1) {
-                    state.enter_actions.splice(index, 1);
-                }
                 return { result: true };
             }
         },
@@ -311,12 +322,10 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                if (!state.transformers) {
-                    state.transformers = [];
-                }
-                let existingTransformer = state.transformers.find(t => t.name === body.transformer_name);
+                let transformers = ensureArrayExists(state, 'transformers');
+                let existingTransformer = transformers.find(t => t.name === body.transformer_name);
                 if (!existingTransformer) {
-                    state.transformers.push({
+                    transformers.push({
                         name: body.transformer_name,
                         rules: []
                     });
@@ -346,10 +355,10 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 let transformers = state.transformers ? state.transformers.map(t => ({ name: t.name })) : [];
-                let current_page_content = transformers.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                let result = getPaginatedResult(transformers, body.pageNo);
                 return {
-                    transformers: current_page_content,
-                    total: transformers.length,
+                    transformers: result.items,
+                    total: result.total,
                 };
             }
         },
@@ -369,14 +378,9 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                let transformer = validateTransformerExists(state, body.transformer_name);
-                let index = state.transformers.findIndex(t => t.name === body.transformer_name);
-                if (index !== -1) {
-                    state.transformers.splice(index, 1);
-                    return { result: true };
-                } else {
-                    throw { err_msg: '转换器不存在' };
-                }
+                validateTransformerExists(state, body.transformer_name);
+                findAndRemoveFromArray(state.transformers, t => t.name === body.transformer_name);
+                return { result: true };
             }
         },
         get_transformer: {
@@ -432,10 +436,8 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 let transformer = validateTransformerExists(state, body.transformer_name);
-                if (!transformer.rules) {
-                    transformer.rules = [];
-                }
-                transformer.rules.push({
+                let rules = ensureArrayExists(transformer, 'rules');
+                rules.push({
                     target_state: body.target_state,
                     expression: body.expression
                 });
@@ -463,13 +465,9 @@ export default {
                 if (!transformer.rules) {
                     return { result: true };
                 }
-                // 找到并删除匹配的规则
-                let index = transformer.rules.findIndex(rule => 
+                findAndRemoveFromArray(transformer.rules, rule => 
                     rule.target_state === body.target_state
                 );
-                if (index !== -1) {
-                    transformer.rules.splice(index, 1);
-                }
                 return { result: true };
             }
         },
@@ -489,12 +487,10 @@ export default {
             },
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
-                if (!policy.sources) {
-                    policy.sources = [];
-                }
-                let existingSource = policy.sources.find(s => s.name === body.name);
+                let sources = ensureArrayExists(policy, 'sources');
+                let existingSource = sources.find(s => s.name === body.name);
                 if (!existingSource) {
-                    policy.sources.push({
+                    sources.push({
                         name: body.name,
                         device: body.device,
                         data_type: body.data_type
@@ -529,10 +525,10 @@ export default {
                     device: s.device, 
                     data_type: s.data_type 
                 })) : [];
-                let current_page_content = sources.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                let result = getPaginatedResult(sources, body.pageNo);
                 return {
-                    sources: current_page_content,
-                    total: sources.length,
+                    sources: result.items,
+                    total: result.total,
                 };
             }
         },
@@ -553,13 +549,8 @@ export default {
                 if (!policy.sources) {
                     throw { err_msg: '数据源不存在' };
                 }
-                let index = policy.sources.findIndex(s => s.name === body.name);
-                if (index !== -1) {
-                    policy.sources.splice(index, 1);
-                    return { result: true };
-                } else {
-                    throw { err_msg: '数据源不存在' };
-                }
+                findAndRemoveFromArray(policy.sources, s => s.name === body.name);
+                return { result: true };
             }
         },
     }
