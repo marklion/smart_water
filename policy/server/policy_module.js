@@ -1,4 +1,30 @@
 const policy_array = []
+
+// 公共验证函数
+function validatePolicyExists(policy_name) {
+    let policy = policy_array.find(p => p.name === policy_name);
+    if (!policy) {
+        throw { err_msg: '策略不存在' };
+    }
+    return policy;
+}
+
+function validateStateExists(policy, state_name) {
+    let state = policy.states ? policy.states.find(s => s.name === state_name) : null;
+    if (!state) {
+        throw { err_msg: '状态不存在' };
+    }
+    return state;
+}
+
+function validateTransformerExists(state, transformer_name) {
+    let transformer = state.transformers ? state.transformers.find(t => t.name === transformer_name) : null;
+    if (!transformer) {
+        throw { err_msg: '转换器不存在' };
+    }
+    return transformer;
+}
+
 export default {
     name: 'policy',
     description: '策略管理',
@@ -91,10 +117,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
                 if (!policy.states) {
                     policy.states = [];
                 }
@@ -126,10 +149,7 @@ export default {
                 }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
                 let states = policy.states ? policy.states.map(s => ({ name: s.name })) : [];
                 let current_page_content = states.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
                 return {
@@ -208,14 +228,8 @@ export default {
                 }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
                 return { state };
             }
         },
@@ -235,14 +249,8 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
                 if (!state.enter_actions) {
                     state.enter_actions = [];
                 }
@@ -275,14 +283,8 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
                 if (!state.enter_actions) {
                     return { result: true };
                 }

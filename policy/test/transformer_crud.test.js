@@ -3,6 +3,28 @@ import { print_test_log, start_server, close_server } from "../../public/lib/tes
 
 let cli;
 
+// 测试辅助函数
+async function setupPolicyStateTransformer(cli, policyName, stateName, transformerName) {
+    await cli.run_cmd('policy');
+    await cli.run_cmd(`policy ${policyName}`);
+    await cli.run_cmd(`state ${stateName}`);
+    await cli.run_cmd(`transformer ${transformerName}`);
+}
+
+async function verifyBdrContains(cli, expectedItems) {
+    let bdr = await cli.run_cmd('bdr');
+    expectedItems.forEach(item => {
+        expect(bdr).toContain(item);
+    });
+}
+
+async function verifyBdrNotContains(cli, unexpectedItems) {
+    let bdr = await cli.run_cmd('bdr');
+    unexpectedItems.forEach(item => {
+        expect(bdr).not.toContain(item);
+    });
+}
+
 beforeAll(async () => {
     print_test_log('transformer CRUD test begin', true);
     cli = await test_utils('npm run dev_cli');
@@ -28,12 +50,7 @@ describe('转换器基本功能测试', () => {
 
     test('创建策略、状态和转换器', async () => {
 
-        await cli.run_cmd('policy');
-        await cli.run_cmd('policy test');
-
-        await cli.run_cmd('state state1');
-
-        await cli.run_cmd('transformer t1');
+        await setupPolicyStateTransformer(cli, 'test', 'state1', 't1');
 
         let result = await cli.run_cmd('rule state2 "temperature > 30"');
         expect(result).toContain('已添加转移规则: 当条件满足时转移到状态 state2');
@@ -41,26 +58,20 @@ describe('转换器基本功能测试', () => {
         await cli.run_cmd('return'); // 从转换器返回状态
         await cli.run_cmd('return'); // 从状态返回策略
         
-        let bdr = await cli.run_cmd('bdr');
-        expect(bdr).toContain("transformer 't1'");
-        expect(bdr).toContain("state 'state1'");
+        await verifyBdrContains(cli, ["transformer 't1'", "state 'state1'"]);
     });
 
     test('配置保存和恢复测试', async () => {
 
-        await cli.run_cmd('policy');
-        await cli.run_cmd('policy test');
-
-        await cli.run_cmd('state state1');
-
-        await cli.run_cmd('transformer t1');
+        await setupPolicyStateTransformer(cli, 'test', 'state1', 't1');
 
         await cli.run_cmd('rule state2 "temperature > 30"');
         await cli.run_cmd('rule state3 "humidity < 50"');
 
-        let bdr = await cli.run_cmd('bdr');
-        expect(bdr).toContain("rule state2 'temperature > 30'");
-        expect(bdr).toContain("rule state3 'humidity < 50'");
+        await verifyBdrContains(cli, [
+            "rule state2 'temperature > 30'",
+            "rule state3 'humidity < 50'"
+        ]);
 
         await cli.save_config();
 
@@ -69,21 +80,17 @@ describe('转换器基本功能测试', () => {
 
     test('转换器完整增删改查测试', async () => {
 
-        await cli.run_cmd('policy');
-        await cli.run_cmd('policy test');
-
-        await cli.run_cmd('state state1');
-
-        await cli.run_cmd('transformer t1');
+        await setupPolicyStateTransformer(cli, 'test', 'state1', 't1');
         await cli.run_cmd('rule state2 "temperature > 30"');
         await cli.run_cmd('rule state3 "humidity < 50"');
 
-        let bdr = await cli.run_cmd('bdr');
-        expect(bdr).toContain("rule state2 'temperature > 30'");
-        expect(bdr).toContain("rule state3 'humidity < 50'");
+        await verifyBdrContains(cli, [
+            "rule state2 'temperature > 30'",
+            "rule state3 'humidity < 50'"
+        ]);
 
         await cli.run_cmd('return'); 
-        bdr = await cli.run_cmd('bdr');
+        let bdr = await cli.run_cmd('bdr');
         expect(bdr).toContain("transformer 't1'");
 
         await cli.run_cmd('state state1'); // 重新进入状态
@@ -91,23 +98,23 @@ describe('转换器基本功能测试', () => {
 
         await cli.run_cmd('rule state4 "pressure > 1000"');
 
-        bdr = await cli.run_cmd('bdr');
-        expect(bdr).toContain("rule state2 'temperature > 30'");
-        expect(bdr).toContain("rule state3 'humidity < 50'");
-        expect(bdr).toContain("rule state4 'pressure > 1000'");
+        await verifyBdrContains(cli, [
+            "rule state2 'temperature > 30'",
+            "rule state3 'humidity < 50'",
+            "rule state4 'pressure > 1000'"
+        ]);
 
         await cli.run_cmd('return'); // 返回状态级别
         await cli.run_cmd('return'); // 返回策略级别
 
         await cli.run_cmd('clear');
 
-        bdr = await cli.run_cmd('bdr');
-
-        expect(bdr).not.toContain("transformer 't1'");
-
-        expect(bdr).not.toContain("rule state2 'temperature > 30'");
-        expect(bdr).not.toContain("rule state3 'humidity < 50'");
-        expect(bdr).not.toContain("rule state4 'pressure > 1000'");
+        await verifyBdrNotContains(cli, [
+            "transformer 't1'",
+            "rule state2 'temperature > 30'",
+            "rule state3 'humidity < 50'",
+            "rule state4 'pressure > 1000'"
+        ]);
 
     });
 });

@@ -3,6 +3,32 @@ import { print_test_log, start_server, close_server } from "../../public/lib/tes
 
 let cli;
 
+// 测试辅助函数
+async function setupPolicyState(cli, policyName, stateName) {
+    await cli.run_cmd('policy');
+    await cli.run_cmd(`policy ${policyName}`);
+    await cli.run_cmd(`state ${stateName}`);
+}
+
+async function verifyBdrContains(cli, expectedItems) {
+    let bdr = await cli.run_cmd('bdr');
+    expectedItems.forEach(item => {
+        expect(bdr).toContain(item);
+    });
+}
+
+async function verifyBdrNotContains(cli, unexpectedItems) {
+    let bdr = await cli.run_cmd('bdr');
+    unexpectedItems.forEach(item => {
+        expect(bdr).not.toContain(item);
+    });
+}
+
+async function returnToRoot(cli) {
+    await cli.run_cmd('return');
+    await cli.run_cmd('return');
+}
+
 beforeAll(async () => {
     print_test_log('state CLI test begin', true);
     cli = await test_utils('npm run dev_cli');
@@ -34,48 +60,40 @@ describe('状态 CLI 测试', () => {
 
     test('基本功能：创建策略、状态和动作', async () => {
         // 创建策略abc并进入策略视图
-        // sw_cli> policy> policy abc
-        await cli.run_cmd('policy abc');
-        
-        // 创建状态s1并进入状态视图
-        // sw_cli> policy> policy-abc>state s1
-        await cli.run_cmd('state s1');
+        await setupPolicyState(cli, 'abc', 's1');
         
         // 添加进入动作
-        // sw_cli> policy> policy-abc> state-s1>enter action 阀门1 开启
         let result = await cli.run_cmd('enter action 阀门1 开启');
         expect(result).toContain('已添加进入动作: 设备 阀门1 执行 开启');
         
-        // sw_cli> policy> policy-abc> state-s1>enter action 阀门2 关闭
         result = await cli.run_cmd('enter action 阀门2 关闭');
         expect(result).toContain('已添加进入动作: 设备 阀门2 执行 关闭');
         
         // 测试状态内部的 bdr 命令
-        // sw_cli> policy> policy-abc> state-s1>bdr
-        let bdr = await cli.run_cmd('bdr')
-        expect(bdr).toContain('enter action 阀门1 开启');
-        expect(bdr).toContain('enter action 阀门2 关闭');
+        await verifyBdrContains(cli, [
+            'enter action 阀门1 开启',
+            'enter action 阀门2 关闭'
+        ]);
         
-        // 返回到策略视图
-        await cli.run_cmd('return');
+        // 返回到根视图
+        await returnToRoot(cli);
         
-        // 返回到策略管理视图
-        await cli.run_cmd('return');
-        
-        bdr = await cli.run_cmd('bdr');
-        expect(bdr).toContain("policy 'abc'");
-        expect(bdr).toContain("state 's1'");
-        expect(bdr).toContain('enter action 阀门1 开启');
-        expect(bdr).toContain('enter action 阀门2 关闭');
-        expect(bdr).toContain('return');
+        // 验证策略级别的配置
+        await verifyBdrContains(cli, [
+            "policy 'abc'",
+            "state 's1'",
+            'enter action 阀门1 开启',
+            'enter action 阀门2 关闭',
+            'return'
+        ]);
     });
 
     test('分页功能测试：创建多个状态', async () => {
         // 创建策略test并进入策略视图
-        await cli.run_cmd('policy test');
+        await setupPolicyState(cli, 'test', 's0');
         
         // 创建多个状态（超过20个以测试分页）
-        for (let i = 0; i < 25; i++) {
+        for (let i = 1; i < 25; i++) {
             await cli.run_cmd(`state s${i}`);
             await cli.run_cmd('return');
         }
@@ -91,8 +109,7 @@ describe('状态 CLI 测试', () => {
         await cli.run_cmd('enter action 设备1 动作1');
         
         // 测试状态内部的 bdr
-        let state_bdr = await cli.run_cmd('bdr');
-        expect(state_bdr).toContain('enter action 设备1 动作1');
+        await verifyBdrContains(cli, ['enter action 设备1 动作1']);
         
         await cli.run_cmd('return');
         await cli.run_cmd('return');
@@ -100,8 +117,7 @@ describe('状态 CLI 测试', () => {
 
     test('状态内部命令测试', async () => {
         // 创建策略和状态
-        await cli.run_cmd('policy test');
-        await cli.run_cmd('state s1');
+        await setupPolicyState(cli, 'test', 's1');
         
         // 测试状态内部的 return 命令
         let result = await cli.run_cmd('return');
@@ -113,10 +129,10 @@ describe('状态 CLI 测试', () => {
         await cli.run_cmd('enter action 传感器1 读取');
         
         // 测试有动作的状态的 bdr
-        let bdr = await cli.run_cmd('bdr');
-        // 现在状态 s1 有动作了，所以 bdr 应该包含这些动作
-        expect(bdr).toContain('enter action 水泵1 启动');
-        expect(bdr).toContain('enter action 传感器1 读取');
+        await verifyBdrContains(cli, [
+            'enter action 水泵1 启动',
+            'enter action 传感器1 读取'
+        ]);
         
         await cli.run_cmd('return');
         await cli.run_cmd('return');
@@ -124,41 +140,39 @@ describe('状态 CLI 测试', () => {
 
     test('Undo功能测试：删除状态和动作', async () => {
         // 创建策略和状态
-        await cli.run_cmd('policy undo_test');
-        await cli.run_cmd('state s1');
+        await setupPolicyState(cli, 'undo_test', 's1');
         await cli.run_cmd('enter action 阀门1 开启');
         await cli.run_cmd('enter action 阀门2 关闭');
         
         // 验证动作已添加
-        let bdr = await cli.run_cmd('bdr');
-        expect(bdr).toContain('enter action 阀门1 开启');
-        expect(bdr).toContain('enter action 阀门2 关闭');
+        await verifyBdrContains(cli, [
+            'enter action 阀门1 开启',
+            'enter action 阀门2 关闭'
+        ]);
         
         // 测试undo enter action命令（删除所有进入动作）
         let result = await cli.run_cmd('undo enter action');
         expect(result).toContain('已删除 2 个进入动作');
 
-        bdr = await cli.run_cmd('bdr');
-        expect(bdr).not.toContain('enter action 阀门1 开启');
-        expect(bdr).not.toContain('enter action 阀门2 关闭');
+        await verifyBdrNotContains(cli, [
+            'enter action 阀门1 开启',
+            'enter action 阀门2 关闭'
+        ]);
 
         await cli.run_cmd('return');
 
         await cli.run_cmd('state s2');
         await cli.run_cmd('return');
 
-        bdr = await cli.run_cmd('bdr');
-        expect(bdr).toContain("state 's1'");
-        expect(bdr).toContain("state 's2'");
+        await verifyBdrContains(cli, ["state 's1'", "state 's2'"]);
         
         // 测试删除单个状态
         let undo_result = await cli.run_cmd('undo state s1');
         expect(undo_result).toContain('状态 s1 已删除');
         
         // 验证状态s1已被删除，s2仍存在
-        bdr = await cli.run_cmd('bdr');
-        expect(bdr).not.toContain("state 's1'");
-        expect(bdr).toContain("state 's2'");
+        await verifyBdrNotContains(cli, ["state 's1'"]);
+        await verifyBdrContains(cli, ["state 's2'"]);
         
         await cli.run_cmd('return');
     });
