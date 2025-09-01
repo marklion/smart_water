@@ -18,25 +18,35 @@ export default {
         cli_utils.add_sub_cli(vorpal, state_cli, prompt);
         state_cli.policy_view = ins;
 
-        vorpal.command('source <name> <device> <data_type>', '创建一个数据源')
-            .action(async function (args) {
-                try {
-                    await policy_lib.add_source(ins.cur_view_name, args.name, args.device, args.data_type);
-                    this.log(`数据源 ${args.name} 创建成功`);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
+        cli_utils.make_undo_cmd(vorpal,
+            'source <name> <device> <data_type>',
+            '添加一个数据源',
+            '删除所有数据源',
+            async (cmd_this, args) => {
+                await policy_lib.add_source(ins.cur_view_name, args.name, args.device, args.data_type);
+                return `数据源 ${args.name} 添加成功`;
+            },
+            async (cmd_this, args) => {
+                // 删除所有数据源
+                let pageNo = 0;
+                while (true) {
+                    let resp = await policy_lib.list_sources(ins.cur_view_name, pageNo);
+                    if (resp.sources.length == 0) {
+                        break;
+                    }
+                    for (let source of resp.sources) {
+                        await policy_lib.del_source(ins.cur_view_name, source.name);
+                    }
+                    pageNo++;
                 }
+                return '所有数据源已删除';
             });
 
-        vorpal.command('undo source <name>', '删除一个数据源')
-            .action(async function (args) {
-                try {
-                    await policy_lib.del_source(ins.cur_view_name, args.name);
-                    this.log(`数据源 ${args.name} 已删除`);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
+        cli_utils.make_common_cmd(vorpal, 'del source <name>', '删除一个数据源', async (cmd_this, args) => {
+            let name = args.name;
+            await policy_lib.del_source(ins.cur_view_name, name);
+            return `数据源 ${name} 删除成功`;
+        });
         
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {

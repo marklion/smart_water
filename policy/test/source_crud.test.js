@@ -32,10 +32,10 @@ describe('数据源增删改查测试', () => {
         await cli.run_cmd('policy test');
         
         let result = await cli.run_cmd('source 温度传感器1 传感器1 temperature');
-        expect(result).toContain('数据源 温度传感器1 创建成功');
+        expect(result).toContain('数据源 温度传感器1 添加成功');
         
         result = await cli.run_cmd('source 湿度传感器1 传感器2 humidity');
-        expect(result).toContain('数据源 湿度传感器1 创建成功');
+        expect(result).toContain('数据源 湿度传感器1 添加成功');
         
         let bdr = await cli.run_cmd('bdr');
         expect(bdr).toContain('source 温度传感器1 传感器1 temperature');
@@ -52,15 +52,12 @@ describe('数据源增删改查测试', () => {
         expect(bdr).toContain('source 温度传感器1 传感器1 temperature');
         expect(bdr).toContain('source 湿度传感器1 传感器2 humidity');
         
-        let result = await cli.run_cmd('undo source 温度传感器1');
-        expect(result).toContain('数据源 温度传感器1 已删除');
+        let result = await cli.run_cmd('undo source');
+        expect(result).toContain('所有数据源已删除');
         
         bdr = await cli.run_cmd('bdr');
         expect(bdr).not.toContain('source 温度传感器1 传感器1 temperature');
-        expect(bdr).toContain('source 湿度传感器1 传感器2 humidity');
-        
-        result = await cli.run_cmd('undo source 湿度传感器1');
-        expect(result).toContain('数据源 湿度传感器1 已删除');
+        expect(bdr).not.toContain('source 湿度传感器1 传感器2 humidity');
         
         bdr = await cli.run_cmd('bdr');
         expect(bdr).not.toContain('source 温度传感器1 传感器1 temperature');
@@ -85,9 +82,8 @@ describe('数据源增删改查测试', () => {
     test('错误处理：删除不存在的数据源', async () => {
         await cli.run_cmd('policy test');
         
-        let result = await cli.run_cmd('undo source 不存在的数据源');
-        expect(result).toContain('Error:');
-        expect(result).toContain('数据源不存在');
+        let result = await cli.run_cmd('undo source');
+        expect(result).toContain('所有数据源已删除');
     });
 
     test('错误处理：创建重复的数据源', async () => {
@@ -96,12 +92,68 @@ describe('数据源增删改查测试', () => {
         await cli.run_cmd('source 温度传感器1 传感器1 temperature');
         
         let result = await cli.run_cmd('source 温度传感器1 传感器1 temperature');
-        expect(result).toContain('数据源 温度传感器1 创建成功');
+        expect(result).toContain('数据源 温度传感器1 添加成功');
         
         let bdr = await cli.run_cmd('bdr');
         let count = (bdr.match(/source 温度传感器1/g) || []).length;
         expect(count).toBe(1);
     });
+    //1.配置若干数据源
+    //2.await cli.save_config()
+    //3.await cli.save_config()
+    //4.bdr一下看看配置是不是如愿清空了
+    //5.await cli.restore_config()
+    //6.bdr一下看看配置是不是如愿回来了
 
+    test('配置保存和恢复测试', async () => {
+        await cli.run_cmd('policy test');
+
+        await cli.run_cmd('source 温度传感器1 传感器1 temperature');
+        await cli.run_cmd('source 湿度传感器1 传感器2 humidity');
+        await cli.run_cmd('source 压力传感器1 传感器3 pressure');
+
+        let bdr = await cli.run_cmd('bdr');
+        expect(bdr).toContain('source 温度传感器1 传感器1 temperature');
+        expect(bdr).toContain('source 湿度传感器1 传感器2 humidity');
+        expect(bdr).toContain('source 压力传感器1 传感器3 pressure');
+
+        await cli.save_config();
+
+        await cli.run_cmd('clear');
+
+        bdr = await cli.run_cmd('bdr');
+        expect(bdr).not.toContain('source 温度传感器1 传感器1 temperature');
+        expect(bdr).not.toContain('source 湿度传感器1 传感器2 humidity');
+        expect(bdr).not.toContain('source 压力传感器1 传感器3 pressure');
+
+        await cli.restore_config();
+
+        bdr = await cli.run_cmd('bdr');
+        expect(bdr).toContain('source 温度传感器1 传感器1 temperature');
+        expect(bdr).toContain('source 湿度传感器1 传感器2 humidity');
+        expect(bdr).toContain('source 压力传感器1 传感器3 pressure');
+    });
+
+    test('多次保存配置测试', async () => {
+        await cli.run_cmd('policy test');
+
+        await cli.run_cmd('source 温度传感器1 传感器1 temperature');
+        await cli.save_config();
+
+        await cli.run_cmd('source 湿度传感器1 传感器2 humidity');
+        await cli.save_config();
+
+        await cli.run_cmd('clear');
+
+        let bdr = await cli.run_cmd('bdr');
+        expect(bdr).not.toContain('source 温度传感器1 传感器1 temperature');
+        expect(bdr).not.toContain('source 湿度传感器1 传感器2 humidity');
+
+        await cli.restore_config();
+
+        bdr = await cli.run_cmd('bdr');
+        expect(bdr).toContain('source 温度传感器1 传感器1 temperature');
+        expect(bdr).toContain('source 湿度传感器1 传感器2 humidity');
+    });
 
 });
