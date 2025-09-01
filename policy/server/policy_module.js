@@ -171,10 +171,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
                 if (!policy.states) {
                     return { result: true };
                 }
@@ -312,14 +309,8 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
                 if (!state.transformers) {
                     state.transformers = [];
                 }
@@ -352,14 +343,8 @@ export default {
                 }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
                 let transformers = state.transformers ? state.transformers.map(t => ({ name: t.name })) : [];
                 let current_page_content = transformers.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
                 return {
@@ -382,17 +367,9 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
-                if (!state.transformers) {
-                    throw { err_msg: '转换器不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                let transformer = validateTransformerExists(state, body.transformer_name);
                 let index = state.transformers.findIndex(t => t.name === body.transformer_name);
                 if (index !== -1) {
                     state.transformers.splice(index, 1);
@@ -430,18 +407,9 @@ export default {
                 }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
-                let transformer = state.transformers ? state.transformers.find(t => t.name === body.transformer_name) : null;
-                if (!transformer) {
-                    throw { err_msg: '转换器不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                let transformer = validateTransformerExists(state, body.transformer_name);
                 return { transformer };
             }
         },
@@ -461,18 +429,9 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
-                let transformer = state.transformers ? state.transformers.find(t => t.name === body.transformer_name) : null;
-                if (!transformer) {
-                    throw { err_msg: '转换器不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                let transformer = validateTransformerExists(state, body.transformer_name);
                 if (!transformer.rules) {
                     transformer.rules = [];
                 }
@@ -498,18 +457,9 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
-                let transformer = state.transformers ? state.transformers.find(t => t.name === body.transformer_name) : null;
-                if (!transformer) {
-                    throw { err_msg: '转换器不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                let transformer = validateTransformerExists(state, body.transformer_name);
                 if (!transformer.rules) {
                     return { result: true };
                 }
@@ -538,10 +488,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
                 if (!policy.sources) {
                     policy.sources = [];
                 }
@@ -576,10 +523,7 @@ export default {
                 }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
                 let sources = policy.sources ? policy.sources.map(s => ({ 
                     name: s.name, 
                     device: s.device, 
@@ -605,10 +549,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
                 if (!policy.sources) {
                     throw { err_msg: '数据源不存在' };
                 }
