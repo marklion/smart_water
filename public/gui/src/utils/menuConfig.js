@@ -65,6 +65,8 @@ export const MenuGroups = {
  */
 export const MenuIcons = {
   HOME: 'House',
+  HOUSE: 'House',
+  GRID: 'Grid',
   SETTING: 'Setting',
   USER: 'User',
   LOCK: 'Lock',

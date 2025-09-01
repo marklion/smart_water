@@ -23,14 +23,15 @@ export default {
         const vorpal = cli_utils.create_vorpal();
         this._vorpalInstance = vorpal;
         cli_utils.make_undo_cmd(vorpal,
-            'add block <farm_name> <block_name> [info]',
+            'add block <farm_name> <block_name> <block_area> [info]',
             '添加一个地块',
             '删除所有地块',
             async (cmd_this, args) => {
                 let farm_name = args.farm_name;
                 let block_name = args.block_name;
+                let area = args.block_area;
                 let info = args.info || '';
-                let result = await resource_lib.add_block(farm_name, block_name, info);
+                let result = await resource_lib.add_block(farm_name, block_name, area, info);
                 if (result.result) {
                     return `地块 ${block_name} 添加成功`;
                 } else {

@@ -1,4 +1,6 @@
-const farms = []
+const farms = [];
+
+
 export default {
     name: 'resource',
     description: '资源管理',
@@ -55,6 +57,7 @@ export default {
                     existingFarm.location = body.location;
                     existingFarm.info = body.info;
                 }
+                
                 return { result: true };
             },
         },
@@ -86,6 +89,7 @@ export default {
             params: {
                 farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
                 block_name: { type: String, mean: '地块名称', example: '地块1', have_to: true },
+                area: { type: Number, mean: '地块面积(亩)', example: 10 ,have_to: false},
                 info: { type: String, mean: '地块信息', example: '信息1', have_to: false }
             },
             result: {
@@ -101,11 +105,15 @@ export default {
                     if (!existingBlock) {
                         farm.blocks.push({
                             name: body.block_name,
-                            info: body.info
+                            area: body.area,
+                            info: body.info,
                         });
                     } else {
-                        existingBlock.info = body.info;
+                        existingBlock.area = body.area || existingBlock.area;
+                        existingBlock.info = body.info || existingBlock.info;
                     }
+                    // 保存数据到文件
+                    
                     return { result: true };
                 }
                 return { result: false };
@@ -129,6 +137,7 @@ export default {
                     let index = farm.blocks.findIndex(block => block.name === body.block_name);
                     if (index !== -1) {
                         farm.blocks.splice(index, 1);
+                        
                         return { result: true };
                     }
                 }
@@ -150,6 +159,7 @@ export default {
                     explain: {
                         farm_name: { type: String, mean: '农场名称', example: '农场1' },
                         name: { type: String, mean: '地块名称', example: '地块1' },
+                        area: { type: Number, mean: '地块面积(亩)', example: 10 },
                         info: { type: String, mean: '地块信息', example: '信息1' }
                     }
                 },
@@ -163,7 +173,8 @@ export default {
                                 ret_array.push({
                                     farm_name: farm.name,
                                     name: block.name,
-                                    info: block.info
+                                    area: block.area || 0,
+                                    info: block.info || ''
                                 });
                             }
                         }

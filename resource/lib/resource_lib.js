@@ -9,8 +9,8 @@ export default {
     list_farm: async function (pageNo, token) {
         return await call_remote('/resource/list_farm', { pageNo }, token);
     },
-    add_block: async function (farm_name, block_name, info, token) {
-        return await call_remote('/resource/add_block', { farm_name, block_name, info }, token);
+    add_block: async function (farm_name, block_name, area, info, token) {
+        return await call_remote('/resource/add_block', { farm_name, block_name, area, info }, token);
     },
     del_block: async function (farm_name, block_name, token) {
         return await call_remote('/resource/del_block', { farm_name, block_name }, token);
