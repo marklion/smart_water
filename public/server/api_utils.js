@@ -224,6 +224,43 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
                 let body = req.body;
                 let token = req.headers['token'];
                 let ret = result_maker(null, '未知错误');
+                try {
+                    // 检查是否需要token验证
+                    const isLoginApi = this.path === '/auth/login';
+                    const isLocalRequest = checkIsLocalRequest(req);
+                    
+                    if (!isLoginApi && !isLocalRequest) {
+                        // 非登录接口且非本机请求需要验证token
+                        if (!token) {
+                            ret = result_maker(null, '缺少token，请先登录');
+                            res.send(ret);
+                            return;
+                        }
+                        
+                        // 验证token有效性
+                        if (app.authModule && app.authModule.verifyToken) {
+                            try {
+                                const decoded = app.authModule.verifyToken(token);
+                                if (!decoded) {
+                                    ret = result_maker(null, 'Token无效或已过期，请重新登录');
+                                    res.send(ret);
+                                    return;
+                                }
+                                req.user = decoded;
+                            } catch (authError) {
+                                ret = result_maker(null, 'Token验证失败，请重新登录');
+                                res.send(ret);
+                                return;
+                            }
+                        }
+                    }
+                } catch (authError) {
+                    console.error('Token验证出错:', authError);
+                    ret = result_maker(null, '身份验证失败');
+                    res.send(ret);
+                    return;
+                }
+                
                 let pc_ret = api_param_check(this.params, body);
                 if (pc_ret.length > 0) {
                     ret = result_maker(null, '参数错误:' + pc_ret);
@@ -254,6 +291,18 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
     };
 
     return ret;
+}
+
+// 检查请求是否来自本机
+function checkIsLocalRequest(req) {
+    const remoteAddress = req.connection?.remoteAddress || 
+                         req.socket?.remoteAddress ||
+                         req.ip ||
+                         '127.0.0.1';
+    
+    // 检查是否是本机地址
+    const localAddresses = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
+    return localAddresses.includes(remoteAddress);
 }
 
 export default make_api;

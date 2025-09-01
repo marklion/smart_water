@@ -31,6 +31,9 @@ async function module_install(app, module) {
 }
 
 async function init_super_user() {
+    const authModule = (await import('../../web/server/auth_module.js')).default;
+    app.authModule = authModule; // 将认证模块添加到app中，供api_utils使用
+    await module_install(app, authModule);
     await module_install(app, (await import('../../device/server/device_management_module.js')).default);
     await module_install(app, (await import('../../resource/server/resource_module.js')).default);
     await module_install(app, (await import('../../policy/server/policy_module.js')).default);
