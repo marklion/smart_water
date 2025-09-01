@@ -138,6 +138,34 @@ export default {
                 };
             }
         },
+        del_state: {
+            name: '删除状态',
+            description: '从策略中删除一个状态',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                if (!policy.states) {
+                    return { result: true };
+                }
+                // 找到并删除匹配的状态
+                let index = policy.states.findIndex(state => state.name === body.state_name);
+                if (index !== -1) {
+                    policy.states.splice(index, 1);
+                }
+                return { result: true };
+            }
+        },
         get_state: {
             name: '获取状态',
             description: '获取状态的详细信息',
@@ -218,10 +246,53 @@ export default {
                 if (!state.enter_actions) {
                     state.enter_actions = [];
                 }
-                state.enter_actions.push({
-                    device: body.device,
-                    action: body.action
-                });
+                // 检查是否已存在相同的动作，避免重复添加
+                let existingAction = state.enter_actions.find(action => 
+                    action.device === body.device && action.action === body.action
+                );
+                if (!existingAction) {
+                    state.enter_actions.push({
+                        device: body.device,
+                        action: body.action
+                    });
+                }
+                return { result: true };
+            }
+        },
+        del_state_action: {
+            name: '删除状态动作',
+            description: '从状态中删除一个动作',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
+                device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
+                action: { type: String, mean: '动作名称', example: '开启', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                if (!state.enter_actions) {
+                    return { result: true };
+                }
+                // 找到并删除匹配的动作
+                let index = state.enter_actions.findIndex(action => 
+                    action.device === body.device && action.action === body.action
+                );
+                if (index !== -1) {
+                    state.enter_actions.splice(index, 1);
+                }
                 return { result: true };
             }
         },
@@ -407,6 +478,46 @@ export default {
                     target_state: body.target_state,
                     expression: body.expression
                 });
+                return { result: true };
+            }
+        },
+        del_transformer_rule: {
+            name: '删除转换器规则',
+            description: '从转换器中删除一个转移规则',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true },
+                target_state: { type: String, mean: '目标状态', example: 's2', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                let transformer = state.transformers ? state.transformers.find(t => t.name === body.transformer_name) : null;
+                if (!transformer) {
+                    throw { err_msg: '转换器不存在' };
+                }
+                if (!transformer.rules) {
+                    return { result: true };
+                }
+                // 找到并删除匹配的规则
+                let index = transformer.rules.findIndex(rule => 
+                    rule.target_state === body.target_state
+                );
+                if (index !== -1) {
+                    transformer.rules.splice(index, 1);
+                }
                 return { result: true };
             }
         },

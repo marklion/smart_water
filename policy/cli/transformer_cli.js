@@ -13,20 +13,36 @@ export default {
         this.prompt_prefix = prompt;
 
         // 添加 rule 命令
-        vorpal.command('rule <target_state> <expression>', '创建一个状态转移条件')
-            .action(async function (args) {
-                try {
-                    await policy_lib.add_transformer_rule(
-                        ins.state_view.policy_view.cur_view_name, 
-                        ins.state_view.cur_view_name, 
-                        ins.cur_view_name, 
-                        args.target_state, 
-                        args.expression
-                    );
-                    this.log(`已添加转移规则: 当条件满足时转移到状态 ${args.target_state}`);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
+        cli_utils.make_undo_cmd(vorpal, 'rule <target_state> <expression>', '创建一个状态转移条件', '删除所有转移规则',
+            async (cmd_this, args) => {
+                await policy_lib.add_transformer_rule(
+                    ins.state_view.policy_view.cur_view_name, 
+                    ins.state_view.cur_view_name, 
+                    ins.cur_view_name, 
+                    args.target_state, 
+                    args.expression
+                );
+                return `已添加转移规则: 当条件满足时转移到状态 ${args.target_state}`;
+            }, 
+            async (cmd_this, args) => {
+                const resp = await policy_lib.get_transformer(
+                    ins.state_view.policy_view.cur_view_name, 
+                    ins.state_view.cur_view_name, 
+                    ins.cur_view_name
+                );
+                let deletedCount = 0;
+                if (resp.transformer && resp.transformer.rules) {
+                    for (const rule of resp.transformer.rules) {
+                        await policy_lib.del_transformer_rule(
+                            ins.state_view.policy_view.cur_view_name, 
+                            ins.state_view.cur_view_name, 
+                            ins.cur_view_name, 
+                            rule.target_state
+                        );
+                        deletedCount++;
+                    }
                 }
+                return `已删除 ${deletedCount} 个转移规则`;
             });
 
         // 添加 bdr 命令

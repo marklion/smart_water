@@ -30,6 +30,15 @@ export default {
             action 
         }, token);
     },
+    del_state_action: async function (policy_name, state_name, trigger, device, action, token) {
+        return await call_remote('/policy/del_state_action', { 
+            policy_name, 
+            state_name, 
+            trigger, 
+            device, 
+            action 
+        }, token);
+    },
     add_transformer: async function (policy_name, state_name, transformer_name, token) {
         return await call_remote('/policy/add_transformer', { 
             policy_name, 
@@ -65,6 +74,14 @@ export default {
             transformer_name, 
             target_state, 
             expression 
+        }, token);
+    },
+    del_transformer_rule: async function (policy_name, state_name, transformer_name, target_state, token) {
+        return await call_remote('/policy/del_transformer_rule', { 
+            policy_name, 
+            state_name, 
+            transformer_name, 
+            target_state 
         }, token);
     },
     add_source: async function (policy_name, name, device, data_type, token) {

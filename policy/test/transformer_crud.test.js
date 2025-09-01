@@ -28,6 +28,7 @@ describe('转换器基本功能测试', () => {
 
     test('创建策略、状态和转换器', async () => {
 
+        await cli.run_cmd('policy');
         await cli.run_cmd('policy test');
 
         await cli.run_cmd('state state1');
@@ -47,6 +48,7 @@ describe('转换器基本功能测试', () => {
 
     test('配置保存和恢复测试', async () => {
 
+        await cli.run_cmd('policy');
         await cli.run_cmd('policy test');
 
         await cli.run_cmd('state state1');
@@ -67,6 +69,7 @@ describe('转换器基本功能测试', () => {
 
     test('转换器完整增删改查测试', async () => {
 
+        await cli.run_cmd('policy');
         await cli.run_cmd('policy test');
 
         await cli.run_cmd('state state1');
