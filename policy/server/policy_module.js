@@ -4,34 +4,26 @@ import {
     findAndRemoveFromArray, 
     addItemIfNotExists, 
     mapArrayToNameOnly, 
-    mapArrayToFields 
+    mapArrayToFields,
+    validateItemExists,
+    validateNestedItemExists,
+    findAndRemoveByName,
+    validateArrayExists
 } from '../../public/server/common_utils.js';
 
 const policy_array = []
 
 // 公共验证函数
 function validatePolicyExists(policy_name) {
-    let policy = policy_array.find(p => p.name === policy_name);
-    if (!policy) {
-        throw { err_msg: '策略不存在' };
-    }
-    return policy;
+    return validateItemExists(policy_array, policy_name, '策略');
 }
 
 function validateStateExists(policy, state_name) {
-    let state = policy.states ? policy.states.find(s => s.name === state_name) : null;
-    if (!state) {
-        throw { err_msg: '状态不存在' };
-    }
-    return state;
+    return validateNestedItemExists(policy, 'states', state_name, '状态');
 }
 
 function validateTransformerExists(state, transformer_name) {
-    let transformer = state.transformers ? state.transformers.find(t => t.name === transformer_name) : null;
-    if (!transformer) {
-        throw { err_msg: '转换器不存在' };
-    }
-    return transformer;
+    return validateNestedItemExists(state, 'transformers', transformer_name, '转换器');
 }
 
 export default {
@@ -97,9 +89,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true}
             },
             func: async function (body, token) {
-                let index = policy_array.findIndex(policy => policy.name === body.name);
-                if (index !== -1) {
-                    policy_array.splice(index, 1);
+                if (findAndRemoveByName(policy_array, body.name)) {
                     return { result: true };
                 } else {
                     throw {
@@ -507,10 +497,8 @@ export default {
             },
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
-                if (!policy.sources) {
-                    throw { err_msg: '数据源不存在' };
-                }
-                findAndRemoveFromArray(policy.sources, s => s.name === body.name);
+                let sources = validateArrayExists(policy, 'sources', '数据源');
+                findAndRemoveFromArray(sources, s => s.name === body.name);
                 return { result: true };
             }
         },

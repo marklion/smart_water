@@ -7,6 +7,34 @@ export function validateItemExists(array, name, itemName = '项目') {
     return item;
 }
 
+export function validateNestedItemExists(parent, arrayName, name, itemName = '项目') {
+    let array = parent[arrayName];
+    if (!array) {
+        throw { err_msg: `${itemName}不存在` };
+    }
+    let item = array.find(item => item.name === name);
+    if (!item) {
+        throw { err_msg: `${itemName}不存在` };
+    }
+    return item;
+}
+
+export function findAndRemoveByName(array, name) {
+    let index = array.findIndex(item => item.name === name);
+    if (index !== -1) {
+        array.splice(index, 1);
+        return true;
+    }
+    return false;
+}
+
+export function validateArrayExists(parent, arrayName, itemName = '项目') {
+    if (!parent[arrayName]) {
+        throw { err_msg: `${itemName}不存在` };
+    }
+    return parent[arrayName];
+}
+
 // 公共工具函数
 export function ensureArrayExists(obj, arrayName) {
     if (!obj[arrayName]) {
