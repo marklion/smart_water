@@ -110,7 +110,7 @@ import {
     Check
 } from '@element-plus/icons-vue'
 import axios from 'axios'
-import PageContent from './PageContent.vue'
+import PageContent from '../../public/gui/src/components/PageContent.vue'
 import StatsOverview from './StatsOverview.vue'
 
 

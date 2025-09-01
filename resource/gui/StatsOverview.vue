@@ -92,7 +92,7 @@ import {
     Location,
     DataLine
 } from '@element-plus/icons-vue'
-import { useStatsStore } from '../composables/useStatsStore.js'
+import { useStatsStore } from '../../public/gui/src/composables/useStatsStore.js'
 
 // 使用全局状态
 const {

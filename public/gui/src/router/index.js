@@ -23,14 +23,14 @@ const router = createRouter({
       {
         name: '农场配置',
         path: '/config/farm_config',
-        component: () => import('../components/FarmConfigView.vue'),
+        component: () => import('../../../../resource/gui/FarmConfigView.vue'),
         parent: '配置中心',
         icon: MenuIcons.HOUSE
       },
       {
         name: '地块配置',
         path: '/config/block_config',
-        component: () => import('../components/BlockConfigView.vue'),
+        component: () => import('../../../../resource/gui/BlockConfigView.vue'),
         parent: '配置中心',
         icon: MenuIcons.GRID
       }
