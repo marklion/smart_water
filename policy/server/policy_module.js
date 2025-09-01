@@ -1,3 +1,12 @@
+import { 
+    ensureArrayExists, 
+    getPaginatedResult, 
+    findAndRemoveFromArray, 
+    addItemIfNotExists, 
+    mapArrayToNameOnly, 
+    mapArrayToFields 
+} from '../../public/server/common_utils.js';
+
 const policy_array = []
 
 // 公共验证函数
@@ -25,31 +34,6 @@ function validateTransformerExists(state, transformer_name) {
     return transformer;
 }
 
-// 公共工具函数
-function ensureArrayExists(obj, arrayName) {
-    if (!obj[arrayName]) {
-        obj[arrayName] = [];
-    }
-    return obj[arrayName];
-}
-
-function getPaginatedResult(array, pageNo, pageSize = 20) {
-    let current_page_content = array.slice(pageNo * pageSize, (pageNo + 1) * pageSize);
-    return {
-        items: current_page_content,
-        total: array.length,
-    };
-}
-
-function findAndRemoveFromArray(array, predicate) {
-    let index = array.findIndex(predicate);
-    if (index !== -1) {
-        array.splice(index, 1);
-        return true;
-    }
-    return false;
-}
-
 export default {
     name: 'policy',
     description: '策略管理',
@@ -67,16 +51,11 @@ export default {
             },
             func: async function (body, token) {
                 try {
-                    let existingPolicy = policy_array.find(policy => policy.name === body.name);
-                    if (!existingPolicy) {
-                        policy_array.push({
-                            name: body.name,
-                            states: []
-                        });
-                        return { result: true };
-                    } else {
-                        return { result: true }; // 如果策略已存在，也返回成功
-                    }
+                    addItemIfNotExists(policy_array, {
+                        name: body.name,
+                        states: []
+                    }, policy => policy.name === body.name);
+                    return { result: true };
                 } catch (error) {
                     throw {
                         err_msg: error.message || '创建策略失败'
@@ -144,13 +123,10 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let states = ensureArrayExists(policy, 'states');
-                let existingState = states.find(s => s.name === body.state_name);
-                if (!existingState) {
-                    states.push({
-                        name: body.state_name,
-                        enter_actions: []
-                    });
-                }
+                addItemIfNotExists(states, {
+                    name: body.state_name,
+                    enter_actions: []
+                }, s => s.name === body.state_name);
                 return { result: true };
             }
         },
@@ -173,7 +149,7 @@ export default {
             },
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
-                let states = policy.states ? policy.states.map(s => ({ name: s.name })) : [];
+                let states = mapArrayToNameOnly(policy.states);
                 let result = getPaginatedResult(states, body.pageNo);
                 return {
                     states: result.items,
@@ -266,15 +242,10 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 let enterActions = ensureArrayExists(state, 'enter_actions');
-                let existingAction = enterActions.find(action => 
-                    action.device === body.device && action.action === body.action
-                );
-                if (!existingAction) {
-                    enterActions.push({
-                        device: body.device,
-                        action: body.action
-                    });
-                }
+                addItemIfNotExists(enterActions, {
+                    device: body.device,
+                    action: body.action
+                }, action => action.device === body.device && action.action === body.action);
                 return { result: true };
             }
         },
@@ -323,13 +294,10 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 let transformers = ensureArrayExists(state, 'transformers');
-                let existingTransformer = transformers.find(t => t.name === body.transformer_name);
-                if (!existingTransformer) {
-                    transformers.push({
-                        name: body.transformer_name,
-                        rules: []
-                    });
-                }
+                addItemIfNotExists(transformers, {
+                    name: body.transformer_name,
+                    rules: []
+                }, t => t.name === body.transformer_name);
                 return { result: true };
             }
         },
@@ -354,7 +322,7 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                let transformers = state.transformers ? state.transformers.map(t => ({ name: t.name })) : [];
+                let transformers = mapArrayToNameOnly(state.transformers);
                 let result = getPaginatedResult(transformers, body.pageNo);
                 return {
                     transformers: result.items,
@@ -488,14 +456,11 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let sources = ensureArrayExists(policy, 'sources');
-                let existingSource = sources.find(s => s.name === body.name);
-                if (!existingSource) {
-                    sources.push({
-                        name: body.name,
-                        device: body.device,
-                        data_type: body.data_type
-                    });
-                }
+                addItemIfNotExists(sources, {
+                    name: body.name,
+                    device: body.device,
+                    data_type: body.data_type
+                }, s => s.name === body.name);
                 return { result: true };
             }
         },
@@ -520,11 +485,7 @@ export default {
             },
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
-                let sources = policy.sources ? policy.sources.map(s => ({ 
-                    name: s.name, 
-                    device: s.device, 
-                    data_type: s.data_type 
-                })) : [];
+                let sources = mapArrayToFields(policy.sources, ['name', 'device', 'data_type']);
                 let result = getPaginatedResult(sources, body.pageNo);
                 return {
                     sources: result.items,
