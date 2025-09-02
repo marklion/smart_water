@@ -1,5 +1,6 @@
 import cli_utils from '../../public/lib/cli_utils.js';
 import policy_lib from '../lib/policy_lib.js';
+import transformer_cli from './transformer_cli.js';
 
 export default {
     command: 'state',
@@ -12,16 +13,31 @@ export default {
         this._vorpalInstance = vorpal;
         this.prompt_prefix = prompt;
 
-        // 添加进入动作命令
-        vorpal.command('enter action <device> <action>', '添加进入状态时的动作')
-            .action(async function (args) {
-                try {
-                    await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'enter', args.device, args.action);
-                    this.log(`已添加进入动作: 设备 ${args.device} 执行 ${args.action}`);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
+        cli_utils.make_undo_cmd(vorpal, 'enter action <device> <action>', '添加进入状态时的动作', '删除所有进入动作',
+            async (cmd_this, args) => {
+                await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'enter', args.device, args.action);
+                return `已添加进入动作: 设备 ${args.device} 执行 ${args.action}`;
+            },
+            async (cmd_this, args) => {
+                const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+                let deletedCount = 0;
+                if (resp.state && resp.state.enter_actions) {
+                    for (const action of resp.state.enter_actions) {
+                        await policy_lib.del_state_action(
+                            ins.policy_view.cur_view_name, 
+                            ins.cur_view_name, 
+                            'enter', 
+                            action.device, 
+                            action.action
+                        );
+                        deletedCount++;
+                    }
                 }
+                return `已删除 ${deletedCount} 个进入动作`;
             });
+
+        transformer_cli.state_view = ins;
+        cli_utils.add_sub_cli(vorpal, transformer_cli, prompt);
 
         // 添加 bdr 命令
         vorpal.command('bdr', '列出所有配置')
@@ -70,6 +86,13 @@ export default {
                 }
             }
         }
+
+        if (this._vorpalInstance) {
+            this.cur_view_name = view_name;
+            let sub_bdr = await cli_utils.make_sub_bdr(this._vorpalInstance);
+            ret = ret.concat(sub_bdr);
+        }
+        
         return ret;
     }
 }
