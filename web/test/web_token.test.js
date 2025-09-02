@@ -78,6 +78,13 @@ describe('Web Token 验证测试', () => {
     test('应该能够成功登录并获取Token', async () => {
         const result = await callAPI('/auth/login', CONFIG.TEST_USER);
         
+        // 如果失败，输出错误信息用于调试
+        if (!result.success) {
+            console.log('登录失败，错误信息:', result.error);
+            console.log('测试用户配置:', CONFIG.TEST_USER);
+            console.log('完整响应:', result);
+        }
+        
         expect(result.success).toBe(true);
         expect(result.data.result).toBeDefined();
         expect(result.data.result.token).toBeDefined();
