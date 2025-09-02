@@ -11,10 +11,25 @@ export default {
         const vorpal = cli_utils.create_vorpal();
         this._vorpalInstance = vorpal;
 
-        cli_utils.make_common_cmd(vorpal, 'add user <name> <password>', '新增一个用户', async (cmd_this, args) => {
-            const result = await web_lib.add_user(args.name, args.password);
-            return `用户 "${args.name}" 创建成功`;
-        });
+        cli_utils.make_undo_cmd(vorpal, 'user <name> <password>', '新增一个用户', '删除所有用户',
+            async (cmd_this, args) => {
+                const result = await web_lib.add_user(args.name, args.password);
+                return `用户 "${args.name}" 创建成功`;
+            },
+            async (cmd_this, args) => {
+                const result = await web_lib.list_users();
+                let deletedCount = 0;
+                for (const user of result.users) {
+                    try {
+                        await web_lib.del_user(user.username);
+                        deletedCount++;
+                    } catch (err) {
+                        console.error(`删除用户 ${user.username} 失败:`, err.err_msg || err.message);
+                    }
+                }
+                return `已删除 ${deletedCount} 个用户`;
+            }
+        );
         cli_utils.make_common_cmd(vorpal, 'del user <name>', '删除用户', async (cmd_this, args) => {
             const result = await web_lib.del_user(args.name);
             return `用户 "${args.name}" 删除成功`;
@@ -32,7 +47,7 @@ export default {
             const result = await web_lib.list_users();
             let commands = [];
             result.users.forEach(user => {
-                commands.push(`add user ${user.username} ********`);
+                commands.push(`user ${user.username} ********`);
             });
             
             return commands;

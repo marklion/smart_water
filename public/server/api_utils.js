@@ -227,10 +227,10 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
                 try {
                     // 检查是否需要token验证
                     const isLoginApi = this.path === '/auth/login';
-                    const isLocalRequest = checkIsLocalRequest(req);
+                    const isLocalRequest = checkIsLocalRequestSecure(req);
                     
                     if (!isLoginApi && !isLocalRequest) {
-                        // 非登录接口且非本机请求需要验证token
+                        // 非登录接口且非本地请求需要验证token（Web访问）
                         if (!token) {
                             ret = result_maker(null, '缺少token，请先登录');
                             res.send(ret);
@@ -253,6 +253,9 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
                                 return;
                             }
                         }
+                    } else if (isLocalRequest && !isLoginApi) {
+                        // 本地请求（CLI）不需要token，但设置一个默认用户标识
+                        req.user = { username: 'cli_user', source: 'local' };
                     }
                 } catch (authError) {
                     console.error('Token验证出错:', authError);
@@ -293,16 +296,19 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
     return ret;
 }
 
-// 检查请求是否来自本机
-function checkIsLocalRequest(req) {
-    const remoteAddress = req.connection?.remoteAddress || 
-                         req.socket?.remoteAddress ||
-                         req.ip ||
-                         '127.0.0.1';
+// 注意：此函数仅检查直接socket地址，不受HTTP头部影响
+function checkIsLocalRequestSecure(req) {
+    // 只信任直接的socket地址，不受头部信息影响
+    const remoteAddress = req.connection?.remoteAddress || req.socket?.remoteAddress;
     
-    // 检查是否是本机地址
-    const localAddresses = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
-    return localAddresses.includes(remoteAddress);
+    if (!remoteAddress) {
+        return false; // 如果无法获取地址，则不认为是本地请求
+    }
+    
+    // 标准化IPv6映射的IPv4地址
+    const normalizedAddress = remoteAddress === '::ffff:127.0.0.1' ? '127.0.0.1' : remoteAddress;
+    const localAddresses = ['127.0.0.1', '::1'];
+    return localAddresses.includes(normalizedAddress);
 }
 
 export default make_api;
