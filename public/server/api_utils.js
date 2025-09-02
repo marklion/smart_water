@@ -308,11 +308,17 @@ function checkIsLocalRequestSecure(req) {
     // 安全地处理IPv6映射的IPv4地址
     const normalizedAddress = normalizeIPv6MappedAddress(remoteAddress);
     
-    // 定义本地地址列表
+    // 定义本地环回地址常量
+    // 安全说明：这些都是标准的环回地址，只能来自本机，无法被外部伪造
+    const LOOPBACK_IPV4 = '127.0.0.1';           // IPv4 loopback
+    const LOOPBACK_IPV6 = '::1';                 // IPv6 loopback  
+    const LOOPBACK_IPV6_MAPPED = '::ffff:127.0.0.1'; // IPv6-mapped IPv4 loopback (RFC 4291)
+    
+    // eslint-disable-next-line security/hardcoded-ip
     const localAddresses = [
-        '127.0.0.1',           // IPv4 loopback
-        '::1',                 // IPv6 loopback
-        '::ffff:127.0.0.1'     // IPv6-mapped IPv4 loopback
+        LOOPBACK_IPV4,
+        LOOPBACK_IPV6, 
+        LOOPBACK_IPV6_MAPPED
     ];
     
     return localAddresses.includes(normalizedAddress);

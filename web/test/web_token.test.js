@@ -19,15 +19,25 @@ describe('Web Token 验证测试', () => {
         // 等待服务器启动
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // 创建测试用户
+        // 创建测试用户 - 先删除可能存在的用户，再创建
         try {
-            await callAPI('/auth/add_user', CONFIG.TEST_USER);
+            await callAPI('/auth/del_user', { username: CONFIG.TEST_USER.username });
         } catch (error) {
-            // 用户可能已存在，忽略错误
+            // 用户不存在时会报错，忽略
+        }
+        
+        try {
+            const result = await callAPI('/auth/add_user', CONFIG.TEST_USER);
+            if (!result.success) {
+                console.log('创建测试用户失败:', result.error);
+            }
+        } catch (error) {
+            console.log('创建测试用户异常:', error);
         }
     }, 60000);
 
     afterAll(async () => {
+        await close_server();
     });
 
     async function callAPI(endpoint, data = {}, token = null) {
@@ -67,6 +77,13 @@ describe('Web Token 验证测试', () => {
 
     test('应该能够成功登录并获取Token', async () => {
         const result = await callAPI('/auth/login', CONFIG.TEST_USER);
+        
+        // 如果失败，输出错误信息用于调试
+        if (!result.success) {
+            console.log('登录失败，错误信息:', result.error);
+            console.log('测试用户配置:', CONFIG.TEST_USER);
+            console.log('完整响应:', result);
+        }
         
         expect(result.success).toBe(true);
         expect(result.data.result).toBeDefined();
