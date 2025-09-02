@@ -224,6 +224,46 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
                 let body = req.body;
                 let token = req.headers['token'];
                 let ret = result_maker(null, '未知错误');
+                try {
+                    // 检查是否需要token验证
+                    const isLoginApi = this.path === '/auth/login';
+                    const isLocalRequest = checkIsLocalRequestSecure(req);
+                    
+                    if (!isLoginApi && !isLocalRequest) {
+                        // 非登录接口且非本地请求需要验证token（Web访问）
+                        if (!token) {
+                            ret = result_maker(null, '缺少token，请先登录');
+                            res.send(ret);
+                            return;
+                        }
+                        
+                        // 验证token有效性
+                        if (app.authModule && app.authModule.verifyToken) {
+                            try {
+                                const decoded = app.authModule.verifyToken(token);
+                                if (!decoded) {
+                                    ret = result_maker(null, 'Token无效或已过期，请重新登录');
+                                    res.send(ret);
+                                    return;
+                                }
+                                req.user = decoded;
+                            } catch (authError) {
+                                ret = result_maker(null, 'Token验证失败，请重新登录');
+                                res.send(ret);
+                                return;
+                            }
+                        }
+                    } else if (isLocalRequest && !isLoginApi) {
+                        // 本地请求（CLI）不需要token，但设置一个默认用户标识
+                        req.user = { username: 'cli_user', source: 'local' };
+                    }
+                } catch (authError) {
+                    console.error('Token验证出错:', authError);
+                    ret = result_maker(null, '身份验证失败');
+                    res.send(ret);
+                    return;
+                }
+                
                 let pc_ret = api_param_check(this.params, body);
                 if (pc_ret.length > 0) {
                     ret = result_maker(null, '参数错误:' + pc_ret);
@@ -254,6 +294,66 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
     };
 
     return ret;
+}
+
+// 注意：此函数仅检查直接socket地址，不受HTTP头部影响
+function checkIsLocalRequestSecure(req) {
+    // 只信任直接的socket地址，不受头部信息影响
+    const remoteAddress = req.connection?.remoteAddress || req.socket?.remoteAddress;
+    
+    if (!remoteAddress) {
+        return false; // 如果无法获取地址，则不认为是本地请求
+    }
+    
+    // 安全地处理IPv6映射的IPv4地址
+    const normalizedAddress = normalizeIPv6MappedAddress(remoteAddress);
+    
+    // 定义本地环回地址常量
+    // 安全说明：这些都是标准的环回地址，只能来自本机，无法被外部伪造
+    const LOOPBACK_IPV4 = '127.0.0.1';           // IPv4 loopback
+    const LOOPBACK_IPV6 = '::1';                 // IPv6 loopback  
+    const LOOPBACK_IPV6_MAPPED = '::ffff:127.0.0.1'; // IPv6-mapped IPv4 loopback (RFC 4291)
+    
+    // eslint-disable-next-line security/hardcoded-ip
+    const localAddresses = [
+        LOOPBACK_IPV4,
+        LOOPBACK_IPV6, 
+        LOOPBACK_IPV6_MAPPED
+    ];
+    
+    return localAddresses.includes(normalizedAddress);
+}
+
+// 辅助函数：安全地标准化IPv6映射的IPv4地址
+function normalizeIPv6MappedAddress(address) {
+    if (!address || typeof address !== 'string') {
+        return address;
+    }
+    
+    // 检查是否是IPv6映射的IPv4地址格式
+    const ipv6MappedPattern = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i;
+    const match = address.match(ipv6MappedPattern);
+    
+    if (match) {
+        const ipv4Part = match[1];
+        // 验证IPv4地址格式的有效性
+        if (isValidIPv4(ipv4Part)) {
+            return ipv4Part;
+        }
+    }
+    
+    return address;
+}
+
+// 验证IPv4地址格式
+function isValidIPv4(ip) {
+    const parts = ip.split('.');
+    if (parts.length !== 4) return false;
+    
+    return parts.every(part => {
+        const num = parseInt(part, 10);
+        return num >= 0 && num <= 255 && part === num.toString();
+    });
 }
 
 export default make_api;
