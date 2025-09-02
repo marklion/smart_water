@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { start_server, close_server } from '../../public/lib/test_utils.js';
 
 // 配置
 const CONFIG = {
@@ -14,12 +15,19 @@ describe('Web Token 验证测试', () => {
     let authToken = null;
 
     beforeAll(async () => {
+        await start_server();
+        // 等待服务器启动
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         // 创建测试用户
         try {
             await callAPI('/auth/add_user', CONFIG.TEST_USER);
         } catch (error) {
             // 用户可能已存在，忽略错误
         }
+    }, 60000);
+
+    afterAll(async () => {
     });
 
     async function callAPI(endpoint, data = {}, token = null) {
