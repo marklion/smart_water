@@ -203,6 +203,22 @@ export default {
                                     }
                                 }
                             }
+                        },
+                        do_actions: { 
+                            type: Array, 
+                            mean: '状态内动作列表', 
+                            explain: {
+                                device: { type: String, mean: '设备名称', example: '阀门1' },
+                                action: { type: String, mean: '动作名称', example: '开启' }
+                            }
+                        },
+                        exit_actions: { 
+                            type: Array, 
+                            mean: '离开动作列表', 
+                            explain: {
+                                device: { type: String, mean: '设备名称', example: '阀门1' },
+                                action: { type: String, mean: '动作名称', example: '关闭' }
+                            }
                         }
                     }
                 }
@@ -211,6 +227,59 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 return { state };
+            }
+        },
+        del_state: {
+            name: '删除状态',
+            description: '删除策略中的一个状态',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                return { state };
+            }
+        },
+        del_state: {
+            name: '删除状态',
+            description: '删除策略中的一个状态',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                if (!policy.states) {
+                    throw { err_msg: '状态不存在' };
+                }
+                let index = policy.states.findIndex(s => s.name === body.state_name);
+                if (index !== -1) {
+                    policy.states.splice(index, 1);
+                    return { result: true };
+                } else {
+                    throw { err_msg: '状态不存在' };
+                }
             }
         },
         add_state_action: {
@@ -427,6 +496,56 @@ export default {
                     rule.target_state === body.target_state
                 );
                 return { result: true };
+            }
+        },
+        del_state_action: {
+            name: '删除状态动作',
+            description: '删除状态中的一个动作',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
+                device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
+                action: { type: String, mean: '动作名称', example: '开启', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = policy_array.find(p => p.name === body.policy_name);
+                if (!policy) {
+                    throw { err_msg: '策略不存在' };
+                }
+                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
+                if (!state) {
+                    throw { err_msg: '状态不存在' };
+                }
+                
+                // 根据触发类型决定操作的动作列表
+                let actionList;
+                if (body.trigger === 'enter') {
+                    actionList = state.enter_actions;
+                } else if (body.trigger === 'do') {
+                    actionList = state.do_actions;
+                } else if (body.trigger === 'exit') {
+                    actionList = state.exit_actions;
+                } else {
+                    throw { err_msg: '无效的触发类型，必须是 enter, do, 或 exit' };
+                }
+                
+                if (!actionList) {
+                    throw { err_msg: '动作不存在' };
+                }
+                
+                let index = actionList.findIndex(a => a.device === body.device && a.action === body.action);
+                if (index !== -1) {
+                    actionList.splice(index, 1);
+                    return { result: true };
+                } else {
+                    throw { err_msg: '动作不存在' };
+                }
             }
         },
         add_source: {

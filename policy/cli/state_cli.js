@@ -39,6 +39,50 @@ export default {
         transformer_cli.state_view = ins;
         cli_utils.add_sub_cli(vorpal, transformer_cli, prompt);
 
+        // 添加在状态内执行的动作命令
+        vorpal.command('do action <device> <action>', '添加在状态内执行的动作')
+            .action(async function (args) {
+                try {
+                    await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'do', args.device, args.action);
+                    this.log(`已添加状态内动作: 设备 ${args.device} 执行 ${args.action}`);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
+            });
+
+        // 添加离开状态时的动作命令
+        vorpal.command('exit action <device> <action>', '添加离开状态时执行的动作')
+            .action(async function (args) {
+                try {
+                    await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'exit', args.device, args.action);
+                    this.log(`已添加离开动作: 设备 ${args.device} 执行 ${args.action}`);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
+            });
+
+        // 删除状态内动作命令
+        vorpal.command('del do <device> <action>', '删除在状态内执行的动作')
+            .action(async function (args) {
+                try {
+                    await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'do', args.device, args.action);
+                    this.log(`已删除状态内动作: 设备 ${args.device} 执行 ${args.action}`);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
+            });
+
+        // 删除离开动作命令
+        vorpal.command('del exit <device> <action>', '删除离开状态时执行的动作')
+            .action(async function (args) {
+                try {
+                    await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'exit', args.device, args.action);
+                    this.log(`已删除离开动作: 设备 ${args.device} 执行 ${args.action}`);
+                } catch (err) {
+                    this.log('Error:', err.err_msg || '未知错误');
+                }
+            });
+
         // 添加 bdr 命令
         vorpal.command('bdr', '列出所有配置')
             .action(async function (args) {
@@ -83,6 +127,16 @@ export default {
             if (resp.state.enter_actions) {
                 for (const action of resp.state.enter_actions) {
                     ret.push(`  enter action ${action.device} ${action.action}`);
+                }
+            }
+            if (resp.state.do_actions) {
+                for (const action of resp.state.do_actions) {
+                    ret.push(`  do action ${action.device} ${action.action}`);
+                }
+            }
+            if (resp.state.exit_actions) {
+                for (const action of resp.state.exit_actions) {
+                    ret.push(`  exit action ${action.device} ${action.action}`);
                 }
             }
         }
