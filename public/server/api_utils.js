@@ -305,10 +305,49 @@ function checkIsLocalRequestSecure(req) {
         return false; // 如果无法获取地址，则不认为是本地请求
     }
     
-    // 标准化IPv6映射的IPv4地址
-    const normalizedAddress = remoteAddress === '::ffff:127.0.0.1' ? '127.0.0.1' : remoteAddress;
-    const localAddresses = ['127.0.0.1', '::1'];
+    // 安全地处理IPv6映射的IPv4地址
+    const normalizedAddress = normalizeIPv6MappedAddress(remoteAddress);
+    
+    // 定义本地地址列表
+    const localAddresses = [
+        '127.0.0.1',           // IPv4 loopback
+        '::1',                 // IPv6 loopback
+        '::ffff:127.0.0.1'     // IPv6-mapped IPv4 loopback
+    ];
+    
     return localAddresses.includes(normalizedAddress);
+}
+
+// 辅助函数：安全地标准化IPv6映射的IPv4地址
+function normalizeIPv6MappedAddress(address) {
+    if (!address || typeof address !== 'string') {
+        return address;
+    }
+    
+    // 检查是否是IPv6映射的IPv4地址格式
+    const ipv6MappedPattern = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i;
+    const match = address.match(ipv6MappedPattern);
+    
+    if (match) {
+        const ipv4Part = match[1];
+        // 验证IPv4地址格式的有效性
+        if (isValidIPv4(ipv4Part)) {
+            return ipv4Part;
+        }
+    }
+    
+    return address;
+}
+
+// 验证IPv4地址格式
+function isValidIPv4(ip) {
+    const parts = ip.split('.');
+    if (parts.length !== 4) return false;
+    
+    return parts.every(part => {
+        const num = parseInt(part, 10);
+        return num >= 0 && num <= 255 && part === num.toString();
+    });
 }
 
 export default make_api;
