@@ -1,13 +1,12 @@
 import axios from 'axios';
-import { start_server, close_server } from '../../public/lib/test_utils.js';
 
 // 配置
 const CONFIG = {
     SERVER_URL: 'http://localhost:47147',
     API_BASE: '/api/v1',
     TEST_USER: {
-        username: 'admin',
-        password: 'admin123'
+        username: process.env.TEST_USERNAME || 'testuser',
+        password: process.env.TEST_PASSWORD || 'testpass123456'
     }
 };
 
@@ -15,21 +14,13 @@ describe('Web Token 验证测试', () => {
     let authToken = null;
 
     beforeAll(async () => {
-        await start_server();
-        // 等待服务器启动
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
         // 创建测试用户
         try {
             await callAPI('/auth/add_user', CONFIG.TEST_USER);
         } catch (error) {
             // 用户可能已存在，忽略错误
         }
-    }, 30000); // 30秒
-
-    afterAll(async () => {
-        await close_server();
-    }, 30000); // 30秒
+    });
 
     async function callAPI(endpoint, data = {}, token = null) {
         const url = `${CONFIG.SERVER_URL}${CONFIG.API_BASE}${endpoint}`;
