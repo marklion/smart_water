@@ -231,14 +231,6 @@ export default {
                                 }
                             }
                         },
-                        enter_actions: { 
-                            type: Array, 
-                            mean: '进入动作列表', 
-                            explain: {
-                                device: { type: String, mean: '设备名称', example: '阀门1' },
-                                action: { type: String, mean: '动作名称', example: '开启' }
-                            }
-                        },
                         do_actions: { 
                             type: Array, 
                             mean: '状态内动作列表', 

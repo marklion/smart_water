@@ -2,28 +2,31 @@ import cli_utils from '../../public/lib/cli_utils.js';
 import policy_lib from '../lib/policy_lib.js';
 import transformer_cli from './transformer_cli.js';
 
+// 常量定义
+const TRIGGER_NAMES = {
+    'enter': '进入状态时',
+    'do': '在状态内',
+    'exit': '离开状态时'
+};
+
+const ACTION_NAMES = {
+    'enter': '进入动作',
+    'do': '状态内动作',
+    'exit': '离开动作'
+};
+
+const ACTION_TYPES = ['enter', 'do', 'exit'];
+
 // 辅助函数：创建动作命令
-function createActionCommand(vorpal, ins, trigger, actionType) {
-    const triggerNames = {
-        'enter': '进入状态时',
-        'do': '在状态内',
-        'exit': '离开状态时'
-    };
-    
-    const actionNames = {
-        'enter': '进入动作',
-        'do': '状态内动作', 
-        'exit': '离开动作'
-    };
-    
+function createActionCommand(vorpal, ins, trigger) {
     cli_utils.make_undo_cmd(
         vorpal, 
         `${trigger} action <device> <action>`, 
-        `【${actionNames[trigger]}】添加${triggerNames[trigger]}执行的动作`, 
-        `【撤销操作】删除所有${actionNames[trigger]}`,
+        `${ACTION_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}执行的动作`, 
+        `撤销操作 - 删除所有${ACTION_NAMES[trigger]}`,
         async (cmd_this, args) => {
             await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
-            return `已添加${actionNames[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
+            return `已添加${ACTION_NAMES[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
         },
         async (cmd_this, args) => {
             const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
@@ -41,31 +44,25 @@ function createActionCommand(vorpal, ins, trigger, actionType) {
                     deletedCount++;
                 }
             }
-            return `已删除 ${deletedCount} 个${actionNames[trigger]}`;
+            return `已删除 ${deletedCount} 个${ACTION_NAMES[trigger]}`;
         }
     );
 }
 
 // 辅助函数：创建删除动作命令
 function createDelActionCommand(vorpal, ins, trigger) {
-    const actionNames = {
-        'enter': '进入动作',
-        'do': '状态内动作',
-        'exit': '离开动作'
-    };
-    
     cli_utils.make_undo_cmd(
         vorpal,
         `del ${trigger} <device> <action>`,
-        `【删除${actionNames[trigger]}】移除指定设备和动作`,
-        `【撤销删除】恢复已删除的${actionNames[trigger]}`,
+        `删除${ACTION_NAMES[trigger]} - 移除指定设备和动作`,
+        `撤销删除 - 恢复已删除的${ACTION_NAMES[trigger]}`,
         async (cmd_this, args) => {
             await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
-            return `已删除${actionNames[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
+            return `已删除${ACTION_NAMES[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
         },
         async (cmd_this, args) => {
             await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
-            return `已恢复${actionNames[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
+            return `已恢复${ACTION_NAMES[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
         }
     );
 }
@@ -81,21 +78,17 @@ export default {
         this._vorpalInstance = vorpal;
         this.prompt_prefix = prompt;
 
-        // 创建所有动作命令
-        createActionCommand(vorpal, ins, 'enter');
-        createActionCommand(vorpal, ins, 'do');
-        createActionCommand(vorpal, ins, 'exit');
+        // 创建所有动作相关命令
+        ACTION_TYPES.forEach(actionType => {
+            createActionCommand(vorpal, ins, actionType);
+            createDelActionCommand(vorpal, ins, actionType);
+        });
 
         transformer_cli.state_view = ins;
         cli_utils.add_sub_cli(vorpal, transformer_cli, prompt);
 
-        // 创建所有删除动作命令
-        createDelActionCommand(vorpal, ins, 'enter');
-        createDelActionCommand(vorpal, ins, 'do');
-        createDelActionCommand(vorpal, ins, 'exit');
-
         // 添加 bdr 命令
-        vorpal.command('bdr', '【查看配置】列出所有状态动作配置')
+        vorpal.command('bdr', '查看配置 - 列出所有状态动作配置')
             .action(async function (args) {
                 try {
                     this.log((await ins.make_bdr(ins.cur_view_name)).join('\n'));
@@ -136,16 +129,15 @@ export default {
         const resp = await policy_lib.get_state(this.policy_view.cur_view_name, view_name);
         
         if (resp.state) {
-            // 使用循环处理所有动作类型，减少重复代码
-            const actionTypes = ['enter', 'do', 'exit'];
-            for (const actionType of actionTypes) {
+            // 使用常量定义处理所有动作类型
+            ACTION_TYPES.forEach(actionType => {
                 const actionsKey = `${actionType}_actions`;
                 if (resp.state[actionsKey]) {
-                    for (const action of resp.state[actionsKey]) {
+                    resp.state[actionsKey].forEach(action => {
                         ret.push(`  ${actionType} action ${action.device} ${action.action}`);
-                    }
+                    });
                 }
-            }
+            });
         }
 
         if (this._vorpalInstance) {
