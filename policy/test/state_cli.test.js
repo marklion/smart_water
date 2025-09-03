@@ -115,9 +115,17 @@ beforeAll(async () => {
     cli = await test_utils('npm run dev_cli');
     await start_server();
     // 彻底清理，确保干净的测试环境
-    await cli.run_cmd('clear');
-    await cli.run_cmd('return'); // 确保在根级别
-    await cli.run_cmd('clear');  // 再次清理
+    try {
+        await cli.run_cmd('return'); // 尝试返回到根级别
+    } catch (e) {
+        // 如果已经在根级别，忽略错误
+    }
+    await cli.run_cmd('clear');  // 清理配置
+    
+    // 在CI环境下额外等待，确保状态稳定
+    if (process.env.CI) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
 });
 
 afterAll(async () => {
@@ -134,9 +142,18 @@ afterAll(async () => {
 describe('状态 CLI 测试', () => {
     beforeEach(async () => {
         // 确保从根级别开始，彻底清空所有配置
-        await cli.run_cmd('return'); // 先返回到根级别
+        try {
+            await cli.run_cmd('return'); // 先返回到根级别
+        } catch (e) {
+            // 如果已经在根级别，忽略错误
+        }
         await cli.run_cmd('clear');  // 清空配置
         await cli.run_cmd('policy'); // 进入策略管理
+        
+        // 在CI环境下额外等待
+        if (process.env.CI) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
     });
 
     afterEach(async () => {
