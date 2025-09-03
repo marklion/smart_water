@@ -3,6 +3,13 @@ import { print_test_log, start_server, close_server } from "../../public/lib/tes
 
 let cli;
 
+// 常量定义 - 与CLI保持一致
+const ACTION_NAMES = {
+    'enter': '进入动作',
+    'do': '状态内动作',
+    'exit': '离开动作'
+};
+
 // 测试辅助函数
 async function setupPolicyState(cli, policyName, stateName) {
     await cli.run_cmd('policy');
@@ -31,27 +38,15 @@ async function returnToRoot(cli) {
 
 // 辅助函数：测试添加动作并验证结果
 async function testAddAction(cli, actionType, device, action) {
-    const actionNames = {
-        'enter': '进入动作',
-        'do': '状态内动作',
-        'exit': '离开动作'
-    };
-    
     const result = await cli.run_cmd(`${actionType} action ${device} ${action}`);
-    expect(result).toContain(`已添加${actionNames[actionType]}: 设备 ${device} 执行 ${action}`);
+    expect(result).toContain(`已添加${ACTION_NAMES[actionType]}: 设备 ${device} 执行 ${action}`);
     return result;
 }
 
 // 辅助函数：测试删除动作并验证结果
 async function testDelAction(cli, actionType, device, action) {
-    const actionNames = {
-        'enter': '进入动作',
-        'do': '状态内动作',
-        'exit': '离开动作'
-    };
-    
     const result = await cli.run_cmd(`del ${actionType} ${device} ${action}`);
-    expect(result).toContain(`已删除${actionNames[actionType]}: 设备 ${device} 执行 ${action}`);
+    expect(result).toContain(`已删除${ACTION_NAMES[actionType]}: 设备 ${device} 执行 ${action}`);
     return result;
 }
 

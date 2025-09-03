@@ -13,6 +13,17 @@ import {
 
 const policy_array = []
 
+// 常量定义 - 减少重复代码
+const ACTION_FIELD_SCHEMA = {
+    device: { type: String, mean: '设备名称', example: '阀门1' },
+    action: { type: String, mean: '动作名称', example: '开启' }
+};
+
+const ACTION_PARAMS_SCHEMA = {
+    device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
+    action: { type: String, mean: '动作名称', example: '开启', have_to: true }
+};
+
 // 公共验证函数
 function validatePolicyExists(policy_name) {
     return validateItemExists(policy_array, policy_name, '策略');
@@ -211,10 +222,7 @@ export default {
                         enter_actions: { 
                             type: Array, 
                             mean: '进入动作列表', 
-                            explain: {
-                                device: { type: String, mean: '设备名称', example: '阀门1' },
-                                action: { type: String, mean: '动作名称', example: '开启' }
-                            }
+                            explain: ACTION_FIELD_SCHEMA
                         },
                         transformers: { 
                             type: Array, 
@@ -234,18 +242,12 @@ export default {
                         do_actions: { 
                             type: Array, 
                             mean: '状态内动作列表', 
-                            explain: {
-                                device: { type: String, mean: '设备名称', example: '阀门1' },
-                                action: { type: String, mean: '动作名称', example: '开启' }
-                            }
+                            explain: ACTION_FIELD_SCHEMA
                         },
                         exit_actions: { 
                             type: Array, 
                             mean: '离开动作列表', 
-                            explain: {
-                                device: { type: String, mean: '设备名称', example: '阀门1' },
-                                action: { type: String, mean: '动作名称', example: '关闭' }
-                            }
+                            explain: ACTION_FIELD_SCHEMA
                         }
                     }
                 }
@@ -266,8 +268,7 @@ export default {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
                 trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
-                device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
-                action: { type: String, mean: '动作名称', example: '开启', have_to: true }
+                ...ACTION_PARAMS_SCHEMA
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
@@ -457,8 +458,7 @@ export default {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
                 trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
-                device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
-                action: { type: String, mean: '动作名称', example: '开启', have_to: true }
+                ...ACTION_PARAMS_SCHEMA
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
