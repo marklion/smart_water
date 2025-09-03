@@ -35,8 +35,13 @@ export default {
             return `用户 "${args.name}" 删除成功`;
         });
         cli_utils.make_common_cmd(vorpal, 'bdr', '列出当前用户配置', async (cmd_this, args) => {
-            const commands = await ins.make_bdr('');
-            return commands.join('\n');
+            try {
+                const commands = await ins.make_bdr('');
+                return commands.join('\n');
+            } catch (err) {
+                console.error('BDR命令执行失败:', err);
+                return '';
+            }
         });
         
         vorpal.delimiter(prompt);
@@ -46,13 +51,17 @@ export default {
         try {
             const result = await web_lib.list_users();
             let commands = [];
-            result.users.forEach(user => {
-                commands.push(`user ${user.username} ********`);
-            });
+            if (result && result.users && Array.isArray(result.users)) {
+                result.users.forEach(user => {
+                    commands.push(`user ${user.username} ********`);
+                });
+            } else {
+                console.log('list_users返回结果异常:', result);
+            }
             
             return commands;
         } catch (err) {
-            console.error('获取用户列表失败:', err.err_msg || err.message);
+            console.error('获取用户列表失败:', err.err_msg || err.message || err);
             return [];
         }
     }
