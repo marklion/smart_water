@@ -26,6 +26,33 @@ function validateTransformerExists(state, transformer_name) {
     return validateNestedItemExists(state, 'transformers', transformer_name, '转换器');
 }
 
+// 辅助函数：根据触发类型获取动作列表名称
+function getActionListName(trigger) {
+    const actionListMap = {
+        'enter': 'enter_actions',
+        'do': 'do_actions', 
+        'exit': 'exit_actions'
+    };
+    
+    const listName = actionListMap[trigger];
+    if (!listName) {
+        throw { err_msg: '无效的触发类型，必须是 enter, do, 或 exit' };
+    }
+    return listName;
+}
+
+// 辅助函数：获取并验证动作列表
+function getActionList(state, trigger, shouldExist = false) {
+    const listName = getActionListName(trigger);
+    const actionList = state[listName];
+    
+    if (shouldExist && !actionList) {
+        throw { err_msg: '动作不存在' };
+    }
+    
+    return actionList;
+}
+
 export default {
     name: 'policy',
     description: '策略管理',
@@ -204,6 +231,14 @@ export default {
                                 }
                             }
                         },
+                        enter_actions: { 
+                            type: Array, 
+                            mean: '进入动作列表', 
+                            explain: {
+                                device: { type: String, mean: '设备名称', example: '阀门1' },
+                                action: { type: String, mean: '动作名称', example: '开启' }
+                            }
+                        },
                         do_actions: { 
                             type: Array, 
                             mean: '状态内动作列表', 
@@ -249,18 +284,7 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 
-                // 根据触发类型决定操作的动作列表
-                let actionListName;
-                if (body.trigger === 'enter') {
-                    actionListName = 'enter_actions';
-                } else if (body.trigger === 'do') {
-                    actionListName = 'do_actions';
-                } else if (body.trigger === 'exit') {
-                    actionListName = 'exit_actions';
-                } else {
-                    throw { err_msg: '无效的触发类型，必须是 enter, do, 或 exit' };
-                }
-                
+                let actionListName = getActionListName(body.trigger);
                 let actionList = ensureArrayExists(state, actionListName);
                 addItemIfNotExists(actionList, {
                     device: body.device,
@@ -448,38 +472,19 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let policy = policy_array.find(p => p.name === body.policy_name);
-                if (!policy) {
-                    throw { err_msg: '策略不存在' };
-                }
-                let state = policy.states ? policy.states.find(s => s.name === body.state_name) : null;
-                if (!state) {
-                    throw { err_msg: '状态不存在' };
-                }
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
                 
-                // 根据触发类型决定操作的动作列表
-                let actionList;
-                if (body.trigger === 'enter') {
-                    actionList = state.enter_actions;
-                } else if (body.trigger === 'do') {
-                    actionList = state.do_actions;
-                } else if (body.trigger === 'exit') {
-                    actionList = state.exit_actions;
-                } else {
-                    throw { err_msg: '无效的触发类型，必须是 enter, do, 或 exit' };
-                }
+                let actionList = getActionList(state, body.trigger, true);
                 
-                if (!actionList) {
+                let actionRemoved = findAndRemoveFromArray(actionList, 
+                    a => a.device === body.device && a.action === body.action);
+                
+                if (!actionRemoved) {
                     throw { err_msg: '动作不存在' };
                 }
                 
-                let index = actionList.findIndex(a => a.device === body.device && a.action === body.action);
-                if (index !== -1) {
-                    actionList.splice(index, 1);
-                    return { result: true };
-                } else {
-                    throw { err_msg: '动作不存在' };
-                }
+                return { result: true };
             }
         },
         add_source: {

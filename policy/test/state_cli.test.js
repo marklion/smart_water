@@ -29,6 +29,52 @@ async function returnToRoot(cli) {
     await cli.run_cmd('return');
 }
 
+// 辅助函数：测试添加动作并验证结果
+async function testAddAction(cli, actionType, device, action) {
+    const actionNames = {
+        'enter': '进入动作',
+        'do': '状态内动作',
+        'exit': '离开动作'
+    };
+    
+    const result = await cli.run_cmd(`${actionType} action ${device} ${action}`);
+    expect(result).toContain(`已添加${actionNames[actionType]}: 设备 ${device} 执行 ${action}`);
+    return result;
+}
+
+// 辅助函数：测试删除动作并验证结果
+async function testDelAction(cli, actionType, device, action) {
+    const actionNames = {
+        'enter': '进入动作',
+        'do': '状态内动作',
+        'exit': '离开动作'
+    };
+    
+    const result = await cli.run_cmd(`del ${actionType} ${device} ${action}`);
+    expect(result).toContain(`已删除${actionNames[actionType]}: 设备 ${device} 执行 ${action}`);
+    return result;
+}
+
+// 辅助函数：批量添加动作
+async function addMultipleActions(cli, actions) {
+    const results = [];
+    for (const {type, device, action} of actions) {
+        const result = await testAddAction(cli, type, device, action);
+        results.push(result);
+    }
+    return results;
+}
+
+// 辅助函数：批量删除动作
+async function delMultipleActions(cli, actions) {
+    const results = [];
+    for (const {type, device, action} of actions) {
+        const result = await testDelAction(cli, type, device, action);
+        results.push(result);
+    }
+    return results;
+}
+
 beforeAll(async () => {
     print_test_log('state CLI test begin', true);
     cli = await test_utils('npm run dev_cli');
@@ -142,22 +188,14 @@ describe('状态 CLI 测试', () => {
         // 创建策略和状态
         await setupPolicyState(cli, 'action_test', 's1');
         
-        // 测试添加 do action
-        let result = await cli.run_cmd('do action 水泵1 运行');
-        expect(result).toContain('已添加状态内动作: 设备 水泵1 执行 运行');
-        
-        result = await cli.run_cmd('do action 传感器1 监测');
-        expect(result).toContain('已添加状态内动作: 设备 传感器1 执行 监测');
-        
-        // 测试添加 exit action
-        result = await cli.run_cmd('exit action 阀门1 关闭');
-        expect(result).toContain('已添加离开动作: 设备 阀门1 执行 关闭');
-        
-        result = await cli.run_cmd('exit action 灯光1 关灯');
-        expect(result).toContain('已添加离开动作: 设备 灯光1 执行 关灯');
-        
-        // 同时添加 enter action 以测试完整配置
-        await cli.run_cmd('enter action 开关1 启动');
+        // 批量添加动作
+        await addMultipleActions(cli, [
+            {type: 'do', device: '水泵1', action: '运行'},
+            {type: 'do', device: '传感器1', action: '监测'},
+            {type: 'exit', device: '阀门1', action: '关闭'},
+            {type: 'exit', device: '灯光1', action: '关灯'},
+            {type: 'enter', device: '开关1', action: '启动'}
+        ]);
         
         // 验证所有动作都在 bdr 中显示
         await verifyBdrContains(cli, [
@@ -186,10 +224,15 @@ describe('状态 CLI 测试', () => {
         // 创建策略和状态
         await setupPolicyState(cli, 'del_test', 's1');
         
-        // 添加各种类型的动作
-        await cli.run_cmd('enter action 设备1 动作1');
-        await cli.run_cmd('do action 设备2 动作2');
-        await cli.run_cmd('exit action 设备3 动作3');
+        // 定义测试动作
+        const testActions = [
+            {type: 'enter', device: '设备1', action: '动作1'},
+            {type: 'do', device: '设备2', action: '动作2'},
+            {type: 'exit', device: '设备3', action: '动作3'}
+        ];
+        
+        // 批量添加动作
+        await addMultipleActions(cli, testActions);
         
         // 验证动作已添加
         await verifyBdrContains(cli, [
@@ -198,17 +241,8 @@ describe('状态 CLI 测试', () => {
             'exit action 设备3 动作3'
         ]);
         
-        // 测试删除 enter action
-        let result = await cli.run_cmd('del enter 设备1 动作1');
-        expect(result).toContain('已删除进入动作: 设备 设备1 执行 动作1');
-        
-        // 测试删除 do action
-        result = await cli.run_cmd('del do 设备2 动作2');
-        expect(result).toContain('已删除状态内动作: 设备 设备2 执行 动作2');
-        
-        // 测试删除 exit action
-        result = await cli.run_cmd('del exit 设备3 动作3');
-        expect(result).toContain('已删除离开动作: 设备 设备3 执行 动作3');
+        // 批量删除动作
+        await delMultipleActions(cli, testActions);
         
         // 验证所有动作都已删除
         await verifyBdrNotContains(cli, [
