@@ -13,6 +13,17 @@ import {
 
 const policy_array = []
 
+// 常量定义 - 减少重复代码
+const ACTION_FIELD_SCHEMA = {
+    device: { type: String, mean: '设备名称', example: '阀门1' },
+    action: { type: String, mean: '动作名称', example: '开启' }
+};
+
+const ACTION_PARAMS_SCHEMA = {
+    device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
+    action: { type: String, mean: '动作名称', example: '开启', have_to: true }
+};
+
 // 公共验证函数
 function validatePolicyExists(policy_name) {
     return validateItemExists(policy_array, policy_name, '策略');
@@ -24,6 +35,60 @@ function validateStateExists(policy, state_name) {
 
 function validateTransformerExists(state, transformer_name) {
     return validateNestedItemExists(state, 'transformers', transformer_name, '转换器');
+}
+
+// 辅助函数：根据触发类型获取动作列表名称
+function getActionListName(trigger) {
+    const actionListMap = {
+        'enter': 'enter_actions',
+        'do': 'do_actions', 
+        'exit': 'exit_actions'
+    };
+    
+    const listName = actionListMap[trigger];
+    if (!listName) {
+        throw { err_msg: '无效的触发类型，必须是 enter, do, 或 exit' };
+    }
+    return listName;
+}
+
+// 辅助函数：获取并验证动作列表
+function getActionList(state, trigger, shouldExist = false) {
+    const listName = getActionListName(trigger);
+    const actionList = state[listName];
+    
+    if (shouldExist && !actionList) {
+        throw { err_msg: '动作不存在' };
+    }
+    
+    return actionList;
+}
+
+// 辅助函数：根据触发类型获取赋值表达式列表名称
+function getAssignmentListName(trigger) {
+    const assignmentListMap = {
+        'enter': 'enter_assignments',
+        'do': 'do_assignments', 
+        'exit': 'exit_assignments'
+    };
+    
+    const listName = assignmentListMap[trigger];
+    if (!listName) {
+        throw { err_msg: '无效的触发类型，必须是 enter, do, 或 exit' };
+    }
+    return listName;
+}
+
+// 辅助函数：获取并验证赋值表达式列表
+function getAssignmentList(state, trigger, shouldExist = false) {
+    const listName = getAssignmentListName(trigger);
+    const assignmentList = state[listName];
+    
+    if (shouldExist && !assignmentList) {
+        throw { err_msg: '赋值表达式不存在' };
+    }
+    
+    return assignmentList;
 }
 
 export default {
@@ -115,7 +180,12 @@ export default {
                 let states = ensureArrayExists(policy, 'states');
                 addItemIfNotExists(states, {
                     name: body.state_name,
-                    enter_actions: []
+                    enter_actions: [],
+                    do_actions: [],
+                    exit_actions: [],
+                    enter_assignments: [],
+                    do_assignments: [],
+                    exit_assignments: []
                 }, s => s.name === body.state_name);
                 return { result: true };
             }
@@ -133,14 +203,77 @@ export default {
                     type: Array, 
                     mean: '状态列表', 
                     explain: {
-                        name: { type: String, mean: '状态名称', example: 's1' }
+                        name: { type: String, mean: '状态名称', example: 's1' },
+                        enter_actions: { 
+                            type: Array, 
+                            mean: '进入动作列表', 
+                            explain: {
+                                device: { type: String, mean: '设备名称', example: '阀门1' },
+                                action: { type: String, mean: '动作名称', example: '开启' }
+                            }
+                        },
+                        do_actions: { 
+                            type: Array, 
+                            mean: '状态内动作列表', 
+                            explain: {
+                                device: { type: String, mean: '设备名称', example: '阀门1' },
+                                action: { type: String, mean: '动作名称', example: '开启' }
+                            }
+                        },
+                        exit_actions: { 
+                            type: Array, 
+                            mean: '离开动作列表', 
+                            explain: {
+                                device: { type: String, mean: '设备名称', example: '阀门1' },
+                                action: { type: String, mean: '动作名称', example: '开启' }
+                            }
+                        },
+                        enter_assignments: {
+                            type: Array,
+                            mean: '进入状态赋值表达式列表',
+                            explain: {
+                                variable_name: { type: String, mean: '变量名', example: 'temp' },
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature' }
+                            }
+                        },
+                        do_assignments: {
+                            type: Array,
+                            mean: '状态内赋值表达式列表',
+                            explain: {
+                                variable_name: { type: String, mean: '变量名', example: 'temp' },
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature' }
+                            }
+                        },
+                        exit_assignments: {
+                            type: Array,
+                            mean: '离开状态赋值表达式列表',
+                            explain: {
+                                variable_name: { type: String, mean: '变量名', example: 'temp' },
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature' }
+                            }
+                        },
+                        transformers: { 
+                            type: Array, 
+                            mean: '转换器列表', 
+                            explain: {
+                                name: { type: String, mean: '转换器名称', example: 't1' },
+                                rules: { 
+                                    type: Array, 
+                                    mean: '转移规则列表', 
+                                    explain: {
+                                        target_state: { type: String, mean: '目标状态', example: 's2' },
+                                        expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
-                let states = mapArrayToNameOnly(policy.states);
-                let result = getPaginatedResult(states, body.pageNo);
+                // 直接返回完整的状态信息，包括actions和assignments
+                let result = getPaginatedResult(policy.states, body.pageNo);
                 return {
                     states: result.items,
                     total: result.total,
@@ -184,10 +317,7 @@ export default {
                         enter_actions: { 
                             type: Array, 
                             mean: '进入动作列表', 
-                            explain: {
-                                device: { type: String, mean: '设备名称', example: '阀门1' },
-                                action: { type: String, mean: '动作名称', example: '开启' }
-                            }
+                            explain: ACTION_FIELD_SCHEMA
                         },
                         transformers: { 
                             type: Array, 
@@ -203,6 +333,40 @@ export default {
                                     }
                                 }
                             }
+                        },
+                        do_actions: { 
+                            type: Array, 
+                            mean: '状态内动作列表', 
+                            explain: ACTION_FIELD_SCHEMA
+                        },
+                        exit_actions: { 
+                            type: Array, 
+                            mean: '离开动作列表', 
+                            explain: ACTION_FIELD_SCHEMA
+                        },
+                        enter_assignments: {
+                            type: Array,
+                            mean: '进入状态赋值表达式列表',
+                            explain: {
+                                variable_name: { type: String, mean: '变量名', example: 'temp' },
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' }
+                            }
+                        },
+                        do_assignments: {
+                            type: Array,
+                            mean: '状态内赋值表达式列表',
+                            explain: {
+                                variable_name: { type: String, mean: '变量名', example: 'temp' },
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' }
+                            }
+                        },
+                        exit_assignments: {
+                            type: Array,
+                            mean: '离开状态赋值表达式列表',
+                            explain: {
+                                variable_name: { type: String, mean: '变量名', example: 'temp' },
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' }
+                            }
                         }
                     }
                 }
@@ -213,6 +377,7 @@ export default {
                 return { state };
             }
         },
+
         add_state_action: {
             name: '添加状态动作',
             description: '向状态添加一个动作',
@@ -222,8 +387,7 @@ export default {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
                 trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
-                device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
-                action: { type: String, mean: '动作名称', example: '开启', have_to: true }
+                ...ACTION_PARAMS_SCHEMA
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
@@ -231,42 +395,17 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                let enterActions = ensureArrayExists(state, 'enter_actions');
-                addItemIfNotExists(enterActions, {
+                
+                let actionListName = getActionListName(body.trigger);
+                let actionList = ensureArrayExists(state, actionListName);
+                addItemIfNotExists(actionList, {
                     device: body.device,
                     action: body.action
                 }, action => action.device === body.device && action.action === body.action);
                 return { result: true };
             }
         },
-        del_state_action: {
-            name: '删除状态动作',
-            description: '从状态中删除一个动作',
-            is_write: true,
-            is_get_api: false,
-            params: {
-                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
-                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
-                trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
-                device: { type: String, mean: '设备名称', example: '阀门1', have_to: true },
-                action: { type: String, mean: '动作名称', example: '开启', have_to: true }
-            },
-            result: {
-                result: { type: Boolean, mean: '操作结果', example: true, have_to: true }
-            },
-            func: async function (body, token) {
-                let policy = validatePolicyExists(body.policy_name);
-                let state = validateStateExists(policy, body.state_name);
-                if (!state.enter_actions) {
-                    return { result: true };
-                }
-                // 找到并删除匹配的动作
-                findAndRemoveFromArray(state.enter_actions, action => 
-                    action.device === body.device && action.action === body.action
-                );
-                return { result: true };
-            }
-        },
+
         add_transformer: {
             name: '添加转换器',
             description: '向状态添加一个转换器',
@@ -426,6 +565,104 @@ export default {
                 findAndRemoveFromArray(transformer.rules, rule => 
                     rule.target_state === body.target_state
                 );
+                return { result: true };
+            }
+        },
+        del_state_action: {
+            name: '删除状态动作',
+            description: '删除状态中的一个动作',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
+                ...ACTION_PARAMS_SCHEMA
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                
+                let actionList = getActionList(state, body.trigger, true);
+                
+                let actionRemoved = findAndRemoveFromArray(actionList, 
+                    a => a.device === body.device && a.action === body.action);
+                
+                if (!actionRemoved) {
+                    throw { err_msg: '动作不存在' };
+                }
+                
+                return { result: true };
+            }
+        },
+        add_state_assignment: {
+            name: '添加状态赋值表达式',
+            description: '向状态添加一个赋值表达式',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
+                variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true },
+                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                
+                let assignmentList = ensureArrayExists(state, getAssignmentListName(body.trigger));
+                
+                // 检查是否已存在相同变量名的赋值表达式
+                let existingAssignment = assignmentList.find(
+                    a => a.variable_name === body.variable_name
+                );
+                
+                if (existingAssignment) {
+                    throw { err_msg: `变量 ${body.variable_name} 的赋值表达式已存在` };
+                }
+                
+                assignmentList.push({
+                    variable_name: body.variable_name,
+                    expression: body.expression
+                });
+                
+                return { result: true };
+            }
+        },
+        del_state_assignment: {
+            name: '删除状态赋值表达式',
+            description: '删除状态中的一个赋值表达式',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
+                variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                
+                let assignmentList = getAssignmentList(state, body.trigger, true);
+                
+                let assignmentRemoved = findAndRemoveFromArray(assignmentList, 
+                    a => a.variable_name === body.variable_name);
+                
+                if (!assignmentRemoved) {
+                    throw { err_msg: '赋值表达式不存在' };
+                }
+                
                 return { result: true };
             }
         },

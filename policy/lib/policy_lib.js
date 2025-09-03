@@ -97,5 +97,22 @@ export default {
     },
     del_source: async function (policy_name, name, token) {
         return await call_remote('/policy/del_source', { policy_name, name }, token);
+    },
+    add_state_assignment: async function (policy_name, state_name, trigger, variable_name, expression, token) {
+        return await call_remote('/policy/add_state_assignment', { 
+            policy_name, 
+            state_name, 
+            trigger, 
+            variable_name, 
+            expression 
+        }, token);
+    },
+    del_state_assignment: async function (policy_name, state_name, trigger, variable_name, token) {
+        return await call_remote('/policy/del_state_assignment', { 
+            policy_name, 
+            state_name, 
+            trigger, 
+            variable_name 
+        }, token);
     }
 }

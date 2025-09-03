@@ -2,6 +2,144 @@ import cli_utils from '../../public/lib/cli_utils.js';
 import policy_lib from '../lib/policy_lib.js';
 import transformer_cli from './transformer_cli.js';
 
+// 常量定义
+const TRIGGER_NAMES = {
+    'enter': '进入状态时',
+    'do': '在状态内',
+    'exit': '离开状态时'
+};
+
+const ACTION_NAMES = {
+    'enter': '进入动作',
+    'do': '状态内动作',
+    'exit': '离开动作'
+};
+
+const ASSIGNMENT_NAMES = {
+    'enter': '进入赋值',
+    'do': '状态内赋值',
+    'exit': '离开赋值'
+};
+
+const ACTION_TYPES = ['enter', 'do', 'exit'];
+
+// 辅助函数：创建动作命令
+function createActionCommand(vorpal, ins, trigger) {
+    cli_utils.make_undo_cmd(
+        vorpal, 
+        `${trigger} action <device> <action>`, 
+        `${ACTION_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}执行的动作`, 
+        `撤销操作 - 删除所有${ACTION_NAMES[trigger]}`,
+        async (cmd_this, args) => {
+            await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
+            return `已添加${ACTION_NAMES[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
+        },
+        async (cmd_this, args) => {
+            const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+            let deletedCount = 0;
+            const actionsKey = `${trigger}_actions`;
+            if (resp.state && resp.state[actionsKey]) {
+                for (const action of resp.state[actionsKey]) {
+                    await policy_lib.del_state_action(
+                        ins.policy_view.cur_view_name, 
+                        ins.cur_view_name, 
+                        trigger, 
+                        action.device, 
+                        action.action
+                    );
+                    deletedCount++;
+                }
+            }
+            return `已删除 ${deletedCount} 个${ACTION_NAMES[trigger]}`;
+        }
+    );
+}
+
+// 辅助函数：创建删除动作命令
+function createDelActionCommand(vorpal, ins, trigger) {
+    cli_utils.make_undo_cmd(
+        vorpal,
+        `del ${trigger} <device> <action>`,
+        `删除${ACTION_NAMES[trigger]} - 移除指定设备和动作`,
+        `撤销删除 - 恢复已删除的${ACTION_NAMES[trigger]}`,
+        async (cmd_this, args) => {
+            await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
+            return `已删除${ACTION_NAMES[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
+        },
+        async (cmd_this, args) => {
+            await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
+            return `已恢复${ACTION_NAMES[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
+        }
+    );
+}
+
+// 辅助函数：创建赋值表达式命令
+function createAssignmentCommand(vorpal, ins, trigger) {
+    cli_utils.make_undo_cmd(
+        vorpal, 
+        `${trigger} assignment <variable_name> <expression>`, 
+        `${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}赋值表达式`, 
+        `撤销操作 - 删除所有${ASSIGNMENT_NAMES[trigger]}`,
+        async (cmd_this, args) => {
+            await policy_lib.add_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
+            return `已添加${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name} = ${args.expression}`;
+        },
+        async (cmd_this, args) => {
+            const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+            let deletedCount = 0;
+            const assignmentsKey = `${trigger}_assignments`;
+            if (resp.state && resp.state[assignmentsKey]) {
+                for (const assignment of resp.state[assignmentsKey]) {
+                    await policy_lib.del_state_assignment(
+                        ins.policy_view.cur_view_name, 
+                        ins.cur_view_name, 
+                        trigger, 
+                        assignment.variable_name
+                    );
+                    deletedCount++;
+                }
+            }
+            return `已删除 ${deletedCount} 个${ASSIGNMENT_NAMES[trigger]}`;
+        }
+    );
+}
+
+// 辅助函数：创建删除赋值表达式命令
+function createDelAssignmentCommand(vorpal, ins, trigger) {
+    cli_utils.make_undo_cmd(
+        vorpal,
+        `del ${trigger} assignment <variable_name>`,
+        `删除${ASSIGNMENT_NAMES[trigger]} - 移除指定变量的赋值表达式`,
+        `撤销删除 - 恢复已删除的${ASSIGNMENT_NAMES[trigger]}`,
+        async (cmd_this, args) => {
+            // 先获取要删除的赋值表达式内容，用于撤销
+            const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+            const assignmentsKey = `${trigger}_assignments`;
+            let deletedAssignment = null;
+            if (resp.state && resp.state[assignmentsKey]) {
+                deletedAssignment = resp.state[assignmentsKey].find(a => a.variable_name === args.variable_name);
+            }
+            
+            await policy_lib.del_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name);
+            
+            // 将删除的赋值表达式保存到args中，供撤销使用
+            if (deletedAssignment) {
+                args.expression = deletedAssignment.expression;
+            }
+            
+            return `已删除${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name}`;
+        },
+        async (cmd_this, args) => {
+            if (args.expression) {
+                await policy_lib.add_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
+                return `已恢复${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name} = ${args.expression}`;
+            } else {
+                return `无法恢复${ASSIGNMENT_NAMES[trigger]}: 缺少表达式信息`;
+            }
+        }
+    );
+}
+
 export default {
     command: 'state',
     name: '创建/进入状态',
@@ -13,34 +151,23 @@ export default {
         this._vorpalInstance = vorpal;
         this.prompt_prefix = prompt;
 
-        cli_utils.make_undo_cmd(vorpal, 'enter action <device> <action>', '添加进入状态时的动作', '删除所有进入动作',
-            async (cmd_this, args) => {
-                await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'enter', args.device, args.action);
-                return `已添加进入动作: 设备 ${args.device} 执行 ${args.action}`;
-            },
-            async (cmd_this, args) => {
-                const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
-                let deletedCount = 0;
-                if (resp.state && resp.state.enter_actions) {
-                    for (const action of resp.state.enter_actions) {
-                        await policy_lib.del_state_action(
-                            ins.policy_view.cur_view_name, 
-                            ins.cur_view_name, 
-                            'enter', 
-                            action.device, 
-                            action.action
-                        );
-                        deletedCount++;
-                    }
-                }
-                return `已删除 ${deletedCount} 个进入动作`;
-            });
+        // 创建所有动作相关命令
+        ACTION_TYPES.forEach(actionType => {
+            createActionCommand(vorpal, ins, actionType);
+            createDelActionCommand(vorpal, ins, actionType);
+        });
+
+        // 创建所有赋值表达式相关命令
+        ACTION_TYPES.forEach(actionType => {
+            createAssignmentCommand(vorpal, ins, actionType);
+            createDelAssignmentCommand(vorpal, ins, actionType);
+        });
 
         transformer_cli.state_view = ins;
         cli_utils.add_sub_cli(vorpal, transformer_cli, prompt);
 
         // 添加 bdr 命令
-        vorpal.command('bdr', '列出所有配置')
+        vorpal.command('bdr', '查看配置 - 列出所有状态动作配置')
             .action(async function (args) {
                 try {
                     this.log((await ins.make_bdr(ins.cur_view_name)).join('\n'));
@@ -79,12 +206,27 @@ export default {
     make_bdr: async function (view_name) {
         let ret = [];
         const resp = await policy_lib.get_state(this.policy_view.cur_view_name, view_name);
+        
         if (resp.state) {
-            if (resp.state.enter_actions) {
-                for (const action of resp.state.enter_actions) {
-                    ret.push(`  enter action ${action.device} ${action.action}`);
+            // 使用常量定义处理所有动作类型
+            ACTION_TYPES.forEach(actionType => {
+                const actionsKey = `${actionType}_actions`;
+                if (resp.state[actionsKey]) {
+                    resp.state[actionsKey].forEach(action => {
+                        ret.push(`  ${actionType} action ${action.device} ${action.action}`);
+                    });
                 }
-            }
+            });
+
+            // 处理所有赋值表达式类型
+            ACTION_TYPES.forEach(actionType => {
+                const assignmentsKey = `${actionType}_assignments`;
+                if (resp.state[assignmentsKey]) {
+                    resp.state[assignmentsKey].forEach(assignment => {
+                        ret.push(`  ${actionType} assignment ${assignment.variable_name} ${assignment.expression}`);
+                    });
+                }
+            });
         }
 
         if (this._vorpalInstance) {
