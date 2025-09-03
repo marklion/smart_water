@@ -15,6 +15,12 @@ const ACTION_NAMES = {
     'exit': '离开动作'
 };
 
+const ASSIGNMENT_NAMES = {
+    'enter': '进入赋值',
+    'do': '状态内赋值',
+    'exit': '离开赋值'
+};
+
 const ACTION_TYPES = ['enter', 'do', 'exit'];
 
 // 辅助函数：创建动作命令
@@ -67,6 +73,73 @@ function createDelActionCommand(vorpal, ins, trigger) {
     );
 }
 
+// 辅助函数：创建赋值表达式命令
+function createAssignmentCommand(vorpal, ins, trigger) {
+    cli_utils.make_undo_cmd(
+        vorpal, 
+        `${trigger} assignment <variable_name> <expression>`, 
+        `${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}赋值表达式`, 
+        `撤销操作 - 删除所有${ASSIGNMENT_NAMES[trigger]}`,
+        async (cmd_this, args) => {
+            await policy_lib.add_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
+            return `已添加${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name} = ${args.expression}`;
+        },
+        async (cmd_this, args) => {
+            const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+            let deletedCount = 0;
+            const assignmentsKey = `${trigger}_assignments`;
+            if (resp.state && resp.state[assignmentsKey]) {
+                for (const assignment of resp.state[assignmentsKey]) {
+                    await policy_lib.del_state_assignment(
+                        ins.policy_view.cur_view_name, 
+                        ins.cur_view_name, 
+                        trigger, 
+                        assignment.variable_name
+                    );
+                    deletedCount++;
+                }
+            }
+            return `已删除 ${deletedCount} 个${ASSIGNMENT_NAMES[trigger]}`;
+        }
+    );
+}
+
+// 辅助函数：创建删除赋值表达式命令
+function createDelAssignmentCommand(vorpal, ins, trigger) {
+    cli_utils.make_undo_cmd(
+        vorpal,
+        `del ${trigger} assignment <variable_name>`,
+        `删除${ASSIGNMENT_NAMES[trigger]} - 移除指定变量的赋值表达式`,
+        `撤销删除 - 恢复已删除的${ASSIGNMENT_NAMES[trigger]}`,
+        async (cmd_this, args) => {
+            // 先获取要删除的赋值表达式内容，用于撤销
+            const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+            const assignmentsKey = `${trigger}_assignments`;
+            let deletedAssignment = null;
+            if (resp.state && resp.state[assignmentsKey]) {
+                deletedAssignment = resp.state[assignmentsKey].find(a => a.variable_name === args.variable_name);
+            }
+            
+            await policy_lib.del_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name);
+            
+            // 将删除的赋值表达式保存到args中，供撤销使用
+            if (deletedAssignment) {
+                args.expression = deletedAssignment.expression;
+            }
+            
+            return `已删除${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name}`;
+        },
+        async (cmd_this, args) => {
+            if (args.expression) {
+                await policy_lib.add_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
+                return `已恢复${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name} = ${args.expression}`;
+            } else {
+                return `无法恢复${ASSIGNMENT_NAMES[trigger]}: 缺少表达式信息`;
+            }
+        }
+    );
+}
+
 export default {
     command: 'state',
     name: '创建/进入状态',
@@ -82,6 +155,12 @@ export default {
         ACTION_TYPES.forEach(actionType => {
             createActionCommand(vorpal, ins, actionType);
             createDelActionCommand(vorpal, ins, actionType);
+        });
+
+        // 创建所有赋值表达式相关命令
+        ACTION_TYPES.forEach(actionType => {
+            createAssignmentCommand(vorpal, ins, actionType);
+            createDelAssignmentCommand(vorpal, ins, actionType);
         });
 
         transformer_cli.state_view = ins;
@@ -135,6 +214,16 @@ export default {
                 if (resp.state[actionsKey]) {
                     resp.state[actionsKey].forEach(action => {
                         ret.push(`  ${actionType} action ${action.device} ${action.action}`);
+                    });
+                }
+            });
+
+            // 处理所有赋值表达式类型
+            ACTION_TYPES.forEach(actionType => {
+                const assignmentsKey = `${actionType}_assignments`;
+                if (resp.state[assignmentsKey]) {
+                    resp.state[assignmentsKey].forEach(assignment => {
+                        ret.push(`  ${actionType} assignment ${assignment.variable_name} ${assignment.expression}`);
                     });
                 }
             });

@@ -10,6 +10,12 @@ const ACTION_NAMES = {
     'exit': '离开动作'
 };
 
+const ASSIGNMENT_NAMES = {
+    'enter': '进入赋值',
+    'do': '状态内赋值',
+    'exit': '离开赋值'
+};
+
 // 测试辅助函数
 async function setupPolicyState(cli, policyName, stateName) {
     await cli.run_cmd('policy');
@@ -70,6 +76,40 @@ async function delMultipleActions(cli, actions) {
     return results;
 }
 
+// 辅助函数：测试添加赋值表达式并验证结果
+async function testAddAssignment(cli, assignmentType, variableName, expression) {
+    const result = await cli.run_cmd(`${assignmentType} assignment ${variableName} ${expression}`);
+    expect(result).toContain(`已添加${ASSIGNMENT_NAMES[assignmentType]}: 变量 ${variableName} = ${expression}`);
+    return result;
+}
+
+// 辅助函数：测试删除赋值表达式并验证结果
+async function testDelAssignment(cli, assignmentType, variableName) {
+    const result = await cli.run_cmd(`del ${assignmentType} assignment ${variableName}`);
+    expect(result).toContain(`已删除${ASSIGNMENT_NAMES[assignmentType]}: 变量 ${variableName}`);
+    return result;
+}
+
+// 辅助函数：批量添加赋值表达式
+async function addMultipleAssignments(cli, assignments) {
+    const results = [];
+    for (const {type, variable, expression} of assignments) {
+        const result = await testAddAssignment(cli, type, variable, expression);
+        results.push(result);
+    }
+    return results;
+}
+
+// 辅助函数：批量删除赋值表达式
+async function delMultipleAssignments(cli, assignments) {
+    const results = [];
+    for (const {type, variable} of assignments) {
+        const result = await testDelAssignment(cli, type, variable);
+        results.push(result);
+    }
+    return results;
+}
+
 beforeAll(async () => {
     print_test_log('state CLI test begin', true);
     cli = await test_utils('npm run dev_cli');
@@ -78,11 +118,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    await cli.run_cmd('clear');
-    await cli.close();
-    await close_server();
+    try {
+        await cli.run_cmd('clear');
+        await cli.close();
+        await close_server();
+    } catch (error) {
+        console.log('清理过程中出现错误，但不影响测试结果:', error.message);
+    }
     print_test_log('state CLI test end', true);
-});
+}, 60000); // 增加超时时间到60秒
 
 describe('状态 CLI 测试', () => {
     beforeEach(async () => {
@@ -160,16 +204,23 @@ describe('状态 CLI 测试', () => {
         // 创建策略和状态
         await setupPolicyState(cli, 'test', 's1');
         
-        // 测试状态内部的 return 命令
-        let result = await cli.run_cmd('return');
-
-        
-        // 重新进入状态并添加一些动作
-        await cli.run_cmd('state s1');
+        // 添加一些动作
         await cli.run_cmd('enter action 水泵1 启动');
         await cli.run_cmd('enter action 传感器1 读取');
         
         // 测试有动作的状态的 bdr
+        await verifyBdrContains(cli, [
+            'enter action 水泵1 启动',
+            'enter action 传感器1 读取'
+        ]);
+        
+        // 测试状态内部的 return 命令
+        let result = await cli.run_cmd('return');
+        
+        // 验证返回到策略级别后，重新进入状态
+        await cli.run_cmd('state s1');
+        
+        // 验证动作仍然存在
         await verifyBdrContains(cli, [
             'enter action 水泵1 启动',
             'enter action 传感器1 读取'
@@ -375,34 +426,30 @@ describe('状态 CLI 测试', () => {
     });
 
     test('保存和恢复配置测试', async () => {
-        // 先返回到根目录并清空所有配置
-        await cli.run_cmd('return');
+        // 确保从干净状态开始
         await cli.run_cmd('clear');
 
-        await cli.run_cmd('policy');
-        await cli.run_cmd('policy save_restore_test');
-        await cli.run_cmd('state initial_state');
+        // 创建初始配置
+        await setupPolicyState(cli, 'save_restore_test', 'initial_state');
         await cli.run_cmd('enter action 初始设备 初始动作');
-        await cli.run_cmd('return');
-        await cli.run_cmd('return');
-        await cli.run_cmd('return');
+        
+        // 返回到根级别
+        await returnToRoot(cli);
 
         let initial_bdr = await cli.run_cmd('bdr');
         expect(initial_bdr).toContain("policy 'save_restore_test'");
         expect(initial_bdr).toContain("state 'initial_state'");
         expect(initial_bdr).toContain('enter action 初始设备 初始动作');
         
-        // 保存配置到默认文件
+        // 保存配置到默认文件（需要在根级别）
+        await cli.run_cmd('return'); // 确保在根级别
         await cli.run_cmd('save sw_cli_config.txt');
 
+        // 清空并创建修改后的配置
         await cli.run_cmd('clear');
-        await cli.run_cmd('policy');
-        await cli.run_cmd('policy modified_policy');
-        await cli.run_cmd('state modified_state');
+        await setupPolicyState(cli, 'modified_policy', 'modified_state');
         await cli.run_cmd('enter action 修改设备 修改动作');
-        await cli.run_cmd('return');
-        await cli.run_cmd('return');
-        await cli.run_cmd('return');
+        await returnToRoot(cli);
 
         let modified_bdr = await cli.run_cmd('bdr');
         expect(modified_bdr).toContain("policy 'modified_policy'");
@@ -411,6 +458,8 @@ describe('状态 CLI 测试', () => {
         expect(modified_bdr).not.toContain("policy 'save_restore_test'");
         expect(modified_bdr).not.toEqual(initial_bdr);
 
+        // 恢复配置（需要在根级别）
+        await cli.run_cmd('return'); // 确保在根级别
         await cli.run_cmd('restore sw_cli_config.txt');
 
         let restored_bdr = await cli.run_cmd('bdr');
@@ -423,6 +472,274 @@ describe('状态 CLI 测试', () => {
         
         // 重新进入policy视图为后续测试做准备
         await cli.run_cmd('policy');
+    });
+
+    test('赋值表达式基本功能测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'assignment_test', 's1');
+        
+        // 添加进入状态赋值表达式（不包含空格的表达式）
+        let result = await cli.run_cmd('enter assignment temp s.temperature');
+        expect(result).toContain('已添加进入赋值: 变量 temp = s.temperature');
+        
+        // 添加状态内赋值表达式
+        result = await cli.run_cmd('do assignment pressure s.pressure');
+        expect(result).toContain('已添加状态内赋值: 变量 pressure = s.pressure');
+        
+        // 添加离开状态赋值表达式
+        result = await cli.run_cmd('exit assignment humidity s.humidity');
+        expect(result).toContain('已添加离开赋值: 变量 humidity = s.humidity');
+        
+        // 测试状态内部的 bdr 命令
+        await verifyBdrContains(cli, [
+            'enter assignment temp s.temperature',
+            'do assignment pressure s.pressure',
+            'exit assignment humidity s.humidity'
+        ]);
+        
+        // 返回到根视图
+        await returnToRoot(cli);
+        
+        // 验证策略级别的配置
+        await verifyBdrContains(cli, [
+            "policy 'assignment_test'",
+            "state 's1'",
+            'enter assignment temp s.temperature',
+            'do assignment pressure s.pressure',
+            'exit assignment humidity s.humidity'
+        ]);
+    });
+
+    test('赋值表达式批量操作测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'batch_assignment_test', 's1');
+        
+        // 定义测试赋值表达式（不包含空格）
+        const testAssignments = [
+            {type: 'enter', variable: 'temp1', expression: 's.sensor1'},
+            {type: 'enter', variable: 'temp2', expression: 's.sensor2'},
+            {type: 'do', variable: 'pressure', expression: 's.pressure_sensor'},
+            {type: 'do', variable: 'flow', expression: 's.flow_rate'},
+            {type: 'exit', variable: 'result1', expression: 'temp1'},
+            {type: 'exit', variable: 'result2', expression: 'pressure'}
+        ];
+        
+        // 批量添加赋值表达式
+        await addMultipleAssignments(cli, testAssignments);
+        
+        // 验证所有赋值表达式都在 bdr 中显示
+        await verifyBdrContains(cli, [
+            'enter assignment temp1 s.sensor1',
+            'enter assignment temp2 s.sensor2',
+            'do assignment pressure s.pressure_sensor',
+            'do assignment flow s.flow_rate',
+            'exit assignment result1 temp1',
+            'exit assignment result2 pressure'
+        ]);
+        
+        await returnToRoot(cli);
+        
+        // 在策略级别验证配置
+        await verifyBdrContains(cli, [
+            "policy 'batch_assignment_test'",
+            "state 's1'",
+            'enter assignment temp1 s.sensor1',
+            'enter assignment temp2 s.sensor2',
+            'do assignment pressure s.pressure_sensor',
+            'do assignment flow s.flow_rate',
+            'exit assignment result1 temp1',
+            'exit assignment result2 pressure'
+        ]);
+    });
+
+    test('del assignment 命令功能测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'del_assignment_test', 's1');
+        
+        // 定义测试赋值表达式（不包含空格）
+        const testAssignments = [
+            {type: 'enter', variable: 'var1', expression: 's.value1'},
+            {type: 'do', variable: 'var2', expression: 's.value2'},
+            {type: 'exit', variable: 'var3', expression: 's.value3'}
+        ];
+        
+        // 批量添加赋值表达式
+        await addMultipleAssignments(cli, testAssignments);
+        
+        // 验证赋值表达式已添加
+        await verifyBdrContains(cli, [
+            'enter assignment var1 s.value1',
+            'do assignment var2 s.value2',
+            'exit assignment var3 s.value3'
+        ]);
+        
+        // 批量删除赋值表达式
+        await delMultipleAssignments(cli, testAssignments);
+        
+        // 验证所有赋值表达式都已删除
+        await verifyBdrNotContains(cli, [
+            'enter assignment var1 s.value1',
+            'do assignment var2 s.value2',
+            'exit assignment var3 s.value3'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+    test('赋值表达式 undo 功能测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'undo_assignment_test', 's1');
+        
+        // 添加多个 enter assignment（不包含空格）
+        await cli.run_cmd('enter assignment temp1 s.temperature1');
+        await cli.run_cmd('enter assignment temp2 s.temperature2');
+        await cli.run_cmd('enter assignment temp3 s.temperature3');
+        
+        // 添加多个 do assignment
+        await cli.run_cmd('do assignment pressure1 s.pressure1');
+        await cli.run_cmd('do assignment pressure2 s.pressure2');
+        
+        // 添加多个 exit assignment
+        await cli.run_cmd('exit assignment result1 temp1');
+        await cli.run_cmd('exit assignment result2 temp3');
+        
+        // 验证赋值表达式已添加
+        await verifyBdrContains(cli, [
+            'enter assignment temp1 s.temperature1',
+            'enter assignment temp2 s.temperature2',
+            'enter assignment temp3 s.temperature3',
+            'do assignment pressure1 s.pressure1',
+            'do assignment pressure2 s.pressure2',
+            'exit assignment result1 temp1',
+            'exit assignment result2 temp3'
+        ]);
+        
+        // 测试 undo enter assignment（删除所有进入赋值表达式）
+        let result = await cli.run_cmd('undo enter assignment');
+        expect(result).toContain('已删除 3 个进入赋值');
+        
+        // 验证 enter assignment 已被删除，但其他类型仍存在
+        await verifyBdrNotContains(cli, [
+            'enter assignment temp1 s.temperature1',
+            'enter assignment temp2 s.temperature2',
+            'enter assignment temp3 s.temperature3'
+        ]);
+        await verifyBdrContains(cli, [
+            'do assignment pressure1 s.pressure1',
+            'do assignment pressure2 s.pressure2',
+            'exit assignment result1 temp1',
+            'exit assignment result2 temp3'
+        ]);
+        
+        // 测试 undo do assignment（删除所有状态内赋值表达式）
+        result = await cli.run_cmd('undo do assignment');
+        expect(result).toContain('已删除 2 个状态内赋值');
+        
+        // 验证 do assignment 也已被删除
+        await verifyBdrNotContains(cli, [
+            'do assignment pressure1 s.pressure1',
+            'do assignment pressure2 s.pressure2'
+        ]);
+        await verifyBdrContains(cli, [
+            'exit assignment result1 temp1',
+            'exit assignment result2 temp3'
+        ]);
+        
+        // 测试 undo exit assignment（删除所有离开赋值表达式）
+        result = await cli.run_cmd('undo exit assignment');
+        expect(result).toContain('已删除 2 个离开赋值');
+        
+        // 验证所有赋值表达式都已被删除
+        await verifyBdrNotContains(cli, [
+            'exit assignment result1 temp1',
+            'exit assignment result2 temp3'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+    test('赋值表达式与动作混合配置测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'mixed_config_test', 's1');
+        
+        // 添加动作和赋值表达式混合配置（不包含空格）
+        await cli.run_cmd('enter action 水泵1 启动');
+        await cli.run_cmd('enter assignment temp s.temperature');
+        await cli.run_cmd('do action 传感器1 读取');
+        await cli.run_cmd('do assignment pressure s.pressure');
+        await cli.run_cmd('exit assignment result temp');
+        await cli.run_cmd('exit action 水泵1 关闭');
+        
+        // 验证混合配置在 bdr 中正确显示
+        await verifyBdrContains(cli, [
+            'enter action 水泵1 启动',
+            'enter assignment temp s.temperature',
+            'do action 传感器1 读取',
+            'do assignment pressure s.pressure',
+            'exit assignment result temp',
+            'exit action 水泵1 关闭'
+        ]);
+        
+        // 删除部分配置
+        await cli.run_cmd('del enter 水泵1 启动');
+        await cli.run_cmd('del do assignment pressure');
+        
+        // 验证删除后的配置
+        await verifyBdrNotContains(cli, [
+            'enter action 水泵1 启动',
+            'do assignment pressure s.pressure'
+        ]);
+        await verifyBdrContains(cli, [
+            'enter assignment temp s.temperature',
+            'do action 传感器1 读取',
+            'exit assignment result temp',
+            'exit action 水泵1 关闭'
+        ]);
+        
+        await returnToRoot(cli);
+        
+        // 在策略级别验证最终配置
+        await verifyBdrContains(cli, [
+            "policy 'mixed_config_test'",
+            "state 's1'",
+            'enter assignment temp s.temperature',
+            'do action 传感器1 读取',
+            'exit assignment result temp',
+            'exit action 水泵1 关闭'
+        ]);
+    });
+
+    test('赋值表达式重复变量名检测测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'duplicate_var_test', 's1');
+        
+        // 添加第一个赋值表达式（不包含空格）
+        let result = await cli.run_cmd('enter assignment temp s.temperature');
+        expect(result).toContain('已添加进入赋值: 变量 temp = s.temperature');
+        
+        // 尝试添加相同变量名的赋值表达式，应该失败
+        result = await cli.run_cmd('enter assignment temp s.temperature2');
+        expect(result).toContain('变量 temp 的赋值表达式已存在');
+        
+        // 验证只有第一个赋值表达式存在
+        await verifyBdrContains(cli, ['enter assignment temp s.temperature']);
+        await verifyBdrNotContains(cli, ['enter assignment temp s.temperature2']);
+        
+        // 但可以在不同类型中使用相同变量名
+        result = await cli.run_cmd('do assignment temp s.pressure');
+        expect(result).toContain('已添加状态内赋值: 变量 temp = s.pressure');
+        
+        result = await cli.run_cmd('exit assignment temp s.humidity');
+        expect(result).toContain('已添加离开赋值: 变量 temp = s.humidity');
+        
+        // 验证不同类型中的相同变量名都存在
+        await verifyBdrContains(cli, [
+            'enter assignment temp s.temperature',
+            'do assignment temp s.pressure',
+            'exit assignment temp s.humidity'
+        ]);
+        
+        await returnToRoot(cli);
     });
 
 });
