@@ -114,7 +114,10 @@ beforeAll(async () => {
     print_test_log('state CLI test begin', true);
     cli = await test_utils('npm run dev_cli');
     await start_server();
+    // 彻底清理，确保干净的测试环境
     await cli.run_cmd('clear');
+    await cli.run_cmd('return'); // 确保在根级别
+    await cli.run_cmd('clear');  // 再次清理
 });
 
 afterAll(async () => {
@@ -130,17 +133,16 @@ afterAll(async () => {
 
 describe('状态 CLI 测试', () => {
     beforeEach(async () => {
-        // 清空所有配置
-        await cli.run_cmd('clear');
-        // 进入策略管理
-        await cli.run_cmd('policy');
+        // 确保从根级别开始，彻底清空所有配置
+        await cli.run_cmd('return'); // 先返回到根级别
+        await cli.run_cmd('clear');  // 清空配置
+        await cli.run_cmd('policy'); // 进入策略管理
     });
 
     afterEach(async () => {
-        // 返回到根视图
-        await cli.run_cmd('return');
-        // 清空配置
-        await cli.run_cmd('clear');
+        // 彻底返回到根视图并清空配置
+        await cli.run_cmd('return'); // 返回到根级别
+        await cli.run_cmd('clear');  // 清空配置
     });
 
     test('基本功能：创建策略、状态和动作', async () => {
