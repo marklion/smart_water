@@ -40,47 +40,84 @@ export default {
         cli_utils.add_sub_cli(vorpal, transformer_cli, prompt);
 
         // 添加在状态内执行的动作命令
-        vorpal.command('do action <device> <action>', '添加在状态内执行的动作')
-            .action(async function (args) {
-                try {
-                    await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'do', args.device, args.action);
-                    this.log(`已添加状态内动作: 设备 ${args.device} 执行 ${args.action}`);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
+        cli_utils.make_undo_cmd(vorpal, 'do action <device> <action>', '添加在状态内执行的动作', '删除所有状态内动作',
+            async (cmd_this, args) => {
+                await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'do', args.device, args.action);
+                return `已添加状态内动作: 设备 ${args.device} 执行 ${args.action}`;
+            },
+            async (cmd_this, args) => {
+                const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+                let deletedCount = 0;
+                if (resp.state && resp.state.do_actions) {
+                    for (const action of resp.state.do_actions) {
+                        await policy_lib.del_state_action(
+                            ins.policy_view.cur_view_name, 
+                            ins.cur_view_name, 
+                            'do', 
+                            action.device, 
+                            action.action
+                        );
+                        deletedCount++;
+                    }
                 }
+                return `已删除 ${deletedCount} 个状态内动作`;
             });
 
         // 添加离开状态时的动作命令
-        vorpal.command('exit action <device> <action>', '添加离开状态时执行的动作')
-            .action(async function (args) {
-                try {
-                    await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'exit', args.device, args.action);
-                    this.log(`已添加离开动作: 设备 ${args.device} 执行 ${args.action}`);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
+        cli_utils.make_undo_cmd(vorpal, 'exit action <device> <action>', '添加离开状态时执行的动作', '删除所有离开动作',
+            async (cmd_this, args) => {
+                await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'exit', args.device, args.action);
+                return `已添加离开动作: 设备 ${args.device} 执行 ${args.action}`;
+            },
+            async (cmd_this, args) => {
+                const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+                let deletedCount = 0;
+                if (resp.state && resp.state.exit_actions) {
+                    for (const action of resp.state.exit_actions) {
+                        await policy_lib.del_state_action(
+                            ins.policy_view.cur_view_name, 
+                            ins.cur_view_name, 
+                            'exit', 
+                            action.device, 
+                            action.action
+                        );
+                        deletedCount++;
+                    }
                 }
+                return `已删除 ${deletedCount} 个离开动作`;
+            });
+
+        // 删除进入动作命令
+        cli_utils.make_undo_cmd(vorpal, 'del enter <device> <action>', '删除进入状态时执行的动作', '恢复已删除的进入动作',
+            async (cmd_this, args) => {
+                await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'enter', args.device, args.action);
+                return `已删除进入动作: 设备 ${args.device} 执行 ${args.action}`;
+            },
+            async (cmd_this, args) => {
+                await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'enter', args.device, args.action);
+                return `已恢复进入动作: 设备 ${args.device} 执行 ${args.action}`;
             });
 
         // 删除状态内动作命令
-        vorpal.command('del do <device> <action>', '删除在状态内执行的动作')
-            .action(async function (args) {
-                try {
-                    await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'do', args.device, args.action);
-                    this.log(`已删除状态内动作: 设备 ${args.device} 执行 ${args.action}`);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
+        cli_utils.make_undo_cmd(vorpal, 'del do <device> <action>', '删除在状态内执行的动作', '恢复已删除的状态内动作',
+            async (cmd_this, args) => {
+                await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'do', args.device, args.action);
+                return `已删除状态内动作: 设备 ${args.device} 执行 ${args.action}`;
+            },
+            async (cmd_this, args) => {
+                await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'do', args.device, args.action);
+                return `已恢复状态内动作: 设备 ${args.device} 执行 ${args.action}`;
             });
 
         // 删除离开动作命令
-        vorpal.command('del exit <device> <action>', '删除离开状态时执行的动作')
-            .action(async function (args) {
-                try {
-                    await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'exit', args.device, args.action);
-                    this.log(`已删除离开动作: 设备 ${args.device} 执行 ${args.action}`);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
+        cli_utils.make_undo_cmd(vorpal, 'del exit <device> <action>', '删除离开状态时执行的动作', '恢复已删除的离开动作',
+            async (cmd_this, args) => {
+                await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'exit', args.device, args.action);
+                return `已删除离开动作: 设备 ${args.device} 执行 ${args.action}`;
+            },
+            async (cmd_this, args) => {
+                await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, 'exit', args.device, args.action);
+                return `已恢复离开动作: 设备 ${args.device} 执行 ${args.action}`;
             });
 
         // 添加 bdr 命令

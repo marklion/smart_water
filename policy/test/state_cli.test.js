@@ -138,6 +138,174 @@ describe('状态 CLI 测试', () => {
         await cli.run_cmd('return');
     });
 
+    test('do action 和 exit action 功能测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'action_test', 's1');
+        
+        // 测试添加 do action
+        let result = await cli.run_cmd('do action 水泵1 运行');
+        expect(result).toContain('已添加状态内动作: 设备 水泵1 执行 运行');
+        
+        result = await cli.run_cmd('do action 传感器1 监测');
+        expect(result).toContain('已添加状态内动作: 设备 传感器1 执行 监测');
+        
+        // 测试添加 exit action
+        result = await cli.run_cmd('exit action 阀门1 关闭');
+        expect(result).toContain('已添加离开动作: 设备 阀门1 执行 关闭');
+        
+        result = await cli.run_cmd('exit action 灯光1 关灯');
+        expect(result).toContain('已添加离开动作: 设备 灯光1 执行 关灯');
+        
+        // 同时添加 enter action 以测试完整配置
+        await cli.run_cmd('enter action 开关1 启动');
+        
+        // 验证所有动作都在 bdr 中显示
+        await verifyBdrContains(cli, [
+            'enter action 开关1 启动',
+            'do action 水泵1 运行',
+            'do action 传感器1 监测',
+            'exit action 阀门1 关闭',
+            'exit action 灯光1 关灯'
+        ]);
+        
+        await returnToRoot(cli);
+        
+        // 在策略级别验证配置
+        await verifyBdrContains(cli, [
+            "policy 'action_test'",
+            "state 's1'",
+            'enter action 开关1 启动',
+            'do action 水泵1 运行',
+            'do action 传感器1 监测',
+            'exit action 阀门1 关闭',
+            'exit action 灯光1 关灯'
+        ]);
+    });
+
+    test('del action 命令功能测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'del_test', 's1');
+        
+        // 添加各种类型的动作
+        await cli.run_cmd('enter action 设备1 动作1');
+        await cli.run_cmd('do action 设备2 动作2');
+        await cli.run_cmd('exit action 设备3 动作3');
+        
+        // 验证动作已添加
+        await verifyBdrContains(cli, [
+            'enter action 设备1 动作1',
+            'do action 设备2 动作2',
+            'exit action 设备3 动作3'
+        ]);
+        
+        // 测试删除 enter action
+        let result = await cli.run_cmd('del enter 设备1 动作1');
+        expect(result).toContain('已删除进入动作: 设备 设备1 执行 动作1');
+        
+        // 测试删除 do action
+        result = await cli.run_cmd('del do 设备2 动作2');
+        expect(result).toContain('已删除状态内动作: 设备 设备2 执行 动作2');
+        
+        // 测试删除 exit action
+        result = await cli.run_cmd('del exit 设备3 动作3');
+        expect(result).toContain('已删除离开动作: 设备 设备3 执行 动作3');
+        
+        // 验证所有动作都已删除
+        await verifyBdrNotContains(cli, [
+            'enter action 设备1 动作1',
+            'do action 设备2 动作2',
+            'exit action 设备3 动作3'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+    test('action undo 功能完整测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'undo_action_test', 's1');
+        
+        // 添加多个 do action
+        await cli.run_cmd('do action 水泵1 启动');
+        await cli.run_cmd('do action 水泵2 启动');
+        await cli.run_cmd('do action 传感器1 监测');
+        
+        // 添加多个 exit action
+        await cli.run_cmd('exit action 阀门1 关闭');
+        await cli.run_cmd('exit action 阀门2 关闭');
+        
+        // 验证动作已添加
+        await verifyBdrContains(cli, [
+            'do action 水泵1 启动',
+            'do action 水泵2 启动',
+            'do action 传感器1 监测',
+            'exit action 阀门1 关闭',
+            'exit action 阀门2 关闭'
+        ]);
+        
+        // 测试 undo do action（删除所有状态内动作）
+        let result = await cli.run_cmd('undo do action');
+        expect(result).toContain('已删除 3 个状态内动作');
+        
+        // 验证 do action 已被删除，但 exit action 仍存在
+        await verifyBdrNotContains(cli, [
+            'do action 水泵1 启动',
+            'do action 水泵2 启动',
+            'do action 传感器1 监测'
+        ]);
+        await verifyBdrContains(cli, [
+            'exit action 阀门1 关闭',
+            'exit action 阀门2 关闭'
+        ]);
+        
+        // 测试 undo exit action（删除所有离开动作）
+        result = await cli.run_cmd('undo exit action');
+        expect(result).toContain('已删除 2 个离开动作');
+        
+        // 验证 exit action 也已被删除
+        await verifyBdrNotContains(cli, [
+            'exit action 阀门1 关闭',
+            'exit action 阀门2 关闭'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+    test('del action 基本功能测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'del_basic_test', 's1');
+        
+        // 添加一些动作
+        await cli.run_cmd('enter action 设备1 动作1');
+        await cli.run_cmd('do action 设备2 动作2');
+        await cli.run_cmd('exit action 设备3 动作3');
+        
+        // 验证动作已添加
+        await verifyBdrContains(cli, [
+            'enter action 设备1 动作1',
+            'do action 设备2 动作2',
+            'exit action 设备3 动作3'
+        ]);
+        
+        // 删除动作
+        let result = await cli.run_cmd('del enter 设备1 动作1');
+        expect(result).toContain('已删除进入动作: 设备 设备1 执行 动作1');
+        
+        result = await cli.run_cmd('del do 设备2 动作2');
+        expect(result).toContain('已删除状态内动作: 设备 设备2 执行 动作2');
+        
+        result = await cli.run_cmd('del exit 设备3 动作3');
+        expect(result).toContain('已删除离开动作: 设备 设备3 执行 动作3');
+        
+        // 验证动作已被删除
+        await verifyBdrNotContains(cli, [
+            'enter action 设备1 动作1',
+            'do action 设备2 动作2',
+            'exit action 设备3 动作3'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
     test('Undo功能测试：删除状态和动作', async () => {
         // 创建策略和状态
         await setupPolicyState(cli, 'undo_test', 's1');
@@ -195,8 +363,8 @@ describe('状态 CLI 测试', () => {
         expect(initial_bdr).toContain("state 'initial_state'");
         expect(initial_bdr).toContain('enter action 初始设备 初始动作');
         
-        // 保存配置到临时文件
-        await cli.run_cmd('save test_state_config.txt');
+        // 保存配置到默认文件
+        await cli.run_cmd('save sw_cli_config.txt');
 
         await cli.run_cmd('clear');
         await cli.run_cmd('policy');
@@ -214,7 +382,7 @@ describe('状态 CLI 测试', () => {
         expect(modified_bdr).not.toContain("policy 'save_restore_test'");
         expect(modified_bdr).not.toEqual(initial_bdr);
 
-        await cli.run_cmd('restore test_state_config.txt');
+        await cli.run_cmd('restore sw_cli_config.txt');
 
         let restored_bdr = await cli.run_cmd('bdr');
         expect(restored_bdr).toContain("policy 'save_restore_test'");
