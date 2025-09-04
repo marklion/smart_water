@@ -217,6 +217,20 @@ onMounted(() => {
     justify-content: center;
 }
 
+/* 隐藏表格滚动条 */
+:deep(.el-table__body-wrapper)::-webkit-scrollbar {
+    display: none;
+}
+
+:deep(.el-table__body-wrapper) {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+:deep(.el-scrollbar__bar.is-horizontal) {
+    display: none !important;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .stats-overview .el-col {
@@ -232,7 +246,5 @@ onMounted(() => {
     .header-actions .el-select {
         width: 100% !important;
     }
-
-
 }
 </style>

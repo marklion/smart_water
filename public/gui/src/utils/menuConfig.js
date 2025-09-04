@@ -115,6 +115,12 @@ export function createMonitorRoute(name, path, component, icon = MenuIcons.MONIT
   })
 }
 
+export function createPolicyRoute(name, path, component, icon = MenuIcons.SETTING) {
+  return createRoute(name, path, component, {
+    parent: MenuGroups.POLICY,
+    icon
+  })
+}
 /**
  * 批量创建路由
  * @param {array} routeConfigs - 路由配置数组
