@@ -16,7 +16,7 @@
 
             <PageContent :fetch_func="loadFarmsData" :params="{}" content_name="farms" total_name="total">
                 <template #default="{ content }">
-                    <el-table :data="content" style="width: 100%" v-loading="loading" stripe :default-expand-all="false"
+                    <el-table :data="content" style="width: 100%" stripe :default-expand-all="false"
                         row-key="name" class="config-table">
                         <el-table-column type="expand">
                             <template #default="props">
@@ -283,6 +283,20 @@ onMounted(() => {
 
 :deep(.el-table__expand-icon:hover) {
     color: #66b1ff;
+}
+
+/* 隐藏表格滚动条 */
+:deep(.el-table__body-wrapper)::-webkit-scrollbar {
+    display: none;
+}
+
+:deep(.el-table__body-wrapper) {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+:deep(.el-scrollbar__bar.is-horizontal) {
+    display: none !important;
 }
 
 /* 响应式设计 */

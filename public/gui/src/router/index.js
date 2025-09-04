@@ -49,6 +49,13 @@ const router = createRouter({
             component: () => import('../../../../resource/gui/BlockConfigView.vue'),
             parent: '配置中心',
             icon: MenuIcons.GRID
+          },
+          {
+            name: '策略模板配置',
+            path: '/config/policy_template',
+            component: () => import('../../../../policy/gui/PolicyTemplateConfigSimple.vue'),
+            parent: '配置中心',
+            icon: MenuIcons.DOCUMENT
           }
         ])
       ]
