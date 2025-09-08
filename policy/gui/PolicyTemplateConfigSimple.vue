@@ -60,7 +60,7 @@
                                                     <el-tag v-for="action in props.row.actions" :key="action.name"
                                                         type="warning" size="small" effect="light" class="info-tag">
                                                         {{ action.name }}
-                                                        <span class="tag-detail">({{ action.device }})</span>
+                                                        <span class="tag-detail">({{ action.type }})</span>
                                                     </el-tag>
                                                 </div>
                                                 <span v-else class="no-data">暂无动作集</span>
@@ -349,7 +349,7 @@ const loadPolicyData = async (params, pageNo = 0) => {
                                 
                                 // 收集动作信息
                                 enterActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '进入', state: state.name }))
-                                doActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '状态内', state: state.name }))
+                                doActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '持续', state: state.name }))
                                 exitActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '离开', state: state.name }))
                                 
                                 const enterAssignments = stateData.enter_assignments || []
@@ -359,7 +359,7 @@ const loadPolicyData = async (params, pageNo = 0) => {
                                 
                                 // 收集变量信息
                                 enterAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '进入', expression: assignment.expression, state: state.name }))
-                                doAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '状态内', expression: assignment.expression, state: state.name }))
+                                doAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '持续', expression: assignment.expression, state: state.name }))
                                 exitAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '离开', expression: assignment.expression, state: state.name }))
                                 
                             } catch (error) {
@@ -375,6 +375,8 @@ const loadPolicyData = async (params, pageNo = 0) => {
                     // 设置动作和变量数组（用于展开详情显示）
                     policy.actions = allActions
                     policy.variables = allVariables
+                    
+                    console.log(`策略 ${policy.name} 的变量信息:`, allVariables)
 
                 } catch (error) {
                     console.error(`加载策略${policy.name}详情失败:`, error)
