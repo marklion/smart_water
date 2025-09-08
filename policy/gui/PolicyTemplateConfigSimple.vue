@@ -5,7 +5,7 @@
         <el-card class="config-list-card" shadow="hover">
             <template #header>
                 <div class="card-header">
-                    <span class="title">策略模板配置</span>
+                    <span class="title">策略配置</span>
                     <div class="header-actions">
                         <el-button type="primary" @click="refreshData" :icon="Refresh">
                             刷新
@@ -21,7 +21,7 @@
                             <template #default="props">
                                 <div class="policy-details">
                                     <div class="policy-detail-header">
-                                        <h4>策略模板详情</h4>
+                                        <h4>策略详情</h4>
                                         <el-tag type="info" size="small">
                                             {{ props.row.name }}
                                         </el-tag>
@@ -90,7 +90,7 @@
                                 </div>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="name" label="策略模板名称" width="180" show-overflow-tooltip>
+                        <el-table-column prop="name" label="策略名称" width="180" show-overflow-tooltip>
                             <template #default="scope">
                                 <div class="policy-name">
                                     <el-icon color="#409EFF" style="margin-right: 8px;">
@@ -100,7 +100,7 @@
                                 </div>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="description" label="模板描述" min-width="200" show-overflow-tooltip />
+                        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
                         <el-table-column prop="states_count" label="状态" width="80" align="center">
                             <template #default="scope">
                                 <el-tag type="info" size="small">{{ scope.row.states_count || 0 }}</el-tag>
@@ -149,7 +149,7 @@
                             <el-icon>
                                 <Document />
                             </el-icon>
-                            <span>策略模板</span>
+                            <span>策略</span>
                         </div>
                         <div class="policy-title">{{ currentPolicy?.name }}</div>
                         <div class="policy-subtitle">状态机配置详情</div>
@@ -335,7 +335,7 @@ const loadPolicyData = async (params, pageNo = 0) => {
                     // 设置默认值
                     policy.actions_count = policy.states_count * 2 // 估算动作数量
                     policy.variables_count = policy.states_count * 1 // 估算变量数量
-                    policy.description = policy.description || `${policy.name}策略模板`
+                    policy.description = policy.description || `${policy.name}策略`
                     policy.created_time = policy.created_time || new Date().toISOString()
 
                     // 设置默认的动作和变量数组（用于展开详情显示）
@@ -349,7 +349,7 @@ const loadPolicyData = async (params, pageNo = 0) => {
                     policy.sources_count = 0
                     policy.actions_count = 0
                     policy.variables_count = 0
-                    policy.description = `${policy.name}策略模板`
+                    policy.description = `${policy.name}策略`
                     policy.created_time = new Date().toISOString()
                     policy.sources = []
                     policy.actions = []

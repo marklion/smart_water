@@ -51,7 +51,7 @@ const router = createRouter({
             icon: MenuIcons.GRID
           },
           {
-            name: '策略模板配置',
+            name: '策略配置',
             path: '/config/policy_template',
             component: () => import('../../../../policy/gui/PolicyTemplateConfigSimple.vue'),
             parent: '配置中心',
