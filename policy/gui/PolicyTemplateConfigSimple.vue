@@ -224,9 +224,9 @@
                                         <div class="column-title">进入</div>
                                         <div class="tags-area">
                                             <el-tag v-for="assignment in state.enter_variable_assignments"
-                                                :key="assignment.variable" size="small" type="primary" effect="light"
+                                                :key="assignment.variable_name" size="small" type="primary" effect="light"
                                                 class="variable-tag">
-                                                {{ assignment.variable }}
+                                                {{ assignment.variable_name }}: {{ assignment.expression }}
                                             </el-tag>
                                         </div>
                                     </div>
@@ -234,9 +234,9 @@
                                         <div class="column-title">持续</div>
                                         <div class="tags-area">
                                             <el-tag v-for="assignment in state.hold_variable_assignments"
-                                                :key="assignment.variable" size="small" type="success" effect="light"
+                                                :key="assignment.variable_name" size="small" type="success" effect="light"
                                                 class="variable-tag">
-                                                {{ assignment.variable }}
+                                                {{ assignment.variable_name }}: {{ assignment.expression }}
                                             </el-tag>
                                         </div>
                                     </div>
@@ -244,9 +244,9 @@
                                         <div class="column-title">离开</div>
                                         <div class="tags-area">
                                             <el-tag v-for="assignment in state.exit_variable_assignments"
-                                                :key="assignment.variable" size="small" type="warning" effect="light"
+                                                :key="assignment.variable_name" size="small" type="warning" effect="light"
                                                 class="variable-tag">
-                                                {{ assignment.variable }}
+                                                {{ assignment.variable_name }}: {{ assignment.expression }}
                                             </el-tag>
                                         </div>
                                     </div>
@@ -401,9 +401,9 @@ const loadStatesData = async (policyName) => {
                     enter_actions: stateDetail.state.enter_actions || [],
                     do_actions: stateDetail.state.do_actions || [],
                     exit_actions: stateDetail.state.exit_actions || [],
-                    enter_variable_assignments: stateDetail.state.enter_variable_assignments || [],
-                    hold_variable_assignments: stateDetail.state.hold_variable_assignments || [],
-                    exit_variable_assignments: stateDetail.state.exit_variable_assignments || [],
+                    enter_variable_assignments: stateDetail.state.enter_assignments || [],
+                    hold_variable_assignments: stateDetail.state.do_assignments || [],
+                    exit_variable_assignments: stateDetail.state.exit_assignments || [],
                     transformers: stateDetail.state.transformers || []
                 }
 
