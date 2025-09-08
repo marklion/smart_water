@@ -90,7 +90,7 @@
                                 </div>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="name" label="策略名称" width="180" show-overflow-tooltip>
+                        <el-table-column prop="name" label="策略名称" width="400" show-overflow-tooltip>
                             <template #default="scope">
                                 <div class="policy-name">
                                     <el-icon color="#409EFF" style="margin-right: 8px;">
@@ -100,23 +100,22 @@
                                 </div>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-                        <el-table-column prop="states_count" label="状态" width="80" align="center">
+                        <el-table-column prop="states_count" label="状态" width="100" align="center">
                             <template #default="scope">
                                 <el-tag type="info" size="small">{{ scope.row.states_count || 0 }}</el-tag>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="sources_count" label="数据源" width="80" align="center">
+                        <el-table-column prop="sources_count" label="数据源" width="100" align="center">
                             <template #default="scope">
                                 <el-tag type="success" size="small">{{ scope.row.sources_count || 0 }}</el-tag>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="actions_count" label="动作" width="80" align="center">
+                        <el-table-column prop="actions_count" label="动作" width="100" align="center">
                             <template #default="scope">
                                 <el-tag type="warning" size="small">{{ scope.row.actions_count || 0 }}</el-tag>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="variables_count" label="变量" width="80" align="center">
+                        <el-table-column prop="variables_count" label="变量" width="100" align="center">
                             <template #default="scope">
                                 <el-tag type="danger" size="small">{{ scope.row.variables_count || 0 }}</el-tag>
                             </template>
@@ -332,15 +331,50 @@ const loadPolicyData = async (params, pageNo = 0) => {
                     policy.sources_count = sourcesResult.total || 0
                     policy.sources = sourcesResult.sources || [] // 保存完整的数据源信息
 
-                    // 设置默认值
-                    policy.actions_count = policy.states_count * 2 // 估算动作数量
-                    policy.variables_count = policy.states_count * 1 // 估算变量数量
-                    policy.description = policy.description || `${policy.name}策略`
+                    // 计算准确的动作和变量数量，同时收集详细信息
+                    let actionsCount = 0
+                    let variablesCount = 0
+                    let allActions = []
+                    let allVariables = []
+                    
+                    if (statesResult.states && statesResult.states.length > 0) {
+                        for (const state of statesResult.states) {
+                            try {
+                                const stateDetail = await policy_lib.get_state(policy.name, state.name, token)
+                                const stateData = stateDetail.state
+                                const enterActions = stateData.enter_actions || []
+                                const doActions = stateData.do_actions || []
+                                const exitActions = stateData.exit_actions || []
+                                actionsCount += enterActions.length + doActions.length + exitActions.length
+                                
+                                // 收集动作信息
+                                enterActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '进入', state: state.name }))
+                                doActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '状态内', state: state.name }))
+                                exitActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '离开', state: state.name }))
+                                
+                                const enterAssignments = stateData.enter_assignments || []
+                                const doAssignments = stateData.do_assignments || []
+                                const exitAssignments = stateData.exit_assignments || []
+                                variablesCount += enterAssignments.length + doAssignments.length + exitAssignments.length
+                                
+                                // 收集变量信息
+                                enterAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '进入', expression: assignment.expression, state: state.name }))
+                                doAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '状态内', expression: assignment.expression, state: state.name }))
+                                exitAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '离开', expression: assignment.expression, state: state.name }))
+                                
+                            } catch (error) {
+                                console.error(`获取状态 ${state.name} 详情失败:`, error)
+                            }
+                        }
+                    }
+                    
+                    policy.actions_count = actionsCount
+                    policy.variables_count = variablesCount
                     policy.created_time = policy.created_time || new Date().toISOString()
 
-                    // 设置默认的动作和变量数组（用于展开详情显示）
-                    policy.actions = []
-                    policy.variables = []
+                    // 设置动作和变量数组（用于展开详情显示）
+                    policy.actions = allActions
+                    policy.variables = allVariables
 
                 } catch (error) {
                     console.error(`加载策略${policy.name}详情失败:`, error)
@@ -349,7 +383,6 @@ const loadPolicyData = async (params, pageNo = 0) => {
                     policy.sources_count = 0
                     policy.actions_count = 0
                     policy.variables_count = 0
-                    policy.description = `${policy.name}策略`
                     policy.created_time = new Date().toISOString()
                     policy.sources = []
                     policy.actions = []
@@ -505,7 +538,60 @@ onMounted(() => {
 }
 
 .config-table {
-    margin-top: 20px;
+    margin-top: 0;
+}
+
+/* 移除卡片内容的内边距，让表格顶满 */
+.config-list-card :deep(.el-card__body) {
+    padding: 0 !important;
+}
+
+/* 确保PageContent组件也没有内边距 */
+.config-list-card :deep(.page-content) {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* 移除所有可能影响表格顶满的内外边距 */
+.config-list-card :deep(.el-table) {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+}
+
+.config-list-card :deep(.el-table__header-wrapper) {
+    margin: 0 !important;
+}
+
+.config-list-card :deep(.el-table__body-wrapper) {
+    margin: 0 !important;
+}
+
+/* 优化表格边框样式 */
+.config-list-card :deep(.el-table td),
+.config-list-card :deep(.el-table th) {
+    border: none !important;
+}
+
+.config-list-card :deep(.el-table::before) {
+    display: none;
+}
+
+.config-list-card :deep(.el-table--border) {
+    border: none !important;
+}
+
+.config-list-card :deep(.el-table--border::after) {
+    display: none;
+}
+
+/* 保持斑马纹效果但移除边框 */
+.config-list-card :deep(.el-table--striped .el-table__body tr.el-table__row--striped td) {
+    background-color: #fafafa;
+}
+
+.config-list-card :deep(.el-table__body tr:hover > td) {
+    background-color: #f5f7fa !important;
 }
 
 /* 隐藏表格滚动条 */
