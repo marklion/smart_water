@@ -46,10 +46,14 @@ async function show_content() {
 onMounted(async () => {
     await show_content();
 });
+
+// 重新加载数据（重置到第一页）
 async function reload() {
     cur_page.value = 1;
     await show_content();
 }
+
+// 暴露方法给父组件
 defineExpose({
     show_content,
     reload

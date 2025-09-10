@@ -22,31 +22,19 @@
                     <el-table :data="content" style="width: 100%" stripe row-key="id" class="config-table">
                         <el-table-column prop="farm_name" label="所属农场" width="180">
                             <template #default="scope">
-                                <div class="farm-name">
-                                    <el-icon color="#409EFF" style="margin-right: 8px;">
-                                        <House />
-                                    </el-icon>
-                                    {{ scope.row.farm_name }}
-                                </div>
+                                <IconNameColumn :name="scope.row.farm_name" :icon="House" icon-color="#409EFF" />
                             </template>
                         </el-table-column>
 
                         <el-table-column prop="name" label="地块名称" width="180">
                             <template #default="scope">
-                                <div class="block-name">
-                                    <el-icon color="#67C23A" style="margin-right: 8px;">
-                                        <Grid />
-                                    </el-icon>
-                                    {{ scope.row.name }}
-                                </div>
+                                <IconNameColumn :name="scope.row.name" :icon="Grid" icon-color="#67C23A" />
                             </template>
                         </el-table-column>
 
                         <el-table-column prop="area" label="面积(亩)" width="100" align="center">
                             <template #default="scope">
-                                <el-tag type="success" size="small">
-                                    {{ scope.row.area || 0 }}
-                                </el-tag>
+                                <CountTag :count="scope.row.area || 0" type="success" suffix="亩" />
                             </template>
                         </el-table-column>
 
@@ -97,24 +85,15 @@ import axios from 'axios'
 import PageContent from '../../public/gui/src/components/PageContent.vue'
 import StatsOverview from './StatsOverview.vue'
 import SearchComponent from '../../public/gui/src/components/SearchComponent.vue'
+import IconNameColumn from '../../public/gui/src/components/IconNameColumn.vue'
+import CountTag from '../../public/gui/src/components/CountTag.vue'
+import { useConfigView } from '../../public/gui/src/composables/useConfigView.js'
 
 
 
 const farms = ref([])
-const statsRef = ref(null)
-const searchRef = ref(null)
-const pageContentRef = ref(null)
 
-// 搜索相关状态
-const searchParams = ref({
-    searchText: '',
-    filters: {}
-})
-
-
-
-
-
+// 先定义loadFarms函数
 const loadFarms = async () => {
     try {
         const response = await axios.post('/api/v1/resource/list_farm', {
@@ -127,6 +106,19 @@ const loadFarms = async () => {
         console.error('加载农场列表失败:', error)
     }
 }
+
+// 使用通用配置视图逻辑
+const {
+    statsRef,
+    searchRef,
+    pageContentRef,
+    searchParams,
+    refreshData: baseRefreshData,
+    onSearch: baseOnSearch,
+    onSearchReset: baseOnSearchReset
+} = useConfigView(loadFarms)
+
+
 
 
 
@@ -149,7 +141,7 @@ const loadBlocksData = async (params, pageNo) => {
                     (block.info && block.info.toLowerCase().includes(searchText))
                 )
             }
-            
+
             return {
                 blocks: blocksData,
                 total: blocksData.length
@@ -174,42 +166,15 @@ const getFarmLocation = (farmName) => {
 
 
 
+// 自定义刷新逻辑，包含loadFarms
 const refreshData = () => {
     loadFarms()
-    if (statsRef.value) {
-        statsRef.value.refresh()
-    }
-    // 重置搜索参数
-    searchParams.value = { searchText: '', filters: {} }
-    if (searchRef.value) {
-        searchRef.value.reset()
-    }
-    // 刷新页面内容
-    if (pageContentRef.value) {
-        pageContentRef.value.reload()
-    }
-}
-// 搜索事件处理
-const onSearch = (params) => {
-    console.log('搜索参数:', params)
-    searchParams.value = params
-    if (pageContentRef.value) {
-        pageContentRef.value.reload()
-    }
+    baseRefreshData()
 }
 
-// 搜索重置事件处理
-const onSearchReset = () => {
-    console.log('重置搜索')
-    searchParams.value = { searchText: '', filters: {} }
-    if (pageContentRef.value) {
-        pageContentRef.value.reload()
-    }
-}
-
-onMounted(() => {
-    loadFarms()
-})
+// 使用基础搜索逻辑
+const onSearch = baseOnSearch
+const onSearchReset = baseOnSearchReset
 </script>
 
 <style scoped>

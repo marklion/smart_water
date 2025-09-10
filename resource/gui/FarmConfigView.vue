@@ -55,45 +55,28 @@
                             </template>
                         </el-table-column>
 
-                        <el-table-column prop="name" label="农场名称" width="120">
+                        <el-table-column prop="name" label="农场名称" width="180">
                             <template #default="scope">
-                                <div class="farm-name">
-                                    <el-icon color="#409EFF" style="margin-right: 8px;">
-                                        <House />
-                                    </el-icon>
-                                    {{ scope.row.name }}
-                                </div>
+                                <IconNameColumn :name="scope.row.name" :icon="House" icon-color="#409EFF" />
                             </template>
                         </el-table-column>
 
                         <el-table-column prop="location" label="位置" width="150">
                             <template #default="scope">
-                                <div class="farm-location">
-                                    <el-icon color="#E6A23C" style="margin-right: 8px;">
-                                        <Location />
-                                    </el-icon>
-                                    {{ scope.row.location }}
-                                </div>
+                                <IconNameColumn :name="scope.row.location" :icon="Location" icon-color="#E6A23C" />
                             </template>
                         </el-table-column>
                         <el-table-column prop="info" label="描述信息" min-width="180" show-overflow-tooltip />
 
                         <el-table-column label="地块数量" width="120" align="center">
                             <template #default="scope">
-                                <el-tag type="info" size="small">
-                                    {{ scope.row.blocks ? scope.row.blocks.length : 0 }}
-                                </el-tag>
+                                <CountTag :count="scope.row.blocks ? scope.row.blocks.length : 0" type="info" />
                             </template>
                         </el-table-column>
 
                         <el-table-column label="配置状态" width="120" align="center">
                             <template #default="scope">
-                                <el-tag type="success" size="small">
-                                    <el-icon style="margin-right: 4px;">
-                                        <Check />
-                                    </el-icon>
-                                    已配置
-                                </el-tag>
+                                <CountTag count="已配置" type="success" :icon="Check" :show-icon="true" />
                             </template>
                         </el-table-column>
                     </el-table>
@@ -104,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
     Refresh,
@@ -116,17 +99,21 @@ import axios from 'axios'
 import PageContent from '../../public/gui/src/components/PageContent.vue'
 import StatsOverview from './StatsOverview.vue'
 import SearchComponent from '../../public/gui/src/components/SearchComponent.vue'
+import IconNameColumn from '../../public/gui/src/components/IconNameColumn.vue'
+import CountTag from '../../public/gui/src/components/CountTag.vue'
+import { useConfigView } from '../../public/gui/src/composables/useConfigView.js'
 
 
-const statsRef = ref(null)
-const searchRef = ref(null)
-const pageContentRef = ref(null)
-
-// 搜索相关状态
-const searchParams = ref({
-    searchText: '',
-    filters: {}
-})
+// 使用通用配置视图逻辑
+const {
+    statsRef,
+    searchRef,
+    pageContentRef,
+    searchParams,
+    refreshData,
+    onSearch,
+    onSearchReset
+} = useConfigView()
 
 const loadFarmsData = async (params, pageNo) => {
     try {
@@ -156,7 +143,7 @@ const loadFarmsData = async (params, pageNo) => {
                     (farm.info && farm.info.toLowerCase().includes(searchText))
                 )
             }
-            
+
             return {
                 farms: farmsData,
                 total: farmsData.length
@@ -175,42 +162,7 @@ const loadFarmsData = async (params, pageNo) => {
 
 
 
-const refreshData = () => {
-    if (statsRef.value) {
-        statsRef.value.refresh()
-    }
-    // 重置搜索参数
-    searchParams.value = { searchText: '', filters: {} }
-    if (searchRef.value) {
-        searchRef.value.reset()
-    }
-    // 刷新页面内容
-    if (pageContentRef.value) {
-        pageContentRef.value.reload()
-    }
-}
-
-// 搜索事件处理
-const onSearch = (params) => {
-    console.log('搜索参数:', params)
-    searchParams.value = params
-    if (pageContentRef.value) {
-        pageContentRef.value.reload()
-    }
-}
-
-// 搜索重置事件处理
-const onSearchReset = () => {
-    console.log('重置搜索')
-    searchParams.value = { searchText: '', filters: {} }
-    if (pageContentRef.value) {
-        pageContentRef.value.reload()
-    }
-}
-
-onMounted(() => {
-    loadFarmsData()
-})
+// loadFarmsData函数保持不变，其他逻辑已移到useConfigView中
 </script>
 
 <style scoped>
@@ -369,6 +321,7 @@ onMounted(() => {
     .header-actions .el-input {
         width: 100% !important;
     }
+
     .blocks-grid {
         grid-template-columns: 1fr;
     }
