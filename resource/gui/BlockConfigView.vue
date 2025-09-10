@@ -7,6 +7,8 @@
                 <div class="card-header">
                     <span class="title">地块配置详情</span>
                     <div class="header-actions">
+                        <SearchComponent ref="searchRef" :search-placeholder="'搜索地块名称、农场...'" @search="onSearch"
+                            @reset="onSearchReset" class="search-component" />
                         <el-button type="primary" @click="refreshData" :icon="Refresh">
                             刷新
                         </el-button>
@@ -14,10 +16,10 @@
                 </div>
             </template>
 
-            <PageContent :fetch_func="loadBlocksData" :params="{}" content_name="blocks" total_name="total">
+            <PageContent :fetch_func="loadBlocksData" :params="searchParams" content_name="blocks" total_name="total"
+                ref="pageContentRef">
                 <template #default="{ content }">
-                    <el-table :data="content" style="width: 100%" stripe row-key="id"
-                        class="config-table">
+                    <el-table :data="content" style="width: 100%" stripe row-key="id" class="config-table">
                         <el-table-column prop="farm_name" label="所属农场" width="180">
                             <template #default="scope">
                                 <div class="farm-name">
@@ -94,11 +96,20 @@ import {
 import axios from 'axios'
 import PageContent from '../../public/gui/src/components/PageContent.vue'
 import StatsOverview from './StatsOverview.vue'
+import SearchComponent from '../../public/gui/src/components/SearchComponent.vue'
 
 
 
 const farms = ref([])
 const statsRef = ref(null)
+const searchRef = ref(null)
+const pageContentRef = ref(null)
+
+// 搜索相关状态
+const searchParams = ref({
+    searchText: '',
+    filters: {}
+})
 
 
 
@@ -127,9 +138,21 @@ const loadBlocksData = async (params, pageNo) => {
             pageNo: pageNo
         })
         if (response.data.err_msg === '') {
+            let blocksData = response.data.result.blocks || []
+
+            // 应用搜索
+            if (params && params.searchText) {
+                const searchText = params.searchText.toLowerCase()
+                blocksData = blocksData.filter(block =>
+                    block.name.toLowerCase().includes(searchText) ||
+                    (block.farm_name && block.farm_name.toLowerCase().includes(searchText)) ||
+                    (block.info && block.info.toLowerCase().includes(searchText))
+                )
+            }
+            
             return {
-                blocks: response.data.result.blocks || [],
-                total: response.data.result.total || 0
+                blocks: blocksData,
+                total: blocksData.length
             }
         } else {
             ElMessage.error(response.data.err_msg || '加载地块列表失败')
@@ -155,6 +178,32 @@ const refreshData = () => {
     loadFarms()
     if (statsRef.value) {
         statsRef.value.refresh()
+    }
+    // 重置搜索参数
+    searchParams.value = { searchText: '', filters: {} }
+    if (searchRef.value) {
+        searchRef.value.reset()
+    }
+    // 刷新页面内容
+    if (pageContentRef.value) {
+        pageContentRef.value.reload()
+    }
+}
+// 搜索事件处理
+const onSearch = (params) => {
+    console.log('搜索参数:', params)
+    searchParams.value = params
+    if (pageContentRef.value) {
+        pageContentRef.value.reload()
+    }
+}
+
+// 搜索重置事件处理
+const onSearchReset = () => {
+    console.log('重置搜索')
+    searchParams.value = { searchText: '', filters: {} }
+    if (pageContentRef.value) {
+        pageContentRef.value.reload()
     }
 }
 
@@ -190,6 +239,11 @@ onMounted(() => {
     display: flex;
     gap: 12px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-component {
+    flex-shrink: 0;
 }
 
 .config-table {

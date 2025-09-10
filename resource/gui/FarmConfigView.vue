@@ -7,6 +7,8 @@
                 <div class="card-header">
                     <span class="title">农场配置详情</span>
                     <div class="header-actions">
+                        <SearchComponent ref="searchRef" :search-placeholder="'搜索农场名称、位置...'" @search="onSearch"
+                            @reset="onSearchReset" class="search-component" />
                         <el-button type="primary" @click="refreshData" :icon="Refresh">
                             刷新
                         </el-button>
@@ -14,10 +16,11 @@
                 </div>
             </template>
 
-            <PageContent :fetch_func="loadFarmsData" :params="{}" content_name="farms" total_name="total">
+            <PageContent :fetch_func="loadFarmsData" :params="searchParams" content_name="farms" total_name="total"
+                ref="pageContentRef">
                 <template #default="{ content }">
-                    <el-table :data="content" style="width: 100%" stripe :default-expand-all="false"
-                        row-key="name" class="config-table">
+                    <el-table :data="content" style="width: 100%" stripe :default-expand-all="false" row-key="name"
+                        class="config-table">
                         <el-table-column type="expand">
                             <template #default="props">
                                 <div class="block-config-details">
@@ -52,7 +55,7 @@
                             </template>
                         </el-table-column>
 
-                        <el-table-column prop="name" label="农场名称" width="180">
+                        <el-table-column prop="name" label="农场名称" width="120">
                             <template #default="scope">
                                 <div class="farm-name">
                                     <el-icon color="#409EFF" style="margin-right: 8px;">
@@ -73,7 +76,7 @@
                                 </div>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="info" label="描述信息" min-width="150" show-overflow-tooltip />
+                        <el-table-column prop="info" label="描述信息" min-width="180" show-overflow-tooltip />
 
                         <el-table-column label="地块数量" width="120" align="center">
                             <template #default="scope">
@@ -112,9 +115,18 @@ import {
 import axios from 'axios'
 import PageContent from '../../public/gui/src/components/PageContent.vue'
 import StatsOverview from './StatsOverview.vue'
+import SearchComponent from '../../public/gui/src/components/SearchComponent.vue'
 
 
 const statsRef = ref(null)
+const searchRef = ref(null)
+const pageContentRef = ref(null)
+
+// 搜索相关状态
+const searchParams = ref({
+    searchText: '',
+    filters: {}
+})
 
 const loadFarmsData = async (params, pageNo) => {
     try {
@@ -122,7 +134,8 @@ const loadFarmsData = async (params, pageNo) => {
             pageNo: pageNo
         })
         if (response.data.err_msg === '') {
-            const farmsData = response.data.result.farms || []
+            let farmsData = response.data.result.farms || []
+
             // 为每个农场加载地块数据
             for (let farm of farmsData) {
                 const blockResponse = await axios.post('/api/v1/resource/list_block', {
@@ -133,9 +146,20 @@ const loadFarmsData = async (params, pageNo) => {
                     farm.blocks = blockResponse.data.result.blocks || []
                 }
             }
+
+            // 应用搜索
+            if (params && params.searchText) {
+                const searchText = params.searchText.toLowerCase()
+                farmsData = farmsData.filter(farm =>
+                    farm.name.toLowerCase().includes(searchText) ||
+                    (farm.location && farm.location.toLowerCase().includes(searchText)) ||
+                    (farm.info && farm.info.toLowerCase().includes(searchText))
+                )
+            }
+            
             return {
                 farms: farmsData,
-                total: response.data.result.total || 0
+                total: farmsData.length
             }
         } else {
             ElMessage.error(response.data.err_msg || '加载农场列表失败')
@@ -154,6 +178,33 @@ const loadFarmsData = async (params, pageNo) => {
 const refreshData = () => {
     if (statsRef.value) {
         statsRef.value.refresh()
+    }
+    // 重置搜索参数
+    searchParams.value = { searchText: '', filters: {} }
+    if (searchRef.value) {
+        searchRef.value.reset()
+    }
+    // 刷新页面内容
+    if (pageContentRef.value) {
+        pageContentRef.value.reload()
+    }
+}
+
+// 搜索事件处理
+const onSearch = (params) => {
+    console.log('搜索参数:', params)
+    searchParams.value = params
+    if (pageContentRef.value) {
+        pageContentRef.value.reload()
+    }
+}
+
+// 搜索重置事件处理
+const onSearchReset = () => {
+    console.log('重置搜索')
+    searchParams.value = { searchText: '', filters: {} }
+    if (pageContentRef.value) {
+        pageContentRef.value.reload()
     }
 }
 
@@ -189,6 +240,11 @@ onMounted(() => {
     display: flex;
     gap: 12px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-component {
+    flex-shrink: 0;
 }
 
 .config-table {
@@ -313,7 +369,6 @@ onMounted(() => {
     .header-actions .el-input {
         width: 100% !important;
     }
-
     .blocks-grid {
         grid-template-columns: 1fr;
     }

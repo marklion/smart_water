@@ -7,6 +7,8 @@
                 <div class="card-header">
                     <span class="title">设备配置详情</span>
                     <div class="header-actions">
+                        <SearchComponent ref="searchRef" :search-placeholder="'搜索设备名称、驱动...'" @search="onSearch"
+                            @reset="onSearchReset" class="search-component" />
                         <el-button type="primary" @click="refreshData" :icon="Refresh">
                             刷新
                         </el-button>
@@ -16,7 +18,8 @@
 
             <el-tabs v-model="activeTab" type="card" class="config-tabs">
                 <el-tab-pane label="驱动列表" name="drivers">
-                    <PageContent content_name="drivers" :fetch_func="fetch_driver_list" v-slot="data">
+                    <PageContent content_name="drivers" :fetch_func="fetch_driver_list" :params="driverSearchParams"
+                        ref="driverPageContentRef" v-slot="data">
                         <el-table :data="data.content" stripe style="width: 100%" class="config-table">
                             <el-table-column prop="name" label="驱动名称" width="200">
                                 <template #default="scope">
@@ -35,18 +38,8 @@
                 </el-tab-pane>
 
                 <el-tab-pane label="设备列表" name="devices">
-                    <div class="device-controls">
-                        <el-input v-model="farmFilter" placeholder="按农场筛选" style="width: 200px;" clearable
-                            @input="refreshDeviceList" />
-                        <el-input v-model="blockFilter" placeholder="按区块筛选" style="width: 200px; margin-left: 10px;"
-                            clearable @input="refreshDeviceList" />
-                        <el-button @click="refreshDeviceList" style="margin-left: 10px;">
-                            刷新列表
-                        </el-button>
-                    </div>
-
                     <PageContent :key="deviceListKey" content_name="devices" :fetch_func="fetch_device_list"
-                        v-slot="data">
+                        :params="deviceSearchParams" ref="devicePageContentRef" v-slot="data">
                         <el-table :data="data.content" stripe style="width: 100%" class="config-table">
                             <el-table-column prop="device_name" label="设备名称" width="180">
                                 <template #default="scope">
@@ -94,6 +87,7 @@ import { ref } from 'vue';
 import device_management_lib from '../lib/device_management_lib';
 import PageContent from '../../public/gui/src/components/PageContent.vue';
 import StatsOverview from '../../resource/gui/StatsOverview.vue';
+import SearchComponent from '../../public/gui/src/components/SearchComponent.vue';
 import {
     Refresh,
     Setting,
@@ -107,13 +101,60 @@ const farmFilter = ref('');
 const blockFilter = ref('');
 const deviceListKey = ref(0);
 const statsRef = ref(null);
+const searchRef = ref(null);
+const driverPageContentRef = ref(null);
+const devicePageContentRef = ref(null);
+
+// 驱动搜索参数
+const driverSearchParams = ref({
+    searchText: '',
+    filters: {}
+});
+
+// 设备搜索参数
+const deviceSearchParams = ref({
+    searchText: '',
+    filters: {}
+});
 
 async function fetch_driver_list(params, pageNo) {
-    return await device_management_lib.get_driver_list('abc', pageNo);
+    const result = await device_management_lib.get_driver_list('abc', pageNo);
+    let drivers = result.drivers || [];
+    
+    // 应用搜索和筛选
+    if (params && params.searchText) {
+        const searchText = params.searchText.toLowerCase();
+        drivers = drivers.filter(driver => 
+            driver.name.toLowerCase().includes(searchText) ||
+            (driver.config_method && driver.config_method.toLowerCase().includes(searchText)) ||
+            (driver.capability && driver.capability.toLowerCase().includes(searchText))
+        );
+    }
+    
+    return {
+        drivers: drivers,
+        total: drivers.length
+    };
 }
 
 async function fetch_device_list(params, pageNo) {
-    return await device_management_lib.list_device(pageNo, farmFilter.value, blockFilter.value, 'abc');
+    const result = await device_management_lib.list_device(pageNo, farmFilter.value, blockFilter.value, 'abc');
+    let devices = result.devices || [];
+    
+    // 应用搜索
+    if (params && params.searchText) {
+        const searchText = params.searchText.toLowerCase();
+        devices = devices.filter(device => 
+            device.device_name.toLowerCase().includes(searchText) ||
+            (device.farm_name && device.farm_name.toLowerCase().includes(searchText)) ||
+            (device.block_name && device.block_name.toLowerCase().includes(searchText))
+        );
+    }
+    
+    return {
+        devices: devices,
+        total: devices.length
+    };
 }
 
 function refreshDeviceList() {
@@ -125,7 +166,51 @@ function refreshData() {
     if (statsRef.value) {
         statsRef.value.refresh();
     }
+    // 重置搜索参数
+    driverSearchParams.value = { searchText: '', filters: {} };
+    deviceSearchParams.value = { searchText: '', filters: {} };
+    if (searchRef.value) {
+        searchRef.value.reset();
+    }
+    // 刷新页面内容
+    if (driverPageContentRef.value) {
+        driverPageContentRef.value.reload();
+    }
+    if (devicePageContentRef.value) {
+        devicePageContentRef.value.reload();
+    }
 }
+
+// 搜索事件处理
+const onSearch = (params) => {
+    console.log('搜索参数:', params, '当前标签:', activeTab.value);
+    if (activeTab.value === 'drivers') {
+        driverSearchParams.value = params;
+        if (driverPageContentRef.value) {
+            driverPageContentRef.value.reload();
+        }
+    } else if (activeTab.value === 'devices') {
+        deviceSearchParams.value = params;
+        if (devicePageContentRef.value) {
+            devicePageContentRef.value.reload();
+        }
+    }
+};
+
+// 搜索重置事件处理
+const onSearchReset = () => {
+    console.log('重置搜索');
+    driverSearchParams.value = { searchText: '', filters: {} };
+    deviceSearchParams.value = { searchText: '', filters: {} };
+    farmFilter.value = '';
+    blockFilter.value = '';
+    
+    if (activeTab.value === 'drivers' && driverPageContentRef.value) {
+        driverPageContentRef.value.reload();
+    } else if (activeTab.value === 'devices' && devicePageContentRef.value) {
+        devicePageContentRef.value.reload();
+    }
+};
 </script>
 
 <style scoped>
@@ -143,6 +228,18 @@ function refreshData() {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-component {
+    flex-shrink: 0;
 }
 
 .title {
