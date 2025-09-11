@@ -1,5 +1,8 @@
 <template>
   <div class="default-page">
+    <!-- 一周天气预报组件 (仅在监控中心显示) -->
+    <WeatherWeekly v-if="route.name === '监控中心'" />
+
     <el-card>
       <template #header>
         <div class="card-header">
@@ -8,10 +11,7 @@
       </template>
 
       <div class="page-content">
-        <el-empty
-          :description="pageDescription"
-          :image-size="200"
-        >
+        <el-empty :description="pageDescription" :image-size="200">
           <el-button type="primary">开始使用</el-button>
         </el-empty>
       </div>
@@ -22,6 +22,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 
 const route = useRoute()
 
