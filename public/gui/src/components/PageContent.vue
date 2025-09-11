@@ -46,26 +46,38 @@ async function show_content() {
 onMounted(async () => {
     await show_content();
 });
+
+// 重新加载数据（重置到第一页）
+async function reload() {
+    cur_page.value = 1;
+    await show_content();
+}
+
+// 暴露方法给父组件
+defineExpose({
+    show_content,
+    reload
+});
 </script>
 
 <style scoped>
 .page-content-container {
     display: flex;
     flex-direction: column;
-    height: 100%; /* 使用全屏高度，您可以根据需要调整 */
+    height: 100%;
 }
 
 .content-area {
     flex: 1;
-    overflow-y: auto; /* 内容超出时显示滚动条 */
-    padding-bottom: 10px; /* 给内容底部添加一些间距 */
+    overflow-y: auto;
+    padding-bottom: 10px;
 }
 
 .pagination-area {
-    flex-shrink: 0; /* 确保分页区域不会被压缩 */
+    flex-shrink: 0;
     padding: 10px 0;
-    background-color: #fff; /* 可选：给分页区域添加背景色 */
-    border-top: 1px solid #eee; /* 可选：添加上边框分隔线 */
+    background-color: #fff;
+    border-top: 1px solid #eee;
     text-align: center;
 }
 </style>

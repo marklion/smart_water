@@ -7,6 +7,8 @@
                 <div class="card-header">
                     <span class="title">农场配置详情</span>
                     <div class="header-actions">
+                        <SearchComponent ref="searchRef" :search-placeholder="'搜索农场名称、位置...'" @search="onSearch"
+                            @reset="onSearchReset" class="search-component" />
                         <el-button type="primary" @click="refreshData" :icon="Refresh">
                             刷新
                         </el-button>
@@ -14,10 +16,11 @@
                 </div>
             </template>
 
-            <PageContent :fetch_func="loadFarmsData" :params="{}" content_name="farms" total_name="total">
+            <PageContent :fetch_func="loadFarmsData" :params="searchParams" content_name="farms" total_name="total"
+                ref="pageContentRef">
                 <template #default="{ content }">
-                    <el-table :data="content" style="width: 100%" stripe :default-expand-all="false"
-                        row-key="name" class="config-table">
+                    <el-table :data="content" style="width: 100%" stripe :default-expand-all="false" row-key="name"
+                        class="config-table">
                         <el-table-column type="expand">
                             <template #default="props">
                                 <div class="block-config-details">
@@ -54,43 +57,26 @@
 
                         <el-table-column prop="name" label="农场名称" width="180">
                             <template #default="scope">
-                                <div class="farm-name">
-                                    <el-icon color="#409EFF" style="margin-right: 8px;">
-                                        <House />
-                                    </el-icon>
-                                    {{ scope.row.name }}
-                                </div>
+                                <IconNameColumn :name="scope.row.name" :icon="House" icon-color="#409EFF" />
                             </template>
                         </el-table-column>
 
                         <el-table-column prop="location" label="位置" width="150">
                             <template #default="scope">
-                                <div class="farm-location">
-                                    <el-icon color="#E6A23C" style="margin-right: 8px;">
-                                        <Location />
-                                    </el-icon>
-                                    {{ scope.row.location }}
-                                </div>
+                                <IconNameColumn :name="scope.row.location" :icon="Location" icon-color="#E6A23C" />
                             </template>
                         </el-table-column>
-                        <el-table-column prop="info" label="描述信息" min-width="150" show-overflow-tooltip />
+                        <el-table-column prop="info" label="描述信息" min-width="180" show-overflow-tooltip />
 
                         <el-table-column label="地块数量" width="120" align="center">
                             <template #default="scope">
-                                <el-tag type="info" size="small">
-                                    {{ scope.row.blocks ? scope.row.blocks.length : 0 }}
-                                </el-tag>
+                                <CountTag :count="scope.row.blocks ? scope.row.blocks.length : 0" type="info" />
                             </template>
                         </el-table-column>
 
                         <el-table-column label="配置状态" width="120" align="center">
                             <template #default="scope">
-                                <el-tag type="success" size="small">
-                                    <el-icon style="margin-right: 4px;">
-                                        <Check />
-                                    </el-icon>
-                                    已配置
-                                </el-tag>
+                                <CountTag count="已配置" type="success" :icon="Check" :show-icon="true" />
                             </template>
                         </el-table-column>
                     </el-table>
@@ -101,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
     Refresh,
@@ -112,9 +98,22 @@ import {
 import axios from 'axios'
 import PageContent from '../../public/gui/src/components/PageContent.vue'
 import StatsOverview from './StatsOverview.vue'
+import SearchComponent from '../../public/gui/src/components/SearchComponent.vue'
+import IconNameColumn from '../../public/gui/src/components/IconNameColumn.vue'
+import CountTag from '../../public/gui/src/components/CountTag.vue'
+import { useConfigView } from '../../public/gui/src/composables/useConfigView.js'
 
 
-const statsRef = ref(null)
+// 使用通用配置视图逻辑
+const {
+    statsRef,
+    searchRef,
+    pageContentRef,
+    searchParams,
+    refreshData,
+    onSearch,
+    onSearchReset
+} = useConfigView()
 
 const loadFarmsData = async (params, pageNo) => {
     try {
@@ -122,7 +121,8 @@ const loadFarmsData = async (params, pageNo) => {
             pageNo: pageNo
         })
         if (response.data.err_msg === '') {
-            const farmsData = response.data.result.farms || []
+            let farmsData = response.data.result.farms || []
+
             // 为每个农场加载地块数据
             for (let farm of farmsData) {
                 const blockResponse = await axios.post('/api/v1/resource/list_block', {
@@ -133,9 +133,20 @@ const loadFarmsData = async (params, pageNo) => {
                     farm.blocks = blockResponse.data.result.blocks || []
                 }
             }
+
+            // 应用搜索
+            if (params && params.searchText) {
+                const searchText = params.searchText.toLowerCase()
+                farmsData = farmsData.filter(farm =>
+                    farm.name.toLowerCase().includes(searchText) ||
+                    (farm.location && farm.location.toLowerCase().includes(searchText)) ||
+                    (farm.info && farm.info.toLowerCase().includes(searchText))
+                )
+            }
+
             return {
                 farms: farmsData,
-                total: response.data.result.total || 0
+                total: farmsData.length
             }
         } else {
             ElMessage.error(response.data.err_msg || '加载农场列表失败')
@@ -151,15 +162,7 @@ const loadFarmsData = async (params, pageNo) => {
 
 
 
-const refreshData = () => {
-    if (statsRef.value) {
-        statsRef.value.refresh()
-    }
-}
-
-onMounted(() => {
-    loadFarmsData()
-})
+// loadFarmsData函数保持不变，其他逻辑已移到useConfigView中
 </script>
 
 <style scoped>
@@ -189,6 +192,11 @@ onMounted(() => {
     display: flex;
     gap: 12px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-component {
+    flex-shrink: 0;
 }
 
 .config-table {

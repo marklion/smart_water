@@ -7,6 +7,8 @@
                 <div class="card-header">
                     <span class="title">地块配置详情</span>
                     <div class="header-actions">
+                        <SearchComponent ref="searchRef" :search-placeholder="'搜索地块名称、农场...'" @search="onSearch"
+                            @reset="onSearchReset" class="search-component" />
                         <el-button type="primary" @click="refreshData" :icon="Refresh">
                             刷新
                         </el-button>
@@ -14,37 +16,25 @@
                 </div>
             </template>
 
-            <PageContent :fetch_func="loadBlocksData" :params="{}" content_name="blocks" total_name="total">
+            <PageContent :fetch_func="loadBlocksData" :params="searchParams" content_name="blocks" total_name="total"
+                ref="pageContentRef">
                 <template #default="{ content }">
-                    <el-table :data="content" style="width: 100%" stripe row-key="id"
-                        class="config-table">
+                    <el-table :data="content" style="width: 100%" stripe row-key="id" class="config-table">
                         <el-table-column prop="farm_name" label="所属农场" width="180">
                             <template #default="scope">
-                                <div class="farm-name">
-                                    <el-icon color="#409EFF" style="margin-right: 8px;">
-                                        <House />
-                                    </el-icon>
-                                    {{ scope.row.farm_name }}
-                                </div>
+                                <IconNameColumn :name="scope.row.farm_name" :icon="House" icon-color="#409EFF" />
                             </template>
                         </el-table-column>
 
                         <el-table-column prop="name" label="地块名称" width="180">
                             <template #default="scope">
-                                <div class="block-name">
-                                    <el-icon color="#67C23A" style="margin-right: 8px;">
-                                        <Grid />
-                                    </el-icon>
-                                    {{ scope.row.name }}
-                                </div>
+                                <IconNameColumn :name="scope.row.name" :icon="Grid" icon-color="#67C23A" />
                             </template>
                         </el-table-column>
 
                         <el-table-column prop="area" label="面积(亩)" width="100" align="center">
                             <template #default="scope">
-                                <el-tag type="success" size="small">
-                                    {{ scope.row.area || 0 }}
-                                </el-tag>
+                                <CountTag :count="scope.row.area || 0" type="success" suffix="亩" />
                             </template>
                         </el-table-column>
 
@@ -94,16 +84,16 @@ import {
 import axios from 'axios'
 import PageContent from '../../public/gui/src/components/PageContent.vue'
 import StatsOverview from './StatsOverview.vue'
+import SearchComponent from '../../public/gui/src/components/SearchComponent.vue'
+import IconNameColumn from '../../public/gui/src/components/IconNameColumn.vue'
+import CountTag from '../../public/gui/src/components/CountTag.vue'
+import { useConfigView } from '../../public/gui/src/composables/useConfigView.js'
 
 
 
 const farms = ref([])
-const statsRef = ref(null)
 
-
-
-
-
+// 先定义loadFarms函数
 const loadFarms = async () => {
     try {
         const response = await axios.post('/api/v1/resource/list_farm', {
@@ -117,6 +107,19 @@ const loadFarms = async () => {
     }
 }
 
+// 使用通用配置视图逻辑
+const {
+    statsRef,
+    searchRef,
+    pageContentRef,
+    searchParams,
+    refreshData: baseRefreshData,
+    onSearch: baseOnSearch,
+    onSearchReset: baseOnSearchReset
+} = useConfigView(loadFarms)
+
+
+
 
 
 
@@ -127,9 +130,21 @@ const loadBlocksData = async (params, pageNo) => {
             pageNo: pageNo
         })
         if (response.data.err_msg === '') {
+            let blocksData = response.data.result.blocks || []
+
+            // 应用搜索
+            if (params && params.searchText) {
+                const searchText = params.searchText.toLowerCase()
+                blocksData = blocksData.filter(block =>
+                    block.name.toLowerCase().includes(searchText) ||
+                    (block.farm_name && block.farm_name.toLowerCase().includes(searchText)) ||
+                    (block.info && block.info.toLowerCase().includes(searchText))
+                )
+            }
+
             return {
-                blocks: response.data.result.blocks || [],
-                total: response.data.result.total || 0
+                blocks: blocksData,
+                total: blocksData.length
             }
         } else {
             ElMessage.error(response.data.err_msg || '加载地块列表失败')
@@ -151,16 +166,15 @@ const getFarmLocation = (farmName) => {
 
 
 
+// 自定义刷新逻辑，包含loadFarms
 const refreshData = () => {
     loadFarms()
-    if (statsRef.value) {
-        statsRef.value.refresh()
-    }
+    baseRefreshData()
 }
 
-onMounted(() => {
-    loadFarms()
-})
+// 使用基础搜索逻辑
+const onSearch = baseOnSearch
+const onSearchReset = baseOnSearchReset
 </script>
 
 <style scoped>
@@ -190,6 +204,11 @@ onMounted(() => {
     display: flex;
     gap: 12px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-component {
+    flex-shrink: 0;
 }
 
 .config-table {

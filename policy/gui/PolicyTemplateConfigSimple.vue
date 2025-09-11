@@ -7,6 +7,8 @@
                 <div class="card-header">
                     <span class="title">策略配置</span>
                     <div class="header-actions">
+                        <SearchComponent ref="searchRef" :search-placeholder="'搜索策略名称...'" @search="onSearch"
+                            @reset="onSearchReset" class="search-component" />
                         <el-button type="primary" @click="refreshData" :icon="Refresh">
                             刷新
                         </el-button>
@@ -14,9 +16,11 @@
                 </div>
             </template>
 
-            <PageContent :fetch_func="loadPolicyData" :params="{}" content_name="policies" total_name="total">
+            <PageContent :fetch_func="loadPolicyData" :params="searchParams" content_name="policies" total_name="total"
+                ref="pageContentRef">
                 <template #default="{ content }">
-                    <el-table :data="content" style="width: 100%" stripe row-key="name" class="config-table">
+                    <el-table :data="content" style="width: 100%; min-width: 1000px;" stripe row-key="name"
+                        class="config-table">
                         <el-table-column type="expand">
                             <template #default="props">
                                 <div class="policy-details">
@@ -90,7 +94,7 @@
                                 </div>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="name" label="策略名称" width="400" show-overflow-tooltip>
+                        <el-table-column prop="name" label="策略名称" width="900" show-overflow-tooltip>
                             <template #default="scope">
                                 <div class="policy-name">
                                     <el-icon color="#409EFF" style="margin-right: 8px;">
@@ -100,7 +104,7 @@
                                 </div>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="states_count" label="状态" width="100" align="center">
+                        <el-table-column prop="states_count" label="状态" width="120" align="center">
                             <template #default="scope">
                                 <el-tag type="info" size="small">{{ scope.row.states_count || 0 }}</el-tag>
                             </template>
@@ -125,7 +129,7 @@
                                 {{ formatTime(scope.row.created_time) }}
                             </template>
                         </el-table-column>
-                        <el-table-column label="操作" width="120">
+                        <el-table-column label="操作" width="200" fixed="right">
                             <template #default="scope">
                                 <el-button size="small" type="primary" @click="showStatesDrawer(scope.row)"
                                     :icon="Setting">
@@ -223,8 +227,8 @@
                                         <div class="column-title">进入</div>
                                         <div class="tags-area">
                                             <el-tag v-for="assignment in state.enter_variable_assignments"
-                                                :key="assignment.variable_name" size="small" type="primary" effect="light"
-                                                class="variable-tag">
+                                                :key="assignment.variable_name" size="small" type="primary"
+                                                effect="light" class="variable-tag">
                                                 {{ assignment.variable_name }}: {{ assignment.expression }}
                                             </el-tag>
                                         </div>
@@ -233,8 +237,8 @@
                                         <div class="column-title">持续</div>
                                         <div class="tags-area">
                                             <el-tag v-for="assignment in state.hold_variable_assignments"
-                                                :key="assignment.variable_name" size="small" type="success" effect="light"
-                                                class="variable-tag">
+                                                :key="assignment.variable_name" size="small" type="success"
+                                                effect="light" class="variable-tag">
                                                 {{ assignment.variable_name }}: {{ assignment.expression }}
                                             </el-tag>
                                         </div>
@@ -243,8 +247,8 @@
                                         <div class="column-title">离开</div>
                                         <div class="tags-area">
                                             <el-tag v-for="assignment in state.exit_variable_assignments"
-                                                :key="assignment.variable_name" size="small" type="warning" effect="light"
-                                                class="variable-tag">
+                                                :key="assignment.variable_name" size="small" type="warning"
+                                                effect="light" class="variable-tag">
                                                 {{ assignment.variable_name }}: {{ assignment.expression }}
                                             </el-tag>
                                         </div>
@@ -302,9 +306,12 @@ import { ElMessage } from 'element-plus'
 import { Refresh, Document, Setting, VideoPlay, Switch, Right, DataLine, Tools, Edit, Close } from '@element-plus/icons-vue'
 import PageContent from '../../public/gui/src/components/PageContent.vue'
 import PolicyStatsOverview from './PolicyStatsOverview.vue'
+import SearchComponent from '../../public/gui/src/components/SearchComponent.vue'
 import policy_lib from '../lib/policy_lib.js'
 
 const statsRef = ref(null)
+const searchRef = ref(null)
+const pageContentRef = ref(null)
 
 const stateData = ref({})
 const stateLoading = ref({})
@@ -312,15 +319,32 @@ const stateLoading = ref({})
 const statesDialogVisible = ref(false)
 const currentPolicy = ref(null)
 
+// 搜索相关状态
+const searchParams = ref({
+    searchText: '',
+    filters: {}
+})
+
 // 数据加载函数 - 使用真实API
 const loadPolicyData = async (params, pageNo = 0) => {
     try {
         const token = localStorage.getItem('auth_token')
         const result = await policy_lib.list_policy(pageNo, token)
 
+        // 如果有搜索参数，进行前端筛选
+        let filteredPolicies = result.policies || []
+
+        if (params && params.searchText) {
+            const searchText = params.searchText.toLowerCase()
+            filteredPolicies = filteredPolicies.filter(policy =>
+                policy.name.toLowerCase().includes(searchText)
+            )
+        }
+
+
         // 为每个策略加载详细信息
-        if (result.policies && result.policies.length > 0) {
-            for (let policy of result.policies) {
+        if (filteredPolicies && filteredPolicies.length > 0) {
+            for (let policy of filteredPolicies) {
                 try {
                     // 获取状态列表
                     const statesResult = await policy_lib.list_states(policy.name, 0, token)
@@ -336,7 +360,7 @@ const loadPolicyData = async (params, pageNo = 0) => {
                     let variablesCount = 0
                     let allActions = []
                     let allVariables = []
-                    
+
                     if (statesResult.states && statesResult.states.length > 0) {
                         for (const state of statesResult.states) {
                             try {
@@ -346,28 +370,28 @@ const loadPolicyData = async (params, pageNo = 0) => {
                                 const doActions = stateData.do_actions || []
                                 const exitActions = stateData.exit_actions || []
                                 actionsCount += enterActions.length + doActions.length + exitActions.length
-                                
+
                                 // 收集动作信息
                                 enterActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '进入', state: state.name }))
                                 doActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '持续', state: state.name }))
                                 exitActions.forEach(action => allActions.push({ name: `${action.device}:${action.action}`, type: '离开', state: state.name }))
-                                
+
                                 const enterAssignments = stateData.enter_assignments || []
                                 const doAssignments = stateData.do_assignments || []
                                 const exitAssignments = stateData.exit_assignments || []
                                 variablesCount += enterAssignments.length + doAssignments.length + exitAssignments.length
-                                
+
                                 // 收集变量信息
                                 enterAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '进入', expression: assignment.expression, state: state.name }))
                                 doAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '持续', expression: assignment.expression, state: state.name }))
                                 exitAssignments.forEach(assignment => allVariables.push({ name: assignment.variable_name, type: '离开', expression: assignment.expression, state: state.name }))
-                                
+
                             } catch (error) {
                                 console.error(`获取状态 ${state.name} 详情失败:`, error)
                             }
                         }
                     }
-                    
+
                     policy.actions_count = actionsCount
                     policy.variables_count = variablesCount
                     policy.created_time = policy.created_time || new Date().toISOString()
@@ -375,7 +399,7 @@ const loadPolicyData = async (params, pageNo = 0) => {
                     // 设置动作和变量数组（用于展开详情显示）
                     policy.actions = allActions
                     policy.variables = allVariables
-                    
+
                     console.log(`策略 ${policy.name} 的变量信息:`, allVariables)
 
                 } catch (error) {
@@ -393,7 +417,10 @@ const loadPolicyData = async (params, pageNo = 0) => {
             }
         }
 
-        return result
+        return {
+            policies: filteredPolicies,
+            total: filteredPolicies.length
+        }
     } catch (error) {
         console.error('加载策略失败:', error)
         return { policies: [], total: 0 }
@@ -405,8 +432,33 @@ const refreshData = () => {
     if (statsRef.value) {
         statsRef.value.refresh()
     }
-    // 强制刷新页面内容
-    window.location.reload()
+    // 重置搜索参数
+    searchParams.value = { searchText: '', filters: {} }
+    if (searchRef.value) {
+        searchRef.value.reset()
+    }
+    // 刷新页面内容
+    if (pageContentRef.value) {
+        pageContentRef.value.reload()
+    }
+}
+
+// 搜索事件处理
+const onSearch = (params) => {
+    console.log('搜索参数:', params) // 添加调试日志
+    searchParams.value = params
+    if (pageContentRef.value) {
+        pageContentRef.value.reload() // 使用reload重置到第一页
+    }
+}
+
+// 搜索重置事件处理
+const onSearchReset = () => {
+    console.log('重置搜索') // 添加调试日志
+    searchParams.value = { searchText: '', filters: {} }
+    if (pageContentRef.value) {
+        pageContentRef.value.reload() // 使用reload重置到第一页
+    }
 }
 
 const formatTime = (timeStr) => {
@@ -536,11 +588,27 @@ onMounted(() => {
 
 .header-actions {
     display: flex;
-    gap: 10px;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-component {
+    flex-shrink: 0;
 }
 
 .config-table {
     margin-top: 0;
+    min-width: 1000px;
+}
+
+/* 确保表格外层容器支持水平滚动 */
+.config-list-card :deep(.page-content) {
+    overflow-x: auto;
+}
+
+.config-list-card :deep(.page-content-container) {
+    overflow-x: auto;
 }
 
 /* 移除卡片内容的内边距，让表格顶满 */
@@ -559,6 +627,16 @@ onMounted(() => {
     margin: 0 !important;
     border-radius: 0 !important;
     border: none !important;
+    min-width: 1000px !important;
+}
+
+/* 确保表格容器可以水平滚动 */
+.config-list-card :deep(.el-table__body-wrapper) {
+    overflow-x: auto !important;
+}
+
+.config-list-card :deep(.el-table__header-wrapper) {
+    overflow-x: auto !important;
 }
 
 .config-list-card :deep(.el-table__header-wrapper) {
@@ -921,7 +999,7 @@ onMounted(() => {
     overflow-x: hidden;
     padding: 20px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 16px;
     align-content: start;
     grid-auto-rows: auto;
@@ -955,6 +1033,8 @@ onMounted(() => {
     overflow: visible;
     transition: all 0.2s ease;
     height: auto;
+    width: 100%;
+    max-width: 100%;
 }
 
 .state-item:hover {
@@ -976,7 +1056,7 @@ onMounted(() => {
 }
 
 .state-section {
-    padding: 16px 20px;
+    padding: 18px 20px;
     border-bottom: 1px solid #f1f5f9;
 }
 
@@ -1005,11 +1085,13 @@ onMounted(() => {
 .three-columns {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
+    gap: 8px;
+    width: 100%;
 }
 
 .column {
     text-align: center;
+    min-width: 0;
 }
 
 .column-title {
@@ -1022,24 +1104,113 @@ onMounted(() => {
 .tags-area {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     min-height: auto;
+    padding: 2px 0;
 }
 
 .action-tag,
 .variable-tag {
     font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 10px 14px;
+    border-radius: 6px;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    width: 100%;
+    word-break: break-word;
+    white-space: normal;
+    line-height: 1.4;
+    text-align: center;
+    min-height: 36px;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+/* 确保所有标签类型都有一致的基础样式 */
+.el-tag.action-tag,
+.el-tag.variable-tag {
+    font-size: 11px !important;
+    padding: 10px 14px !important;
+    border-radius: 6px !important;
+    min-height: 36px !important;
+    height: auto !important;
+    line-height: 1.4 !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+
+/* 变量标签特殊字体 */
+.variable-tag {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+/* 标签悬停效果 */
+.action-tag:hover,
+.variable-tag:hover,
+.el-tag.action-tag:hover,
+.el-tag.variable-tag:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 覆盖Element UI默认标签样式 */
+.tags-area .el-tag {
+    font-size: 11px !important;
+    padding: 10px 14px !important;
+    border-radius: 6px !important;
+    min-height: 36px !important;
+    height: auto !important;
+    line-height: 1.4 !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+}
+
+/* 确保不同类型标签的颜色保持Element UI原有样式 */
+.tags-area .el-tag--primary {
+    background-color: #ecf5ff;
+    border-color: #b3d8ff;
+    color: #409eff;
+}
+
+.tags-area .el-tag--success {
+    background-color: #f0f9ff;
+    border-color: #95de64;
+    color: #67c23a;
+}
+
+.tags-area .el-tag--warning {
+    background-color: #fdf6ec;
+    border-color: #f5dab1;
+    color: #e6a23c;
+}
+
+.tags-area .el-tag[effect="light"] {
+    opacity: 0.8;
 }
 
 /* 状态转移样式 */
 .transition-section {
     background: #fafbfc;
+    position: relative;
+    z-index: 1;
 }
 
 .transition-grid {
@@ -1052,11 +1223,14 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 6px;
     transition: all 0.2s ease;
+    position: relative;
+    z-index: 2;
+    margin: 2px 0;
 }
 
 .transition-item:hover {
