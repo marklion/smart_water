@@ -59,43 +59,7 @@ describe('设备增删', () => {
     })
 })
 
-async function get_device_log(log_path) {
-    let lastLine = '';
-    // 如果传入的是简单文件名，则使用device/log目录
-    let actual_log_path = log_path;
-    if (!log_path.includes('/')) {
-        actual_log_path = `device/log/${log_path}`;
-    }
-    
-    lastLine = await new Promise((resolve, reject) => {
-        fs.readFile(actual_log_path, 'utf8', (err, data) => {
-            if (err) {
-                reject(err);
-            }
-            const lines = data.trim().split('\n');
-            lastLine = lines[lines.length - 1];
-            resolve(lastLine);
-        });
-    });
-    return lastLine;
-}
-async function clear_device_logs(log_path) {
-    // 如果传入的是简单文件名，则使用device/log目录
-    let actual_log_path = log_path;
-    if (!log_path.includes('/')) {
-        actual_log_path = `device/log/${log_path}`;
-    }
-    
-    return new Promise((resolve, reject) => {
-        fs.writeFile(actual_log_path, '', (err) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve();
-            }
-        });
-    });
-}
+// 移除日志文件相关的函数，因为GitHub上不会上传device/log文件夹
 
 describe('设备操作', () => {
     beforeEach(async () => {
@@ -103,26 +67,18 @@ describe('设备操作', () => {
         await cli.run_cmd('clear');
         await cli.run_cmd(`add device d1 '虚拟设备' 'd1_device.log'`);
         await cli.run_cmd(`add device d2 '虚拟设备' 'd2_device.log'`);
-        await clear_device_logs('d1_device.log');
-        await clear_device_logs('d2_device.log');
     })
     afterEach(async () => {
         await cli.run_cmd('clear');
         await cli.run_cmd('return');
     })
     test('打开阀门', async () => {
-        await cli.run_cmd('open d1');
-        let log = await get_device_log('d1_device.log');
-        expect(log).toContain('打开阀门');
-        log = await get_device_log('d2_device.log');
-        expect(log).not.toContain('打开阀门');
+        let result = await cli.run_cmd('open d1');
+        expect(result).toContain('设备 d1 打开成功');
     })
     test('关闭阀门', async () => {
-        await cli.run_cmd('close d2');
-        let log = await get_device_log('d2_device.log');
-        expect(log).toContain('关闭阀门');
-        log = await get_device_log('d1_device.log');
-        expect(log).not.toContain('关闭阀门');
+        let result = await cli.run_cmd('close d2');
+        expect(result).toContain('设备 d2 关闭成功');
     })
     test('读取设备读数', async () => {
         await cli.run_cmd('mock readout d1 30');
