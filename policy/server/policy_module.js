@@ -20,6 +20,7 @@ let scan_timer = null
 // 策略运行状态存储
 const policy_runtime_states = new Map()
 
+
 // 常量定义 - 减少重复代码
 const ACTION_FIELD_SCHEMA = {
     device: { type: String, mean: '设备名称', example: '阀门1' },
@@ -852,6 +853,7 @@ async function processPolicyExecution(policy) {
 
 async function executeStateActions(policy, state, trigger, runtimeState) {
     try {
+        // 执行赋值表达式
         const assignmentListName = getAssignmentListName(trigger);
         const assignments = state[assignmentListName];
         if (assignments && assignments.length > 0) {
@@ -865,6 +867,8 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                 }
             }
         }
+        
+        // 执行动作
         const actionListName = getActionListName(trigger);
         const actions = state[actionListName];
         if (actions && actions.length > 0) {
@@ -948,28 +952,20 @@ async function executeDeviceAction(device, action) {
 
 async function evaluateAssignmentExpression(expression, runtimeState) {
     try {
+        // 简化的上下文，只包含基本数据
         const context = {
             ...Object.fromEntries(runtimeState.variables),
             sensors: await getSensorData(),
-            devices: await getDeviceStatus(),
-            Date: Date,
-            Math: Math,
-            abs: Math.abs,
-            max: Math.max,
-            min: Math.min,
-            round: Math.round,
-            floor: Math.floor,
-            ceil: Math.ceil,
-            sqrt: Math.sqrt,
-            pow: Math.pow,
-            sin: Math.sin,
-            cos: Math.cos,
-            tan: Math.tan,
-            log: Math.log,
-            exp: Math.exp
+            devices: await getDeviceStatus()
         };
-        const func = new Function(...Object.keys(context), `return ${expression}`);
-        const result = func(...Object.values(context));
+        
+        // 简单的表达式求值
+        const result = eval(`(function() { 
+            with (arguments[0]) { 
+                return ${expression}; 
+            } 
+        })`)(context);
+        
         return result;
     } catch (error) {
         console.error(`赋值表达式求值失败: ${expression}`, error);
@@ -979,21 +975,20 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
 
 async function evaluateTransitionExpression(expression, runtimeState) {
     try {
+        // 简化的上下文，只包含基本数据
         const context = {
             ...Object.fromEntries(runtimeState.variables),
             sensors: await getSensorData(),
-            devices: await getDeviceStatus(),
-            Date: Date,
-            Math: Math,
-            abs: Math.abs,
-            max: Math.max,
-            min: Math.min,
-            round: Math.round,
-            floor: Math.floor,
-            ceil: Math.ceil
+            devices: await getDeviceStatus()
         };
-        const func = new Function(...Object.keys(context), `return ${expression}`);
-        const result = func(...Object.values(context));
+        
+        // 简单的表达式求值
+        const result = eval(`(function() { 
+            with (arguments[0]) { 
+                return ${expression}; 
+            } 
+        })`)(context);
+        
         console.log(`表达式求值: ${expression} = ${result}`);
         return Boolean(result);
     } catch (error) {
