@@ -988,6 +988,9 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
 
 async function evaluateTransitionExpression(expression, runtimeState) {
     try {
+        // 导入安全的 AST 表达式求值器
+        const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+        
         // 简化的上下文，只包含基本数据
         const context = {
             ...Object.fromEntries(runtimeState.variables),
@@ -1002,8 +1005,9 @@ async function evaluateTransitionExpression(expression, runtimeState) {
             floor: Math.floor,
             ceil: Math.ceil
         };
-        const func = new Function(...Object.keys(context), `return ${expression}`);
-        const result = func(...Object.values(context));
+        
+        // 使用安全的 AST 求值器
+        const result = evaluator.evaluate(expression, context);
         console.log(`表达式求值: ${expression} = ${result}`);
         return Boolean(result);
     } catch (error) {
