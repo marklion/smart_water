@@ -16,6 +16,7 @@ export default async function (log_file_path) {
     
     let ret = {
         log_file: actual_log_path,
+        mock_value: null, // 存储模拟值
         read_last_line:async function() {
             return new Promise((resolve, reject) => {
                 fs.readFile(actual_log_path, 'utf8', (err, data) => {
@@ -66,18 +67,23 @@ export default async function (log_file_path) {
             });
         },
         open: async function () {
-            const status = '开启';
-            const details = '设备状态: 阀门已打开，开始工作';
-            await this.write_log(`[操作] ${status} - ${details}`);
+            await this.write_log('打开阀门');
             return { status: 'opened', message: '阀门已成功打开' };
         },
         close: async function () {
-            const status = '关闭';
-            const details = '设备状态: 阀门已关闭，停止工作';
-            await this.write_log(`[操作] ${status} - ${details}`);
+            await this.write_log('关闭阀门');
             return { status: 'closed', message: '阀门已成功关闭' };
         },
         readout: async function () {
+            // 如果有模拟值，优先返回模拟值
+            if (this.mock_value !== null) {
+                const deviceType = this.getDeviceType();
+                const unit = this.getUnit();
+                const details = `当前${deviceType}: ${this.mock_value}${unit}`;
+                await this.write_log(`[读取] ${details}`);
+                return this.mock_value;
+            }
+            
             let lastLine = await this.read_last_line();
             lastLine = lastLine.replace(/\[.*?\]\s*/, '');
             const value = parseFloat(lastLine) || 0;
@@ -91,6 +97,7 @@ export default async function (log_file_path) {
             return value;
         },
         mock_readout: async function (value) {
+            this.mock_value = value; // 存储模拟值
             const deviceType = this.getDeviceType();
             const unit = this.getUnit();
             const details = `模拟${deviceType}: ${value}${unit}`;
