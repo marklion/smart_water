@@ -952,6 +952,9 @@ async function executeDeviceAction(device, action) {
 
 async function evaluateAssignmentExpression(expression, runtimeState) {
     try {
+        // 导入安全的 AST 表达式求值器
+        const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+        
         // 简化的上下文，只包含基本数据
         const context = {
             ...Object.fromEntries(runtimeState.variables),
@@ -973,8 +976,9 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
             log: Math.log,
             exp: Math.exp
         };
-        const func = new Function(...Object.keys(context), `return ${expression}`);
-        const result = func(...Object.values(context));
+        
+        // 使用安全的 AST 求值器
+        const result = evaluator.evaluate(expression, context);
         return result;
     } catch (error) {
         console.error(`赋值表达式求值失败: ${expression}`, error);

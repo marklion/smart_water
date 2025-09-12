@@ -48,6 +48,7 @@
         "webpack-cli": "^6.0.1"
     },
     "dependencies": {
+        "acorn": "^8.15.0",
         "axios": "^1.11.0",
         "cls-hooked": "^4.2.2",
         "connect-history-api-fallback": "^2.0.0",
