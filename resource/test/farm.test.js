@@ -27,6 +27,9 @@ describe('配置测试', () => {
     beforeEach(async () => {
         await cli.run_cmd('resource')
         await cli.run_cmd('farm')
+        // 先清理可能存在的农场
+        await cli.run_cmd('clear', 'resource> farm> ')
+        // 添加测试农场
         for (const farm of farm_configs) {
             await cli.run_cmd(`add farm '${farm.name}' '${farm.location}' ${farm.info ? `'${farm.info}'` : ''}`, 'resource> farm> ');
         }
