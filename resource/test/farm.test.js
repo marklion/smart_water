@@ -27,6 +27,18 @@ describe('配置测试', () => {
     beforeEach(async () => {
         await cli.run_cmd('resource')
         await cli.run_cmd('farm')
+        // 先清空所有现有农场
+        let existing_farms = await cli.run_cmd('bdr');
+        if (existing_farms.trim()) {
+            let farm_lines = existing_farms.split('\n').filter(line => line.trim().startsWith('add farm'));
+            for (let line of farm_lines) {
+                let match = line.match(/add farm '([^']+)'/);
+                if (match) {
+                    await cli.run_cmd(`del farm ${match[1]}`);
+                }
+            }
+        }
+        // 然后创建测试农场
         for (const farm of farm_configs) {
             await cli.run_cmd(`add farm '${farm.name}' '${farm.location}' ${farm.info ? `'${farm.info}'` : ''}`);
         }
