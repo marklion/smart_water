@@ -36,6 +36,12 @@ class SafeExpressionEvaluator {
         this.allowedGlobals = new Set([
             'Math', 'Date'
         ]);
+
+        // 危险函数名列表
+        this.dangerousFunctions = new Set([
+            'eval', 'Function', 'require', 'import', 'console', 'process', 'global',
+            'setTimeout', 'setInterval', 'setImmediate', 'clearTimeout', 'clearInterval'
+        ]);
     }
 
     parseExpression(expression) {
@@ -164,6 +170,10 @@ class SafeExpressionEvaluator {
                 return node.value;
             
             case 'Identifier':
+                // 检查是否为危险函数名
+                if (this.dangerousFunctions.has(node.name)) {
+                    throw new Error(`不允许访问危险函数: ${node.name}`);
+                }
                 if (!(node.name in context)) {
                     throw new Error(`未定义的变量: ${node.name}`);
                 }
