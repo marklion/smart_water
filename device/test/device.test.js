@@ -61,8 +61,14 @@ describe('设备增删', () => {
 
 async function get_device_log(log_path) {
     let lastLine = '';
+    // 如果传入的是简单文件名，则使用device/log目录
+    let actual_log_path = log_path;
+    if (!log_path.includes('/')) {
+        actual_log_path = `device/log/${log_path}`;
+    }
+    
     lastLine = await new Promise((resolve, reject) => {
-        fs.readFile(log_path, 'utf8', (err, data) => {
+        fs.readFile(actual_log_path, 'utf8', (err, data) => {
             if (err) {
                 reject(err);
             }
@@ -74,8 +80,14 @@ async function get_device_log(log_path) {
     return lastLine;
 }
 async function clear_device_logs(log_path) {
+    // 如果传入的是简单文件名，则使用device/log目录
+    let actual_log_path = log_path;
+    if (!log_path.includes('/')) {
+        actual_log_path = `device/log/${log_path}`;
+    }
+    
     return new Promise((resolve, reject) => {
-        fs.writeFile(log_path, '', (err) => {
+        fs.writeFile(actual_log_path, '', (err) => {
             if (err) {
                 reject(err);
             } else {
