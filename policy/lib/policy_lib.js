@@ -114,5 +114,11 @@ export default {
             trigger, 
             variable_name 
         }, token);
+    },
+    set_scan_period: async function (period_ms, token) {
+        return await call_remote('/policy/set_scan_period', { period_ms }, token);
+    },
+    get_scan_period: async function (token) {
+        return await call_remote('/policy/get_scan_period', {}, token);
     }
 }

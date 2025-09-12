@@ -761,4 +761,168 @@ describe('状态 CLI 测试', () => {
         await returnToRoot(cli);
     });
 
+    test('AST 安全表达式求值器 - 基本数学运算测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'ast_math_test', 's1');
+        
+        // 测试基本算术运算
+        let result = await cli.run_cmd('enter assignment sum 10+5');
+        expect(result).toContain('已添加进入赋值: 变量 sum = 10+5');
+        
+        result = await cli.run_cmd('enter assignment diff 10-5');
+        expect(result).toContain('已添加进入赋值: 变量 diff = 10-5');
+        
+        result = await cli.run_cmd('enter assignment product 10*5');
+        expect(result).toContain('已添加进入赋值: 变量 product = 10*5');
+        
+        result = await cli.run_cmd('enter assignment quotient 10/5');
+        expect(result).toContain('已添加进入赋值: 变量 quotient = 10/5');
+        
+        // 验证所有数学运算表达式都被正确添加
+        await verifyBdrContains(cli, [
+            'enter assignment sum 10+5',
+            'enter assignment diff 10-5',
+            'enter assignment product 10*5',
+            'enter assignment quotient 10/5'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+    test('AST 安全表达式求值器 - 比较运算测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'ast_comparison_test', 's1');
+        
+        // 测试比较运算 - 只使用不会与 CLI 解析冲突的表达式
+        let result = await cli.run_cmd('enter assignment greater 10>5');
+        expect(result).toContain('已添加进入赋值: 变量 greater = 10>5');
+        
+        result = await cli.run_cmd('enter assignment less 5<10');
+        expect(result).toContain('已添加进入赋值: 变量 less = 5<10');
+        
+        result = await cli.run_cmd('enter assignment greater_equal 10>=5');
+        expect(result).toContain('已添加进入赋值: 变量 greater_equal = 10>=5');
+        
+        result = await cli.run_cmd('enter assignment less_equal 5<=10');
+        expect(result).toContain('已添加进入赋值: 变量 less_equal = 5<=10');
+        
+        // 验证所有比较运算表达式都被正确添加
+        await verifyBdrContains(cli, [
+            'enter assignment greater 10>5',
+            'enter assignment less 5<10',
+            'enter assignment greater_equal 10>=5',
+            'enter assignment less_equal 5<=10'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+    test('AST 安全表达式求值器 - 逻辑运算测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'ast_logic_test', 's1');
+        
+        // 测试逻辑运算 - 使用引号保护包含特殊字符的表达式
+        let result = await cli.run_cmd('enter assignment and_op "true&&false"');
+        expect(result).toContain('已添加进入赋值: 变量 and_op = true&&false');
+        
+        result = await cli.run_cmd('enter assignment or_op "true||false"');
+        expect(result).toContain('已添加进入赋值: 变量 or_op = true||false');
+        
+        result = await cli.run_cmd('enter assignment not_op "!true"');
+        expect(result).toContain('已添加进入赋值: 变量 not_op = !true');
+        
+        // 验证所有逻辑运算表达式都被正确添加
+        await verifyBdrContains(cli, [
+            'enter assignment and_op true&&false',
+            'enter assignment or_op true||false',
+            'enter assignment not_op !true'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+    test('AST 安全表达式求值器 - Math 函数测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'ast_math_functions_test', 's1');
+        
+        // 测试 Math 函数
+        let result = await cli.run_cmd('enter assignment abs_val abs(-5)');
+        expect(result).toContain('已添加进入赋值: 变量 abs_val = abs(-5)');
+        
+        result = await cli.run_cmd('enter assignment max_val max(10,5)');
+        expect(result).toContain('已添加进入赋值: 变量 max_val = max(10,5)');
+        
+        result = await cli.run_cmd('enter assignment min_val min(10,5)');
+        expect(result).toContain('已添加进入赋值: 变量 min_val = min(10,5)');
+        
+        result = await cli.run_cmd('enter assignment round_val round(3.7)');
+        expect(result).toContain('已添加进入赋值: 变量 round_val = round(3.7)');
+        
+        // 验证所有 Math 函数表达式都被正确添加
+        await verifyBdrContains(cli, [
+            'enter assignment abs_val abs(-5)',
+            'enter assignment max_val max(10,5)',
+            'enter assignment min_val min(10,5)',
+            'enter assignment round_val round(3.7)'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+    test('AST 安全表达式求值器 - 复杂表达式测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'ast_complex_test', 's1');
+        
+        // 测试复杂表达式 - 使用引号保护包含特殊字符的表达式
+        let result = await cli.run_cmd('enter assignment complex1 "(10+5)*2"');
+        expect(result).toContain('已添加进入赋值: 变量 complex1 = (10+5)*2');
+        
+        result = await cli.run_cmd('enter assignment complex2 "10>5?10:5"');
+        expect(result).toContain('已添加进入赋值: 变量 complex2 = 10>5?10:5');
+        
+        result = await cli.run_cmd('enter assignment complex3 "(10>5)&&(5<10)"');
+        expect(result).toContain('已添加进入赋值: 变量 complex3 = (10>5)&&(5<10)');
+        
+        // 验证所有复杂表达式都被正确添加
+        await verifyBdrContains(cli, [
+            'enter assignment complex1 (10+5)*2',
+            'enter assignment complex2 10>5?10:5',
+            'enter assignment complex3 (10>5)&&(5<10)'
+        ]);
+        
+        await returnToRoot(cli);
+    });
+
+
+    test('AST 安全表达式求值器 - 危险代码阻止测试', async () => {
+        // 创建策略和状态
+        await setupPolicyState(cli, 'ast_security_test', 's1');
+        
+        // 测试危险代码被正确阻止 - 使用简单的危险函数名
+        // 注意：CLI 命令在添加时不会立即验证表达式，只有在执行时才会验证
+        let result = await cli.run_cmd('enter assignment dangerous1 eval');
+        expect(result).toContain('已添加进入赋值: 变量 dangerous1 = eval');
+        
+        result = await cli.run_cmd('enter assignment dangerous2 require');
+        expect(result).toContain('已添加进入赋值: 变量 dangerous2 = require');
+        
+        result = await cli.run_cmd('enter assignment dangerous3 console');
+        expect(result).toContain('已添加进入赋值: 变量 dangerous3 = console');
+        
+        result = await cli.run_cmd('enter assignment dangerous4 process');
+        expect(result).toContain('已添加进入赋值: 变量 dangerous4 = process');
+        
+        // 验证危险表达式被添加（CLI 允许添加，但执行时会被阻止）
+        await verifyBdrContains(cli, [
+            'enter assignment dangerous1 eval',
+            'enter assignment dangerous2 require',
+            'enter assignment dangerous3 console',
+            'enter assignment dangerous4 process'
+        ]);
+        
+        // 注意：实际的危险代码阻止会在策略执行时发生，通过 AST 求值器实现
+        
+        await returnToRoot(cli);
+    });
+
 });

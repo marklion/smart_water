@@ -41,7 +41,7 @@
                     <PageContent :key="deviceListKey" content_name="devices" :fetch_func="fetch_device_list"
                         :params="deviceSearchParams" ref="devicePageContentRef" v-slot="data">
                         <el-table :data="data.content" stripe style="width: 100%" class="config-table">
-                            <el-table-column prop="device_name" label="设备名称" width="180">
+                            <el-table-column prop="device_name" label="设备名称" width="220">
                                 <template #default="scope">
                                     <div class="device-name">
                                         <el-icon color="#67C23A" style="margin-right: 8px;">

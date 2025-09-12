@@ -13,6 +13,14 @@ import {
 
 const policy_array = []
 
+// 扫描周期配置，默认为0（不扫描）
+let scan_period_ms = 0
+// 扫描定时器
+let scan_timer = null
+// 策略运行状态存储
+const policy_runtime_states = new Map()
+
+
 // 常量定义 - 减少重复代码
 const ACTION_FIELD_SCHEMA = {
     device: { type: String, mean: '设备名称', example: '阀门1' },
@@ -739,5 +747,325 @@ export default {
                 return { result: true };
             }
         },
+        set_scan_period: {
+            name: '设置扫描周期',
+            description: '设置策略扫描周期，0表示不扫描',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                period_ms: { type: Number, mean: '扫描周期（毫秒）', example: 5000, have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                if (body.period_ms < 0) {
+                    throw { err_msg: '扫描周期不能为负数' };
+                }
+                
+                if (scan_timer) {
+                    clearInterval(scan_timer);
+                    scan_timer = null;
+                }
+                scan_period_ms = body.period_ms;
+                if (scan_period_ms > 0) {
+                    scan_timer = setInterval(scanAndExecutePolicies, scan_period_ms);
+                }
+                
+                return { result: true };
+            }
+        },
+        get_scan_period: {
+            name: '获取扫描周期',
+            description: '获取当前策略扫描周期配置',
+            is_write: false,
+            is_get_api: true,
+            params: {},
+            result: {
+                period_ms: { type: Number, mean: '扫描周期（毫秒）', example: 5000 }
+            },
+            func: async function (body, token) {
+                return { period_ms: scan_period_ms };
+            }
+        },
+        force_stop_scan: {
+            name: '强制停止扫描',
+            description: '强制停止所有策略扫描定时器',
+            is_write: true,
+            is_get_api: false,
+            params: {},
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                if (scan_timer) {
+                    clearInterval(scan_timer);
+                    scan_timer = null;
+                }
+                scan_period_ms = 0;
+                return { result: true };
+            }
+        },
+    }
+}
+
+async function scanAndExecutePolicies() {
+    try {
+        console.log(`[${new Date().toISOString()}] 执行策略扫描，当前扫描周期: ${scan_period_ms}ms`);
+        for (const policy of policy_array) {
+            await processPolicyExecution(policy);
+        }
+    } catch (error) {
+        console.error('策略扫描执行出错:', error);
+    }
+}
+
+async function processPolicyExecution(policy) {
+    if (!policy.states || policy.states.length === 0) {
+        return;
+    }
+    let runtimeState = policy_runtime_states.get(policy.name);
+    if (!runtimeState) {
+        runtimeState = {
+            current_state: policy.states[0].name,
+            variables: new Map(),
+            last_execution_time: Date.now(),
+            start_time: Date.now(),
+            execution_count: 0
+        };
+        policy_runtime_states.set(policy.name, runtimeState);
+        console.log(`策略 ${policy.name} 初始化，进入状态: ${runtimeState.current_state}`);
+        await executeStateActions(policy, policy.states[0], 'enter', runtimeState);
+    }
+    runtimeState.execution_count = (runtimeState.execution_count || 0) + 1;
+    runtimeState.last_execution_time = Date.now();
+    const runtimeMinutes = Math.floor((Date.now() - runtimeState.start_time) / 60000);
+    runtimeState.runtime = `${runtimeMinutes}分钟`;
+    const currentState = policy.states.find(s => s.name === runtimeState.current_state);
+    if (!currentState) {
+        console.error(`策略 ${policy.name} 的当前状态 ${runtimeState.current_state} 不存在`);
+        return;
+    }
+    console.log(`策略 ${policy.name} 执行第${runtimeState.execution_count}次，当前状态: ${runtimeState.current_state}，运行时间: ${runtimeState.runtime}`);
+    await executeStateActions(policy, currentState, 'do', runtimeState);
+    await checkStateTransitions(policy, currentState, runtimeState);
+}
+
+async function executeStateActions(policy, state, trigger, runtimeState) {
+    try {
+        // 执行赋值表达式
+        const assignmentListName = getAssignmentListName(trigger);
+        const assignments = state[assignmentListName];
+        if (assignments && assignments.length > 0) {
+            for (const assignment of assignments) {
+                try {
+                    const value = await evaluateAssignmentExpression(assignment.expression, runtimeState);
+                    runtimeState.variables.set(assignment.variable_name, value);
+                    console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 赋值: ${assignment.variable_name} = ${value}`);
+                } catch (error) {
+                    console.error(`赋值表达式执行失败: ${assignment.variable_name} = ${assignment.expression}`, error);
+                }
+            }
+        }
+        
+        // 执行动作
+        const actionListName = getActionListName(trigger);
+        const actions = state[actionListName];
+        if (actions && actions.length > 0) {
+            for (const action of actions) {
+                try {
+                    console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 执行动作: 设备=${action.device}, 动作=${action.action}`);
+                    await executeDeviceAction(action.device, action.action);
+                } catch (error) {
+                    console.error(`动作执行失败: 设备=${action.device}, 动作=${action.action}`, error);
+                }
+            }
+        }
+    } catch (error) {
+        console.error(`执行状态动作失败: 策略=${policy.name}, 状态=${state.name}, 触发=${trigger}`, error);
+    }
+}
+
+async function checkStateTransitions(policy, currentState, runtimeState) {
+    if (!currentState.transformers || currentState.transformers.length === 0) {
+        return;
+    }
+    for (const transformer of currentState.transformers) {
+        if (!transformer.rules || transformer.rules.length === 0) {
+            continue;
+        }
+        for (const rule of transformer.rules) {
+            try {
+                console.log(`策略 ${policy.name} 检查转换条件: ${rule.expression} -> ${rule.target_state}`);
+                const shouldTransition = await evaluateTransitionExpression(rule.expression, runtimeState);
+                if (shouldTransition) {
+                    await performStateTransition(policy, currentState, rule.target_state, runtimeState);
+                    return;
+                }
+            } catch (error) {
+                console.error(`转换条件检查失败: ${rule.expression}`, error);
+            }
+        }
+    }
+}
+
+async function performStateTransition(policy, fromState, toStateName, runtimeState) {
+    const toState = policy.states.find(s => s.name === toStateName);
+    if (!toState) {
+        console.error(`目标状态 ${toStateName} 不存在`);
+        return;
+    }
+    console.log(`策略 ${policy.name} 状态转换: ${fromState.name} -> ${toStateName}`);
+    await executeStateActions(policy, fromState, 'exit', runtimeState);
+    runtimeState.current_state = toStateName;
+    runtimeState.last_execution_time = Date.now();
+    await executeStateActions(policy, toState, 'enter', runtimeState);
+}
+
+async function executeDeviceAction(device, action) {
+    try {
+        const deviceModule = await import('../../device/server/device_management_module.js');
+        let methodName;
+        let params = { device_name: device };
+        const actionLower = action.toLowerCase();
+        if (actionLower.includes('打开') || actionLower.includes('开启') || actionLower.includes('open')) {
+            methodName = 'open_device';
+        } else if (actionLower.includes('关闭') || actionLower.includes('close')) {
+            methodName = 'close_device';
+        } else if (actionLower.includes('读取') || actionLower.includes('检查') || actionLower.includes('启动') || 
+                   actionLower.includes('监测') || actionLower.includes('read') || actionLower.includes('check')) {
+            methodName = 'readout_device';
+        } else if (actionLower.includes('模拟') || actionLower.includes('mock')) {
+            methodName = 'mock_readout';
+            params.value = 1;
+        } else {
+            throw new Error(`未知的动作: ${action}`);
+        }
+        const result = await deviceModule.default.methods[methodName].func(params);
+        console.log(`设备动作执行成功: ${device} -> ${action}`, result);
+        return result;
+    } catch (error) {
+        console.error(`设备动作执行异常: ${device} -> ${action}`, error);
+        throw error;
+    }
+}
+
+async function evaluateAssignmentExpression(expression, runtimeState) {
+    try {
+        // 导入安全的 AST 表达式求值器
+        const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+        
+        // 简化的上下文，只包含基本数据
+        const context = {
+            ...Object.fromEntries(runtimeState.variables),
+            sensors: await getSensorData(),
+            devices: await getDeviceStatus(),
+            Date: Date,
+            Math: Math,
+            abs: Math.abs,
+            max: Math.max,
+            min: Math.min,
+            round: Math.round,
+            floor: Math.floor,
+            ceil: Math.ceil,
+            sqrt: Math.sqrt,
+            pow: Math.pow,
+            sin: Math.sin,
+            cos: Math.cos,
+            tan: Math.tan,
+            log: Math.log,
+            exp: Math.exp
+        };
+        
+        // 使用安全的 AST 求值器
+        const result = evaluator.evaluate(expression, context);
+        return result;
+    } catch (error) {
+        console.error(`赋值表达式求值失败: ${expression}`, error);
+        return null;
+    }
+}
+
+async function evaluateTransitionExpression(expression, runtimeState) {
+    try {
+        // 导入安全的 AST 表达式求值器
+        const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+        
+        // 简化的上下文，只包含基本数据
+        const context = {
+            ...Object.fromEntries(runtimeState.variables),
+            sensors: await getSensorData(),
+            devices: await getDeviceStatus(),
+            Date: Date,
+            Math: Math,
+            abs: Math.abs,
+            max: Math.max,
+            min: Math.min,
+            round: Math.round,
+            floor: Math.floor,
+            ceil: Math.ceil
+        };
+        
+        // 使用安全的 AST 求值器
+        const result = evaluator.evaluate(expression, context);
+        console.log(`表达式求值: ${expression} = ${result}`);
+        return Boolean(result);
+    } catch (error) {
+        console.error(`表达式求值失败: ${expression}`, error);
+        return false;
+    }
+}
+
+async function getSensorData() {
+    try {
+        const deviceModule = await import('../../device/server/device_management_module.js');
+        const result = await deviceModule.default.methods.list_device.func({});
+        const sensors = {};
+        if (result && result.devices) {
+            for (const device of result.devices) {
+                try {
+                    const deviceData = await deviceModule.default.methods.readout_device.func({
+                        device_name: device.device_name
+                    });
+                    if (deviceData && deviceData.readout !== undefined) {
+                        sensors[device.device_name] = deviceData.readout;
+                    }
+                } catch (deviceError) {
+                    console.warn(`获取设备 ${device.device_name} 数据失败:`, deviceError.message);
+                    sensors[device.device_name] = 0;
+                }
+            }
+        }
+        return sensors;
+    } catch (error) {
+        console.error('获取传感器数据失败:', error);
+        return {};
+    }
+}
+
+async function getDeviceStatus() {
+    try {
+        const deviceModule = await import('../../device/server/device_management_module.js');
+        const result = await deviceModule.default.methods.list_device.func({});
+        const devices = {};
+        if (result && result.devices) {
+            for (const device of result.devices) {
+                try {
+                    const deviceData = await deviceModule.default.methods.readout_device.func({
+                        device_name: device.device_name
+                    });
+                    if (deviceData && deviceData.readout !== undefined) {
+                        devices[device.device_name] = deviceData.readout > 0 ? 1 : 0;
+                    }
+                } catch (deviceError) {
+                    console.warn(`获取设备 ${device.device_name} 状态失败:`, deviceError.message);
+                    devices[device.device_name] = 0;
+                }
+            }
+        }
+        return devices;
+    } catch (error) {
+        console.error('获取设备状态失败:', error);
+        return {};
     }
 }
