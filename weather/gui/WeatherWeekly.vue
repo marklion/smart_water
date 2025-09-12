@@ -19,17 +19,19 @@
                     </div>
                     <div class="today-details">
                         <div class="detail-row">
-                            <span>{{ currentWeather?.tem_day || '--' }}° / {{ currentWeather?.tem_night || '--'
-                                }}°</span>
+                            <span>{{ currentWeather?.tem_day || '--' }}° / {{ currentWeather?.tem_night || '--' }}°</span>
                         </div>
                         <div class="detail-row">
-                            <span>{{ currentWeather?.win || '--' }}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span>{{ currentWeather?.win_speed || '--' }}</span>
+                            <span>{{ currentWeather?.win || '--' }} {{ currentWeather?.win_speed || '--' }}</span>
                         </div>
                         <div class="detail-row">
                             <span>湿度 {{ currentWeather?.humidity || '--' }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span>气压 {{ currentWeather?.pressure || '--' }}hPa</span>
+                        </div>
+                        <div class="detail-row">
+                            <span>空气质量 {{ currentWeather?.air || '--' }}</span>
                         </div>
                     </div>
                 </div>
@@ -197,6 +199,9 @@ const fetchTodayWeather = async () => {
         if (result.weather_data) {
             currentWeather.value = result.weather_data
             console.log('今日天气数据加载成功')
+            console.log('今日天气数据字段:', Object.keys(result.weather_data))
+            console.log('tem_day:', result.weather_data.tem_day)
+            console.log('tem_night:', result.weather_data.tem_night)
             ElMessage.success('今日天气数据获取成功')
         } else {
             throw new Error('今日天气数据获取失败')
@@ -245,26 +250,26 @@ const fetchAllWeatherData = async () => {
     }
 }
 
-// 生成今日天气演示数据 - 单日接口格式
+// 生成今日天气演示数据 - 根据实际API数据结构
 const generateTodayDemoData = () => {
     return {
-        nums: 0,
+        nums: 5,
         cityid: "101080101",
         city: "呼和浩特",
-        date: "2025-09-10",
-        week: "星期三",
-        update_time: "18:16",
-        wea: "多云",
-        wea_img: "yun",
-        tem: "25.8",        // 实时温度
-        tem_day: "28",      // 最高温度
+        date: "2025-09-11",
+        week: "星期四",
+        update_time: "14:40",
+        wea: "晴",
+        wea_img: "qing",
+        tem: "26",          // 实时温度
+        tem_day: "27",      // 最高温度
         tem_night: "14",    // 最低温度
-        win: "西南风",
-        win_speed: "<3级",
+        win: "西风",
+        win_speed: "1级",
         win_meter: "5km/h",
-        air: "51",
-        pressure: "893",
-        humidity: "41%"
+        air: "43",
+        pressure: "894",
+        humidity: "57%"
     }
 }
 
@@ -352,7 +357,7 @@ onUnmounted(() => {
     display: flex;
     gap: 16px;
     align-items: stretch;
-    height: 180px;
+    height: 200px;
 }
 
 /* 今日天气 */

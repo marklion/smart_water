@@ -244,7 +244,12 @@ export default {
                         wea: { type: String, mean: '天气状况', example: '多云' },
                         humidity: { type: String, mean: '湿度', example: '41%' },
                         win: { type: String, mean: '风向', example: '西南风' },
-                        win_speed: { type: String, mean: '风速', example: '<3级' }
+                        win_speed: { type: String, mean: '风速', example: '<3级' },
+                        win_meter: { type: String, mean: '风速', example: '5km/h' },
+                        air: { type: String, mean: '空气质量', example: '43' },
+                        pressure: { type: String, mean: '气压', example: '894' },
+                        tem_day: { type: String, mean: '最高温度', example: '27' },
+                        tem_night: { type: String, mean: '最低温度', example: '14' },
                     }
                 }
             },
