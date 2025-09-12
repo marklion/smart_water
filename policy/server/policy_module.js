@@ -956,12 +956,26 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
         const context = {
             ...Object.fromEntries(runtimeState.variables),
             sensors: await getSensorData(),
-            devices: await getDeviceStatus()
+            devices: await getDeviceStatus(),
+            Date: Date,
+            Math: Math,
+            abs: Math.abs,
+            max: Math.max,
+            min: Math.min,
+            round: Math.round,
+            floor: Math.floor,
+            ceil: Math.ceil,
+            sqrt: Math.sqrt,
+            pow: Math.pow,
+            sin: Math.sin,
+            cos: Math.cos,
+            tan: Math.tan,
+            log: Math.log,
+            exp: Math.exp
         };
-        
-        // 安全的表达式求值
         const func = new Function(...Object.keys(context), `return ${expression}`);
-        const result = func(...Object.values(context));        return result;
+        const result = func(...Object.values(context));
+        return result;
     } catch (error) {
         console.error(`赋值表达式求值失败: ${expression}`, error);
         return null;
@@ -974,12 +988,19 @@ async function evaluateTransitionExpression(expression, runtimeState) {
         const context = {
             ...Object.fromEntries(runtimeState.variables),
             sensors: await getSensorData(),
-            devices: await getDeviceStatus()
+            devices: await getDeviceStatus(),
+            Date: Date,
+            Math: Math,
+            abs: Math.abs,
+            max: Math.max,
+            min: Math.min,
+            round: Math.round,
+            floor: Math.floor,
+            ceil: Math.ceil
         };
-        
-        // 安全的表达式求值
         const func = new Function(...Object.keys(context), `return ${expression}`);
-        const result = func(...Object.values(context));        console.log(`表达式求值: ${expression} = ${result}`);
+        const result = func(...Object.values(context));
+        console.log(`表达式求值: ${expression} = ${result}`);
         return Boolean(result);
     } catch (error) {
         console.error(`表达式求值失败: ${expression}`, error);
