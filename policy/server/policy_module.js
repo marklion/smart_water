@@ -959,14 +959,9 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
             devices: await getDeviceStatus()
         };
         
-        // 简单的表达式求值
-        const result = eval(`(function() { 
-            with (arguments[0]) { 
-                return ${expression}; 
-            } 
-        })`)(context);
-        
-        return result;
+        // 安全的表达式求值
+        const func = new Function(...Object.keys(context), `return ${expression}`);
+        const result = func(...Object.values(context));        return result;
     } catch (error) {
         console.error(`赋值表达式求值失败: ${expression}`, error);
         return null;
@@ -982,14 +977,9 @@ async function evaluateTransitionExpression(expression, runtimeState) {
             devices: await getDeviceStatus()
         };
         
-        // 简单的表达式求值
-        const result = eval(`(function() { 
-            with (arguments[0]) { 
-                return ${expression}; 
-            } 
-        })`)(context);
-        
-        console.log(`表达式求值: ${expression} = ${result}`);
+        // 安全的表达式求值
+        const func = new Function(...Object.keys(context), `return ${expression}`);
+        const result = func(...Object.values(context));        console.log(`表达式求值: ${expression} = ${result}`);
         return Boolean(result);
     } catch (error) {
         console.error(`表达式求值失败: ${expression}`, error);
