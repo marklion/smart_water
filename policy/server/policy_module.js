@@ -13,6 +13,13 @@ import {
 
 const policy_array = []
 
+// 扫描周期配置，默认为0（不扫描）
+let scan_period_ms = 0
+// 扫描定时器
+let scan_timer = null
+// 策略运行状态存储
+const policy_runtime_states = new Map()
+
 // 常量定义 - 减少重复代码
 const ACTION_FIELD_SCHEMA = {
     device: { type: String, mean: '设备名称', example: '阀门1' },
