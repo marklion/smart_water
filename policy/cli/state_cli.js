@@ -57,18 +57,13 @@ function createActionCommand(vorpal, ins, trigger) {
 
 // 辅助函数：创建删除动作命令
 function createDelActionCommand(vorpal, ins, trigger) {
-    cli_utils.make_undo_cmd(
+    cli_utils.make_common_cmd(
         vorpal,
         `del ${trigger} <device> <action>`,
         `删除${ACTION_NAMES[trigger]} - 移除指定设备和动作`,
-        `撤销删除 - 恢复已删除的${ACTION_NAMES[trigger]}`,
         async (cmd_this, args) => {
             await policy_lib.del_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
             return `已删除${ACTION_NAMES[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
-        },
-        async (cmd_this, args) => {
-            await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
-            return `已恢复${ACTION_NAMES[trigger]}: 设备 ${args.device} 执行 ${args.action}`;
         }
     );
 }
@@ -106,36 +101,13 @@ function createAssignmentCommand(vorpal, ins, trigger) {
 
 // 辅助函数：创建删除赋值表达式命令
 function createDelAssignmentCommand(vorpal, ins, trigger) {
-    cli_utils.make_undo_cmd(
+    cli_utils.make_common_cmd(
         vorpal,
         `del ${trigger} assignment <variable_name>`,
         `删除${ASSIGNMENT_NAMES[trigger]} - 移除指定变量的赋值表达式`,
-        `撤销删除 - 恢复已删除的${ASSIGNMENT_NAMES[trigger]}`,
         async (cmd_this, args) => {
-            // 先获取要删除的赋值表达式内容，用于撤销
-            const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
-            const assignmentsKey = `${trigger}_assignments`;
-            let deletedAssignment = null;
-            if (resp.state && resp.state[assignmentsKey]) {
-                deletedAssignment = resp.state[assignmentsKey].find(a => a.variable_name === args.variable_name);
-            }
-            
             await policy_lib.del_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name);
-            
-            // 将删除的赋值表达式保存到args中，供撤销使用
-            if (deletedAssignment) {
-                args.expression = deletedAssignment.expression;
-            }
-            
             return `已删除${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name}`;
-        },
-        async (cmd_this, args) => {
-            if (args.expression) {
-                await policy_lib.add_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
-                return `已恢复${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name} = ${args.expression}`;
-            } else {
-                return `无法恢复${ASSIGNMENT_NAMES[trigger]}: 缺少表达式信息`;
-            }
         }
     );
 }
