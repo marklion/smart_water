@@ -98,6 +98,7 @@ export default {
         for (let cmd of cmds) {
             let output = await cli.run_cmd(cmd);
             expect(output).not.toContain('Usage:');
+            expect(output.substring(0, 5)).not.toEqual('Error');
             if (cli.current_prompt !== orig_prompt) {
                 let sub_commands = await this.collect_cmds(cli);
                 for (let sub_cmd of sub_commands) {
