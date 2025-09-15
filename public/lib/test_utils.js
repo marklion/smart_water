@@ -53,7 +53,8 @@ export default async function create_cli(processName) {
 
     ret.process = pty.spawn(command, args, {
         cwd: process.cwd(),
-        env: process.env
+        env: process.env,
+        cols: 320,
     });
     ret.output = '';
     ret.process.on('data', function (data) {
@@ -96,6 +97,7 @@ export default async function create_cli(processName) {
         ret.process.write(cmd + '\n');
         let resp = await waitForPrompt(prompt);
         print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+        ret.current_prompt = resp.prompt;
 
         return resp.content;
     }
