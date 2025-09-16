@@ -19,9 +19,18 @@ async function get_driver(device_name, capability) {
     if (driver_config.capability.indexOf(capability) === -1) {
         throw { err_msg: '驱动不支持该能力' };
     }
-    return await driver_config.driver(device.config_key);
+    
+    // 使用设备名称作为缓存键，确保每个设备只有一个驱动实例
+    const cache_key = device_name;
+    if (!driver_instances.has(cache_key)) {
+        const driver_instance = await driver_config.driver(device.config_key);
+        driver_instances.set(cache_key, driver_instance);
+    }
+    
+    return driver_instances.get(cache_key);
 }
 const device_array = []
+const driver_instances = new Map() // 缓存驱动实例
 export default {
     name: 'device_management',
     description: '设备管理',
@@ -77,7 +86,7 @@ export default {
                 if (driver_array.find(driver => driver.name === body.driver_name) === undefined) {
                     throw { err_msg: '驱动不存在' };
                 }
-                let exist_device = device_array.find(device => device.name === body.device_name);
+                let exist_device = device_array.find(device => device.device_name === body.device_name);
                 if (!exist_device) {
                     exist_device = {
                         device_name: body.device_name,
@@ -108,6 +117,8 @@ export default {
                 let index = device_array.findIndex(device => device.device_name === body.device_name);
                 if (index !== -1) {
                     device_array.splice(index, 1);
+                    // 清理驱动实例缓存
+                    driver_instances.delete(body.device_name);
                     return { result: true };
                 } else {
                     return { result: false };
