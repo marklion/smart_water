@@ -75,6 +75,8 @@ export default {
                     this.log('Error:', err.err_msg || '未知错误');
                 }
             });
+        // 设置token，用于API调用
+        sub_cli_definition.token = '';
         if (!cli.sub_clies) {
             cli.sub_clies = [];
         }

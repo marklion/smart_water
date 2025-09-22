@@ -100,11 +100,13 @@ export default {
     },
     do_config: async function (vorpal, command) {
         let next_vorpal = await vorpal.execSync(command);
-        let ret = vorpal;
-        if (next_vorpal != vorpal && next_vorpal != undefined) {
-            ret = next_vorpal;
+        // 等待命令执行完成
+        await new Promise(resolve => setTimeout(resolve, 200));
+        // 如果命令返回了新的vorpal实例，使用新的；否则保持当前的
+        if (next_vorpal && next_vorpal !== vorpal) {
+            return next_vorpal;
         }
-        return ret;
+        return vorpal;
     },
     restore_config: async function (filename) {
         if (!filename) {
@@ -117,9 +119,45 @@ export default {
         let content = fs.readFileSync(filename, 'utf-8');
         let commands = content.split('\n').filter(line => line.trim() !== '');
         let vorpal = get_vorpal();
-        for (let command of commands) {
-            vorpal = await this.do_config(vorpal, command);
+
+        while (vorpal !== get_vorpal()) {
+            try {
+                vorpal = await vorpal.execSync('return');
+            } catch (e) {
+                break;
+            }
         }
+        
+        for (let command of commands) {
+            try {
+                if (!command.trim()) {
+                    continue;
+                }
+                vorpal = await this.do_config(vorpal, command);
+            } catch (error) {
+                console.log(`恢复命令失败: ${command}, 错误: ${error.message}`);
+            }
+        }
+        let root_vorpal = get_vorpal();
+        let max_attempts = 10; // 防止无限循环
+        let attempts = 0;
+        
+        while (vorpal !== root_vorpal && attempts < max_attempts) {
+            try {
+                vorpal = await vorpal.execSync('return');
+                attempts++;
+                // 如果返回的是根vorpal实例，使用它
+                if (vorpal === root_vorpal) {
+                    break;
+                }
+            } catch (e) {
+                // 如果无法返回，直接使用根vorpal实例
+                vorpal = root_vorpal;
+                break;
+            }
+        }
+
+        vorpal = root_vorpal;
     },
     destroy: function () {
         let sub_clies = g_vorpal.sub_clies;
