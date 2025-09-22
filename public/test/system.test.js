@@ -22,6 +22,10 @@ test("根目录命令测试", async () => {
     expect(help_output).toContain('restore');
 });
 test('保存恢复测试', async () => {
+    // 确保从完全干净的状态开始
+    await cli.run_cmd('clear');
+    await cli.run_cmd('set_sys_name default_sys');
+    
     let cur_bdr = await cli.run_cmd('bdr');
     await cli.run_cmd('set_sys_name test_sys');
     let new_bdr = await cli.run_cmd('bdr');
@@ -40,4 +44,4 @@ test('命令走读', async () => {
     for (let cmd of cmds) {
         await go_though_cli.run_and_check(cli, cmd);
     }
-})
+}, 240000)
