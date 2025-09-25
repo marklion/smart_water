@@ -708,11 +708,6 @@ export default {
 }
 
 .dashboard-container {
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-}
-
-.dashboard-container {
     position: fixed;
     top: 0;
     left: 0;
@@ -729,17 +724,11 @@ export default {
     font-family: 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', sans-serif;
     color: #fff;
     contain: layout style paint;
-}
-
-/* 隐藏主容器滚动条 */
-.dashboard-container::-webkit-scrollbar {
-    display: none !important;
-}
-
-.dashboard-container {
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
 }
+
+/* 隐藏主容器滚动条已合并到主定义中 */
 
 /* 动态背景效果 - 优化：减少复杂度 */
 .bg-animation {
@@ -1296,7 +1285,7 @@ export default {
 
 .metric-row {
     display: flex;
-    gap: 12px;
+    gap: 10px;
 }
 
 .metric-item {
@@ -1358,6 +1347,9 @@ export default {
 .water-trend-card {
     width: 260px;
     height: 240px;
+    top: 10px;
+    right: 10px;
+    transform: translate(0, 0);
 }
 
 /* 设备统计卡片 */
@@ -1437,11 +1429,7 @@ export default {
     transform: translate(0, 0);
 }
 
-.water-trend-card {
-    top: 10px;
-    right: 10px;
-    transform: translate(0, 0);
-}
+/* .water-trend-card 已合并到主定义中 */
 
 .farm-distribution-card {
     bottom: 10px;
@@ -1505,22 +1493,23 @@ export default {
 
 /* 用水量趋势卡片样式 */
 .water-trend {
-    height: 80px;
+    height: 120px;
 }
 
 .trend-chart {
     display: flex;
     align-items: end;
-    gap: 3px;
-    height: 70px;
-    margin-bottom: 8px;
+    gap: 4px;
+    height: 80px;
+    margin-bottom: 10px;
 }
 
 .trend-bar {
     flex: 1;
     background: linear-gradient(to top, #00d4ff, #0099cc);
-    border-radius: 1px 1px 0 0;
-    min-height: 2px;
+    border-radius: 2px 2px 0 0;
+    min-height: 4px;
+    transition: all 0.3s ease;
 }
 
 .trend-labels {
@@ -1896,10 +1885,7 @@ export default {
     margin-bottom: 20px;
 }
 
-.metric-row {
-    display: flex;
-    gap: 10px;
-}
+/* .metric-row 已合并到主定义中 */
 
 .metric-item {
     flex: 1;
@@ -1959,6 +1945,8 @@ export default {
     max-height: calc(100vh - 300px);
     contain: layout style paint; /* 启用CSS containment */
     transform: translateZ(0); /* 启用硬件加速 */
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
 }
 
 /* 完全隐藏灌溉列表滚动条 */
@@ -1966,11 +1954,6 @@ export default {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
-}
-
-.irrigation-list {
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
 }
 
 .irrigation-item {
@@ -2156,6 +2139,8 @@ export default {
     position: relative;
     overflow: hidden;
     height: 240px;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
 }
 
 .chart-card :deep(.el-card__body) {
@@ -2483,11 +2468,7 @@ export default {
     }
 }
 
-/* 硬件加速 */
-.chart-card {
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-}
+/* 硬件加速已合并到.chart-card主定义中 */
 
 /* 减少动画偏好 */
 @media (prefers-reduced-motion: reduce) {
@@ -2703,36 +2684,14 @@ export default {
 }
 
 /* 用水量趋势 */
-.water-trend {
-    height: 120px;
-}
-
-.trend-chart {
-    display: flex;
-    align-items: end;
-    gap: 4px;
-    height: 80px;
-    margin-bottom: 10px;
-}
-
-.trend-bar {
-    flex: 1;
-    background: linear-gradient(to top, #00d4ff, #0099cc);
-    border-radius: 2px 2px 0 0;
-    min-height: 4px;
-    transition: all 0.3s ease;
-}
+/* .water-trend 已合并到主定义中 */
+/* .trend-chart 已合并到主定义中 */
 
 .trend-bar:hover {
     background: linear-gradient(to top, #00d4ff, #00a8e6);
 }
 
-.trend-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 9px;
-    color: #999;
-}
+/* .trend-labels 已合并到主定义中 */
 
 /* 农场分布 */
 .farm-distribution {
