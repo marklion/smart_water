@@ -504,18 +504,25 @@ export default {
 
         let timeInterval = null
         let bubbleInterval = null
+        let currentBubbleIndex = 0 // 用于循环显示气泡
+        
         const updateTime = () => {
             const now = new Date()
             currentTime.value = now.toLocaleTimeString('zh-CN')
         }
+        
+        // 气泡动画 - 使用循环显示替代随机选择
         const startBubbleAnimation = () => {
             bubbleInterval = setInterval(() => {
-                const randomBubble = Math.floor(Math.random() * floatingDataBubbles.value.length)
-                floatingDataBubbles.value[randomBubble].visible = true
+                // 循环显示所有气泡，避免随机性
+                floatingDataBubbles.value[currentBubbleIndex].visible = true
 
                 setTimeout(() => {
-                    floatingDataBubbles.value[randomBubble].visible = false
+                    floatingDataBubbles.value[currentBubbleIndex].visible = false
                 }, 3000) // 减少显示时间
+                
+                // 移动到下一个气泡
+                currentBubbleIndex = (currentBubbleIndex + 1) % floatingDataBubbles.value.length
             }, 5000) // 增加间隔时间，减少频率
         }
 
@@ -525,7 +532,8 @@ export default {
             floatingDataBubbles.value[2].value = realData.waterUsage + 'm³'
             floatingDataBubbles.value[3].value = realData.onlineCount.toString()
             floatingDataBubbles.value[4].value = realData.farmCount.toString()
-            floatingDataBubbles.value[5].value = Math.floor(Math.random() * 20) + 80 + '%'
+            // 灌溉率使用固定值，后续可替换为真实API数据
+            floatingDataBubbles.value[5].value = '90%' // 固定值，待替换为真实数据
             floatingDataBubbles.value[6].value = realData.viewCount.toString()
         }
 
@@ -534,18 +542,15 @@ export default {
         // 数据刷新定时器
         let dataRefreshInterval = null
 
-        // 加载真实数据 - 优化：减少随机性，提高性能
+        // 加载真实数据 - 使用固定值，待替换为真实API调用
         const loadRealData = async () => {
             try {
-                // 模拟API调用 - 使用更稳定的数据生成
-                const baseDeviceCount = 35
-                const variation = Math.sin(Date.now() / 10000) * 10 // 使用正弦波减少随机性
-                realData.deviceCount = Math.floor(baseDeviceCount + variation)
-                realData.farmCount = Math.floor(8 + Math.sin(Date.now() / 15000) * 3)
-                realData.viewCount = Math.floor(800 + Math.sin(Date.now() / 8000) * 200)
-                realData.onlineCount = Math.floor(realData.deviceCount * 0.85)
-                realData.waterUsage = (75 + Math.sin(Date.now() / 12000) * 25).toFixed(1)
-                realData.runRate = Math.floor(85 + Math.sin(Date.now() / 9000) * 10)
+                realData.deviceCount = 35
+                realData.farmCount = 8
+                realData.viewCount = 1200
+                realData.onlineCount = 30 // 基于设备总数的85%
+                realData.waterUsage = 85.5
+                realData.runRate = 90
 
                 updateBubbleData()
             } catch (error) {
