@@ -492,14 +492,14 @@ export default {
 
         // 浮动数据气泡
         const floatingDataBubbles = ref([
-            { x: 20, y: 25, title: '设备总数', value: '0', icon: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z', visible: false, delay: 0 },
-            { x: 80, y: 20, title: '运行率', value: '0%', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 2 },
-            { x: 15, y: 50, title: '今日用水', value: '0m³', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1s-1 .45-1 1v3h-1c-.9 0-1.64.58-1.9 1.39C5.08 15.5 5 15.24 5 15c0-3.87 3.13-7 7-7s7 3.13 7 7c0 .24-.08.5-.1.39z', visible: false, delay: 4 },
-            { x: 85, y: 55, title: '在线设备', value: '0', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 6 },
-            { x: 25, y: 75, title: '农场数量', value: '0', icon: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z', visible: false, delay: 8 },
-            { x: 75, y: 80, title: '灌溉率', value: '0%', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 10 },
-            { x: 50, y: 15, title: '访问量', value: '0', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 12 },
-            { x: 50, y: 85, title: '系统状态', value: '正常', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 14 }
+            { x: -14, y: 25, title: '设备总数', value: '0', icon: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z', visible: false, delay: 0 },
+            { x: 110, y: 20, title: '运行率', value: '0%', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 2 },
+            { x: -15, y: 50, title: '今日用水', value: '0m³', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1s-1 .45-1 1v3h-1c-.9 0-1.64.58-1.9 1.39C5.08 15.5 5 15.24 5 15c0-3.87 3.13-7 7-7s7 3.13 7 7c0 .24-.08.5-.1.39z', visible: false, delay: 4 },
+            { x: 120, y: 55, title: '在线设备', value: '0', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 6 },
+            { x: -18, y: 75, title: '农场数量', value: '0', icon: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z', visible: false, delay: 8 },
+            { x: 110, y: 80, title: '灌溉率', value: '0%', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 10 },
+            { x: 50, y: -10, title: '访问量', value: '0', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 12 },
+            { x: 50, y: 110, title: '系统状态', value: '正常', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', visible: false, delay: 14 }
         ])
 
         let timeInterval = null
@@ -598,10 +598,10 @@ export default {
 
         // 返回按钮
         const goBack = () => {
-            if (window.history.length > 1) {
-                window.history.back()
+            if (globalThis.history.length > 1) {
+                globalThis.history.back()
             } else {
-                window.location.hash = '#/center'
+                globalThis.location.hash = '#/center'
             }
         }
 
@@ -660,7 +660,7 @@ export default {
     --font-size-xs: 8px;
     --font-size-sm: 10px;
     --font-size-base: 11px;
-    --font-size-md: 13px;
+    --font-size-md: 20px;
     --font-size-lg: 16px;
     --font-size-xl: 18px;
 
@@ -1270,7 +1270,7 @@ export default {
 }
 
 .stat-title {
-    font-size: 16px;
+    font-size: 20px;
     font-weight: 700;
     color: #00d4ff;
     margin-bottom: 4px;
@@ -1298,16 +1298,11 @@ export default {
 }
 
 .metric-label {
-    font-size: 9px;
+    font-size: 20px;
     color: #999;
     margin-bottom: 4px;
 }
 
-.metric-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: #00d4ff;
-}
 
 .metric-value.online {
     color: #4CAF50;
@@ -1341,6 +1336,9 @@ export default {
 .device-stats-card {
     width: 220px;
     height: 220px;
+    top: 10px;
+    left: 10px;
+    transform: translate(0, 0);
 }
 
 /* 用水量趋势卡片 */
@@ -1356,12 +1354,18 @@ export default {
 .farm-distribution-card {
     width: 280px;
     height: 200px;
+    bottom: 10px;
+    left: 10px;
+    transform: translate(0, 0);
 }
 
 /* 系统性能卡片 */
 .performance-card {
     width: 260px;
     height: 320px;
+    bottom: 400px;
+    right: 400px;
+    transform: translate(0, 0);
 }
 
 .center-stat-card:hover {
@@ -1423,28 +1427,13 @@ export default {
 }
 
 /* 卡片定位 - 分布在球体容器的四个角落，靠近边缘 */
-.device-stats-card {
-    top: 10px;
-    left: 10px;
-    transform: translate(0, 0);
-}
 
 /* .water-trend-card 已合并到主定义中 */
 
-.farm-distribution-card {
-    bottom: 10px;
-    left: 10px;
-    transform: translate(0, 0);
-}
 
-.performance-card {
-    bottom: 400px;
-    right: 400px;
-    transform: translate(0, 0);
-}
 
 .card-header {
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 .card-header h4 {
@@ -1500,8 +1489,8 @@ export default {
     display: flex;
     align-items: end;
     gap: 4px;
-    height: 80px;
-    margin-bottom: 10px;
+    height: 100px;
+    margin-bottom: 15px;
 }
 
 .trend-bar {
@@ -1515,37 +1504,11 @@ export default {
 .trend-labels {
     display: flex;
     justify-content: space-between;
-    font-size: 9px;
+    font-size: 16px;
     color: #999;
 }
 
-/* 农场分布卡片样式 */
-.farm-distribution {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
 
-.farm-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.farm-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.farm-dot.green {
-    background: #4CAF50;
-}
-
-.farm-dot.red {
-    background: #F44336;
-}
 
 .farm-dot.orange {
     background: #FF9800;
@@ -1887,20 +1850,7 @@ export default {
 
 /* .metric-row 已合并到主定义中 */
 
-.metric-item {
-    flex: 1;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(0, 212, 255, 0.2);
-    border-radius: 6px;
-    padding: 12px;
-    text-align: center;
-}
 
-.metric-label {
-    font-size: 10px;
-    color: #999;
-    margin-bottom: 6px;
-}
 
 .metric-number {
     font-size: 16px;
@@ -2012,16 +1962,11 @@ export default {
     flex-shrink: 0;
 }
 
-.metric-label {
-    font-size: 10px;
-    color: #ccc;
-    margin-bottom: 2px;
-    white-space: nowrap;
-}
 
 .metric-value {
-    font-size: 11px;
+    font-size: 18px;
     font-weight: 600;
+    color: #00d4ff;
     padding: 3px 6px;
     border-radius: 6px;
     background: rgba(0, 0, 0, 0.3);
@@ -2544,12 +2489,6 @@ export default {
     color: #ccc;
 }
 
-.metric-value {
-    font-size: 16px;
-    font-weight: 700;
-    color: #00d4ff;
-    margin-bottom: 4px;
-}
 
 .metric-change {
     font-size: 10px;
@@ -2626,14 +2565,6 @@ export default {
     margin-bottom: 20px;
 }
 
-.stat-item {
-    flex: 1;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(0, 212, 255, 0.2);
-    border-radius: 6px;
-    padding: 10px;
-    text-align: center;
-}
 
 .stat-label {
     font-size: 10px;
@@ -2641,11 +2572,6 @@ export default {
     margin-bottom: 6px;
 }
 
-.stat-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: #00d4ff;
-}
 
 /* 设备状态统计 */
 .device-stats {
@@ -2740,24 +2666,7 @@ export default {
     gap: 12px;
 }
 
-.metric-item {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 6px;
-    padding: 8px;
-}
 
-.metric-label {
-    font-size: 10px;
-    color: #999;
-    margin-bottom: 4px;
-}
-
-.metric-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: #00d4ff;
-    margin-bottom: 6px;
-}
 
 .metric-bar {
     height: 4px;
@@ -2780,9 +2689,6 @@ export default {
         font-size: 9px;
     }
 
-    .stat-value {
-        font-size: 11px;
-    }
 
     .detail-label {
         font-size: 9px;
@@ -2810,9 +2716,6 @@ export default {
         font-size: 8px;
     }
 
-    .stat-value {
-        font-size: 10px;
-    }
 
     .detail-label {
         font-size: 8px;
@@ -2835,13 +2738,6 @@ export default {
     }
 }
 
-.status-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 9px;
-    color: #ccc;
-}
 
 .status-indicator {
     width: 8px;
