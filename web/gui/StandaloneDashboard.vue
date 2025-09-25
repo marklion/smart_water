@@ -660,7 +660,7 @@ export default {
     --font-size-xs: 8px;
     --font-size-sm: 10px;
     --font-size-base: 11px;
-    --font-size-md: 20px;
+    --font-size-md: 100px;
     --font-size-lg: 16px;
     --font-size-xl: 18px;
 
@@ -1100,7 +1100,7 @@ export default {
 }
 
 .stat-value {
-    font-size: 28px;
+    font-size: 13px;
     font-weight: 800;
     background: linear-gradient(45deg, #00d4ff, #4CAF50);
     -webkit-background-clip: text;
@@ -1242,6 +1242,8 @@ export default {
      border: 1px solid rgba(0, 212, 255, 0.3);
      border-radius: 8px;
      padding: 16px;
+     left:10px;
+     top: 10px;
      backdrop-filter: blur(10px);
      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
      pointer-events: auto;
@@ -1270,7 +1272,7 @@ export default {
 }
 
 .stat-title {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 700;
     color: #00d4ff;
     margin-bottom: 4px;
@@ -1298,7 +1300,7 @@ export default {
 }
 
 .metric-label {
-    font-size: 20px;
+    font-size: 16px;    
     color: #999;
     margin-bottom: 4px;
 }
@@ -1335,7 +1337,7 @@ export default {
 /* 设备状态统计卡片 */
 .device-stats-card {
     width: 220px;
-    height: 220px;
+    height: 250px;
     top: 10px;
     left: 10px;
     transform: translate(0, 0);
@@ -1376,7 +1378,7 @@ export default {
 
  /* 中央区域卡片定位 */
  .center-stats-cards .device-stats-card {
-     top: 250px;
+     top: 280px;
      left: 10px;
  }
 
@@ -1391,7 +1393,7 @@ export default {
 }
 
 .center-stats-cards .performance-card {
-    bottom: 80px;
+    bottom: 10px;
     right: 10px;
 }
 
@@ -1460,25 +1462,12 @@ export default {
     margin-bottom: 0;
 }
 
-.device-icon {
-    font-size: 12px;
-}
 
 .device-info {
     flex: 1;
 }
 
-.device-label {
-    font-size: 10px;
-    color: #ccc;
-    margin-bottom: 2px;
-}
 
-.device-value {
-    font-size: 12px;
-    font-weight: 700;
-    color: #00d4ff;
-}
 
 /* 用水量趋势卡片样式 */
 .water-trend {
@@ -1510,9 +1499,6 @@ export default {
 
 
 
-.farm-dot.orange {
-    background: #FF9800;
-}
 
 /* 设备统计横向柱状图样式 */
 .device-horizontal-chart {
@@ -1634,9 +1620,6 @@ export default {
         padding: var(--spacing-lg);
     }
 
-    .card-header h4 {
-        font-size: var(--font-size-base);
-    }
 
     .pie-chart {
         width: 100px;
@@ -1654,9 +1637,6 @@ export default {
         padding: var(--spacing-md);
     }
 
-    .card-header h4 {
-        font-size: var(--font-size-sm);
-    }
 
     .chart-label {
         font-size: var(--font-size-sm);
@@ -1964,7 +1944,7 @@ export default {
 
 
 .metric-value {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 600;
     color: #00d4ff;
     padding: 3px 6px;
@@ -2566,11 +2546,6 @@ export default {
 }
 
 
-.stat-label {
-    font-size: 10px;
-    color: #999;
-    margin-bottom: 6px;
-}
 
 
 /* 设备状态统计 */
@@ -2580,21 +2555,9 @@ export default {
     gap: 12px;
 }
 
-.device-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 6px;
-}
 
 .device-icon {
     font-size: 16px;
-}
-
-.device-info {
-    flex: 1;
 }
 
 .device-label {
@@ -2615,48 +2578,6 @@ export default {
 
 .trend-bar:hover {
     background: linear-gradient(to top, #00d4ff, #00a8e6);
-}
-
-/* .trend-labels 已合并到主定义中 */
-
-/* 农场分布 */
-.farm-distribution {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.farm-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-}
-
-.farm-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.farm-dot.green {
-    background: #4CAF50;
-}
-
-.farm-dot.red {
-    background: #F44336;
-}
-
-.farm-dot.orange {
-    background: #FF9800;
-}
-
-.farm-text {
-    font-size: 11px;
-    color: #ccc;
 }
 
 /* 系统性能 */
@@ -2685,9 +2606,6 @@ export default {
 
 /* 响应式字体大小 */
 @media (max-width: 1200px) {
-    .stat-label {
-        font-size: 9px;
-    }
 
 
     .detail-label {
@@ -2712,9 +2630,6 @@ export default {
 }
 
 @media (max-width: 768px) {
-    .stat-label {
-        font-size: 8px;
-    }
 
 
     .detail-label {
