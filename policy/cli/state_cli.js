@@ -76,7 +76,7 @@ function createAssignmentCommand(vorpal, ins, trigger) {
         `${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}赋值表达式`, 
         `撤销操作 - 删除所有${ASSIGNMENT_NAMES[trigger]}`,
         async (cmd_this, args) => {
-            await policy_lib.add_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
+            await policy_lib.add_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
             return `已添加${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name} = ${args.expression}`;
         },
         async (cmd_this, args) => {
@@ -85,7 +85,7 @@ function createAssignmentCommand(vorpal, ins, trigger) {
             const assignmentsKey = `${trigger}_assignments`;
             if (resp.state && resp.state[assignmentsKey]) {
                 for (const assignment of resp.state[assignmentsKey]) {
-                    await policy_lib.del_state_assignment(
+                    await policy_lib.del_assignment(
                         ins.policy_view.cur_view_name, 
                         ins.cur_view_name, 
                         trigger, 
@@ -106,8 +106,66 @@ function createDelAssignmentCommand(vorpal, ins, trigger) {
         `del ${trigger} assignment <variable_name>`,
         `删除${ASSIGNMENT_NAMES[trigger]} - 移除指定变量的赋值表达式`,
         async (cmd_this, args) => {
-            await policy_lib.del_state_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name);
+            await policy_lib.del_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name);
             return `已删除${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name}`;
+        }
+    );
+}
+
+// 辅助函数：创建跨策略变量赋值命令
+function createCrossPolicyAssignmentCommand(vorpal, ins, trigger) {
+    cli_utils.make_undo_cmd(
+        vorpal, 
+        `${trigger} crossAssignment <policy_name> <variable_name> <expression>`, 
+        `跨策略${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}跨策略变量赋值`, 
+        `撤销操作 - 删除所有跨策略${ASSIGNMENT_NAMES[trigger]}`,
+        async (cmd_this, args) => {
+            await policy_lib.add_assignment(
+                ins.policy_view.cur_view_name, 
+                ins.cur_view_name, 
+                trigger, 
+                args.variable_name, 
+                args.expression,
+                args.policy_name
+            );
+            return `已添加跨策略${ASSIGNMENT_NAMES[trigger]}: 策略 ${args.policy_name} 的变量 ${args.variable_name} = ${args.expression}`;
+        },
+        async (cmd_this, args) => {
+            const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
+            let deletedCount = 0;
+            const assignmentsKey = `cross_policy_${trigger}_assignments`;
+            if (resp.state && resp.state[assignmentsKey]) {
+                for (const assignment of resp.state[assignmentsKey]) {
+                    await policy_lib.del_assignment(
+                        ins.policy_view.cur_view_name, 
+                        ins.cur_view_name, 
+                        trigger, 
+                        assignment.variable_name,
+                        assignment.target_policy_name
+                    );
+                    deletedCount++;
+                }
+            }
+            return `已删除 ${deletedCount} 个跨策略${ASSIGNMENT_NAMES[trigger]}`;
+        }
+    );
+}
+
+// 辅助函数：创建删除跨策略变量赋值命令
+function createDelCrossPolicyAssignmentCommand(vorpal, ins, trigger) {
+    cli_utils.make_common_cmd(
+        vorpal,
+        `del ${trigger} crossAssignment <policy_name> <variable_name>`,
+        `删除跨策略${ASSIGNMENT_NAMES[trigger]} - 移除指定策略和变量的赋值`,
+        async (cmd_this, args) => {
+            await policy_lib.del_assignment(
+                ins.policy_view.cur_view_name, 
+                ins.cur_view_name, 
+                trigger, 
+                args.variable_name,
+                args.policy_name
+            );
+            return `已删除跨策略${ASSIGNMENT_NAMES[trigger]}: 策略 ${args.policy_name} 的变量 ${args.variable_name}`;
         }
     );
 }
@@ -133,6 +191,12 @@ export default {
         ACTION_TYPES.forEach(actionType => {
             createAssignmentCommand(vorpal, ins, actionType);
             createDelAssignmentCommand(vorpal, ins, actionType);
+        });
+
+        // 创建所有跨策略变量赋值相关命令
+        ACTION_TYPES.forEach(actionType => {
+            createCrossPolicyAssignmentCommand(vorpal, ins, actionType);
+            createDelCrossPolicyAssignmentCommand(vorpal, ins, actionType);
         });
 
         transformer_cli.state_view = ins;
@@ -196,6 +260,16 @@ export default {
                 if (resp.state[assignmentsKey]) {
                     resp.state[assignmentsKey].forEach(assignment => {
                         ret.push(`  ${actionType} assignment ${assignment.variable_name} ${assignment.expression}`);
+                    });
+                }
+            });
+
+            // 处理所有跨策略变量赋值类型
+            ACTION_TYPES.forEach(actionType => {
+                const assignmentsKey = `cross_policy_${actionType}_assignments`;
+                if (resp.state[assignmentsKey]) {
+                    resp.state[assignmentsKey].forEach(assignment => {
+                        ret.push(`  ${actionType} crossAssignment ${assignment.target_policy_name} ${assignment.variable_name} ${assignment.expression}`);
                     });
                 }
             });

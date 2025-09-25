@@ -98,22 +98,36 @@ export default {
     del_source: async function (policy_name, name, token) {
         return await call_remote('/policy/del_source', { policy_name, name }, token);
     },
-    add_state_assignment: async function (policy_name, state_name, trigger, variable_name, expression, token) {
-        return await call_remote('/policy/add_state_assignment', { 
+    add_assignment: async function (policy_name, state_name, trigger, variable_name, expression, target_policy_name = null, token) {
+        const params = { 
             policy_name, 
             state_name, 
             trigger, 
             variable_name, 
             expression 
-        }, token);
+        };
+        
+        // 如果是跨策略赋值，添加target_policy_name参数
+        if (target_policy_name) {
+            params.target_policy_name = target_policy_name;
+        }
+        
+        return await call_remote('/policy/add_assignment', params, token);
     },
-    del_state_assignment: async function (policy_name, state_name, trigger, variable_name, token) {
-        return await call_remote('/policy/del_state_assignment', { 
+    del_assignment: async function (policy_name, state_name, trigger, variable_name, target_policy_name = null, token) {
+        const params = { 
             policy_name, 
             state_name, 
             trigger, 
             variable_name 
-        }, token);
+        };
+        
+        // 如果是跨策略赋值，添加target_policy_name参数
+        if (target_policy_name) {
+            params.target_policy_name = target_policy_name;
+        }
+        
+        return await call_remote('/policy/del_assignment', params, token);
     },
     set_scan_period: async function (period_ms, token) {
         return await call_remote('/policy/set_scan_period', { period_ms }, token);

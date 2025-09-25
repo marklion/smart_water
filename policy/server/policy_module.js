@@ -45,6 +45,17 @@ function validateTransformerExists(state, transformer_name) {
     return validateNestedItemExists(state, 'transformers', transformer_name, '转换器');
 }
 
+function validateVariableExists(policy, variable_name) {
+    if (!policy.sources || policy.sources.length === 0) {
+        throw { err_msg: `策略 ${policy.name} 中没有定义任何数据源，无法使用变量 ${variable_name}` };
+    }
+    
+    const sourceExists = policy.sources.some(source => source.name === variable_name);
+    if (!sourceExists) {
+        throw { err_msg: `变量 ${variable_name} 在策略 ${policy.name} 的数据源中不存在` };
+    }
+}
+
 // 辅助函数：根据触发类型获取动作列表名称
 function getActionListName(trigger) {
     const actionListMap = {
@@ -606,9 +617,9 @@ export default {
                 return { result: true };
             }
         },
-        add_state_assignment: {
-            name: '添加状态赋值表达式',
-            description: '向状态添加一个赋值表达式',
+        add_assignment: {
+            name: '添加赋值表达式',
+            description: '添加策略内或跨策略赋值表达式',
             is_write: true,
             is_get_api: false,
             params: {
@@ -616,7 +627,8 @@ export default {
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
                 trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
                 variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true },
-                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10', have_to: true }
+                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10', have_to: true },
+                target_policy_name: { type: String, mean: '目标策略名称', example: '策略2', have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -625,35 +637,60 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 
-                let assignmentList = ensureArrayExists(state, getAssignmentListName(body.trigger));
-                
-                // 检查是否已存在相同变量名的赋值表达式
-                let existingAssignment = assignmentList.find(
-                    a => a.variable_name === body.variable_name
-                );
-                
-                if (existingAssignment) {
-                    throw { err_msg: `变量 ${body.variable_name} 的赋值表达式已存在` };
+                // 如果是跨策略赋值，不验证变量存在性
+                if (body.target_policy_name) {
+                    // 跨策略赋值逻辑
+                    let assignmentList = ensureArrayExists(state, getAssignmentListName(body.trigger));
+                    
+                    // 检查是否已存在相同变量名的赋值表达式
+                    let existingAssignment = assignmentList.find(
+                        a => a.variable_name === body.variable_name && a.target_policy_name === body.target_policy_name
+                    );
+                    
+                    if (existingAssignment) {
+                        throw { err_msg: `变量 ${body.variable_name} 的跨策略赋值表达式已存在` };
+                    }
+                    
+                    assignmentList.push({
+                        variable_name: body.variable_name,
+                        expression: body.expression,
+                        target_policy_name: body.target_policy_name
+                    });
+                } else {
+                    // 策略内赋值逻辑
+                    validateVariableExists(policy, body.variable_name);
+                    
+                    let assignmentList = ensureArrayExists(state, getAssignmentListName(body.trigger));
+                    
+                    // 检查是否已存在相同变量名的赋值表达式
+                    let existingAssignment = assignmentList.find(
+                        a => a.variable_name === body.variable_name
+                    );
+                    
+                    if (existingAssignment) {
+                        throw { err_msg: `变量 ${body.variable_name} 的赋值表达式已存在` };
+                    }
+                    
+                    assignmentList.push({
+                        variable_name: body.variable_name,
+                        expression: body.expression
+                    });
                 }
-                
-                assignmentList.push({
-                    variable_name: body.variable_name,
-                    expression: body.expression
-                });
                 
                 return { result: true };
             }
         },
-        del_state_assignment: {
-            name: '删除状态赋值表达式',
-            description: '删除状态中的一个赋值表达式',
+        del_assignment: {
+            name: '删除赋值表达式',
+            description: '删除策略内或跨策略赋值表达式',
             is_write: true,
             is_get_api: false,
             params: {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
                 trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
-                variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true }
+                variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true },
+                target_policy_name: { type: String, mean: '目标策略名称', example: '策略2', have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -664,8 +701,16 @@ export default {
                 
                 let assignmentList = getAssignmentList(state, body.trigger, true);
                 
-                let assignmentRemoved = findAndRemoveFromArray(assignmentList, 
-                    a => a.variable_name === body.variable_name);
+                let assignmentRemoved;
+                if (body.target_policy_name) {
+                    // 跨策略赋值删除
+                    assignmentRemoved = findAndRemoveFromArray(assignmentList, 
+                        a => a.variable_name === body.variable_name && a.target_policy_name === body.target_policy_name);
+                } else {
+                    // 策略内赋值删除
+                    assignmentRemoved = findAndRemoveFromArray(assignmentList, 
+                        a => a.variable_name === body.variable_name);
+                }
                 
                 if (!assignmentRemoved) {
                     throw { err_msg: '赋值表达式不存在' };
