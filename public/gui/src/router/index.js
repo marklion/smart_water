@@ -9,7 +9,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/center'
+      redirect: '/dashboard'
     },
     {
       path: '/login',
@@ -24,6 +24,12 @@ const router = createRouter({
       component: () => import('../components/MainLayout.vue'),
       children: [
         ...batchCreateRoutes([
+          {
+            name: '数据大屏',
+            path: '/dashboard',
+            component: () => import('../../../../web/gui/StandaloneDashboard.vue'),
+            icon: MenuIcons.DATA
+          },
           {
             name: '监控中心',
             path: '/center',
@@ -67,7 +73,7 @@ router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('auth_token')
   if (to.path === '/login') {
     if (token) {
-      next('/center')
+      next('/dashboard')
     } else {
       next()
     }
