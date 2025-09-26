@@ -26,9 +26,9 @@ const ACTION_TYPES = ['enter', 'do', 'exit'];
 // 辅助函数：创建动作命令
 function createActionCommand(vorpal, ins, trigger) {
     cli_utils.make_undo_cmd(
-        vorpal, 
-        `${trigger} action <device> <action>`, 
-        `${ACTION_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}执行的动作`, 
+        vorpal,
+        `${trigger} action <device> <action>`,
+        `${ACTION_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}执行的动作`,
         `撤销操作 - 删除所有${ACTION_NAMES[trigger]}`,
         async (cmd_this, args) => {
             await policy_lib.add_state_action(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.device, args.action);
@@ -41,10 +41,10 @@ function createActionCommand(vorpal, ins, trigger) {
             if (resp.state && resp.state[actionsKey]) {
                 for (const action of resp.state[actionsKey]) {
                     await policy_lib.del_state_action(
-                        ins.policy_view.cur_view_name, 
-                        ins.cur_view_name, 
-                        trigger, 
-                        action.device, 
+                        ins.policy_view.cur_view_name,
+                        ins.cur_view_name,
+                        trigger,
+                        action.device,
                         action.action
                     );
                     deletedCount++;
@@ -71,9 +71,9 @@ function createDelActionCommand(vorpal, ins, trigger) {
 // 辅助函数：创建赋值表达式命令
 function createAssignmentCommand(vorpal, ins, trigger) {
     cli_utils.make_undo_cmd(
-        vorpal, 
-        `${trigger} assignment <variable_name> <expression>`, 
-        `${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}赋值表达式`, 
+        vorpal,
+        `${trigger} assignment <variable_name> <expression>`,
+        `${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}赋值表达式`,
         `撤销操作 - 删除所有${ASSIGNMENT_NAMES[trigger]}`,
         async (cmd_this, args) => {
             await policy_lib.add_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
@@ -85,10 +85,17 @@ function createAssignmentCommand(vorpal, ins, trigger) {
             const assignmentsKey = `${trigger}_assignments`;
             if (resp.state && resp.state[assignmentsKey]) {
                 for (const assignment of resp.state[assignmentsKey]) {
+<<<<<<< HEAD
                     await policy_lib.del_assignment(
-                        ins.policy_view.cur_view_name, 
-                        ins.cur_view_name, 
-                        trigger, 
+                        ins.policy_view.cur_view_name,
+                        ins.cur_view_name,
+                        trigger,
+=======
+                    await policy_lib.del_state_assignment(
+                        ins.policy_view.cur_view_name,
+                        ins.cur_view_name,
+                        trigger,
+>>>>>>> 96ba6c3 (DPKW-39 add cli go through)
                         assignment.variable_name
                     );
                     deletedCount++;
@@ -115,16 +122,16 @@ function createDelAssignmentCommand(vorpal, ins, trigger) {
 // 辅助函数：创建跨策略变量赋值命令
 function createCrossPolicyAssignmentCommand(vorpal, ins, trigger) {
     cli_utils.make_undo_cmd(
-        vorpal, 
-        `${trigger} crossAssignment <policy_name> <variable_name> <expression>`, 
-        `跨策略${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}跨策略变量赋值`, 
+        vorpal,
+        `${trigger} crossAssignment <policy_name> <variable_name> <expression>`,
+        `跨策略${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}跨策略变量赋值`,
         `撤销操作 - 删除所有跨策略${ASSIGNMENT_NAMES[trigger]}`,
         async (cmd_this, args) => {
             await policy_lib.add_assignment(
-                ins.policy_view.cur_view_name, 
-                ins.cur_view_name, 
-                trigger, 
-                args.variable_name, 
+                ins.policy_view.cur_view_name,
+                ins.cur_view_name,
+                trigger,
+                args.variable_name,
                 args.expression,
                 args.policy_name
             );
@@ -137,9 +144,9 @@ function createCrossPolicyAssignmentCommand(vorpal, ins, trigger) {
             if (resp.state && resp.state[assignmentsKey]) {
                 for (const assignment of resp.state[assignmentsKey]) {
                     await policy_lib.del_assignment(
-                        ins.policy_view.cur_view_name, 
-                        ins.cur_view_name, 
-                        trigger, 
+                        ins.policy_view.cur_view_name,
+                        ins.cur_view_name,
+                        trigger,
                         assignment.variable_name,
                         assignment.target_policy_name
                     );
@@ -159,9 +166,9 @@ function createDelCrossPolicyAssignmentCommand(vorpal, ins, trigger) {
         `删除跨策略${ASSIGNMENT_NAMES[trigger]} - 移除指定策略和变量的赋值`,
         async (cmd_this, args) => {
             await policy_lib.del_assignment(
-                ins.policy_view.cur_view_name, 
-                ins.cur_view_name, 
-                trigger, 
+                ins.policy_view.cur_view_name,
+                ins.cur_view_name,
+                trigger,
                 args.variable_name,
                 args.policy_name
             );
@@ -242,14 +249,14 @@ export default {
     make_bdr: async function (view_name) {
         let ret = [];
         const resp = await policy_lib.get_state(this.policy_view.cur_view_name, view_name);
-        
+
         if (resp.state) {
             // 使用常量定义处理所有动作类型
             ACTION_TYPES.forEach(actionType => {
                 const actionsKey = `${actionType}_actions`;
                 if (resp.state[actionsKey]) {
                     resp.state[actionsKey].forEach(action => {
-                        ret.push(`  ${actionType} action ${action.device} ${action.action}`);
+                        ret.push(`  ${actionType} action '${action.device}' '${action.action}'`);
                     });
                 }
             });
@@ -259,7 +266,7 @@ export default {
                 const assignmentsKey = `${actionType}_assignments`;
                 if (resp.state[assignmentsKey]) {
                     resp.state[assignmentsKey].forEach(assignment => {
-                        ret.push(`  ${actionType} assignment ${assignment.variable_name} ${assignment.expression}`);
+                        ret.push(`  ${actionType} assignment '${assignment.variable_name}' '${assignment.expression}'    ret.push(`  ${actionType} crossAssignment ${assignment.target_policy_name} ${assignment.variable_name} ${assignment.expression}`);
                     });
                 }
             });
@@ -280,7 +287,7 @@ export default {
             let sub_bdr = await cli_utils.make_sub_bdr(this._vorpalInstance);
             ret = ret.concat(sub_bdr);
         }
-        
+
         return ret;
     }
 }

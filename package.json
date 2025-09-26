@@ -68,6 +68,7 @@
         "mysql2": "^3.14.1",
         "node-fetch": "^3.3.2",
         "pg-hstore": "^2.3.4",
+        "pict-pairwise-testing": "^1.1.0",
         "sequelize": "^6.37.7",
         "uuid": "^11.1.0",
         "vorpal": "^1.12.0",

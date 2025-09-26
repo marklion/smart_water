@@ -29,7 +29,7 @@ export default {
             async (cmd_this, args) => {
                 let farm_name = args.farm_name;
                 let block_name = args.block_name;
-                let area = args.block_area;
+                let area = parseFloat(args.block_area);
                 let info = args.info || '';
                 let result = await resource_lib.add_block(farm_name, block_name, area, info);
                 if (result.result) {

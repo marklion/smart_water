@@ -34,23 +34,34 @@ export default {
         let ins = this;
         let sub_cli = sub_cli_definition.install(parent_prompt);
         let enter_cmd = sub_cli_definition.command;
-        if (sub_cli_definition.enter_view_hook)
-        {
+        if (sub_cli_definition.enter_view_hook) {
             enter_cmd = enter_cmd + ' <view_name>';
         }
         if (sub_cli_definition.undo_hook) {
             cli.command(`undo ${sub_cli_definition.command} <view_name>`, '删除视图')
                 .action(async function (args) {
-                    let resp = await sub_cli_definition.undo_hook(args);
-                    if (resp) {
-                        this.log(resp);
+                    let cleaned_args = { ...args };
+                    for (let key in cleaned_args) {
+                        cleaned_args[key] = String(cleaned_args[key]);
+                    }
+                    try {
+                        let resp = await sub_cli_definition.undo_hook(cleaned_args);
+                        if (resp) {
+                            this.log(resp);
+                        }
+                    } catch (error) {
+                        this.log('Error:', error.err_msg || '未知错误');
                     }
                 })
         }
         cli.command(enter_cmd, '进入' + sub_cli_definition.name)
             .action(async function (args) {
+                let cleaned_args = { ...args };
+                for (let key in cleaned_args) {
+                    cleaned_args[key] = String(cleaned_args[key]);
+                }
                 if (sub_cli_definition.enter_view_hook) {
-                    let resp = await sub_cli_definition.enter_view_hook(args);
+                    let resp = await sub_cli_definition.enter_view_hook(cleaned_args);
                     if (resp) {
                         this.log(resp);
                     }
@@ -61,13 +72,13 @@ export default {
             });
         sub_cli.command('return', '返回上一级视图')
             .alias('back')
-            .action(async function (args) {
+            .action(async function () {
                 sub_cli.hide();
                 cli.show();
                 return cli;
             });
         sub_cli.command('clear', '清除当前配置')
-            .action(async function (args) {
+            .action(async function () {
                 try {
                     await ins.clear_config(sub_cli);
                     this.log('当前配置已清除');
@@ -80,14 +91,12 @@ export default {
         }
         cli.sub_clies.push(sub_cli_definition);
     },
-    get_view_name_array:async function(sub_cli)
-    {
+    get_view_name_array: async function (sub_cli) {
         let ret = [];
         if (sub_cli.get_all_views) {
             ret = await sub_cli.get_all_views();
         }
-        else
-        {
+        else {
             ret = [''];
         }
         return ret;
@@ -140,7 +149,11 @@ export default {
         let ret = vorpal.command(cmd, description)
             .action(async function (args) {
                 try {
-                    let result = await func(this, args);
+                    let cleaned_args = { ...args };
+                    for (let key in cleaned_args) {
+                        cleaned_args[key] = String(cleaned_args[key]);
+                    }
+                    let result = await func(this, cleaned_args);
                     if (result) {
                         this.log(result);
                     }
@@ -153,8 +166,12 @@ export default {
     make_undo_cmd: function (vorpal, cmd, config_description, undo_description, config_func, undo_func) {
         let ret = vorpal.command(cmd, config_description)
             .action(async function (args) {
+                let cleaned_args = { ...args };
+                for (let key in cleaned_args) {
+                    cleaned_args[key] = String(cleaned_args[key]);
+                }
                 try {
-                    let result = await config_func(this, args);
+                    let result = await config_func(this, cleaned_args);
                     if (result) {
                         this.log(result);
                     }
@@ -165,8 +182,12 @@ export default {
         let undo_cmd_string = 'undo ' + cmd.split(/[<[]/)[0].trim();
         vorpal.command(undo_cmd_string, undo_description)
             .action(async function (args) {
+                let cleaned_args = { ...args };
+                for (let key in cleaned_args) {
+                    cleaned_args[key] = String(cleaned_args[key]);
+                }
                 try {
-                    let result = await undo_func(this, args);
+                    let result = await undo_func(this, cleaned_args);
                     if (result) {
                         this.log(result);
                     }
@@ -183,11 +204,15 @@ export default {
     make_display_cmd: function (vorpal, cmd, description, func) {
         let ret = vorpal.command(cmd, description)
             .action(async function (args) {
+                let cleaned_args = { ...args };
+                for (let key in cleaned_args) {
+                    cleaned_args[key] = String(cleaned_args[key]);
+                }
                 try {
                     let cur_page = 0;
                     let all_finished = false;
                     while (all_finished == false) {
-                        let got_count = await func(this, args, cur_page);
+                        let got_count = await func(this, cleaned_args, cur_page);
                         if (got_count <= 0) {
                             all_finished = true;
                         } else {

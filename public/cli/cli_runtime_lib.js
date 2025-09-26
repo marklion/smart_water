@@ -27,15 +27,14 @@ function get_vorpal() {
                     this.log('Error:', err.err_msg || '未知错误');
                 }
             });
-        vorpal.command('set_sys_name <sys_name>', '设置系统名称')
-            .action(async function (args) {
-                try {
-                    await call_remote('/set_sys_name', { sys_name: args.sys_name });
-                    this.log('系统名称已设置为：' + args.sys_name);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
+        cli_utils.make_undo_cmd(vorpal, 'set_sys_name <sys_name>', '设置系统名称', '清除系统名称', async (cmd_this,args) => {
+            await call_remote('/set_sys_name', { sys_name: args.sys_name });
+            cmd_this.log('系统名称已设置为：' + args.sys_name);
+        }, async (cmd_this,args) => {
+            await call_remote('/set_sys_name', { sys_name: 'no_name' });
+            cmd_this.log('系统名称已清除');
+        });
+
         cli_utils.add_sub_cli(vorpal, device_cli, prompt);
         cli_utils.add_sub_cli(vorpal, resource_cli, prompt);
         cli_utils.add_sub_cli(vorpal, policy_cli, prompt);

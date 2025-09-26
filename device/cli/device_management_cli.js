@@ -105,7 +105,14 @@ export default {
         let ret = []
         let devices = await get_all_devices(this.token);
         for (let device of devices) {
-            ret.push(`add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.longitude || ''}' '${device.latitude || ''}' '${device.farm_name || ''}' '${device.block_name || ''}'`);
+            let tmp_cmd =`add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.longitude || ''}' '${device.latitude || ''}' ` ;
+            if (device.farm_name) {
+                tmp_cmd += `'${device.farm_name}' `;
+            }
+            if (device.block_name) {
+                tmp_cmd += `'${device.block_name}'`;
+            }
+            ret.push(tmp_cmd);
         }
         if (this._vorpalInstance) {
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));

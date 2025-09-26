@@ -19,14 +19,14 @@ async function get_driver(device_name, capability) {
     if (driver_config.capability.indexOf(capability) === -1) {
         throw { err_msg: '驱动不支持该能力' };
     }
-    
+
     // 使用设备名称作为缓存键，确保每个设备只有一个驱动实例
     const cache_key = device_name;
     if (!driver_instances.has(cache_key)) {
         const driver_instance = await driver_config.driver(device.config_key);
         driver_instances.set(cache_key, driver_instance);
     }
-    
+
     return driver_instances.get(cache_key);
 }
 const device_array = []
@@ -88,12 +88,12 @@ export default {
                 if (driver_array.find(driver => driver.name === body.driver_name) === undefined) {
                     throw { err_msg: '驱动不存在' };
                 }
-                
+
                 // 验证必填的经度和纬度参数
                 if (body.longitude === undefined || body.latitude === undefined) {
                     throw { err_msg: '经度和纬度是必填参数' };
                 }
-                
+
                 // 验证坐标范围
                 if (body.longitude < -180 || body.longitude > 180) {
                     throw { err_msg: '经度必须在-180到180之间' };
@@ -101,7 +101,7 @@ export default {
                 if (body.latitude < -90 || body.latitude > 90) {
                     throw { err_msg: '纬度必须在-90到90之间' };
                 }
-                
+
                 let exist_device = device_array.find(device => device.device_name === body.device_name);
                 if (!exist_device) {
                     exist_device = {
@@ -113,9 +113,11 @@ export default {
                 exist_device.config_key = body.config_key;
                 exist_device.longitude = body.longitude;
                 exist_device.latitude = body.latitude;
-                if (body.farm_name && body.block_name) {
-                    exist_device.block_name = body.block_name;
+                if (body.farm_name) {
                     exist_device.farm_name = body.farm_name;
+                }
+                if (body.block_name) {
+                    exist_device.block_name = body.block_name;
                 }
                 return { result: true };
             }
