@@ -32,7 +32,7 @@ const pageTitle = computed(() => {
 
 const pageDescription = computed(() => {
   const descriptions = {
-    '首页': '欢迎使用智能水务管理系统',
+    '首页': '欢迎使用智能灌溉管理系统',
     '设备配置': '在这里可以配置和管理各种设备',
     '策略配置': '在这里可以配置各种策略规则',
     '用户管理': '在这里可以管理系统用户',

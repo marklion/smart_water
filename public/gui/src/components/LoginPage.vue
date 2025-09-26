@@ -15,36 +15,24 @@
       <div class="showcase-content">
         <div class="logo-section">
           <div class="logo-icon">
-            <svg viewBox="0 0 512 512" class="plant-logo" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="mainLogoGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-                  <stop offset="0%" stop-color="#00b59c" />
-                  <stop offset="100%" stop-color="#9cffac" />
-                </linearGradient>
-              </defs>
-              <path
-                d="m497 482h-10.002v-1.678c0-12.473 6.708-24.096 17.504-30.335 7.173-4.145 9.628-13.319 5.483-20.492s-13.319-9.63-20.492-5.482c-6.759 3.905-12.65 8.95-17.496 14.805-4.846-5.855-10.737-10.9-17.496-14.805-7.174-4.146-16.348-1.689-20.492 5.482-4.145 7.174-1.689 16.348 5.483 20.493 10.797 6.238 17.504 17.861 17.504 30.334v1.678h-69.996v-1.678c0-12.473 6.708-24.096 17.504-30.335 7.173-4.145 9.628-13.319 5.483-20.492s-13.319-9.63-20.492-5.482c-6.759 3.905-12.65 8.95-17.496 14.805-4.846-5.855-10.737-10.9-17.496-14.805-7.174-4.146-16.348-1.689-20.492 5.482-4.145 7.174-1.689 16.348 5.483 20.493 10.798 6.239 17.506 17.862 17.506 30.334v1.678h-56v-122h25c8.284 0 15-6.716 15-15v-15h15c8.284 0 15-6.716 15-15s-6.716-15-15-15h-15v-15c0-8.284-6.716-15-15-15h-5v-35c0-35.841-29.159-65-65-65s-65 29.159-65 65v35h-5c-8.284 0-15 6.716-15 15v15h-15c-8.284 0-15 6.716-15 15s6.716 15 15 15h15v15c0 8.284 6.716 15 15 15h25v122h-56v-1.678c0-12.473 6.708-24.096 17.504-30.334 7.173-4.146 9.628-13.319 5.483-20.493-4.145-7.173-13.319-9.63-20.492-5.482-6.759 3.905-12.65 8.95-17.496 14.805-4.846-5.855-10.737-10.9-17.496-14.805-7.173-4.146-16.348-1.689-20.492 5.482-4.145 7.173-1.689 16.348 5.483 20.492 10.798 6.24 17.506 17.863 17.506 30.335v1.678h-69.998v-1.678c0-12.473 6.708-24.096 17.504-30.334 7.173-4.146 9.628-13.319 5.483-20.493-4.145-7.173-13.319-9.63-20.492-5.482-6.759 3.905-12.65 8.95-17.496 14.805-4.846-5.855-10.737-10.9-17.496-14.805-7.174-4.146-16.348-1.689-20.492 5.482-4.145 7.173-1.689 16.348 5.483 20.492 10.797 6.239 17.504 17.862 17.504 30.335v1.678h-10c-8.284 0-15 6.716-15 15s6.716 15 15 15h482c8.284 0 15-6.716 15-15s-6.716-15-15-15zm-276-247c0-19.299 15.701-35 35-35s35 15.701 35 35v35h-70zm-20 65h110v30h-110zm40 60h30v122h-30zm220-125c0-8.284 6.716-15 15-15s15 6.716 15 15-6.716 15-15 15-15-6.716-15-15zm-40-15c8.284 0 15 6.716 15 15s-6.716 15-15 15-15-6.716-15-15s6.716-15 15-15zm-70 15c0-8.284 6.716-15 15-15s15 6.716 15 15-6.716 15-15 15-15-6.716-15-15zm-330 0c0-8.284 6.716-15 15-15s15 6.716 15 15-6.716 15-15 15-15-6.716-15-15zm55 0c0-8.284 6.716-15 15-15s15 6.716 15 15-6.716 15-15 15-15-6.716-15-15zm70-15c8.284 0 15 6.716 15 15s-6.716 15-15 15-15-6.716-15-15 6.716-15 15-15zm254.957-129.957c-5.858-5.858-5.858-15.355 0-21.213s15.355-5.858 21.213 0 5.858 15.355 0 21.213-15.355 5.858-21.213 0zm-38.891 38.891c-5.858-5.858-5.858-15.355 0-21.213s15.355-5.858 21.213 0 5.858 15.355 0 21.213-15.355 5.858-21.213 0zm-38.891 38.891c-5.858-5.858-5.858-15.355 0-21.213s15.355-5.858 21.213 0 5.858 15.355 0 21.213c-5.857 5.858-15.355 5.858-21.213 0zm-82.175-152.825c0-8.284 6.716-15 15-15s15 6.716 15 15-6.716 15-15 15-15-6.716-15-15zm0 55c0-8.284 6.716-15 15-15s15 6.716 15 15-6.716 15-15 15-15-6.716-15-15zm0 55c0-8.284 6.716-15 15-15s15 6.716 15 15-6.716 15-15 15-15-6.716-15-15zm-151.17-34.957c-5.858-5.858-5.858-15.355 0-21.213s15.355-5.858 21.213 0 5.858 15.355 0 21.213-15.355 5.858-21.213 0zm38.891 38.891c-5.858-5.858-5.858-15.355 0-21.213s15.355-5.858 21.213 0 5.858 15.355 0 21.213-15.355 5.858-21.213 0zm38.891 38.891c-5.858-5.858-5.858-15.355 0-21.213s15.355-5.858 21.213 0 5.858 15.355 0 21.213-15.355 5.858-21.213 0z"
-                fill="url(#mainLogoGradient)" />
-            </svg>
+            <img src="/logo.png" alt="智能灌溉管理系统" class="plant-logo" />
           </div>
-          <h1 class="system-title">智能水务管理系统</h1>
+          <h1 class="system-title">智能灌溉管理系统</h1>
           <p class="system-subtitle">Smart Water Management System</p>
         </div>
 
-        <div class="feature-list">
-          <el-row :gutter="20">
-            <el-col :span="24" v-for="feature in features" :key="feature.title" class="feature-col">
-              <el-card class="feature-card" shadow="hover">
-                <div class="feature-content">
-                  <div class="feature-icon" :class="feature.iconClass">{{ feature.icon }}</div>
-                  <div class="feature-text">
-                    <h3>{{ feature.title }}</h3>
-                    <p>{{ feature.description }}</p>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
+        <div class="system-intro">
+          <div class="intro-content">
+            <h2 class="intro-title">让灌溉更智能，让农业更简单</h2>
+            <p class="intro-description">专业的水肥一体化智能管理平台</p>
+            <p class="intro-subtitle">通过物联网技术、大数据分析。为您提供精准、高效、节水的灌溉解决方案。支持远程监控、智能决策、自动控制，让传统农业迈向智慧农业新时代。</p>
+            <div class="intro-features">
+              <span class="feature-tag">智能控制</span>
+              <span class="feature-tag">节水增效</span>
+              <span class="feature-tag">远程监控</span>
+              <span class="feature-tag">数据分析</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -107,26 +95,6 @@ const loginForm = reactive({
   password: ''
 })
 
-const features = [
-  {
-    title: '智能灌溉',
-    description: '精准控制，节水高效',
-    icon: '●',
-    iconClass: 'water-icon'
-  },
-  {
-    title: '智慧农业',
-    description: '科学种植，提升产量',
-    icon: '♦',
-    iconClass: 'plant-icon'
-  },
-  {
-    title: '数据监控',
-    description: '实时监测，智能决策',
-    icon: '■',
-    iconClass: 'chart-icon'
-  }
-]
 
 const rules = {
   username: [
@@ -185,7 +153,7 @@ const handleLogin = async () => {
   width: 100%;
   height: 100%;
   display: flex;
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 25%, #74b9ff 40%, #00b59c 70%, #9cffac 100%);
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 30%, #74b9ff 60%, #2a5298 75%, #1e3c72 100%);
   overflow: hidden;
   z-index: 9999;
 }
@@ -318,8 +286,9 @@ const handleLogin = async () => {
 }
 
 .plant-logo {
-  width: 120px;
-  height: 120px;
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
   filter: drop-shadow(0 0 20px rgba(156, 255, 172, 0.4));
   animation: glow 3s ease-in-out infinite alternate;
 }
@@ -328,77 +297,86 @@ const handleLogin = async () => {
   font-size: 48px;
   font-weight: 700;
   margin: 0 0 10px 0;
-  background: linear-gradient(45deg, #ffffff, #e3f2fd);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  color: #ffffff;
+  text-shadow: 
+    2px 2px 4px rgba(0, 0, 0, 0.8),
+    0 0 10px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(0, 0, 0, 0.3);
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.6));
 }
 
 .system-subtitle {
   font-size: 18px;
   margin: 0;
-  opacity: 0.9;
-  font-weight: 300;
+  color: #ffffff;
+  font-weight: 400;
   letter-spacing: 1px;
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 5px rgba(0, 0, 0, 0.5);
 }
 
-.feature-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.system-intro {
+  margin-top: 40px;
 }
 
-.feature-col {
-  margin-bottom: 20px;
-}
-
-.feature-card {
+.intro-content {
+  text-align: center;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 30px;
 }
 
-.feature-card :deep(.el-card__body) {
-  padding: 20px;
+.intro-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 15px 0;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.feature-content {
-  display: flex;
-  align-items: center;
-  text-align: left;
-}
-
-.feature-icon {
-  font-size: 32px;
-  margin-right: 20px;
-  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
-}
-
-.water-icon {
-  color: #409eff;
-}
-
-.plant-icon {
-  color: #67c23a;
-}
-
-.chart-icon {
-  color: #e6a23c;
-}
-
-.feature-text h3 {
-  margin: 0 0 5px 0;
+.intro-description {
   font-size: 20px;
-  font-weight: 600;
-  color: white;
+  font-weight: 500;
+  margin: 0 0 15px 0;
+  color: #e8f5e8;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.feature-text p {
-  margin: 0;
-  font-size: 14px;
-  opacity: 0.8;
+.intro-subtitle {
+  font-size: 16px;
+  margin: 0 0 20px 0;
+  opacity: 0.9;
   color: white;
+  line-height: 1.6;
+  font-weight: 300;
+}
+
+.intro-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.feature-tag {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+}
+
+.feature-tag:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
 }
 
 /* 右侧登录区域 */
