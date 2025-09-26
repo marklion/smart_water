@@ -74,11 +74,11 @@ export default {
             },
             func: async function (body, token) {
                 let index = farms.findIndex(farm => farm.name === body.name);
-                if (index !== -1) {
-                    farms.splice(index, 1);
-                    return { result: true };
+                if (index === -1) {
+                    throw { err_msg: `农场 ${body.name} 不存在` };
                 }
-                return { result: false };
+                farms.splice(index, 1);
+                return { result: true };
             },
         },
         add_block:{
@@ -96,27 +96,29 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
+                // 验证农场是否存在
                 let farm = farms.find(farm => farm.name === body.farm_name);
-                if (farm) {
-                    if (!farm.blocks) {
-                        farm.blocks = [];
-                    }
-                    let existingBlock = farm.blocks.find(block => block.name === body.block_name);
-                    if (!existingBlock) {
-                        farm.blocks.push({
-                            name: body.block_name,
-                            area: body.area,
-                            info: body.info,
-                        });
-                    } else {
-                        existingBlock.area = body.area || existingBlock.area;
-                        existingBlock.info = body.info || existingBlock.info;
-                    }
-                    // 保存数据到文件
-                    
-                    return { result: true };
+                if (!farm) {
+                    throw { err_msg: `农场 ${body.farm_name} 不存在` };
                 }
-                return { result: false };
+                
+                if (!farm.blocks) {
+                    farm.blocks = [];
+                }
+                let existingBlock = farm.blocks.find(block => block.name === body.block_name);
+                if (!existingBlock) {
+                    farm.blocks.push({
+                        name: body.block_name,
+                        area: body.area,
+                        info: body.info,
+                    });
+                } else {
+                    existingBlock.area = body.area || existingBlock.area;
+                    existingBlock.info = body.info || existingBlock.info;
+                }
+                // 保存数据到文件
+                
+                return { result: true };
             },
         },
         del_block:{
@@ -132,16 +134,24 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
+                // 验证农场是否存在
                 let farm = farms.find(farm => farm.name === body.farm_name);
-                if (farm && farm.blocks) {
-                    let index = farm.blocks.findIndex(block => block.name === body.block_name);
-                    if (index !== -1) {
-                        farm.blocks.splice(index, 1);
-                        
-                        return { result: true };
-                    }
+                if (!farm) {
+                    throw { err_msg: `农场 ${body.farm_name} 不存在` };
                 }
-                return { result: false };
+                
+                // 验证地块是否存在
+                if (!farm.blocks) {
+                    throw { err_msg: `农场 ${body.farm_name} 中没有地块` };
+                }
+                
+                let index = farm.blocks.findIndex(block => block.name === body.block_name);
+                if (index === -1) {
+                    throw { err_msg: `地块 ${body.block_name} 在农场 ${body.farm_name} 中不存在` };
+                }
+                
+                farm.blocks.splice(index, 1);
+                return { result: true };
             },
         },
         list_block:{

@@ -1,12 +1,6 @@
 <template>
-  <el-menu
-    :default-active="activeIndex"
-    :mode="mode"
-    router
-    class="menu-bar"
-    :collapse="isCollapsed"
-    @select="handleSelect"
-  >
+  <el-menu :default-active="activeIndex" :mode="mode" router class="menu-bar" :collapse="isCollapsed"
+    @select="handleSelect">
     <template v-for="item in menuItems" :key="item.path || item.title">
       <!-- 顶级菜单项（无子菜单） -->
       <el-menu-item v-if="!item.children" :index="item.path" :disabled="!item.path">
@@ -25,11 +19,7 @@
           <span>{{ item.title }}</span>
         </template>
 
-        <el-menu-item
-          v-for="child in item.children"
-          :key="child.path"
-          :index="child.path"
-        >
+        <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
           <el-icon v-if="child.icon">
             <component :is="child.icon" />
           </el-icon>
@@ -168,7 +158,8 @@ defineExpose({
   width: 64px;
 }
 
-.el-menu-item, .el-sub-menu__title {
+.el-menu-item,
+.el-sub-menu__title {
   height: 50px;
   line-height: 50px;
 }

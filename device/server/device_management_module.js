@@ -115,14 +115,13 @@ export default {
             },
             func: async function (body, token) {
                 let index = device_array.findIndex(device => device.device_name === body.device_name);
-                if (index !== -1) {
-                    device_array.splice(index, 1);
-                    // 清理驱动实例缓存
-                    driver_instances.delete(body.device_name);
-                    return { result: true };
-                } else {
-                    return { result: false };
+                if (index === -1) {
+                    throw { err_msg: `设备 ${body.device_name} 不存在` };
                 }
+                device_array.splice(index, 1);
+                // 清理驱动实例缓存
+                driver_instances.delete(body.device_name);
+                return { result: true };
             }
         },
         list_device: {

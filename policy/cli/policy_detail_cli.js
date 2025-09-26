@@ -80,8 +80,15 @@ export default {
         return ret;
     },
     undo_hook: async function (args) {
-        await policy_lib.del_policy(args.view_name);
-        return `策略 ${args.view_name} 已删除`;
+        try {
+            const result = await policy_lib.del_policy(args.view_name);
+            if (!result) {
+                return `Error: 策略 ${args.view_name} 不存在`;
+            }
+            return `策略 ${args.view_name} 已删除`;
+        } catch (error) {
+            return `Error: ${error.err_msg || `策略 ${args.view_name} 删除失败`}`;
+        }
     },
     make_bdr: async function (view_name) {
         let ret = [];
