@@ -181,11 +181,12 @@ const logout = () => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 12px 24px;
+    padding: 2px 24px;
     border-top: 1px solid var(--el-border-color);
     background: var(--el-bg-color);
-    box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.1);
-    gap: 4px;
+    box-shadow: none;
+    gap: 1px;
+    height: 40px;
 }
 
 .header-tools {
