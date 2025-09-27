@@ -4,12 +4,8 @@
         <el-header class="app-header">
             <div class="header-left">
                 <div class="header-title">
-                    <span class="title-text">智能水务管理系统</span>
-                </div>
-
-                <div class="tech-support">
-                    <el-avatar :size="16" :src="logoSrc" class="company-logo"></el-avatar>
-                    <el-text size="small" type="info">北京卓创微朗科技有限公司提供技术支持</el-text>
+                    <img src="/logo.png" alt="Logo" class="system-logo" />
+                    <span class="title-text">智能灌溉管理系统</span>
                 </div>
             </div>
 
@@ -52,12 +48,25 @@
                 </el-scrollbar>
             </el-main>
         </el-container>
+        
+        <!-- 底部技术支持信息 -->
+        <el-footer v-if="!isDashboard" class="app-footer">
+            <div class="tech-support">
+                <el-avatar :size="16" :src="logoSrc" class="company-logo"></el-avatar>
+                <div class="company-info">
+                    <el-text size="small" type="info">北京卓创微朗科技有限公司提供技术支持</el-text>
+                </div>
+            </div>
+            <div class="company-address">
+                <el-text size="small" type="info">北京市海淀区高梁桥斜街42号111号</el-text>
+            </div>
+        </el-footer>
     </el-container>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import {
     UserFilled,
     User,
@@ -67,9 +76,15 @@ import {
 import MenuBar from './MenuBar.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 const logoSrc = '/产品 LOGO.jpeg'
 const username = ref('')
+
+// 判断是否为数据大屏页面
+const isDashboard = computed(() => {
+    return route.path === '/dashboard' || route.path === '/web/dashboard'
+})
 
 onMounted(() => {
     const storedUsername = localStorage.getItem('username')
@@ -101,6 +116,13 @@ const logout = () => {
 .main-layout {
     height: 100vh;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .app-header {
@@ -125,6 +147,12 @@ const logout = () => {
     gap: 8px;
 }
 
+.system-logo {
+    height: 32px;
+    width: auto;
+    margin-right: 8px;
+}
+
 .title-text {
     font-size: 20px;
     font-weight: 700;
@@ -135,7 +163,30 @@ const logout = () => {
 .tech-support {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+}
+
+.company-info {
+    display: flex;
+    align-items: center;
+}
+
+.company-address {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.app-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 24px;
+    border-top: 1px solid var(--el-border-color);
+    background: var(--el-bg-color);
+    box-shadow: none;
+    gap: 1px;
+    height: 40px;
 }
 
 .header-tools {

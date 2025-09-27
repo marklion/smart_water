@@ -56,6 +56,43 @@ function validateVariableExists(policy, variable_name) {
     }
 }
 
+// 验证设备存在性和动作能力
+async function validateDeviceAction(device_name, action) {
+    try {
+        const deviceModule = await import('../../device/server/device_management_module.js');
+        const deviceResult = await deviceModule.default.methods.list_device.func({ pageNo: 0 });
+        
+        if (!deviceResult || !deviceResult.devices) {
+            throw { err_msg: '无法获取设备列表' };
+        }
+        
+        const device = deviceResult.devices.find(d => d.device_name === device_name);
+        if (!device) {
+            throw { err_msg: `设备 ${device_name} 不存在` };
+        }
+        
+        // 解析设备能力
+        let capabilities = [];
+        try {
+            capabilities = JSON.parse(device.capability);
+        } catch (e) {
+            throw { err_msg: `设备 ${device_name} 的能力配置无效` };
+        }
+        
+        // 直接检查动作是否在设备能力中
+        if (!capabilities.includes(action)) {
+            throw { err_msg: `设备 ${device_name} 不支持动作 ${action}，设备支持的能力: ${capabilities.join(', ')}` };
+        }
+        
+        return true;
+    } catch (error) {
+        if (error.err_msg) {
+            throw error;
+        }
+        throw { err_msg: `验证设备动作失败: ${error.message}` };
+    }
+}
+
 // 辅助函数：根据触发类型获取动作列表名称
 function getActionListName(trigger) {
     const actionListMap = {
@@ -173,12 +210,20 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true}
             },
             func: async function (body, token) {
-                if (findAndRemoveByName(policy_array, body.name)) {
-                    return { result: true };
-                } else {
-                    throw {
-                        err_msg:'策略不存在',
+                try {
+                    // 先验证策略是否存在
+                    validatePolicyExists(body.name);
+                    
+                    if (findAndRemoveByName(policy_array, body.name)) {
+                        return { result: true };
+                    } else {
+                        throw {
+                            err_msg:'策略删除失败',
+                        }
                     }
+                } catch (error) {
+                    // 确保异常被正确抛出
+                    throw error;
                 }
             },
         },
@@ -314,7 +359,11 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 validateStateExists(policy, body.state_name);
-                findAndRemoveFromArray(policy.states, s => s.name === body.state_name);
+                
+                const removed = findAndRemoveFromArray(policy.states, s => s.name === body.state_name);
+                if (!removed) {
+                    throw { err_msg: '状态删除失败' };
+                }
                 return { result: true };
             }
         },
@@ -415,6 +464,9 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 
+                // 验证设备存在性和动作能力
+                await validateDeviceAction(body.device, body.action);
+                
                 let actionListName = getActionListName(body.trigger);
                 let actionList = ensureArrayExists(state, actionListName);
                 addItemIfNotExists(actionList, {
@@ -495,7 +547,11 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 validateTransformerExists(state, body.transformer_name);
-                findAndRemoveFromArray(state.transformers, t => t.name === body.transformer_name);
+                
+                const removed = findAndRemoveFromArray(state.transformers, t => t.name === body.transformer_name);
+                if (!removed) {
+                    throw { err_msg: '转换器删除失败' };
+                }
                 return { result: true };
             }
         },
@@ -578,12 +634,24 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 let transformer = validateTransformerExists(state, body.transformer_name);
+                
                 if (!transformer.rules) {
-                    return { result: true };
+                    throw { err_msg: '转换器规则列表不存在' };
                 }
-                findAndRemoveFromArray(transformer.rules, rule => 
+                
+                // 验证规则是否存在
+                const ruleExists = transformer.rules.some(rule => rule.target_state === body.target_state);
+                if (!ruleExists) {
+                    throw { err_msg: `转换器规则不存在: 目标状态 ${body.target_state}` };
+                }
+                
+                const removed = findAndRemoveFromArray(transformer.rules, rule => 
                     rule.target_state === body.target_state
                 );
+                
+                if (!removed) {
+                    throw { err_msg: '转换器规则删除失败' };
+                }
                 return { result: true };
             }
         },
@@ -605,13 +673,22 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 
+                // 验证设备是否存在
+                await validateDeviceAction(body.device, body.action);
+                
                 let actionList = getActionList(state, body.trigger, true);
+                
+                // 验证动作是否存在
+                const actionExists = actionList.some(a => a.device === body.device && a.action === body.action);
+                if (!actionExists) {
+                    throw { err_msg: `动作不存在: 设备 ${body.device} 执行 ${body.action}` };
+                }
                 
                 let actionRemoved = findAndRemoveFromArray(actionList, 
                     a => a.device === body.device && a.action === body.action);
                 
                 if (!actionRemoved) {
-                    throw { err_msg: '动作不存在' };
+                    throw { err_msg: '动作删除失败' };
                 }
                 
                 return { result: true };
@@ -701,6 +778,22 @@ export default {
                 
                 let assignmentList = getAssignmentList(state, body.trigger, true);
                 
+                // 验证赋值表达式是否存在
+                let assignmentExists;
+                if (body.target_policy_name) {
+                    // 跨策略赋值验证
+                    assignmentExists = assignmentList.some(a => 
+                        a.variable_name === body.variable_name && a.target_policy_name === body.target_policy_name);
+                } else {
+                    // 策略内赋值验证
+                    assignmentExists = assignmentList.some(a => a.variable_name === body.variable_name);
+                }
+                
+                if (!assignmentExists) {
+                    const assignmentType = body.target_policy_name ? '跨策略赋值表达式' : '赋值表达式';
+                    throw { err_msg: `${assignmentType}不存在: 变量 ${body.variable_name}` };
+                }
+                
                 let assignmentRemoved;
                 if (body.target_policy_name) {
                     // 跨策略赋值删除
@@ -713,7 +806,7 @@ export default {
                 }
                 
                 if (!assignmentRemoved) {
-                    throw { err_msg: '赋值表达式不存在' };
+                    throw { err_msg: '赋值表达式删除失败' };
                 }
                 
                 return { result: true };
@@ -788,7 +881,17 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let sources = validateArrayExists(policy, 'sources', '数据源');
-                findAndRemoveFromArray(sources, s => s.name === body.name);
+                
+                // 验证数据源是否存在
+                const sourceExists = sources.some(s => s.name === body.name);
+                if (!sourceExists) {
+                    throw { err_msg: `数据源 ${body.name} 不存在` };
+                }
+                
+                const removed = findAndRemoveFromArray(sources, s => s.name === body.name);
+                if (!removed) {
+                    throw { err_msg: '数据源删除失败' };
+                }
                 return { result: true };
             }
         },
