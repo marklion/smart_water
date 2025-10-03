@@ -33,7 +33,6 @@ export function useConfigView(loadDataFunc) {
 
     // 搜索事件处理
     const onSearch = (params) => {
-        console.log('搜索参数:', params)
         searchParams.value = params
         if (pageContentRef.value) {
             pageContentRef.value.reload()
@@ -42,7 +41,6 @@ export function useConfigView(loadDataFunc) {
 
     // 搜索重置事件处理
     const onSearchReset = () => {
-        console.log('重置搜索')
         searchParams.value = { searchText: '', filters: {} }
         if (pageContentRef.value) {
             pageContentRef.value.reload()

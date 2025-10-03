@@ -49,11 +49,22 @@ function make_params_help_info(params, is_params = true) {
             }
         }
         if (is_params) {
-            let param_array = [itr, params[itr].type.name, params[itr].have_to.toString(), params[itr].mean, example];
+            let param_array = [
+                itr, 
+                (params[itr].type && params[itr].type.name) || 'Unknown', 
+                (params[itr].have_to || false).toString(), 
+                params[itr].mean || '', 
+                example
+            ];
             rows.push(param_array);
         }
         else {
-            let result_array = [itr, params[itr].type.name, params[itr].mean, example];
+            let result_array = [
+                itr, 
+                (params[itr].type && params[itr].type.name) || 'Unknown', 
+                params[itr].mean || '', 
+                example
+            ];
             rows.push(result_array);
         }
         if (params[itr].type == Object || params[itr].type == Array) {

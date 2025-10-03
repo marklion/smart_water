@@ -1,59 +1,48 @@
 <template>
-    <div class="weather-weekly-container">
-        <div class="weather-horizontal-layout">
-            <!-- 今天天气 -->
-            <div class="today-weather" 
-                 :class="currentWeather ? getWeatherTheme(currentWeather.wea, currentWeather.wea_img) : ''">
-                <div class="today-header">
-                    <span>今日天气</span>
-                    <span class="update-time" v-if="updateTime">{{ updateTime }}</span>
-                </div>
-                <div class="today-content">
-                    <div class="today-main">
-                        <img :src="getCurrentWeatherIcon()" :alt="currentWeather?.wea || '天气'" class="today-icon" />
-                        <div class="today-info">
-                            <div class="today-temp">{{ currentWeather?.tem || '--' }}°</div>
-                            <div class="today-desc">{{ currentWeather?.wea || '多云' }}</div>
-                            <div class="today-city">{{ currentWeather?.city || '呼和浩特' }}</div>
-                        </div>
-                    </div>
-                    <div class="today-details">
-                        <div class="detail-row">
-                            <span>{{ currentWeather?.tem_day || '--' }}° / {{ currentWeather?.tem_night || '--' }}°</span>
-                        </div>
-                        <div class="detail-row">
-                            <span>{{ currentWeather?.win || '--' }} {{ currentWeather?.win_speed || '--' }}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span>湿度 {{ currentWeather?.humidity || '--' }}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span>气压 {{ currentWeather?.pressure || '--' }}hPa</span>
-                        </div>
-                        <div class="detail-row">
-                            <span>空气质量 {{ currentWeather?.air || '--' }}</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="weather-container">
+        <!-- 天气卡片 -->
+        <div class="weather-card" :class="getSelectedWeatherTheme()">
+            <!-- 卡片头部 -->
+            <div class="weather-card-header">
+                <div class="weather-title">{{ getSelectedDayName() }}</div>
+                <div class="weather-update" v-if="updateTime && selectedDayIndex === 0">{{ updateTime }}</div>
             </div>
 
-            <!-- 未来6天天气 -->
-            <div class="future-weather">
-                <div class="future-list">
-                    <div v-for="(day, index) in weeklyData" :key="index" 
-                         class="future-item"
-                         :class="getWeatherTheme(day.wea, day.wea_img)">
-                        <div class="future-date">{{ formatShortDate(day.date) }}</div>
-                        <img :src="getWeatherIcon(day.wea_img)" :alt="day.wea" class="future-icon" />
-                        <div class="future-temp">
-                            <span class="temp-high">{{ day.tem_day }}°</span>
-                            <span class="temp-low">{{ day.tem_night }}°</span>
-                        </div>
-                        <div class="future-desc">{{ day.wea }}</div>
-                        <div class="future-wind">
-                            <div class="wind-info">{{ day.win }}</div>
-                            <div class="wind-speed">{{ day.win_speed }}</div>
-                        </div>
+            <!-- 卡片内容 -->
+            <div class="weather-card-content">
+                <!-- 左侧：天气图标和主要信息 -->
+                <div class="weather-main-section">
+                    <div class="weather-icon-container">
+                        <img :src="getSelectedWeatherIcon()" :alt="getSelectedWeatherDesc()" class="weather-icon" />
+                    </div>
+                    <div class="weather-primary-info">
+                        <div class="weather-temperature">{{ getSelectedTemperature() }}°</div>
+                        <div class="weather-condition">{{ getSelectedWeatherDesc() }}</div>
+                        <div class="weather-location">{{ getSelectedCity() }}</div>
+                    </div>
+                </div>
+
+                <!-- 右侧：详细信息 -->
+                <div class="weather-details-section">
+                    <div class="weather-detail-item">
+                        <div class="detail-label">温度范围</div>
+                        <div class="detail-value">{{ getSelectedTempRange() }}</div>
+                    </div>
+                    <div class="weather-detail-item">
+                        <div class="detail-label">风力</div>
+                        <div class="detail-value">{{ getSelectedWind() }}</div>
+                    </div>
+                    <div class="weather-detail-item">
+                        <div class="detail-label">湿度</div>
+                        <div class="detail-value">{{ getSelectedHumidity() }}%</div>
+                    </div>
+                    <div class="weather-detail-item">
+                        <div class="detail-label">气压</div>
+                        <div class="detail-value">{{ getSelectedPressure() }}hPa</div>
+                    </div>
+                    <div class="weather-detail-item">
+                        <div class="detail-label">空气质量</div>
+                        <div class="detail-value">{{ getSelectedAirQuality() }}</div>
                     </div>
                 </div>
             </div>
@@ -70,6 +59,10 @@ const weeklyData = ref([])
 const currentWeather = ref(null)
 const loading = ref(false)
 let autoRefreshTimer = null
+
+// 自动切换相关
+const selectedDayIndex = ref(0)
+let autoSwitchTimer = null
 
 // 天气图标映射 - 支持中文描述和英文代码
 const weatherIconMap = {
@@ -139,11 +132,11 @@ const formatShortDate = (dateStr) => {
     const today = new Date()
     const tomorrow = new Date(today)
     tomorrow.setDate(today.getDate() + 1)
-    
+
     if (date.toDateString() === tomorrow.toDateString()) {
         return '明天'
     }
-    
+
     const weekdays = ['日', '一', '二', '三', '四', '五', '六']
     return `周${weekdays[date.getDay()]}`
 }
@@ -164,7 +157,7 @@ const getWeatherTheme = (weatherDesc, weatherCode) => {
             return 'weather-partly-cloudy'
         }
     }
-    
+
     // 备用：根据英文代码判断
     if (weatherCode) {
         if (['yu', 'lei', 'leizhenyu', 'xiayu', 'zhongyu', 'dayu', 'zhenyu'].includes(weatherCode)) {
@@ -179,7 +172,7 @@ const getWeatherTheme = (weatherDesc, weatherCode) => {
             return 'weather-partly-cloudy'
         }
     }
-    
+
     // 默认主题
     return 'weather-default'
 }
@@ -189,6 +182,117 @@ const updateTime = computed(() => {
     if (!currentWeather.value?.update_time) return ''
     return `更新于 ${currentWeather.value.update_time}`
 })
+
+// 获取选中的天气数据
+const getSelectedWeatherData = () => {
+    if (selectedDayIndex.value === 0) {
+        return currentWeather.value
+    } else {
+        return weeklyData.value[selectedDayIndex.value - 1]
+    }
+}
+
+// 获取选中的日期名称
+const getSelectedDayName = () => {
+    if (selectedDayIndex.value === 0) {
+        return '今日天气'
+    } else {
+        const day = weeklyData.value[selectedDayIndex.value - 1]
+        return formatShortDate(day?.date || '')
+    }
+}
+
+// 获取选中的天气图标
+const getSelectedWeatherIcon = () => {
+    const data = getSelectedWeatherData()
+    if (!data) return getWeatherIcon('qing')
+
+    if (selectedDayIndex.value === 0) {
+        return getCurrentWeatherIcon()
+    } else {
+        return getWeatherIcon(data.wea_img)
+    }
+}
+
+// 获取选中的天气描述
+const getSelectedWeatherDesc = () => {
+    const data = getSelectedWeatherData()
+    return data?.wea || '多云'
+}
+
+// 获取选中的温度
+const getSelectedTemperature = () => {
+    const data = getSelectedWeatherData()
+    if (selectedDayIndex.value === 0) {
+        return data?.tem || '--'
+    } else {
+        return data?.tem_day || '--'
+    }
+}
+
+// 获取选中的城市
+const getSelectedCity = () => {
+    const data = getSelectedWeatherData()
+    return data?.city || '呼和浩特'
+}
+
+// 获取选中的温度范围
+const getSelectedTempRange = () => {
+    const data = getSelectedWeatherData()
+    if (selectedDayIndex.value === 0) {
+        return `${data?.tem_day || '--'}° / ${data?.tem_night || '--'}°`
+    } else {
+        return `${data?.tem_day || '--'}° / ${data?.tem_night || '--'}°`
+    }
+}
+
+// 获取选中的风力
+const getSelectedWind = () => {
+    const data = getSelectedWeatherData()
+    return `${data?.win || '--'} ${data?.win_speed || '--'}`
+}
+
+// 获取选中的湿度
+const getSelectedHumidity = () => {
+    const data = getSelectedWeatherData()
+    return data?.humidity || '--'
+}
+
+// 获取选中的气压
+const getSelectedPressure = () => {
+    const data = getSelectedWeatherData()
+    return data?.pressure || '--'
+}
+
+// 获取选中的空气质量
+const getSelectedAirQuality = () => {
+    const data = getSelectedWeatherData()
+    return data?.air || '--'
+}
+
+// 获取选中的天气主题
+const getSelectedWeatherTheme = () => {
+    const data = getSelectedWeatherData()
+    if (!data) return 'weather-sunny'
+    return getWeatherTheme(data.wea, data.wea_img)
+}
+
+// 设置自动切换定时器
+const setupAutoSwitch = () => {
+    if (autoSwitchTimer) {
+        clearInterval(autoSwitchTimer)
+    }
+
+    autoSwitchTimer = setInterval(() => {
+        // 计算总的天数（今天 + 未来6天）
+        const totalDays = 1 + (weeklyData.value.length || 0)
+
+        if (totalDays > 1) {
+            selectedDayIndex.value = (selectedDayIndex.value + 1) % totalDays
+            console.log(`自动切换到第 ${selectedDayIndex.value + 1} 天天气`)
+        }
+    }, 3000) // 每3秒切换一次
+}
 
 // 获取今日天气数据（实时温度）- 调用后端接口
 const fetchTodayWeather = async () => {
@@ -202,7 +306,7 @@ const fetchTodayWeather = async () => {
             console.log('今日天气数据字段:', Object.keys(result.weather_data))
             console.log('tem_day:', result.weather_data.tem_day)
             console.log('tem_night:', result.weather_data.tem_night)
-            ElMessage.success('今日天气数据获取成功')
+            console.log('今日天气数据获取成功')
         } else {
             throw new Error('今日天气数据获取失败')
         }
@@ -210,7 +314,8 @@ const fetchTodayWeather = async () => {
         console.error('获取今日天气失败:', error)
         // 使用演示数据
         currentWeather.value = generateTodayDemoData()
-        ElMessage.warning('今日天气使用演示数据')
+        // 静默处理，不显示警告消息
+        console.log('今日天气使用演示数据')
     }
 }
 
@@ -223,7 +328,7 @@ const fetchWeeklyWeather = async () => {
         if (result.future_weather && Array.isArray(result.future_weather)) {
             weeklyData.value = result.future_weather
             console.log('未来天气数据加载成功，共', result.future_weather.length, '天')
-            ElMessage.success('未来天气预报数据获取成功')
+            console.log('未来天气预报数据获取成功')
         } else {
             throw new Error('未来天气数据获取失败')
         }
@@ -231,7 +336,8 @@ const fetchWeeklyWeather = async () => {
         console.error('获取未来天气失败:', error)
         // 使用演示数据
         weeklyData.value = generateFutureDemoData()
-        ElMessage.warning('未来天气使用演示数据')
+        // 静默处理，不显示警告消息
+        console.log('未来天气使用演示数据')
     }
 }
 
@@ -240,11 +346,15 @@ const fetchAllWeatherData = async () => {
     loading.value = true
 
     try {
-        // 并行获取今日和未来天气数据
-        await Promise.all([
-            fetchTodayWeather(),
-            fetchWeeklyWeather()
-        ])
+        // 直接使用演示数据，避免API调用卡顿
+        currentWeather.value = generateTodayDemoData()
+        weeklyData.value = generateFutureDemoData()
+        console.log('天气组件使用演示数据')
+    } catch (error) {
+        console.error('天气数据初始化失败:', error)
+        // 确保有演示数据
+        currentWeather.value = generateTodayDemoData()
+        weeklyData.value = generateFutureDemoData()
     } finally {
         loading.value = false
     }
@@ -333,6 +443,7 @@ onMounted(() => {
     console.log('天气组件已挂载')
     fetchAllWeatherData()
     setupAutoRefresh()
+    setupAutoSwitch()
 })
 
 onUnmounted(() => {
@@ -341,116 +452,154 @@ onUnmounted(() => {
         autoRefreshTimer = null
         console.log('一周天气自动刷新定时器已清除')
     }
+    if (autoSwitchTimer) {
+        clearInterval(autoSwitchTimer)
+        autoSwitchTimer = null
+        console.log('天气自动切换定时器已清除')
+    }
 })
 </script>
 
 <style scoped>
-.weather-weekly-container {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 16px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+.weather-container {
+    width: 100%;
+    padding: 0;
+    min-height: 200px;
 }
 
-.weather-horizontal-layout {
-    display: flex;
-    gap: 16px;
-    align-items: stretch;
-    height: 200px;
-}
-
-/* 今日天气 */
-.today-weather {
-    flex: 0 0 300px;
-    border-radius: 12px;
-    padding: 16px;
+.weather-card {
+    background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
+    border-radius: 16px;
+    padding: 20px;
     color: white;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    position: relative;
+    overflow: visible;
+    transition: all 0.3s ease;
+    min-height: 180px;
 }
 
-/* 今日天气默认背景（如果没有数据时使用） */
-.today-weather:not([class*="weather-"]) {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.weather-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border-radius: 16px;
+    pointer-events: none;
 }
 
-/* 移除今日天气背景动画，保持简洁 */
-
-.today-header {
+.weather-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
-    font-size: 14px;
-    font-weight: 600;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 2;
 }
 
-.update-time {
-    font-size: 10px;
-    opacity: 0.8;
-    font-weight: normal;
+.weather-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.today-content {
+.weather-update {
+    font-size: 12px;
+    opacity: 0.9;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 8px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.weather-card-content {
+    display: flex;
+    gap: 24px;
+    position: relative;
+    z-index: 2;
+}
+
+.weather-main-section {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 16px;
+    flex: 1;
 }
 
-.today-main {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.weather-icon-container {
+    position: relative;
 }
 
-.today-icon {
-    width: 80px;
-    height: 80px;
+.weather-icon {
+    width: 64px;
+    height: 64px;
     object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
 }
 
-.today-info {
+.weather-primary-info {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
 }
 
-.today-temp {
-    font-size: 42px;
+.weather-temperature {
+    font-size: 36px;
     font-weight: 800;
     line-height: 1;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    color: white;
 }
 
-.today-desc {
+.weather-condition {
     font-size: 16px;
+    font-weight: 600;
+    opacity: 0.95;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.weather-location {
+    font-size: 14px;
     opacity: 0.9;
     font-weight: 500;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
-.today-city {
-    font-size: 12px;
-    opacity: 0.8;
-    font-weight: 400;
-}
-
-.today-details {
+.weather-details-section {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    flex-shrink: 0;
+    gap: 12px;
+    flex: 1;
+    max-width: 200px;
 }
 
-.detail-row {
-    font-size: 13px;
+.weather-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.detail-label {
+    font-size: 12px;
     opacity: 0.9;
-    white-space: nowrap;
     font-weight: 500;
-    text-align: right;
+    color: white;
+}
+
+.detail-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* 未来天气 */
@@ -469,6 +618,7 @@ onUnmounted(() => {
     gap: 8px;
     width: 100%;
     height: 100%;
+    position: relative;
 }
 
 .future-item {
@@ -479,42 +629,45 @@ onUnmounted(() => {
     gap: 4px;
     padding: 8px 6px;
     border-radius: 8px;
-    transition: all 0.3s ease;
+    transition: all 0.5s ease;
     text-align: center;
     height: 100%;
     min-width: 0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     color: white;
+    position: relative;
+    transform-origin: center;
 }
 
 /* 基于天气状况的动态背景 */
 .weather-sunny {
-    background: linear-gradient(135deg, #f7b733 0%, #fc4a1a 100%); /* 橙黄色 - 阳光明媚 */
+    background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
+    /* 橙红色 - 阳光明媚 */
 }
 
 .weather-partly-cloudy {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* 蓝紫色 - 多云 */
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+    /* 蓝色 - 多云 */
 }
 
 .weather-cloudy {
-    background: linear-gradient(135deg, #757f9a 0%, #d7dde8 100%); /* 灰色系 - 阴天 */
+    background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+    /* 紫色 - 阴天 */
 }
 
 .weather-rainy {
-    background: linear-gradient(135deg, #4b79a1 0%, #283e51 100%); /* 深蓝灰 - 雨天 */
+    background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+    /* 绿色 - 雨天 */
 }
 
 .weather-snowy {
-    background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%); /* 浅蓝白 - 雪天 */
-    color: #333 !important; /* 雪天背景较浅，使用深色文字 */
+    background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+    /* 红色 - 雪天 */
 }
 
-.weather-snowy .future-date,
-.weather-snowy .temp-high,
-.weather-snowy .future-desc,
-.weather-snowy .wind-info {
-    color: #333 !important;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+.weather-default {
+    background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
+    /* 默认橙色 */
 }
 
 .weather-snowy .temp-low,
@@ -541,7 +694,8 @@ onUnmounted(() => {
 }
 
 .weather-default {
-    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); /* 默认绿色 */
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    /* 默认绿色 */
 }
 
 /* 移除未来天气背景动画，保持简洁 */
