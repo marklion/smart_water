@@ -29,8 +29,8 @@ export default {
             async (cmd_this, args) => {
                 let name = args.name;
                 let location = args.location;
-                let longitude = parseFloat(args.longitude);
-                let latitude = parseFloat(args.latitude);
+                let longitude = Number.parseFloat(args.longitude);
+                let latitude = Number.parseFloat(args.latitude);
                 let info = args.info || '';
                 let result = await resource_lib.add_farm(name, location, longitude, latitude, info);
                 if (result.result) {

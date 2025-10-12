@@ -52,7 +52,6 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { ElMessage } from 'element-plus'
 import call_remote from '../../public/lib/call_remote.js'
 
 const weeklyData = ref([])
@@ -239,11 +238,7 @@ const getSelectedCity = () => {
 // 获取选中的温度范围
 const getSelectedTempRange = () => {
     const data = getSelectedWeatherData()
-    if (selectedDayIndex.value === 0) {
-        return `${data?.tem_day || '--'}° / ${data?.tem_night || '--'}°`
-    } else {
-        return `${data?.tem_day || '--'}° / ${data?.tem_night || '--'}°`
-    }
+    return `${data?.tem_day || '--'}° / ${data?.tem_night || '--'}°`
 }
 
 // 获取选中的风力
@@ -693,10 +688,6 @@ onUnmounted(() => {
     color: #666 !important;
 }
 
-.weather-default {
-    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    /* 默认绿色 */
-}
 
 /* 移除未来天气背景动画，保持简洁 */
 

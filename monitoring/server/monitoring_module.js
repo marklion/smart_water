@@ -71,23 +71,16 @@ export default {
                         const deviceResult = await deviceModule.methods.list_device.func({ farm_name: farmName, pageNo: 0 }, token);
                         deviceList = deviceResult.devices || [];
                     } catch (error) {
+                        console.warn('获取设备列表失败，使用空列表:', error.message || error);
                         deviceList = [];
                     }
                     
-                    // 3. 从策略模块获取轮灌组数据
-                    const policyModule = (await import('../../policy/server/policy_module.js')).default;
+                    // 3. 轮灌组数据使用假数据（逻辑尚未实现）
                     let policyList = [];
-                    try {
-                        const policyResult = await policyModule.methods.list_policy.func({}, token);
-                        policyList = policyResult.policies || [];
-                    } catch (error) {
-                        // 策略模块数据获取失败，使用模拟数据
-                    }
                     
                     // 4. 计算基础信息
                     let totalArea = 0;
                     let irrigationGroups = 0;
-                    let cropName = '未知';
                     let totalDevices = 0;
                     let onlineDevices = 0;
                     let offlineDevices = 0;
@@ -99,10 +92,11 @@ export default {
                         }, 0);
                     }
                     
-                    // 计算轮灌组数量（策略数量或地块数量）
-                    irrigationGroups = Math.max(policyList.length, farm.blocks ? farm.blocks.length : 0);
+                    // 计算轮灌组数量（使用假数据）
+                    irrigationGroups = farm.blocks ? farm.blocks.length : 6;
                     
                     // 根据农场名称推断作物类型
+                    let cropName;
                     if (farm.name.includes('玉米') || farm.name.includes('智慧农场')) {
                         cropName = '玉米';
                     } else if (farm.name.includes('小麦') || farm.name.includes('测试农场')) {
@@ -117,12 +111,8 @@ export default {
                         // 根据设备状态计算在线/离线数量
                         onlineDevices = deviceList.filter(device => device.status === 'online' || device.status === '运行中').length;
                         offlineDevices = totalDevices - onlineDevices;
-                    } else {
-                        // 如果没有设备数据，显示0
-                        totalDevices = 0;
-                        onlineDevices = 0;
-                        offlineDevices = 0;
                     }
+                    // 如果没有设备数据，所有变量都保持初始值 0
                     
                     
                     return {
@@ -255,46 +245,57 @@ export default {
             func: async function (body, token) {
                 const { farmName } = body;
                 
-                // 从资源模块获取农场和地块数据
-                const resourceModule = (await import('../../resource/server/resource_module.js')).default;
-                
-                // 获取农场列表
-                const farmListResult = await resourceModule.methods.list_farm.func({}, token);
-                const farms = farmListResult.farms || [];
-                
-                // 根据农场名称找到对应的农场
-                const farm = farms.find(f => f.name === farmName);
-                
-                if (!farm) {
-                    throw new Error(`农场 ${farmName} 不存在`);
-                }
-                
-                let groups = [];
-                
-                if (farm.blocks && farm.blocks.length > 0) {
-                    // 根据地块数据生成轮灌组
-                    groups = farm.blocks.map((block, index) => {
-                        // 移除模拟状态生成，设置为默认状态
-                        let status = '待机';
-                        let progress = 0;
-                        let startTime = '--';
-                        let endTime = '--';
-                        
-                        return {
-                            id: index + 1,
-                            name: `${block.name}灌溉组`,
-                            status: status,
-                            progress: progress,
-                            startTime: startTime,
-                            endTime: endTime
-                        };
-                    });
-                } else {
-                    // 如果没有地块数据，返回空数组
-                    groups = [];
-                }
-                
-                // 移除模拟数据变化
+                // 使用假数据返回轮灌组信息（逻辑尚未实现）
+                const groups = [
+                    {
+                        id: 1,
+                        name: 'A区灌溉组',
+                        status: '待机',
+                        progress: 0,
+                        startTime: '--',
+                        endTime: '--'
+                    },
+                    {
+                        id: 2,
+                        name: 'B区灌溉组',
+                        status: '待机',
+                        progress: 0,
+                        startTime: '--',
+                        endTime: '--'
+                    },
+                    {
+                        id: 3,
+                        name: 'C区灌溉组',
+                        status: '待机',
+                        progress: 0,
+                        startTime: '--',
+                        endTime: '--'
+                    },
+                    {
+                        id: 4,
+                        name: 'D区灌溉组',
+                        status: '待机',
+                        progress: 0,
+                        startTime: '--',
+                        endTime: '--'
+                    },
+                    {
+                        id: 5,
+                        name: 'E区灌溉组',
+                        status: '待机',
+                        progress: 0,
+                        startTime: '--',
+                        endTime: '--'
+                    },
+                    {
+                        id: 6,
+                        name: 'F区灌溉组',
+                        status: '待机',
+                        progress: 0,
+                        startTime: '--',
+                        endTime: '--'
+                    }
+                ];
                 
                 return groups;
             }

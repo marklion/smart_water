@@ -149,12 +149,12 @@ const initMap = async () => {
     console.log('开始初始化地图...')
     
     // 动态加载高德地图API
-    if (!window.AMap) {
+    if (globalThis.AMap) {
+      console.log('高德地图API已存在')
+    } else {
       console.log('加载高德地图API...')
       await loadAMapScript()
       console.log('高德地图API加载完成')
-    } else {
-      console.log('高德地图API已存在')
     }
     
     console.log('创建地图实例，中心点:', props.center, '缩放级别:', props.zoom)
@@ -211,7 +211,7 @@ const initMap = async () => {
 // 动态加载高德地图API
 const loadAMapScript = () => {
   return new Promise((resolve, reject) => {
-    if (window.AMap) {
+    if (globalThis.AMap) {
       resolve()
       return
     }
@@ -236,7 +236,8 @@ const initDeviceMarkers = () => {
   // 清除现有标记
   clearMarkers()
   
-  props.devices.forEach((device, index) => {
+  let index = 0
+  for (const device of props.devices) {
     console.log(`创建设备标记 ${index + 1}:`, device)
     const marker = createDeviceMarker(device)
     if (marker) {
@@ -245,14 +246,17 @@ const initDeviceMarkers = () => {
     } else {
       console.log(`设备标记 ${index + 1} 创建失败`)
     }
-  })
+    index++
+  }
   
   console.log('设备标记初始化完成，总标记数:', markers.length)
 }
 
 // 创建设备标记
 const createDeviceMarker = (device) => {
-  if (!window.AMap) {
+  if (globalThis.AMap) {
+    // 高德地图API已加载，继续执行
+  } else {
     console.log('高德地图API未加载')
     return null
   }
@@ -516,9 +520,9 @@ const resetView = () => {
 
 // 清除标记
 const clearMarkers = () => {
-  markers.forEach(marker => {
+  for (const marker of markers) {
     map.remove(marker)
-  })
+  }
   markers = []
 }
 
@@ -615,11 +619,11 @@ onUnmounted(() => {
     clearAllLayers()
     
     // 清除所有标记
-    markers.forEach(marker => {
+    for (const marker of markers) {
       if (marker) {
         map.remove(marker)
       }
-    })
+    }
     markers = []
     
     // 销毁地图实例

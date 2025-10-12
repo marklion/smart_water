@@ -31,7 +31,15 @@ export default {
         });
         cli_utils.make_undo_cmd(vorpal, 'add device <device_name> <driver_name> <config_key> <longitude> <latitude> [farm_name] [block_name]', '添加一个设备', '删除所有设备',
             async (cmd_this, args) => {
-                let result = await device_management_lib.add_device(args.device_name, args.driver_name, args.config_key, args.longitude, args.latitude, args.farm_name, args.block_name, this.token);
+                let result = await device_management_lib.add_device({
+                    device_name: args.device_name,
+                    driver_name: args.driver_name,
+                    config_key: args.config_key,
+                    longitude: args.longitude,
+                    latitude: args.latitude,
+                    farm_name: args.farm_name,
+                    block_name: args.block_name
+                }, this.token);
                 if (result.result) {
                     return `设备 ${args.device_name} 添加成功`;
                 } else {
@@ -79,7 +87,7 @@ export default {
             }
         });
         cli_utils.make_common_cmd(vorpal, 'mock readout <device_name> <value>', '模拟设备读数', async (cmd_this, args) => {
-            await device_management_lib.mock_readout(args.device_name, parseFloat(args.value), this.token);
+            await device_management_lib.mock_readout(args.device_name, Number.parseFloat(args.value), this.token);
             return `设备 ${args.device_name} 模拟读数为: ${args.value}`;
         });
         vorpal.delimiter(prompt)

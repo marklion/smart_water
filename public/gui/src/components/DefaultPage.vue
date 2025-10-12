@@ -172,9 +172,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, h, nextTick, shallowRef } from 'vue'
+import { computed, reactive, ref, onMounted, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import call_remote from '../../../lib/call_remote.js'
@@ -426,9 +426,8 @@ const loadRealDeviceData = async (farmId) => {
           deviceType = 'flowmeter'
         } else if (device.driver_name && device.driver_name.includes('施肥机')) {
           deviceType = 'fertilizer'
-        } else if (device.driver_name && device.driver_name.includes('电磁阀')) {
-          deviceType = 'valve'
         }
+        // 电磁阀类型保持默认值 'valve'
 
         // 如果有经纬度坐标，不设置x,y（让地图组件直接使用经纬度）；否则使用默认坐标
         let x, y
@@ -646,12 +645,23 @@ onMounted(() => {
 <style scoped>
 .default-page {
   height: 100%;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 .card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #f8f9fa, #ffffff);
+  color: #2d3748;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 1;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 18px;
   font-weight: bold;
 }
@@ -688,11 +698,6 @@ html {
   overflow-x: hidden;
 }
 
-.default-page {
-  overflow-x: hidden;
-  width: 100%;
-  max-width: 100%;
-}
 
 /* 顶部农场选择器 */
 .farm-selector-header {
@@ -732,11 +737,6 @@ html {
 }
 
 /* 响应式网格布局 */
-.content-wrapper {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
 
 .main-content {
   display: grid;
@@ -826,19 +826,6 @@ html {
 }
 
 /* 卡片通用样式 */
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  background: linear-gradient(135deg, #f8f9fa, #ffffff);
-  color: #2d3748;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  position: relative;
-  z-index: 1;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 
 .card-header::after {
   content: '';
@@ -890,6 +877,12 @@ html {
 
 .farm-select {
   width: 140px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(64, 158, 255, 0.3);
+  border-radius: 8px;
+  color: #333;
+  padding: 8px 12px;
+  font-size: 14px;
 }
 
 /* 卡片样式优化 */
@@ -1126,14 +1119,6 @@ html {
   z-index: 10;
 }
 
-.farm-select {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(64, 158, 255, 0.3);
-  border-radius: 8px;
-  color: #333;
-  padding: 8px 12px;
-  font-size: 14px;
-}
 
 .map-container {
   width: 100%;
