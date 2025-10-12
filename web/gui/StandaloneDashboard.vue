@@ -11,7 +11,7 @@
                 </svg>
                 控制中心
             </button>
-            <h1 class="main-title">舒德尔智能灌溉管理系统数据大屏</h1>
+            <h1 class="main-title">{{ systemName }}数据大屏</h1>
         </div>
 
         <!-- 主要内容区域 -->
@@ -347,6 +347,7 @@ export default {
     setup() {
         // 响应式数据
         const currentTime = ref('')
+        const systemName = ref('舒德尔智能灌溉管理系统')
         const realData = reactive({
             deviceCount: 0,
             farmCount: 0,
@@ -618,6 +619,7 @@ export default {
             loadRealData()
             startAutoScroll()
             startBubbleAnimation()
+            getSystemName()
 
             // 每60秒刷新数据 - 减少刷新频率
             dataRefreshInterval = setInterval(loadRealData, 60000)
@@ -635,8 +637,27 @@ export default {
             dataRefreshInterval = null
         })
 
+        // 获取系统名称
+        const getSystemName = async () => {
+            try {
+                const response = await fetch('/api/v1/get_sys_name', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                const data = await response.json()
+                if (data.err_msg === '' && data.result.sys_name && data.result.sys_name !== 'no name') {
+                    systemName.value = data.result.sys_name
+                }
+            } catch (error) {
+                console.error('获取系统名称失败:', error)
+            }
+        }
+
         return {
             currentTime,
+            systemName,
             realData,
             newsList,
             farmIrrigationData,

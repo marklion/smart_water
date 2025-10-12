@@ -180,6 +180,25 @@ import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import call_remote from '../../../lib/call_remote.js'
 
 const route = useRoute()
+const systemName = ref('智能灌溉管理系统')
+
+// 获取系统名称
+const getSystemName = async () => {
+  try {
+    const response = await fetch('/api/v1/get_sys_name', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    const data = await response.json()
+    if (data.err_msg === '' && data.result.sys_name && data.result.sys_name !== 'no name') {
+      systemName.value = data.result.sys_name
+    }
+  } catch (error) {
+    console.error('获取系统名称失败:', error)
+  }
+}
 
 const pageTitle = computed(() => {
   return route.name || '页面'
@@ -638,6 +657,7 @@ const toggleDevice = async (marker) => {
 // 组件挂载时加载数据
 onMounted(() => {
   loadFarmList()
+  getSystemName()
 })
 
 </script>

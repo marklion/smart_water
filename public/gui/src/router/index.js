@@ -9,7 +9,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/dashboard'
+      redirect: '/center'
     },
     {
       path: '/login',
@@ -73,7 +73,7 @@ router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('auth_token')
   if (to.path === '/login') {
     if (token) {
-      next('/dashboard')
+      next('/center')
     } else {
       next()
     }

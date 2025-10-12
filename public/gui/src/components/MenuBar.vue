@@ -1,33 +1,41 @@
 <template>
-  <el-menu :default-active="activeIndex" :mode="mode" router class="menu-bar" :collapse="isCollapsed"
-    @select="handleSelect">
-    <template v-for="item in menuItems" :key="item.path || item.title">
-      <!-- 顶级菜单项（无子菜单） -->
-      <el-menu-item v-if="!item.children" :index="item.path" :disabled="!item.path">
-        <el-icon v-if="item.icon">
-          <component :is="item.icon" />
-        </el-icon>
-        <span>{{ item.title }}</span>
-      </el-menu-item>
-
-      <!-- 有子菜单的项目 -->
-      <el-sub-menu v-else :index="item.title">
-        <template #title>
+  <div class="menu-container">
+    <!-- 菜单 -->
+    <el-menu :default-active="activeIndex" :mode="mode" router class="menu-bar" :collapse="isCollapsed"
+      @select="handleSelect">
+      <template v-for="item in menuItems" :key="item.path || item.title">
+        <!-- 顶级菜单项（无子菜单） -->
+        <el-menu-item v-if="!item.children" :index="item.path" :disabled="!item.path">
           <el-icon v-if="item.icon">
             <component :is="item.icon" />
           </el-icon>
           <span>{{ item.title }}</span>
-        </template>
-
-        <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
-          <el-icon v-if="child.icon">
-            <component :is="child.icon" />
-          </el-icon>
-          <span>{{ child.title }}</span>
         </el-menu-item>
-      </el-sub-menu>
-    </template>
-  </el-menu>
+
+        <!-- 有子菜单的项目 -->
+        <el-sub-menu v-else :index="item.title">
+          <template #title>
+            <el-icon v-if="item.icon">
+              <component :is="item.icon" />
+            </el-icon>
+            <span>{{ item.title }}</span>
+          </template>
+
+          <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
+            <el-icon v-if="child.icon">
+              <component :is="child.icon" />
+            </el-icon>
+            <span>{{ child.title }}</span>
+          </el-menu-item>
+        </el-sub-menu>
+      </template>
+    </el-menu>
+
+    <!-- 右侧插槽内容 -->
+    <div v-if="mode === 'horizontal'" class="menu-right-slot">
+      <slot name="right"></slot>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -144,13 +152,33 @@ defineExpose({
 </script>
 
 <style scoped>
+.menu-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.menu-container:has(.menu-right-slot) {
+  flex-direction: row;
+  align-items: center;
+}
+
+.menu-right-slot {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 16px;
+  height: 100%;
+}
+
 .menu-bar {
   height: 100%;
   border-right: solid 1px var(--el-menu-border-color);
+  flex: 1;
 }
 
 .menu-bar.el-menu--horizontal {
-  border-right: none;
+  border-right:none;
   border-bottom: solid 1px var(--el-menu-border-color);
 }
 
@@ -172,5 +200,18 @@ defineExpose({
 
 .el-menu--collapse .el-icon {
   margin-right: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .menu-right-slot {
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .menu-right-slot {
+    padding: 0 8px;
+  }
 }
 </style>

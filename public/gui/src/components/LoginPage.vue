@@ -15,9 +15,9 @@
       <div class="showcase-content">
         <div class="logo-section">
           <div class="logo-icon">
-            <img src="/logo.png" alt="智能灌溉管理系统" class="plant-logo" />
+            <img src="/logo.png" :alt="systemName" class="plant-logo" />
           </div>
-          <h1 class="system-title">智能灌溉管理系统</h1>
+          <h1 class="system-title">{{ systemName }}</h1>
           <p class="system-subtitle">Smart Water Management System</p>
         </div>
 
@@ -80,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
@@ -89,6 +89,7 @@ const router = useRouter()
 const loginFormRef = ref()
 
 const logoSrc = '/产品 LOGO.jpeg'
+const systemName = ref('智能灌溉管理系统')
 
 const loginForm = reactive({
   username: '',
@@ -143,6 +144,28 @@ const handleLogin = async () => {
     isLoading.value = false
   }
 }
+
+// 获取系统名称
+const getSystemName = async () => {
+  try {
+    const response = await fetch('/api/v1/get_sys_name', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    const data = await response.json()
+    if (data.err_msg === '' && data.result.sys_name && data.result.sys_name !== 'no name') {
+      systemName.value = data.result.sys_name
+    }
+  } catch (error) {
+    console.error('获取系统名称失败:', error)
+  }
+}
+
+onMounted(() => {
+  getSystemName()
+})
 </script>
 
 <style scoped>
