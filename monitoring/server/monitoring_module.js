@@ -124,10 +124,6 @@ export default {
                         offlineDevices = 0;
                     }
                     
-                    // 添加实时变化
-                    const randomVariation = Math.random() * 0.1 - 0.05; // -5% 到 +5% 的变化
-                    onlineDevices = Math.max(0, Math.floor(onlineDevices * (1 + randomVariation)));
-                    offlineDevices = totalDevices - onlineDevices;
                     
                     return {
                         irrigationGroups,
@@ -212,15 +208,12 @@ export default {
                     baseFertilizer = 600;
                 }
                 
-                // 添加实时变化
-                const timeVariation = Math.sin(Date.now() / 10000) * 0.1; // 基于时间的正弦变化
-                const randomVariation = (Math.random() - 0.5) * 0.2; // 随机变化
-                
-                const totalFlow = Math.floor(baseFlow * (1 + timeVariation + randomVariation));
-                const mainPipeFlow = Math.floor(250 * (1 + timeVariation * 0.5));
-                const mainPipePressure = Math.round(basePressure * (1 + timeVariation * 0.3) * 1000) / 1000;
-                const fertilizerFlow = Math.floor(50 * (1 + timeVariation * 0.2));
-                const totalFertilizer = Math.floor(baseFertilizer * (1 + timeVariation * 0.1));
+                // 移除模拟数据变化，返回基础数据
+                const totalFlow = baseFlow;
+                const mainPipeFlow = 250;
+                const mainPipePressure = basePressure;
+                const fertilizerFlow = 50;
+                const totalFertilizer = baseFertilizer;
                 
                 return {
                     totalFlow,
@@ -281,38 +274,11 @@ export default {
                 if (farm.blocks && farm.blocks.length > 0) {
                     // 根据地块数据生成轮灌组
                     groups = farm.blocks.map((block, index) => {
-                        // 根据地块面积和当前时间生成状态
-                        const currentHour = new Date().getHours();
-                        const isWorkingTime = currentHour >= 8 && currentHour <= 18;
-                        const isMaintenanceTime = Math.random() < 0.1; // 10%概率维护
-                        
+                        // 移除模拟状态生成，设置为默认状态
                         let status = '待机';
                         let progress = 0;
                         let startTime = '--';
                         let endTime = '--';
-                        
-                        if (isMaintenanceTime) {
-                            status = '维护中';
-                        } else if (isWorkingTime && Math.random() < 0.6) { // 60%概率运行
-                            status = '运行中';
-                            progress = Math.floor(Math.random() * 100);
-                            
-                            // 根据当前时间生成开始和结束时间
-                            const startHour = 8 + Math.floor(Math.random() * 6); // 8-14点开始
-                            const duration = 2 + Math.floor(Math.random() * 4); // 2-5小时
-                            const endHour = startHour + duration;
-                            
-                            startTime = `${startHour.toString().padStart(2, '0')}:00`;
-                            endTime = `${endHour.toString().padStart(2, '0')}:00`;
-                        } else {
-                            // 待机状态，设置计划时间
-                            const planStartHour = 14 + Math.floor(Math.random() * 4); // 14-18点计划
-                            const planDuration = 2 + Math.floor(Math.random() * 3); // 2-4小时
-                            const planEndHour = planStartHour + planDuration;
-                            
-                            startTime = `${planStartHour.toString().padStart(2, '0')}:00`;
-                            endTime = `${planEndHour.toString().padStart(2, '0')}:00`;
-                        }
                         
                         return {
                             id: index + 1,
@@ -328,14 +294,7 @@ export default {
                     groups = [];
                 }
                 
-                // 添加一些实时变化
-                groups.forEach(group => {
-                    if (group.status === '运行中') {
-                        // 运行中的组进度会有小幅变化
-                        const variation = (Math.random() - 0.5) * 5; // ±2.5% 的变化
-                        group.progress = Math.max(0, Math.min(100, group.progress + variation));
-                    }
-                });
+                // 移除模拟数据变化
                 
                 return groups;
             }
