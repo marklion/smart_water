@@ -20,11 +20,30 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 
 const route = useRoute()
+const systemName = ref('智能灌溉管理系统')
+
+// 获取系统名称
+const getSystemName = async () => {
+  try {
+    const response = await fetch('/api/v1/get_sys_name', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    const data = await response.json()
+    if (data.err_msg === '' && data.result.sys_name && data.result.sys_name !== 'no name') {
+      systemName.value = data.result.sys_name
+    }
+  } catch (error) {
+    console.error('获取系统名称失败:', error)
+  }
+}
 
 const pageTitle = computed(() => {
   return route.name || '页面'
@@ -41,6 +60,10 @@ const pageDescription = computed(() => {
     '告警管理': '在这里可以管理系统告警'
   }
   return descriptions[route.name] || `${route.name}功能正在开发中...`
+})
+
+onMounted(() => {
+  getSystemName()
 })
 </script>
 
