@@ -76,6 +76,8 @@ export default {
                 device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' },
                 driver_name: { type: String, have_to: true, mean: '驱动名称', example: '虚拟设备' },
                 config_key: { type: String, have_to: true, mean: '配置json', example: 'log_file' },
+                longitude: { type: Number, have_to: true, mean: '经度', example: 111.670801 },
+                latitude: { type: Number, have_to: true, mean: '纬度', example: 40.818311 },
                 farm_name: { type: String, have_to: false, mean: '所属农场', example: '农场1' },
                 block_name: { type: String, have_to: false, mean: '所属区块', example: '区块1' },
             },
@@ -86,6 +88,20 @@ export default {
                 if (driver_array.find(driver => driver.name === body.driver_name) === undefined) {
                     throw { err_msg: '驱动不存在' };
                 }
+                
+                // 验证必填的经度和纬度参数
+                if (body.longitude === undefined || body.latitude === undefined) {
+                    throw { err_msg: '经度和纬度是必填参数' };
+                }
+                
+                // 验证坐标范围
+                if (body.longitude < -180 || body.longitude > 180) {
+                    throw { err_msg: '经度必须在-180到180之间' };
+                }
+                if (body.latitude < -90 || body.latitude > 90) {
+                    throw { err_msg: '纬度必须在-90到90之间' };
+                }
+                
                 let exist_device = device_array.find(device => device.device_name === body.device_name);
                 if (!exist_device) {
                     exist_device = {
@@ -95,6 +111,8 @@ export default {
                 }
                 exist_device.driver_name = body.driver_name;
                 exist_device.config_key = body.config_key;
+                exist_device.longitude = body.longitude;
+                exist_device.latitude = body.latitude;
                 if (body.farm_name && body.block_name) {
                     exist_device.block_name = body.block_name;
                     exist_device.farm_name = body.farm_name;
@@ -143,7 +161,9 @@ export default {
                         config_key: { type: String, mean: '配置json', example: 'log_file' },
                         capability: { type: String, mean: '能力集', example: '[]' },
                         farm_name: { type: String, mean: '所属农场', example: '农场1' },
-                        block_name: { type: String, mean: '所属区块', example: '区块1' }
+                        block_name: { type: String, mean: '所属区块', example: '区块1' },
+                        longitude: { type: Number, mean: '经度', example: 111.670801 },
+                        latitude: { type: Number, mean: '纬度', example: 40.818311 }
                     }
                 },
             },
@@ -163,7 +183,9 @@ export default {
                         config_key: device.config_key,
                         capability: JSON.stringify(capability),
                         farm_name: device.farm_name || '',
-                        block_name: device.block_name || ''
+                        block_name: device.block_name || '',
+                        longitude: device.longitude || null,
+                        latitude: device.latitude || null
                     });
                 });
                 let current_page_content = filtered_devices.slice(body.pageNo * 20, (body.pageNo + 1) * 20);

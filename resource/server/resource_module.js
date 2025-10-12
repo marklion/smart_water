@@ -19,6 +19,8 @@ export default {
                     explain: {
                         name: { type: String, mean: '农场名称', example: '农场1' },
                         location: { type: String, mean: '农场位置', example: '位置1' },
+                        longitude: { type: Number, mean: '经度', example: 111.670801 },
+                        latitude: { type: Number, mean: '纬度', example: 40.818311 },
                         info: { type: String, mean: '农场信息', example: '信息1' }
                     }
                 },
@@ -39,22 +41,41 @@ export default {
             params: {
                 name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
                 location: { type: String, mean: '农场位置', example: '位置1', have_to: true },
+                longitude: { type: Number, mean: '经度', example: 111.670801, have_to: true },
+                latitude: { type: Number, mean: '纬度', example: 40.818311, have_to: true },
                 info: { type: String, mean: '农场信息', example: '信息1', have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
+                // 验证坐标参数
+                if (body.longitude === undefined || body.latitude === undefined) {
+                    throw { err_msg: '经度和纬度是必填参数' };
+                }
+                
+                // 验证坐标范围
+                if (body.longitude < -180 || body.longitude > 180) {
+                    throw { err_msg: '经度必须在-180到180之间' };
+                }
+                if (body.latitude < -90 || body.latitude > 90) {
+                    throw { err_msg: '纬度必须在-90到90之间' };
+                }
+                
                 let existingFarm = farms.find(farm => farm.name === body.name);
                 if (!existingFarm) {
                     farms.push({
                         name: body.name,
                         location: body.location,
+                        longitude: body.longitude,
+                        latitude: body.latitude,
                         info: body.info
                     });
                 }
                 else {
                     existingFarm.location = body.location;
+                    existingFarm.longitude = body.longitude;
+                    existingFarm.latitude = body.latitude;
                     existingFarm.info = body.info;
                 }
                 

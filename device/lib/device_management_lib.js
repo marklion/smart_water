@@ -3,11 +3,23 @@ export default{
     get_driver_list: async function (token, pageNo = 0) {
         return await call_remote('/device_management/list_driver', { pageNo }, token);
     },
-    add_device: async function (device_name, driver_name, config_key, farm_name, block_name, token) {
+    add_device: async function (deviceConfig, token) {
+        const {
+            device_name,
+            driver_name,
+            config_key,
+            longitude,
+            latitude,
+            farm_name,
+            block_name
+        } = deviceConfig;
+        
         return await call_remote('/device_management/add_device', {
             device_name: String(device_name),
             driver_name: String(driver_name),
             config_key: String(config_key),
+            longitude: Number.parseFloat(longitude),
+            latitude: Number.parseFloat(latitude),
             farm_name: String(farm_name),
             block_name: String(block_name),
         }, token);
