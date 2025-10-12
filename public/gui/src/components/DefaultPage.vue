@@ -77,90 +77,8 @@
               </template>
 
               <div class="map-container">
-                <div class="map-placeholder">
-                  <!-- 地图标记点 -->
-                  <div class="map-markers">
-                     <div v-for="marker in mapMarkers" :key="marker.id" class="map-marker" :class="[marker.type, marker.status]"
-                       :style="{ left: marker.x + '%', top: marker.y + '%' }"
-                     >
-                       <el-popover
-                         :visible="marker.showPopover"
-                         placement="top"
-                         :width="400"
-                         trigger="click"
-                         @show="marker.showPopover = true"
-                         @hide="marker.showPopover = false"
-                       >
-                         <template #reference>
-                           <div class="marker-icon" @click="marker.showPopover = !marker.showPopover">
-                             <img v-if="marker.type === 'valve'" 
-                                  src="/deviceIcon/电磁阀.png" 
-                                  alt="电磁阀" 
-                                  class="device-icon" />
-                             <img v-else-if="marker.type === 'flowmeter'" 
-                                  src="/deviceIcon/流量计.png" 
-                                  alt="流量计" 
-                                  class="device-icon" />
-                             <img v-else-if="marker.type === 'fertilizer'" 
-                                  src="/deviceIcon/施肥机.png" 
-                                  alt="施肥机" 
-                                  class="device-icon" />
-                             <i v-else class="el-icon-location"></i>
-                           </div>
-                         </template>
-                         
-                         <!-- 设备控制组件 -->
-                         <div class="device-popover-content">
-                           <div class="device-popover-header">
-                             <div class="device-popover-icon">
-                               <img :src="`/deviceIcon/${marker.deviceType === '电磁阀' ? '电磁阀' : marker.deviceType === '流量计' ? '流量计' : '施肥机'}.png`" 
-                                    :alt="marker.deviceType" />
-                             </div>
-                             <div class="device-popover-info">
-                               <h3 class="device-popover-name">{{ marker.deviceName }}</h3>
-                               <el-tag :type="marker.status === 'open' || marker.status === 'active' ? 'success' : 'danger'" size="small">
-                                 {{ marker.status === 'open' || marker.status === 'active' ? '开启' : '关闭' }}
-                               </el-tag>
-                             </div>
-                           </div>
-                           
-                           <div class="device-popover-details">
-                             <div class="detail-item">
-                               <span class="detail-label">设备类型</span>
-                               <span class="detail-value">{{ marker.deviceType }}</span>
-                             </div>
-                             <div class="detail-item">
-                               <span class="detail-label">所属农场</span>
-                               <span class="detail-value">{{ marker.farmName }}</span>
-                             </div>
-                             <div class="detail-item">
-                               <span class="detail-label">设备区块</span>
-                               <span class="detail-value">{{ marker.blockName }}</span>
-                             </div>
-                           </div>
-                           
-                           <div class="device-popover-actions" v-if="marker.type === 'valve' || marker.type === 'fertilizer'">
-                             <el-button 
-                               :type="marker.status === 'open' || marker.status === 'active' ? 'danger' : 'success'"
-                               size="small"
-                               @click="toggleDevice(marker)"
-                             >
-                               {{ marker.status === 'open' || marker.status === 'active' ? '关闭设备' : '开启设备' }}
-                             </el-button>
-                             <el-button type="primary" size="small" @click="readDeviceStatus(marker.deviceName)">
-                               读取状态
-                             </el-button>
-                           </div>
-                         </div>
-                       </el-popover>
-                       
-                       <div class="marker-label">{{ marker.label }}</div>
-                       <div class="marker-status" :class="marker.status">
-                         {{ marker.status === 'open' ? '开' : marker.status === 'closed' ? '关' : '运行' }}
-                       </div>
-                     </div>
-                  </div>
-                </div>
+                <InteractiveMapComponent :devices="mapMarkers" :center="mapCenter" :zoom="mapZoom"
+                  @device-click="onDeviceClick" @device-toggle="onDeviceToggle" />
               </div>
             </el-card>
 
@@ -258,6 +176,7 @@ import { computed, reactive, ref, onMounted, h, nextTick, shallowRef } from 'vue
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
+import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import call_remote from '../../../lib/call_remote.js'
 
 const route = useRoute()
@@ -304,88 +223,12 @@ const realtimeData = reactive({
   totalFertilizer: '0 m³'
 })
 
-// 地图标记点 - 使用shallowRef优化性能
-const mapMarkers = shallowRef([
-  { 
-    id: 1, 
-    x: 20, 
-    y: 30, 
-    type: 'valve', 
-    label: '电磁阀1',
-    deviceName: '温室1号主灌溉管道阀门1',
-    deviceType: '电磁阀',
-    status: 'closed',
-    capability: ['open', 'close', 'readout'],
-    farmName: '温室1号',
-    blockName: '主灌溉管道',
-    showPopover: false
-  },
-  { 
-    id: 2, 
-    x: 60, 
-    y: 45, 
-    type: 'valve', 
-    label: '电磁阀2',
-    deviceName: '温室1号施肥管道阀门1',
-    deviceType: '电磁阀',
-    status: 'open',
-    capability: ['open', 'close', 'readout'],
-    farmName: '温室1号',
-    blockName: '施肥管道'
-  },
-  { 
-    id: 3, 
-    x: 80, 
-    y: 25, 
-    type: 'flowmeter', 
-    label: '流量计1',
-    deviceName: '温室1号主灌溉管道流量计1',
-    deviceType: '流量计',
-    status: 'active',
-    capability: ['readout'],
-    farmName: '温室1号',
-    blockName: '主灌溉管道'
-  },
-  { 
-    id: 4, 
-    x: 40, 
-    y: 60, 
-    type: 'valve', 
-    label: '电磁阀3',
-    deviceName: '温室2号排水管道阀门1',
-    deviceType: '电磁阀',
-    status: 'closed',
-    capability: ['open', 'close', 'readout'],
-    farmName: '温室2号',
-    blockName: '排水管道'
-  },
-  { 
-    id: 5, 
-    x: 70, 
-    y: 70, 
-    type: 'flowmeter', 
-    label: '流量计2',
-    deviceName: '温室2号混合浇肥管道流量计1',
-    deviceType: '流量计',
-    status: 'active',
-    capability: ['readout'],
-    farmName: '温室2号',
-    blockName: '混合浇肥管道'
-  },
-  { 
-    id: 6, 
-    x: 30, 
-    y: 80, 
-    type: 'fertilizer', 
-    label: '施肥机1',
-    deviceName: '温室1号施肥机1',
-    deviceType: '施肥机',
-    status: 'active',
-    capability: ['open', 'close', 'readout'],
-    farmName: '温室1号',
-    blockName: '施肥系统'
-  }
-])
+// 地图配置
+const mapCenter = ref({ lng: 111.670801, lat: 40.818311 }) // 默认呼和浩特市坐标
+const mapZoom = ref(15)
+
+// 地图标记点 - 使用shallowRef优化性能，从真实设备数据获取
+const mapMarkers = shallowRef([])
 
 // 轮灌组数据 - 使用shallowRef优化性能
 const irrigationGroups = shallowRef([
@@ -495,7 +338,9 @@ const loadFarmList = async () => {
         id: farm.name, // 直接使用农场名称作为ID
         name: farm.name,
         info: farm.info,
-        location: farm.location
+        location: farm.location,
+        longitude: farm.longitude,
+        latitude: farm.latitude
       }))
       selectedFarm.value = farmList.value[0].id
       await loadFarmData(selectedFarm.value)
@@ -521,22 +366,8 @@ const loadFarmData = async (farmId) => {
       basicInfo.offlineDevices = basicResponse.offlineDevices || 0
     }
 
-    // 暂时注释掉实时数据和轮灌组接口调用
-    // // 加载实时数据 - 使用监控中心模块
-    // const realtimeResponse = await call_remote('/monitoring/getRealtimeData', { farmName: farmId })
-    // if (realtimeResponse) {
-    //   realtimeData.totalFlow = `${realtimeResponse.totalFlow || 0} m³`
-    //   realtimeData.mainPipeFlow = `${realtimeResponse.mainPipeFlow || 0} m³/h`
-    //   realtimeData.mainPipePressure = `${realtimeResponse.mainPipePressure || 0} mpa`
-    //   realtimeData.fertilizerFlow = `${realtimeResponse.fertilizerFlow || 0} L/h`
-    //   realtimeData.totalFertilizer = `${realtimeResponse.totalFertilizer || 0} m³`
-    // }
-
-    // // 加载轮灌组数据 - 使用监控中心模块
-    // const irrigationResponse = await call_remote('/monitoring/getIrrigationGroups', { farmName: farmId })
-    // if (irrigationResponse) {
-    //   irrigationGroups.value = irrigationResponse || []
-    // }
+    // 加载真实设备数据
+    await loadRealDeviceData(farmId)
   } catch (error) {
     console.error('加载农场数据失败:', error)
     // 使用模拟数据
@@ -556,7 +387,149 @@ const loadFarmData = async (farmId) => {
 }
 
 const onFarmChange = async (farmId) => {
+  // 更新地图中心点到选中农场的坐标
+  const selectedFarmData = farmList.value.find(farm => farm.id === farmId)
+  if (selectedFarmData && selectedFarmData.longitude && selectedFarmData.latitude) {
+    mapCenter.value = {
+      lng: selectedFarmData.longitude,
+      lat: selectedFarmData.latitude
+    }
+    console.log('地图中心点已更新到农场:', selectedFarmData.name, mapCenter.value)
+  } else {
+    // 如果没有坐标信息，使用默认坐标
+    mapCenter.value = { lng: 111.670801, lat: 40.818311 }
+    console.log('使用默认地图中心点')
+  }
+
   await loadFarmData(farmId)
+}
+
+// 加载真实设备数据
+const loadRealDeviceData = async (farmId) => {
+  try {
+    console.log('开始加载真实设备数据，农场ID:', farmId)
+
+    // 从设备管理API获取设备列表
+    const deviceResponse = await call_remote('/device_management/list_device', {
+      farm_name: farmId,
+      pageNo: 0
+    })
+
+    if (deviceResponse && deviceResponse.devices) {
+      console.log('获取到设备数据:', deviceResponse.devices)
+
+      // 转换设备数据为地图标记格式
+      const devices = deviceResponse.devices.map((device, index) => {
+        // 根据设备类型确定标记类型
+        let deviceType = 'valve' // 默认类型
+        if (device.driver_name && device.driver_name.includes('流量计')) {
+          deviceType = 'flowmeter'
+        } else if (device.driver_name && device.driver_name.includes('施肥机')) {
+          deviceType = 'fertilizer'
+        } else if (device.driver_name && device.driver_name.includes('电磁阀')) {
+          deviceType = 'valve'
+        }
+
+        // 如果有经纬度坐标，不设置x,y（让地图组件直接使用经纬度）；否则使用默认坐标
+        let x, y
+        if (device.longitude && device.latitude) {
+          // 有真实坐标时，不设置x,y，让地图组件直接使用经纬度
+          x = null
+          y = null
+        } else {
+          // 使用默认坐标（如果没有设置经纬度）
+          x = 20 + (index % 5) * 20
+          y = 30 + Math.floor(index / 5) * 20
+        }
+
+        return {
+          id: device.id || index + 1,
+          x: x,
+          y: y,
+          type: deviceType,
+          label: device.device_name || `设备${index + 1}`,
+          deviceName: device.device_name,
+          deviceType: device.driver_name || '未知设备',
+          status: 'active', // 默认状态，可以从设备状态API获取
+          capability: device.capability ? device.capability.split(',') : ['readout'],
+          farmName: device.farm_name || farmId,
+          blockName: device.block_name || '未知区块',
+          showPopover: false,
+          // 保存原始设备数据
+          originalDevice: device,
+          // 保存真实坐标
+          longitude: device.longitude,
+          latitude: device.latitude
+        }
+      })
+
+      mapMarkers.value = devices
+      console.log('设备数据转换完成，标记数量:', mapMarkers.value.length)
+
+      // 更新基本信息中的设备数量
+      basicInfo.totalDevices = devices.length
+      basicInfo.onlineDevices = devices.filter(d => d.status === 'active' || d.status === 'open').length
+      basicInfo.offlineDevices = devices.length - basicInfo.onlineDevices
+
+    } else {
+      console.log('未获取到设备数据，使用默认数据')
+      // 如果没有获取到设备数据，使用默认的模拟数据
+      mapMarkers.value = getDefaultDeviceData()
+    }
+
+  } catch (error) {
+    console.error('加载真实设备数据失败:', error)
+    // 出错时使用默认数据
+    mapMarkers.value = getDefaultDeviceData()
+  }
+}
+
+// 获取默认设备数据（作为备用）
+const getDefaultDeviceData = () => {
+  return [
+    {
+      id: 1,
+      x: 20,
+      y: 30,
+      type: 'valve',
+      label: '电磁阀1',
+      deviceName: '温室1号主灌溉管道阀门1',
+      deviceType: '电磁阀',
+      status: 'closed',
+      capability: ['open', 'close', 'readout'],
+      farmName: '温室1号',
+      blockName: '主灌溉管道',
+      showPopover: false
+    },
+    {
+      id: 2,
+      x: 60,
+      y: 45,
+      type: 'valve',
+      label: '电磁阀2',
+      deviceName: '温室1号施肥管道阀门1',
+      deviceType: '电磁阀',
+      status: 'open',
+      capability: ['open', 'close', 'readout'],
+      farmName: '温室1号',
+      blockName: '施肥管道',
+      showPopover: false
+    },
+    {
+      id: 3,
+      x: 80,
+      y: 25,
+      type: 'flowmeter',
+      label: '流量计1',
+      deviceName: '温室1号主灌溉管道流量计1',
+      deviceType: '流量计',
+      status: 'active',
+      capability: ['readout'],
+      farmName: '温室1号',
+      blockName: '主灌溉管道',
+      showPopover: false
+    }
+  ]
 }
 
 // 设备控制方法
@@ -620,7 +593,7 @@ const getDeviceStatusInfo = (marker) => {
     'active': '运行中',
     'inactive': '停止'
   }
-  
+
   return {
     deviceName: marker.deviceName,
     deviceType: marker.deviceType,
@@ -628,6 +601,21 @@ const getDeviceStatusInfo = (marker) => {
     farmName: marker.farmName,
     blockName: marker.blockName,
     capability: marker.capability
+  }
+}
+
+// 地图事件处理方法
+const onDeviceClick = (device) => {
+  console.log('设备被点击:', device)
+  // 可以在这里添加额外的设备点击处理逻辑
+}
+
+const onDeviceToggle = (device) => {
+  console.log('设备状态切换:', device)
+  // 更新本地设备状态
+  const marker = mapMarkers.value.find(m => m.id === device.id)
+  if (marker) {
+    marker.status = device.status
   }
 }
 
@@ -964,9 +952,9 @@ html {
 }
 
 /* 确保面板内容能够自适应 */
-.left-panel > *,
-.right-panel > *,
-.center-panel > * {
+.left-panel>*,
+.right-panel>*,
+.center-panel>* {
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -1151,10 +1139,6 @@ html {
   width: 100%;
   height: 500px;
   position: relative;
-  background-image: url('/testfarmpng.jpeg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -1194,183 +1178,7 @@ html {
   }
 }
 
-.map-placeholder {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  background: transparent;
-}
-
-.map-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  z-index: 5;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 8px 16px;
-  border-radius: 8px;
-  backdrop-filter: blur(4px);
-}
-
-.map-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #409eff;
-  margin-bottom: 10px;
-}
-
-.map-subtitle {
-  font-size: 14px;
-  color: #ffffff;
-  font-weight: 500;
-}
-
-.map-markers {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10;
-}
-
-.map-marker {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-/* 地图标记重构样式 */
-.map-marker {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  z-index: 10;
-}
-
-/* 标记图标容器 */
-.marker-icon {
-  width: 36px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 50%;
-  border: 2px solid #409eff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-/* 确保图标在容器内完全居中 */
-.marker-icon img {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  max-width: 28px;
-  max-height: 28px;
-  width: auto;
-  height: auto;
-}
-
-/* 地图设备图标 */
-.map-marker .device-icon {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  object-position: center;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
-  display: block;
-  margin: 0;
-  padding: 0;
-}
-
-/* 设备类型颜色 */
-.map-marker.valve .marker-icon {
-  border-color: #409eff;
-}
-
-.map-marker.flowmeter .marker-icon {
-  border-color: #e6a23c;
-}
-
-.map-marker.fertilizer .marker-icon {
-  border-color: #9c27b0;
-}
-
-/* 设备状态颜色 */
-.map-marker.open .marker-icon,
-.map-marker.active .marker-icon {
-  border-color: #67c23a;
-  box-shadow: 0 2px 8px rgba(103, 194, 58, 0.3);
-}
-
-.map-marker.closed .marker-icon,
-.map-marker.inactive .marker-icon {
-  border-color: #f56c6c;
-  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.3);
-}
-
-/* 设备标签 */
-.marker-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #2c3e50;
-  background: rgba(255, 255, 255, 0.95);
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  margin-bottom: 3px;
-  white-space: nowrap;
-}
-
-/* 设备状态 */
-.marker-status {
-  font-size: 9px;
-  font-weight: 600;
-  color: white;
-  padding: 3px 6px;
-  border-radius: 4px;
-  text-align: center;
-  min-width: 20px;
-}
-
-.marker-status.open,
-.marker-status.active {
-  background: #67c23a;
-}
-
-.marker-status.closed,
-.marker-status.inactive {
-  background: #f56c6c;
-}
-
-
-/* 悬停效果 - 优化性能 */
-.map-marker:hover {
-  transform: translate(-50%, -50%) scale(1.01);
-  transition: transform 0.15s ease;
-}
-
-.map-marker:hover .marker-icon {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  transform: scale(1.02);
-}
+/* 旧的地图标记样式已移除，现在使用真实地图组件 */
 
 /* 设备控制弹框样式 - 优化性能 */
 .device-control-modal .el-message-box {
@@ -1556,7 +1364,6 @@ html {
   border-radius: 1px;
 }
 
-/* 新的专业弹窗样式 */
 .device-type-badge {
   display: inline-block;
   padding: 6px 16px;
@@ -1621,8 +1428,15 @@ html {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .status-text {
@@ -2057,22 +1871,22 @@ html {
   .monitoring-center {
     padding: 12px;
   }
-  
+
   .farm-selector-header {
     padding: 12px 16px;
     margin-bottom: 16px;
   }
-  
+
   .selector-label {
     font-size: 14px;
   }
-  
+
   .main-content {
     gap: 12px;
     display: flex;
     flex-direction: column;
   }
-  
+
   /* 确保所有面板都显示 */
   .left-panel,
   .center-panel,
@@ -2081,53 +1895,53 @@ html {
     max-width: 100%;
     order: unset;
   }
-  
+
   /* 调整显示顺序 */
   .left-panel {
     order: 1;
   }
-  
+
   .center-panel {
     order: 2;
   }
-  
+
   .right-panel {
     order: 3;
   }
-  
+
   .info-grid {
     grid-template-columns: 1fr;
     gap: 8px;
   }
-  
+
   .info-item {
     padding: 10px 12px;
   }
-  
+
   .card-header {
     padding: 12px 16px;
   }
-  
+
   .card-title {
     font-size: 16px;
   }
-  
+
   .realtime-data {
     gap: 6px;
   }
-  
+
   .data-item {
     padding: 10px 12px;
   }
-  
+
   .map-container {
     height: 250px;
   }
-  
+
   .el-table {
     font-size: 12px;
   }
-  
+
   .el-table .el-table__cell {
     padding: 6px 4px;
   }
@@ -2167,17 +1981,17 @@ html {
   .monitoring-center {
     padding: 8px;
   }
-  
+
   .farm-selector-header {
     padding: 8px 12px;
   }
-  
+
   .main-content {
     gap: 8px;
     display: flex;
     flex-direction: column;
   }
-  
+
   /* 确保所有面板都显示 */
   .left-panel,
   .center-panel,
@@ -2186,37 +2000,37 @@ html {
     max-width: 100%;
     order: unset;
   }
-  
+
   /* 调整显示顺序 */
   .left-panel {
     order: 1;
   }
-  
+
   .center-panel {
     order: 2;
   }
-  
+
   .right-panel {
     order: 3;
   }
-  
+
   .card-header {
     padding: 8px 12px;
   }
-  
+
   .info-item,
   .data-item {
     padding: 8px 10px;
   }
-  
+
   .map-container {
     height: 200px;
   }
-  
+
   .el-table {
     font-size: 11px;
   }
-  
+
   .el-table .el-table__cell {
     padding: 4px 2px;
   }
@@ -2243,7 +2057,4 @@ html {
   max-width: 100%;
   overflow-x: auto;
 }
-
-
-
 </style>

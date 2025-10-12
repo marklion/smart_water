@@ -23,14 +23,16 @@ export default {
         const vorpal = cli_utils.create_vorpal();
         this._vorpalInstance = vorpal;
         cli_utils.make_undo_cmd(vorpal,
-            'add farm <name> <location> [info]',
+            'add farm <name> <location> <longitude> <latitude> [info]',
             '添加一个农场',
             '删除所有农场',
             async (cmd_this, args) => {
                 let name = args.name;
                 let location = args.location;
+                let longitude = parseFloat(args.longitude);
+                let latitude = parseFloat(args.latitude);
                 let info = args.info || '';
-                let result = await resource_lib.add_farm(name, location, info);
+                let result = await resource_lib.add_farm(name, location, longitude, latitude, info);
                 if (result.result) {
                     return `农场 ${name} 添加成功`;
                 } else {
@@ -67,7 +69,7 @@ export default {
         let ret = []
         let farms = await get_all_farms()
         for (let farm of farms) {
-            ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.info || ''}'`);
+            ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.longitude || ''}' '${farm.latitude || ''}' '${farm.info || ''}'`);
         }
         if (this._vorpalInstance) {
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));

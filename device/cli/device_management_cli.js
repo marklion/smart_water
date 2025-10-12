@@ -29,9 +29,9 @@ export default {
             }
             return drivers.length;
         });
-        cli_utils.make_undo_cmd(vorpal, 'add device <device_name> <driver_name> <config_key> [farm_name] [block_name]', '添加一个设备', '删除所有设备',
+        cli_utils.make_undo_cmd(vorpal, 'add device <device_name> <driver_name> <config_key> <longitude> <latitude> [farm_name] [block_name]', '添加一个设备', '删除所有设备',
             async (cmd_this, args) => {
-                let result = await device_management_lib.add_device(args.device_name, args.driver_name, args.config_key, args.farm_name, args.block_name, this.token);
+                let result = await device_management_lib.add_device(args.device_name, args.driver_name, args.config_key, args.longitude, args.latitude, args.farm_name, args.block_name, this.token);
                 if (result.result) {
                     return `设备 ${args.device_name} 添加成功`;
                 } else {
@@ -97,7 +97,7 @@ export default {
         let ret = []
         let devices = await get_all_devices(this.token);
         for (let device of devices) {
-            ret.push(`add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.farm_name || ''}' '${device.block_name || ''}'`);
+            ret.push(`add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.longitude || ''}' '${device.latitude || ''}' '${device.farm_name || ''}' '${device.block_name || ''}'`);
         }
         if (this._vorpalInstance) {
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));

@@ -1,7 +1,7 @@
 import call_remote from '../../public/lib/call_remote.js';
 export default {
-    add_farm: async function (name, location, info, token) {
-        return await call_remote('/resource/add_farm', { name, location, info }, token);
+    add_farm: async function (name, location, longitude, latitude, info, token) {
+        return await call_remote('/resource/add_farm', { name, location, longitude, latitude, info }, token);
     },
     del_farm: async function (name, token) {
         return await call_remote('/resource/del_farm', { name }, token);
