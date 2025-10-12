@@ -74,16 +74,46 @@
                                     </div>
                                 </template>
                             </el-table-column>
+                            <el-table-column prop="coordinates" label="坐标位置" width="200">
+                                <template #default="scope">
+                                    <div class="coordinates-display">
+                                        <div v-if="scope.row.longitude && scope.row.latitude" class="coordinate-values">
+                                            <div class="coordinate-item">
+                                                <span class="coordinate-label">经度:</span>
+                                                <span class="coordinate-value">{{ scope.row.longitude.toFixed(6)
+                                                    }}</span>
+                                            </div>
+                                            <div class="coordinate-item">
+                                                <span class="coordinate-label">纬度:</span>
+                                                <span class="coordinate-value">{{ scope.row.latitude.toFixed(6)
+                                                    }}</span>
+                                            </div>
+                                        </div>
+                                        <div v-else class="no-coordinates">
+                                            <el-tag type="warning" size="small">未设置坐标</el-tag>
+                                        </div>
+                                    </div>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="操作" width="120" fixed="right">
+                                <template #default="scope">
+                                    <el-button type="primary" size="small" @click="editDevice(scope.row)">
+                                        编辑
+                                    </el-button>
+                                </template>
+                            </el-table-column>
                         </el-table>
                     </PageContent>
                 </el-tab-pane>
             </el-tabs>
         </el-card>
+
     </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
+import { ElMessage } from 'element-plus';
 import device_management_lib from '../lib/device_management_lib';
 import PageContent from '../../public/gui/src/components/PageContent.vue';
 import StatsOverview from '../../resource/gui/StatsOverview.vue';
@@ -105,6 +135,7 @@ const searchRef = ref(null);
 const driverPageContentRef = ref(null);
 const devicePageContentRef = ref(null);
 
+
 // 驱动搜索参数
 const driverSearchParams = ref({
     searchText: '',
@@ -120,17 +151,17 @@ const deviceSearchParams = ref({
 async function fetch_driver_list(params, pageNo) {
     const result = await device_management_lib.get_driver_list('abc', pageNo);
     let drivers = result.drivers || [];
-    
+
     // 应用搜索和筛选
     if (params && params.searchText) {
         const searchText = params.searchText.toLowerCase();
-        drivers = drivers.filter(driver => 
+        drivers = drivers.filter(driver =>
             driver.name.toLowerCase().includes(searchText) ||
             (driver.config_method && driver.config_method.toLowerCase().includes(searchText)) ||
             (driver.capability && driver.capability.toLowerCase().includes(searchText))
         );
     }
-    
+
     return {
         drivers: drivers,
         total: drivers.length
@@ -140,17 +171,17 @@ async function fetch_driver_list(params, pageNo) {
 async function fetch_device_list(params, pageNo) {
     const result = await device_management_lib.list_device(pageNo, farmFilter.value, blockFilter.value, 'abc');
     let devices = result.devices || [];
-    
+
     // 应用搜索
     if (params && params.searchText) {
         const searchText = params.searchText.toLowerCase();
-        devices = devices.filter(device => 
+        devices = devices.filter(device =>
             device.device_name.toLowerCase().includes(searchText) ||
             (device.farm_name && device.farm_name.toLowerCase().includes(searchText)) ||
             (device.block_name && device.block_name.toLowerCase().includes(searchText))
         );
     }
-    
+
     return {
         devices: devices,
         total: devices.length
@@ -204,13 +235,23 @@ const onSearchReset = () => {
     deviceSearchParams.value = { searchText: '', filters: {} };
     farmFilter.value = '';
     blockFilter.value = '';
-    
+
     if (activeTab.value === 'drivers' && driverPageContentRef.value) {
         driverPageContentRef.value.reload();
     } else if (activeTab.value === 'devices' && devicePageContentRef.value) {
         devicePageContentRef.value.reload();
     }
 };
+
+
+
+// 编辑设备
+const editDevice = (device) => {
+    console.log('编辑设备:', device);
+    // 这里可以打开设备编辑对话框
+    ElMessage.info('设备编辑功能开发中...');
+};
+
 </script>
 
 <style scoped>
@@ -297,6 +338,60 @@ const onSearchReset = () => {
     .device-controls .el-input {
         width: 100% !important;
         margin-left: 0 !important;
+    }
+}
+/* 坐标显示样式 */
+.coordinates-display {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.coordinate-values {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.coordinate-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.coordinate-label {
+    font-weight: 500;
+    color: #606266;
+    min-width: 35px;
+}
+
+.coordinate-value {
+    color: #303133;
+    font-family: 'Courier New', monospace;
+    background: #f5f7fa;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #e4e7ed;
+}
+
+.no-coordinates {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .coordinate-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .coordinate-label {
+        min-width: auto;
     }
 }
 </style>
