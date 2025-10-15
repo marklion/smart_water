@@ -1020,7 +1020,7 @@ async function processPolicyExecution(policy) {
     }
     let runtimeState = policy_runtime_states.get(policy.name);
     if (!runtimeState) {
-        // 确定初始状态：优先使用设置的初始状态，否则使用第一个状态
+        // 确定初始状态：必须使用设置的初始状态
         let initialStateName;
         let initialState;
 
@@ -1028,13 +1028,12 @@ async function processPolicyExecution(policy) {
             initialStateName = policy.init_state;
             initialState = policy.states.find(s => s.name === policy.init_state);
             if (!initialState) {
-                console.error(`策略 ${policy.name} 的初始状态 ${policy.init_state} 不存在，使用第一个状态`);
-                initialStateName = policy.states[0].name;
-                initialState = policy.states[0];
+                console.error(`策略 ${policy.name} 的初始状态 ${policy.init_state} 不存在，策略无法启动`);
+                return; // 如果初始状态不存在，直接返回，不启动策略
             }
         } else {
-            initialStateName = policy.states[0].name;
-            initialState = policy.states[0];
+            console.error(`策略 ${policy.name} 没有设置初始状态，策略无法启动`);
+            return; // 如果没有设置初始状态，直接返回，不启动策略
         }
 
         runtimeState = {
@@ -1043,9 +1042,17 @@ async function processPolicyExecution(policy) {
             last_execution_time: Date.now(),
             start_time: Date.now(),
             execution_count: 0,
+            is_first_execution: true, // 标记是否为第一次执行
             // 策略执行逻辑：先检查状态转换，需要转换就直接结束当前周期
             executePolicyCycle: async function(policy, currentState) {
                 console.log(`策略 ${policy.name} 执行第${this.execution_count}次，当前状态: ${this.current_state}，运行时间: ${this.runtime}`);
+
+                // 如果是第一次执行，先执行初始状态的enter动作
+                if (this.is_first_execution) {
+                    console.log(`策略 ${policy.name} 第一次执行，执行初始状态 ${this.current_state} 的enter动作`);
+                    await executeStateActions(policy, currentState, 'enter', this);
+                    this.is_first_execution = false;
+                }
 
                 // 先检查是否需要状态转换，如果需要转换就直接转换并结束当前执行周期
                 const transitionResult = await checkStateTransitions(policy, currentState, this);
