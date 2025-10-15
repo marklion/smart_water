@@ -67,13 +67,14 @@ export default {
             transformer_name 
         }, token);
     },
-    add_transformer_rule: async function (policy_name, state_name, transformer_name, target_state, expression, token) {
+    add_transformer_rule: async function (policy_name, state_name, transformer_name, target_state, expression, is_constant = false, token) {
         return await call_remote('/policy/add_transformer_rule', { 
             policy_name, 
             state_name, 
             transformer_name, 
             target_state, 
-            expression 
+            expression,
+            is_constant
         }, token);
     },
     del_transformer_rule: async function (policy_name, state_name, transformer_name, target_state, token) {
@@ -98,13 +99,14 @@ export default {
     del_source: async function (policy_name, name, token) {
         return await call_remote('/policy/del_source', { policy_name, name }, token);
     },
-    add_assignment: async function (policy_name, state_name, trigger, variable_name, expression, target_policy_name = null, token) {
+    add_assignment: async function (policy_name, state_name, trigger, variable_name, expression, target_policy_name = null, is_constant = false, token) {
         const params = { 
             policy_name, 
             state_name, 
             trigger, 
             variable_name, 
-            expression 
+            expression,
+            is_constant
         };
         
         // 如果是跨策略赋值，添加target_policy_name参数
@@ -134,5 +136,11 @@ export default {
     },
     get_scan_period: async function (token) {
         return await call_remote('/policy/get_scan_period', {}, token);
+    },
+    set_init_state: async function (policy_name, state_name, token) {
+        return await call_remote('/policy/set_init_state', { policy_name, state_name }, token);
+    },
+    get_init_state: async function (policy_name, token) {
+        return await call_remote('/policy/get_init_state', { policy_name }, token);
     }
 }

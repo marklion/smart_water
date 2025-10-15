@@ -7,7 +7,7 @@ const driver_array = [
         driver: virtual_driver,
     }
 ];
-async function get_driver(device_name, capability) {
+export async function get_driver(device_name, capability) {
     let device = device_array.find(device => device.device_name === device_name);
     if (!device) {
         throw { err_msg: '设备不存在' };

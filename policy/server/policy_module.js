@@ -11,6 +11,8 @@ import {
     validateArrayExists
 } from '../../public/server/common_utils.js';
 
+import deviceModule, { get_driver } from '../../device/server/device_management_module.js';
+
 const policy_array = []
 
 // 扫描周期配置，默认为0（不扫描）
@@ -45,36 +47,31 @@ function validateTransformerExists(state, transformer_name) {
     return validateNestedItemExists(state, 'transformers', transformer_name, '转换器');
 }
 
-function validateVariableExists(policy, variable_name) {
-    if (!policy.sources || policy.sources.length === 0) {
-        throw { err_msg: `策略 ${policy.name} 中没有定义任何数据源，无法使用变量 ${variable_name}` };
-    }
 
-    const sourceExists = policy.sources.some(source => source.name === variable_name);
-    if (!sourceExists) {
-        throw { err_msg: `变量 ${variable_name} 在策略 ${policy.name} 的数据源中不存在` };
-    }
+// 设备操作接口 - 直接使用已导入的模块
+async function getDriverFunction() {
+    return get_driver;
 }
 
 // 验证设备存在性和动作能力
 async function validateDeviceAction(device_name, action) {
     try {
-        const deviceModule = await import('../../device/server/device_management_module.js');
-        const deviceResult = await deviceModule.default.methods.list_device.func({ pageNo: 0 });
+        // 获取设备列表
+        const deviceResult = await deviceModule.methods.list_device.func({ pageNo: 0 });
 
         if (!deviceResult || !deviceResult.devices) {
             throw { err_msg: '无法获取设备列表' };
         }
 
-        const device = deviceResult.devices.find(d => d.device_name === device_name);
-        if (!device) {
+        const deviceInfo = deviceResult.devices.find(d => d.device_name === device_name);
+        if (!deviceInfo) {
             throw { err_msg: `设备 ${device_name} 不存在` };
         }
 
         // 解析设备能力
         let capabilities = [];
         try {
-            capabilities = JSON.parse(device.capability);
+            capabilities = JSON.parse(deviceInfo.capability);
         } catch (e) {
             throw { err_msg: `设备 ${device_name} 的能力配置无效` };
         }
@@ -326,7 +323,8 @@ export default {
                                     mean: '转移规则列表',
                                     explain: {
                                         target_state: { type: String, mean: '目标状态', example: 's2' },
-                                        expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
+                                        expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' },
+                                        is_constant: { type: Boolean, mean: '是否为常量表达式', example: true }
                                     }
                                 }
                             }
@@ -397,7 +395,8 @@ export default {
                                     mean: '转移规则列表',
                                     explain: {
                                         target_state: { type: String, mean: '目标状态', example: 's2' },
-                                        expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
+                                        expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' },
+                                        is_constant: { type: Boolean, mean: '是否为常量表达式', example: true }
                                     }
                                 }
                             }
@@ -418,6 +417,7 @@ export default {
                             explain: {
                                 variable_name: { type: String, mean: '变量名', example: 'temp' },
                                 expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' },
+                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true },
                                 target_policy_name: { type: String, mean: '目标策略名称', example: '策略2' },
                             }
                         },
@@ -427,6 +427,7 @@ export default {
                             explain: {
                                 variable_name: { type: String, mean: '变量名', example: 'temp' },
                                 expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' },
+                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true },
                                 target_policy_name: { type: String, mean: '目标策略名称', example: '策略2' },
                             }
                         },
@@ -436,6 +437,7 @@ export default {
                             explain: {
                                 variable_name: { type: String, mean: '变量名', example: 'temp' },
                                 expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' },
+                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true },
                                 target_policy_name: { type: String, mean: '目标策略名称', example: '策略2' },
                             }
                         }
@@ -602,7 +604,8 @@ export default {
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
                 transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true },
                 target_state: { type: String, mean: '目标状态', example: 's2', have_to: true },
-                expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40', have_to: true }
+                expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40', have_to: true },
+                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true, have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -614,7 +617,8 @@ export default {
                 let rules = ensureArrayExists(transformer, 'rules');
                 rules.push({
                     target_state: body.target_state,
-                    expression: body.expression
+                    expression: body.expression,
+                    is_constant: body.is_constant || false
                 });
                 return { result: true };
             }
@@ -708,7 +712,8 @@ export default {
                 trigger: { type: String, mean: '触发类型', example: 'enter', have_to: true },
                 variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true },
                 expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10', have_to: true },
-                target_policy_name: { type: String, mean: '目标策略名称', example: '策略2', have_to: false }
+                target_policy_name: { type: String, mean: '目标策略名称', example: '策略2', have_to: false },
+                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true, have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -734,12 +739,11 @@ export default {
                     assignmentList.push({
                         variable_name: body.variable_name,
                         expression: body.expression,
-                        target_policy_name: body.target_policy_name
+                        target_policy_name: body.target_policy_name,
+                        is_constant: body.is_constant || false
                     });
                 } else {
                     // 策略内赋值逻辑
-                    //validateVariableExists(policy, body.variable_name);
-
                     let assignmentList = ensureArrayExists(state, getAssignmentListName(body.trigger));
 
                     // 检查是否已存在相同变量名的赋值表达式
@@ -753,7 +757,8 @@ export default {
 
                     assignmentList.push({
                         variable_name: body.variable_name,
-                        expression: body.expression
+                        expression: body.expression,
+                        is_constant: body.is_constant || false
                     });
                 }
 
@@ -957,6 +962,44 @@ export default {
                 return { result: true };
             }
         },
+        set_init_state: {
+            name: '设置初始状态',
+            description: '为策略设置初始状态，而不是第一个状态',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '初始状态名称', example: 's1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                validateStateExists(policy, body.state_name);
+
+                // 设置初始状态
+                policy.init_state = body.state_name;
+
+                return { result: true };
+            }
+        },
+        get_init_state: {
+            name: '获取初始状态',
+            description: '获取策略的初始状态配置',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true }
+            },
+            result: {
+                init_state: { type: String, mean: '初始状态名称', example: 's1' }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                return { init_state: policy.init_state || null };
+            }
+        },
     }
 }
 
@@ -977,29 +1020,97 @@ async function processPolicyExecution(policy) {
     }
     let runtimeState = policy_runtime_states.get(policy.name);
     if (!runtimeState) {
+        // 确定初始状态：优先使用设置的初始状态，否则使用第一个状态
+        let initialStateName;
+        let initialState;
+
+        if (policy.init_state) {
+            initialStateName = policy.init_state;
+            initialState = policy.states.find(s => s.name === policy.init_state);
+            if (!initialState) {
+                console.error(`策略 ${policy.name} 的初始状态 ${policy.init_state} 不存在，使用第一个状态`);
+                initialStateName = policy.states[0].name;
+                initialState = policy.states[0];
+            }
+        } else {
+            initialStateName = policy.states[0].name;
+            initialState = policy.states[0];
+        }
+
         runtimeState = {
-            current_state: policy.states[0].name,
+            current_state: initialStateName,
             variables: new Map(),
             last_execution_time: Date.now(),
             start_time: Date.now(),
-            execution_count: 0
+            execution_count: 0,
+            // 策略执行逻辑：先检查状态转换，需要转换就直接结束当前周期
+            executePolicyCycle: async function(policy, currentState) {
+                console.log(`策略 ${policy.name} 执行第${this.execution_count}次，当前状态: ${this.current_state}，运行时间: ${this.runtime}`);
+
+                // 先检查是否需要状态转换，如果需要转换就直接转换并结束当前执行周期
+                const transitionResult = await checkStateTransitions(policy, currentState, this);
+                if (transitionResult) {
+                    // 发生了状态转换，直接结束当前策略的执行周期（就像到晚饭时间不饿就直接跳过今天）
+                    return true; // 返回 true 表示发生了状态转换，需要结束当前周期
+                }
+
+                // 没有状态转换，继续执行当前状态的 do 动作
+                await executeStateActions(policy, currentState, 'do', this);
+                return false; // 返回 false 表示没有状态转换，正常执行完成
+            },
+            // 获取数据源读数的函数
+            getSource: async function(sourceName) {
+                try {
+                    // 验证数据源是否存在
+                    if (!policy.sources || policy.sources.length === 0) {
+                        throw new Error(`策略 ${policy.name} 中没有定义任何数据源`);
+                    }
+
+                    const source = policy.sources.find(s => s.name === sourceName);
+                    if (!source) {
+                        throw new Error(`数据源 ${sourceName} 在策略 ${policy.name} 中不存在`);
+                    }
+
+                    // 获取设备读数
+                    const getDriver = await getDriverFunction();
+                    const driver = await getDriver(source.device, 'readout');
+                    const readout = await driver.readout();
+                    const deviceData = { readout };
+
+                    if (deviceData && deviceData.readout !== undefined) {
+                        console.log(`获取数据源 ${sourceName} 的读数: ${deviceData.readout}`);
+                        return deviceData.readout;
+                    } else {
+                        console.warn(`数据源 ${sourceName} 的读数获取失败，返回默认值 0`);
+                        return 0;
+                    }
+                } catch (error) {
+                    console.error(`获取数据源 ${sourceName} 读数失败:`, error.message);
+                    return 0; // 出错时返回默认值 0
+                }
+            }
         };
         policy_runtime_states.set(policy.name, runtimeState);
         console.log(`策略 ${policy.name} 初始化，进入状态: ${runtimeState.current_state}`);
-        await executeStateActions(policy, policy.states[0], 'enter', runtimeState);
+        await executeStateActions(policy, initialState, 'enter', runtimeState);
     }
     runtimeState.execution_count = (runtimeState.execution_count || 0) + 1;
     runtimeState.last_execution_time = Date.now();
     const runtimeMinutes = Math.floor((Date.now() - runtimeState.start_time) / 60000);
     runtimeState.runtime = `${runtimeMinutes}分钟`;
+
     const currentState = policy.states.find(s => s.name === runtimeState.current_state);
     if (!currentState) {
         console.error(`策略 ${policy.name} 的当前状态 ${runtimeState.current_state} 不存在`);
         return;
     }
-    console.log(`策略 ${policy.name} 执行第${runtimeState.execution_count}次，当前状态: ${runtimeState.current_state}，运行时间: ${runtimeState.runtime}`);
-    await executeStateActions(policy, currentState, 'do', runtimeState);
-    await checkStateTransitions(policy, currentState, runtimeState);
+
+    // 使用封装的策略执行逻辑（吃饭形式）
+    const hasTransition = await runtimeState.executePolicyCycle(policy, currentState);
+    if (hasTransition) {
+        // 发生了状态转换，直接结束当前策略的执行周期
+        return;
+    }
 }
 
 async function executeStateActions(policy, state, trigger, runtimeState) {
@@ -1039,7 +1150,7 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
 
 async function checkStateTransitions(policy, currentState, runtimeState) {
     if (!currentState.transformers || currentState.transformers.length === 0) {
-        return;
+        return false; // 没有转换器，返回 false 表示没有发生状态转换
     }
     for (const transformer of currentState.transformers) {
         if (!transformer.rules || transformer.rules.length === 0) {
@@ -1051,13 +1162,14 @@ async function checkStateTransitions(policy, currentState, runtimeState) {
                 const shouldTransition = await evaluateTransitionExpression(rule.expression, runtimeState);
                 if (shouldTransition) {
                     await performStateTransition(policy, currentState, rule.target_state, runtimeState);
-                    return;
+                    return true; // 发生了状态转换，返回 true
                 }
             } catch (error) {
                 console.error(`转换条件检查失败: ${rule.expression}`, error);
             }
         }
     }
+    return false; // 没有满足转换条件，返回 false 表示没有发生状态转换
 }
 
 async function performStateTransition(policy, fromState, toStateName, runtimeState) {
@@ -1075,24 +1187,26 @@ async function performStateTransition(policy, fromState, toStateName, runtimeSta
 
 async function executeDeviceAction(device, action) {
     try {
-        const deviceModule = await import('../../device/server/device_management_module.js');
-        let methodName;
-        let params = { device_name: device };
-        const actionLower = action.toLowerCase();
-        if (actionLower.includes('打开') || actionLower.includes('开启') || actionLower.includes('open')) {
-            methodName = 'open_device';
-        } else if (actionLower.includes('关闭') || actionLower.includes('close')) {
-            methodName = 'close_device';
-        } else if (actionLower.includes('读取') || actionLower.includes('检查') || actionLower.includes('启动') ||
-            actionLower.includes('监测') || actionLower.includes('read') || actionLower.includes('check')) {
-            methodName = 'readout_device';
-        } else if (actionLower.includes('模拟') || actionLower.includes('mock')) {
-            methodName = 'mock_readout';
-            params.value = 1;
+        const getDriver = await getDriverFunction();
+        let result;
+
+        if (action === 'open') {
+            const driver = await getDriver(device, 'open');
+            result = await driver.open();
+        } else if (action === 'close') {
+            const driver = await getDriver(device, 'close');
+            result = await driver.close();
+        } else if (action === 'readout') {
+            const driver = await getDriver(device, 'readout');
+            const readout = await driver.readout();
+            result = { readout };
+        } else if (action === 'mock_readout') {
+            const driver = await getDriver(device, 'mock_readout');
+            result = await driver.mock_readout(1);
         } else {
             throw new Error(`未知的动作: ${action}`);
         }
-        const result = await deviceModule.default.methods[methodName].func(params);
+
         console.log(`设备动作执行成功: ${device} -> ${action}`, result);
         return result;
     } catch (error) {
@@ -1111,6 +1225,7 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
             ...Object.fromEntries(runtimeState.variables),
             sensors: await getSensorData(),
             devices: await getDeviceStatus(),
+            getSource: runtimeState.getSource.bind(runtimeState), // 添加 getSource 函数
             Date: Date,
             Math: Math,
             abs: Math.abs,
@@ -1147,6 +1262,7 @@ async function evaluateTransitionExpression(expression, runtimeState) {
             ...Object.fromEntries(runtimeState.variables),
             sensors: await getSensorData(),
             devices: await getDeviceStatus(),
+            getSource: runtimeState.getSource.bind(runtimeState), // 添加 getSource 函数
             Date: Date,
             Math: Math,
             abs: Math.abs,
@@ -1169,18 +1285,17 @@ async function evaluateTransitionExpression(expression, runtimeState) {
 
 async function getSensorData() {
     try {
-        const deviceModule = await import('../../device/server/device_management_module.js');
-        const result = await deviceModule.default.methods.list_device.func({});
+        // 获取设备列表
+        const result = await deviceModule.methods.list_device.func({});
         const sensors = {};
+
         if (result && result.devices) {
+            const getDriver = await getDriverFunction();
             for (const device of result.devices) {
                 try {
-                    const deviceData = await deviceModule.default.methods.readout_device.func({
-                        device_name: device.device_name
-                    });
-                    if (deviceData && deviceData.readout !== undefined) {
-                        sensors[device.device_name] = deviceData.readout;
-                    }
+                    const driver = await getDriver(device.device_name, 'readout');
+                    const readout = await driver.readout();
+                    sensors[device.device_name] = readout;
                 } catch (deviceError) {
                     console.warn(`获取设备 ${device.device_name} 数据失败:`, deviceError.message);
                     sensors[device.device_name] = 0;
@@ -1196,18 +1311,17 @@ async function getSensorData() {
 
 async function getDeviceStatus() {
     try {
-        const deviceModule = await import('../../device/server/device_management_module.js');
-        const result = await deviceModule.default.methods.list_device.func({});
+        // 获取设备列表
+        const result = await deviceModule.methods.list_device.func({});
         const devices = {};
+
         if (result && result.devices) {
+            const getDriver = await getDriverFunction();
             for (const device of result.devices) {
                 try {
-                    const deviceData = await deviceModule.default.methods.readout_device.func({
-                        device_name: device.device_name
-                    });
-                    if (deviceData && deviceData.readout !== undefined) {
-                        devices[device.device_name] = deviceData.readout > 0 ? 1 : 0;
-                    }
+                    const driver = await getDriver(device.device_name, 'readout');
+                    const readout = await driver.readout();
+                    devices[device.device_name] = readout > 0 ? 1 : 0;
                 } catch (deviceError) {
                     console.warn(`获取设备 ${device.device_name} 状态失败:`, deviceError.message);
                     devices[device.device_name] = 0;

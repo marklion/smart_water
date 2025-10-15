@@ -2,52 +2,70 @@
   <div class="interactive-map-container">
     <!-- 地图容器 -->
     <div id="amap-container" class="amap-container"></div>
-    
+
     <!-- 地图控件 -->
     <div class="map-controls">
       <el-dropdown trigger="click" @command="handleMapLayerCommand">
         <el-tag type="success" size="small" class="map-type-tag" title="点击选择地图图层类型">
-          <el-icon><Location /></el-icon>
+          <el-icon>
+            <Location />
+          </el-icon>
           {{ currentLayerType }}
-          <el-icon><ArrowDown /></el-icon>
+          <el-icon>
+            <ArrowDown />
+          </el-icon>
         </el-tag>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="satellite">
-              <el-icon><Location /></el-icon>
+              <el-icon>
+                <Location />
+              </el-icon>
               卫星地图（定期更新）
             </el-dropdown-item>
             <el-dropdown-item command="traffic">
-              <el-icon><Grid /></el-icon>
+              <el-icon>
+                <Grid />
+              </el-icon>
               实时交通地图
             </el-dropdown-item>
             <el-dropdown-item command="hybrid">
-              <el-icon><Grid /></el-icon>
+              <el-icon>
+                <Grid />
+              </el-icon>
               混合图层（卫星+交通）
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      
+
       <el-button-group class="control-group">
         <el-button size="small" @click="zoomIn">
-          <el-icon><ZoomIn /></el-icon>
+          <el-icon>
+            <ZoomIn />
+          </el-icon>
         </el-button>
         <el-button size="small" @click="zoomOut">
-          <el-icon><ZoomOut /></el-icon>
+          <el-icon>
+            <ZoomOut />
+          </el-icon>
         </el-button>
         <el-button size="small" @click="resetView">
-          <el-icon><Refresh /></el-icon>
+          <el-icon>
+            <Refresh />
+          </el-icon>
         </el-button>
       </el-button-group>
     </div>
-    
+
     <!-- 设备信息面板 -->
     <div v-if="selectedDevice" class="device-info-panel">
       <div class="panel-header">
         <h3>{{ selectedDevice.deviceName }}</h3>
         <el-button size="small" @click="closeDevicePanel">
-          <el-icon><Close /></el-icon>
+          <el-icon>
+            <Close />
+          </el-icon>
         </el-button>
       </div>
       <div class="panel-content">
@@ -58,7 +76,9 @@
           </div>
           <div class="detail-item">
             <span class="label">设备状态：</span>
-            <el-tag :type="selectedDevice.status === 'open' || selectedDevice.status === 'active' ? 'success' : 'danger'" size="small">
+            <el-tag
+              :type="selectedDevice.status === 'open' || selectedDevice.status === 'active' ? 'success' : 'danger'"
+              size="small">
               {{ selectedDevice.status === 'open' || selectedDevice.status === 'active' ? '开启' : '关闭' }}
             </el-tag>
           </div>
@@ -82,22 +102,22 @@
             </span>
           </div>
         </div>
-        
-        <div class="device-actions" v-if="selectedDevice.type === 'valve' || selectedDevice.type === 'fertilizer' || getDeviceTypeFromName(selectedDevice.device_name || selectedDevice.deviceName) === 'valve' || getDeviceTypeFromName(selectedDevice.device_name || selectedDevice.deviceName) === 'fertilizer'">
-          <el-button 
+
+        <div class="device-actions"
+          v-if="hasDeviceCapability(selectedDevice, 'open') || hasDeviceCapability(selectedDevice, 'close')">
+          <el-button v-if="hasDeviceCapability(selectedDevice, 'open') && hasDeviceCapability(selectedDevice, 'close')"
             :type="selectedDevice.status === 'open' || selectedDevice.status === 'active' ? 'danger' : 'success'"
-            size="small"
-            @click="toggleDevice(selectedDevice)"
-          >
+            size="small" @click="toggleDevice(selectedDevice)">
             {{ selectedDevice.status === 'open' || selectedDevice.status === 'active' ? '关闭设备' : '开启设备' }}
           </el-button>
-          <el-button type="primary" size="small" @click="readDeviceStatus(selectedDevice.deviceName)">
-            读取状态
+          <el-button v-if="hasDeviceCapability(selectedDevice, 'readout')" type="primary" size="small"
+            @click="readDeviceStatus(selectedDevice.deviceName)">
+            读取数据
           </el-button>
         </div>
       </div>
     </div>
-    
+
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-overlay">
       <div class="loading-spinner"></div>
@@ -146,22 +166,20 @@ let markers = []
 const initMap = async () => {
   try {
     loading.value = true
-    console.log('开始初始化地图...')
-    
+
     // 动态加载高德地图API
-    if (globalThis.AMap) {
-      console.log('高德地图API已存在')
-    } else {
-      console.log('加载高德地图API...')
+    if (!globalThis.AMap) {
       await loadAMapScript()
-      console.log('高德地图API加载完成')
     }
-    
-    console.log('创建地图实例，中心点:', props.center, '缩放级别:', props.zoom)
-    
+
+    // 确保AMap已经加载完成
+    if (!globalThis.AMap) {
+      throw new Error('高德地图API加载失败')
+    }
+
     // 创建地图实例（使用标准地图作为底图）
     const initialStyle = mapConfig.mapStyles.normal
-    
+
     map = new AMap.Map('amap-container', {
       zoom: props.zoom,
       center: [props.center.lng, props.center.lat],
@@ -170,9 +188,13 @@ const initMap = async () => {
       pitch: 0,
       rotation: 0,
       features: ['bg', 'road', 'building', 'point'],
-      showLabel: true
+      showLabel: true,
+      // 优化Canvas性能
+      optimize: true,
+      // 减少不必要的重绘
+      renderOnMoving: false
     })
-    
+
     // 确保地图样式正确应用
     setTimeout(() => {
       if (map) {
@@ -182,7 +204,7 @@ const initMap = async () => {
         map.render()
       }
     }, 1000)
-    
+
     // 添加地图控件
     if (mapConfig.controls.showScale) {
       map.addControl(new AMap.Scale())
@@ -190,17 +212,17 @@ const initMap = async () => {
     if (mapConfig.controls.showToolbar) {
       map.addControl(new AMap.ToolBar())
     }
-    
+
     // 监听地图事件
     map.on('click', onMapClick)
-    
+
     // 等待地图完全加载
     map.on('complete', () => {
       loading.value = false
       // 初始化设备标记
       initDeviceMarkers()
     })
-    
+
   } catch (error) {
     console.error('地图初始化失败:', error)
     loading.value = false
@@ -215,7 +237,7 @@ const loadAMapScript = () => {
       resolve()
       return
     }
-    
+
     const script = document.createElement('script')
     script.src = getAMapScriptUrl()
     script.onload = resolve
@@ -227,72 +249,52 @@ const loadAMapScript = () => {
 // 初始化设备标记
 const initDeviceMarkers = () => {
   if (!map || !props.devices) {
-    console.log('地图或设备数据未准备好:', { map: !!map, devices: props.devices?.length })
     return
   }
-  
-  console.log('开始初始化设备标记，设备数量:', props.devices.length)
-  
+
   // 清除现有标记
   clearMarkers()
-  
-  let index = 0
+
   for (const device of props.devices) {
-    console.log(`创建设备标记 ${index + 1}:`, device)
     const marker = createDeviceMarker(device)
     if (marker) {
       markers.push(marker)
-      console.log(`设备标记 ${index + 1} 创建成功`)
-    } else {
-      console.log(`设备标记 ${index + 1} 创建失败`)
     }
-    index++
   }
-  
-  console.log('设备标记初始化完成，总标记数:', markers.length)
 }
 
 // 创建设备标记
 const createDeviceMarker = (device) => {
-  if (globalThis.AMap) {
-    // 高德地图API已加载，继续执行
-  } else {
-    console.log('高德地图API未加载')
+  if (!globalThis.AMap) {
     return null
   }
-  
+
   try {
     let lng, lat
-    
+
     // 优先使用真实经纬度坐标
     if (device.longitude && device.latitude) {
       lng = device.longitude
       lat = device.latitude
-      console.log(`设备 ${device.deviceName || device.device_name} 使用真实坐标:`, { lng, lat })
     } else if (device.x && device.y) {
       // 如果没有真实坐标，使用xy坐标转换
       const converted = convertXYToLngLat(device.x, device.y, props.center.lng, props.center.lat)
       lng = converted.lng
       lat = converted.lat
-      console.log(`设备 ${device.deviceName || device.device_name} 坐标转换:`, { 
-        original: { x: device.x, y: device.y }, 
-        converted: { lng, lat } 
-      })
     } else {
-      console.log('设备坐标数据不完整:', device)
       return null
     }
-    
+
     // 创建自定义标记
     const markerContent = createMarkerContent(device)
-    
+
     const marker = new AMap.Marker({
       position: [lng, lat],
       content: markerContent,
       anchor: 'center',
       offset: new AMap.Pixel(0, 0)
     })
-    
+
     // 添加点击事件
     marker.on('click', () => {
       // 为设备添加类型信息
@@ -302,10 +304,10 @@ const createDeviceMarker = (device) => {
       }
       onDeviceClick(deviceWithType)
     })
-    
+
     // 添加到地图
     map.add(marker)
-    
+
     return marker
   } catch (error) {
     console.error('创建设备标记失败:', error, device)
@@ -318,7 +320,32 @@ const getDeviceTypeFromName = (deviceName) => {
   if (deviceName.includes('流量计')) return 'flowmeter'
   if (deviceName.includes('阀门')) return 'valve'
   if (deviceName.includes('施肥机')) return 'fertilizer'
+  if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
   return 'valve' // 默认类型
+}
+
+// 检查设备是否具有特定能力
+const hasDeviceCapability = (device, capability) => {
+  if (!device) return false
+
+  // 从设备的能力集数组中检查
+  if (device.capability && Array.isArray(device.capability)) {
+    return device.capability.includes(capability)
+  }
+
+  // 从原始设备数据中检查
+  if (device.originalDevice && device.originalDevice.capability) {
+    try {
+      const capabilities = JSON.parse(device.originalDevice.capability)
+      return Array.isArray(capabilities) && capabilities.includes(capability)
+    } catch (error) {
+      // 如果不是JSON格式，尝试按逗号分割
+      const capabilities = device.originalDevice.capability.split(',').map(c => c.trim())
+      return capabilities.includes(capability)
+    }
+  }
+
+  return false
 }
 
 // 创建标记内容
@@ -328,7 +355,7 @@ const createMarkerContent = (device) => {
   const iconName = getDeviceIcon(deviceType)
   const deviceName = device.label || device.device_name || device.deviceName
   const statusText = getStatusText(device.status)
-  
+
   return `
     <div class="device-marker ${deviceType} ${statusClass}">
       <div class="marker-icon">
@@ -385,28 +412,26 @@ const handleMapLayerCommand = (command) => {
 // 设置卫星图层
 const setSatelliteLayer = () => {
   if (!map) return
-  
-  console.log('切换到卫星图层')
+
   currentLayerType.value = '卫星地图'
-  
+
   try {
     // 清除所有图层
     clearAllLayers()
-    
+
     // 创建卫星图层
     satelliteLayer = new AMap.TileLayer.Satellite({
       zIndex: 1
     })
-    
+
     // 添加卫星图层
     map.add(satelliteLayer)
-    
+
     // 设置底图样式
     map.setMapStyle(mapConfig.mapStyles.normal)
-    
-    console.log('卫星图层已设置')
+
     ElMessage.success('已切换到卫星地图')
-    
+
   } catch (error) {
     console.error('设置卫星图层失败:', error)
     ElMessage.error('卫星地图设置失败')
@@ -416,30 +441,28 @@ const setSatelliteLayer = () => {
 // 设置实时交通图层
 const setTrafficLayer = () => {
   if (!map) return
-  
-  console.log('切换到实时交通图层')
+
   currentLayerType.value = '实时交通'
-  
+
   try {
     // 清除所有图层
     clearAllLayers()
-    
+
     // 创建交通图层
     trafficLayer = new AMap.TileLayer.Traffic({
       zIndex: 1,
       autoRefresh: true,
       interval: 180
     })
-    
+
     // 添加交通图层
     map.add(trafficLayer)
-    
+
     // 设置底图样式
     map.setMapStyle(mapConfig.mapStyles.normal)
-    
-    console.log('交通图层已设置')
+
     ElMessage.success('已切换到实时交通地图')
-    
+
   } catch (error) {
     console.error('设置交通图层失败:', error)
     ElMessage.error('交通地图设置失败')
@@ -449,36 +472,34 @@ const setTrafficLayer = () => {
 // 设置混合图层（卫星+交通）
 const setHybridLayer = () => {
   if (!map) return
-  
-  console.log('切换到混合图层')
+
   currentLayerType.value = '混合图层'
-  
+
   try {
     // 清除所有图层
     clearAllLayers()
-    
+
     // 创建卫星图层
     satelliteLayer = new AMap.TileLayer.Satellite({
       zIndex: 1
     })
-    
+
     // 创建交通图层
     trafficLayer = new AMap.TileLayer.Traffic({
       zIndex: 2,
       autoRefresh: true,
       interval: 180
     })
-    
+
     // 添加图层
     map.add(satelliteLayer)
     map.add(trafficLayer)
-    
+
     // 设置底图样式
     map.setMapStyle(mapConfig.mapStyles.normal)
-    
-    console.log('混合图层已设置')
+
     ElMessage.success('已切换到混合图层（卫星+交通）')
-    
+
   } catch (error) {
     console.error('设置混合图层失败:', error)
     ElMessage.error('混合图层设置失败')
@@ -531,23 +552,43 @@ const closeDevicePanel = () => {
   selectedDevice.value = null
 }
 
+// 更新设备状态 - 安全地更新设备状态，避免直接修改原对象
+const updateDeviceStatus = (deviceName, newStatus) => {
+  if (selectedDevice.value &&
+    (selectedDevice.value.device_name || selectedDevice.value.deviceName) === deviceName) {
+    selectedDevice.value = { ...selectedDevice.value, status: newStatus }
+  }
+}
+
 // 设备控制方法
 const toggleDevice = async (device) => {
   try {
     const deviceName = device.device_name || device.deviceName
-    const deviceType = device.type || getDeviceTypeFromName(deviceName)
-    
+
+    // 检查设备是否支持开关操作
+    if (!hasDeviceCapability(device, 'open') || !hasDeviceCapability(device, 'close')) {
+      ElMessage.warning('该设备不支持开关操作')
+      return
+    }
+
+    let newStatus
     if (device.status === 'open' || device.status === 'active') {
       await closeDevice(deviceName)
-      device.status = deviceType === 'fertilizer' ? 'inactive' : 'closed'
+      // 根据设备类型确定关闭状态
+      const deviceType = device.type || getDeviceTypeFromName(deviceName)
+      newStatus = deviceType === 'fertilizer' ? 'inactive' : 'closed'
     } else {
       await openDevice(deviceName)
-      device.status = deviceType === 'fertilizer' ? 'active' : 'open'
+      // 根据设备类型确定开启状态
+      const deviceType = device.type || getDeviceTypeFromName(deviceName)
+      newStatus = deviceType === 'fertilizer' ? 'active' : 'open'
     }
-    
-    // 更新地图上的标记
+
+    // 更新当前选中设备的状态
+    updateDeviceStatus(deviceName, newStatus)
+    const updatedDevice = { ...device, status: newStatus }
+    emit('device-toggle', updatedDevice)
     initDeviceMarkers()
-    emit('device-toggle', device)
     ElMessage.success('设备操作成功')
   } catch (error) {
     ElMessage.error('设备操作失败: ' + error.message)
@@ -600,7 +641,6 @@ watch(() => props.devices, () => {
 // 监听地图中心点变化
 watch(() => props.center, (newCenter) => {
   if (map && newCenter) {
-    console.log('地图中心点变化:', newCenter)
     map.setCenter([newCenter.lng, newCenter.lat])
   }
 }, { deep: true })
@@ -762,8 +802,13 @@ onUnmounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 新的设备标记样式 */
@@ -849,6 +894,11 @@ onUnmounted(() => {
   background: rgba(156, 39, 176, 0.1);
 }
 
+:deep(.device-marker.sensor .marker-icon) {
+  border-color: #67c23a;
+  background: rgba(103, 194, 58, 0.1);
+}
+
 /* 设备状态颜色 */
 :deep(.device-marker.active .device-status) {
   background: #67c23a;
@@ -876,9 +926,11 @@ onUnmounted(() => {
   0% {
     box-shadow: 0 0 0 0 rgba(103, 194, 58, 0.4);
   }
+
   70% {
     box-shadow: 0 0 0 6px rgba(103, 194, 58, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(103, 194, 58, 0);
   }
@@ -890,11 +942,10 @@ onUnmounted(() => {
     top: 10px;
     right: 10px;
   }
-  
+
   .device-info-panel {
     top: 10px;
-    left: 10px;
-    width: calc(100% - 20px);
+    left: 10px;   width: calc(100% - 20px);
     max-width: 300px;
   }
   

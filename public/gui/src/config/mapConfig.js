@@ -14,7 +14,6 @@ export const mapConfig = {
     lat: 40.818311   // 呼和浩特市纬度
   },
   
-  // 默认缩放级别
   defaultZoom: 15,
   
   // 地图样式配置（只保留卫星地图需要的样式）
@@ -34,7 +33,8 @@ export const mapConfig = {
     iconMap: {
       'valve': '电磁阀',
       'flowmeter': '流量计', 
-      'fertilizer': '施肥机'
+      'fertilizer': '施肥机',
+      'sensor': '流量计'  // 传感器使用流量计图标，或者可以添加专门的传感器图标
     },
     
     // 设备状态颜色
@@ -49,7 +49,8 @@ export const mapConfig = {
     typeColors: {
       'valve': '#409eff',
       'flowmeter': '#e6a23c',
-      'fertilizer': '#9c27b0'
+      'fertilizer': '#9c27b0',
+      'sensor': '#67c23a'  // 传感器使用绿色
     }
   },
   
