@@ -70,17 +70,17 @@ export default {
             }
             return devices.length;
         });
-        cli_utils.make_common_cmd(vorpal, 'open <device_name>', '打开阀门', async (cmd_this, args)=>{
+        cli_utils.make_common_cmd(vorpal, 'open <device_name>', '打开阀门', async (cmd_this, args) => {
             await device_management_lib.open_device(args.device_name, this.token);
             return `设备 ${args.device_name} 打开成功`;
         })
-        cli_utils.make_common_cmd(vorpal, 'close <device_name>', '关闭阀门', async (cmd_this, args)=>{
+        cli_utils.make_common_cmd(vorpal, 'close <device_name>', '关闭阀门', async (cmd_this, args) => {
             await device_management_lib.close_device(args.device_name, this.token);
             return `设备 ${args.device_name} 关闭成功`;
         })
         cli_utils.make_common_cmd(vorpal, 'readout <device_name>', '读取设备读数', async (cmd_this, args) => {
             let resp = await device_management_lib.readout_device(args.device_name, this.token);
-            if (resp!== null) {
+            if (resp !== null) {
                 return `设备 ${args.device_name} 当前读数为: ${resp.readout}`;
             } else {
                 return `设备 ${args.device_name} 读取失败`;
@@ -91,21 +91,13 @@ export default {
             return `设备 ${args.device_name} 模拟读数为: ${args.value}`;
         });
         vorpal.delimiter(prompt)
-        vorpal.command('bdr', '列出所有配置')
-            .action(async function (args) {
-                try {
-                    this.log((await ins.make_bdr()).join('\n'));
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
         return vorpal;
     },
     make_bdr: async function () {
         let ret = []
         let devices = await get_all_devices(this.token);
         for (let device of devices) {
-            let tmp_cmd =`add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.longitude || ''}' '${device.latitude || ''}' ` ;
+            let tmp_cmd = `add device '${device.device_name}' '${device.driver_name}' '${device.config_key}' '${device.longitude || ''}' '${device.latitude || ''}' `;
             if (device.farm_name) {
                 tmp_cmd += `'${device.farm_name}' `;
             }

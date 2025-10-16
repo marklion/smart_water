@@ -33,26 +33,37 @@ export default {
     add_sub_cli: function (cli, sub_cli_definition, parent_prompt) {
         let ins = this;
         let sub_cli = sub_cli_definition.install(parent_prompt);
+        this.make_common_cmd(sub_cli, 'bdr', '列出所有配置', async (cmd_this, args) => {
+            let cmd_ret = '';
+            try {
+                cmd_ret = (await sub_cli_definition.make_bdr(sub_cli_definition.cur_view_name)).join('\n');
+            } catch (err) {
+                cmd_ret = 'Error: ' + (err.err_msg || '未知错误');
+            }
+
+            return cmd_ret;
+        });
         let enter_cmd = sub_cli_definition.command;
         if (sub_cli_definition.enter_view_hook) {
             enter_cmd = enter_cmd + ' <view_name>';
         }
         if (sub_cli_definition.undo_hook) {
-            cli.command(`undo ${sub_cli_definition.command} <view_name>`, '删除视图')
-                .action(async function (args) {
-                    let cleaned_args = { ...args };
-                    for (let key in cleaned_args) {
-                        cleaned_args[key] = String(cleaned_args[key]);
+            this.make_common_cmd(cli, `undo ${sub_cli_definition.command} <view_name>`, '删除视图', async (cmd_this, args) => {
+                let cmd_ret = '';
+                let cleaned_args = { ...args };
+                for (let key in cleaned_args) {
+                    cleaned_args[key] = String(cleaned_args[key]);
+                }
+                try {
+                    let resp = await sub_cli_definition.undo_hook(cleaned_args);
+                    if (resp) {
+                        cmd_ret = resp;
                     }
-                    try {
-                        let resp = await sub_cli_definition.undo_hook(cleaned_args);
-                        if (resp) {
-                            this.log(resp);
-                        }
-                    } catch (error) {
-                        this.log('Error:', error.err_msg || '未知错误');
-                    }
-                })
+                } catch (error) {
+                    cmd_ret = 'Error: ' + (error.err_msg || '未知错误');
+                }
+                return cmd_ret;
+            });
         }
         cli.command(enter_cmd, '进入' + sub_cli_definition.name)
             .action(async function (args) {
@@ -77,15 +88,17 @@ export default {
                 cli.show();
                 return cli;
             });
-        sub_cli.command('clear', '清除当前配置')
-            .action(async function () {
-                try {
-                    await ins.clear_config(sub_cli);
-                    this.log('当前配置已清除');
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
+        this.make_common_cmd(sub_cli, 'clear', '清除当前配置', async (cmd_this, args) => {
+            let cmd_ret = '';
+            try {
+                await ins.clear_config(sub_cli);
+                cmd_ret = '当前配置已清除';
+            } catch (err) {
+                cmd_ret = 'Error: ' + (err.err_msg || '未知错误');
+            }
+            return cmd_ret;
+        });
+
         if (!cli.sub_clies) {
             cli.sub_clies = [];
         }

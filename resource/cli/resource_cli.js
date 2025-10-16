@@ -13,14 +13,6 @@ export default {
         cli_utils.add_sub_cli(vorpal, farm_cli, prompt);
         cli_utils.add_sub_cli(vorpal, block_cli, prompt);
         vorpal.delimiter(prompt)
-        vorpal.command('bdr', '列出所有配置')
-            .action(async function (args) {
-                try {
-                    this.log((await ins.make_bdr()).join('\n'));
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
         return vorpal;
     },
     make_bdr: async function () {
