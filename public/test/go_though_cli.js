@@ -554,6 +554,7 @@ export default {
             await cli.run_cmd(depend);
         }
         let cmds = make_pairwise_cmds(cmd_obj);
+        print_test_log(`run cmds: ${JSON.stringify(cmds)}`);
         for (let cmd of cmds) {
             let output = await cli.run_cmd(cmd);
             expect(output).not.toContain('Usage:');
