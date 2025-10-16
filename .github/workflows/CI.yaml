@@ -33,3 +33,5 @@ jobs:
       env:
         CI: true
         DISPLAY: ':99.0'
+        LANG: zh_CN.UTF-8
+        LC_ALL: zh_CN.UTF-8
