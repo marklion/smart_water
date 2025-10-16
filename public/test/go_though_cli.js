@@ -241,7 +241,10 @@ function make_pairwise_cmds(cmd_obj) {
     };
     let ret = [cmd_obj.cmd];
     if (cmd_obj.params.length > 0) {
-        ret = pict.pict(model).testCases.map(param_set => {
+        print_test_log(`test model:${JSON.stringify(model)}`);
+        let tcs = pict.pict(model).testCases;
+        print_test_log(`tcs:${JSON.stringify(tcs)}`);
+        ret = tcs.map(param_set => {
             let cmd_line = cmd_obj.cmd;
             for (let p of cmd_obj.params) {
                 let v = param_set[p.text];
@@ -461,22 +464,22 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'clear'
             ],
-        },{
-            cmd:'del source',
-            depends:[
+        }, {
+            cmd: 'del source',
+            depends: [
                 'source abcd a b',
                 'source 汉字内容 a b'
             ],
-            teardown:[
+            teardown: [
                 'undo source'
             ]
-        },{
-            cmd:'del user',
-            depends:[
+        }, {
+            cmd: 'del user',
+            depends: [
                 'user abcd 12345',
                 'user 汉字内容 12345',
             ],
-            teardown:[
+            teardown: [
                 'undo user'
             ]
         }
