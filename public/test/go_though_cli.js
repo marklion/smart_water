@@ -207,20 +207,53 @@ function convert_param(cmd, param) {
             values: ['abcd']
         },
         {
-            cmd:'del source',
-            param:'name',
-            values:['abcd','LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
+            cmd: 'del source',
+            param: 'name',
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
-            cmd:'scan period',
+            cmd: 'scan period',
             param: 'period_ms',
-            values:[ '23'],
+            values: ['23'],
         },
         {
-            cmd:'del user',
-            param:'name',
-            values:['abcd','LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
-        }
+            cmd: 'del user',
+            param: 'name',
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
+        },
+        {
+            cmd: 'enter assignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
+            cmd: 'do assignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        }, {
+            cmd: 'exit assignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
+            cmd: 'enter crossAssignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
+            cmd: 'do crossAssignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        }, {
+            cmd: 'exit crossAssignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
+            cmd: 'rule',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
     ];
     for (let item of exceptions) {
         if (item.cmd === cmd && item.param === param) {
@@ -401,7 +434,7 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'del enter assignment',
             depends: [
-                'enter assignment LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
+                'enter assignment true LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
             ],
             teardown: [
                 'undo enter assignment',
@@ -409,7 +442,7 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'del exit assignment',
             depends: [
-                'exit assignment LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
+                'exit assignment false LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
             ],
             teardown: [
                 'undo exit assignment',
@@ -418,7 +451,7 @@ function cmds_depend_prepare(cmd, parent) {
         {
             cmd: 'del do assignment',
             depends: [
-                'do assignment LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
+                'do assignment true LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
             ],
             teardown: [
                 'undo do assignment',
@@ -427,7 +460,7 @@ function cmds_depend_prepare(cmd, parent) {
         {
             cmd: 'del enter crossAssignment',
             depends: [
-                'enter crossAssignment abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
+                'enter crossAssignment true abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
             ],
             teardown: [
                 'undo enter crossAssignment'
@@ -436,7 +469,7 @@ function cmds_depend_prepare(cmd, parent) {
         {
             cmd: 'del exit crossAssignment',
             depends: [
-                'exit crossAssignment abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
+                'exit crossAssignment false abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
             ],
             teardown: [
                 'undo exit crossAssignment'
@@ -444,7 +477,7 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'del do crossAssignment',
             depends: [
-                'do crossAssignment abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
+                'do crossAssignment false abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
             ],
             teardown: [
                 'undo do crossAssignment'
@@ -482,6 +515,21 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'undo user'
             ]
+        },{
+            cmd:'init state',
+            depends:[
+                'state abcd',
+                'return',
+                'state 12345',
+                'return',
+                'state \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\'',
+                'return',
+                'state \'a = b.a + 1\'',
+                'return',
+            ],
+            teardown:[
+                'clear'
+            ],
         }
     ];
     let ret = { depends: [], teardown: [] };
@@ -553,12 +601,12 @@ export default {
 
     run_and_check: async function (cli, cmd_obj) {
         let orig_prompt = cli.current_prompt;
-        for (let depend of cmd_obj.depend_define.depends) {
-            await cli.run_cmd(depend);
-        }
         let cmds = make_pairwise_cmds(cmd_obj);
         print_test_log(`run cmds: ${JSON.stringify(cmds)}`);
         for (let cmd of cmds) {
+            for (let depend of cmd_obj.depend_define.depends) {
+                await cli.run_cmd(depend);
+            }
             let output = await cli.run_cmd(cmd);
             expect(output).not.toContain('Usage:');
             expect(output).not.toContain('Invalid Command');
@@ -582,9 +630,9 @@ export default {
                 let bdr = await cli.run_cmd('bdr');
                 expect(bdr).not.toContain(cmd.trim());
             }
-        }
-        for (let teardown of cmd_obj.depend_define.teardown) {
-            await cli.run_cmd(teardown);
+            for (let teardown of cmd_obj.depend_define.teardown) {
+                await cli.run_cmd(teardown);
+            }
         }
     }
 }

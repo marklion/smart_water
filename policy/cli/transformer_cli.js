@@ -81,8 +81,7 @@ export default {
         if (resp.transformer && resp.transformer.rules) {
             for (const rule of resp.transformer.rules) {
                 const isConstant = rule.is_constant || false;
-                const expression = isConstant ? rule.expression : `"${rule.expression}"`;
-                ret.push(`  rule ${isConstant} '${rule.target_state}' '${expression}'`);
+                ret.push(`  rule '${isConstant}' '${rule.target_state}' '${rule.expression}'`);
             }
         }
         return ret;

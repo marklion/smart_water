@@ -57,9 +57,8 @@ export default {
                 return `策略 ${ins.cur_view_name} 的初始状态已设置为: ${args.state_name}`;
             },
             async (cmd_this, args) => {
-                // 清除初始状态设置（通过设置为null或空字符串）
-                // 注意：这里我们需要一个清除初始状态的方法，暂时通过重新设置来实现
-                return `初始状态设置已清除，将使用第一个状态作为初始状态`;
+                await policy_lib.set_init_state(ins.cur_view_name, '');
+                return `初始状态设置已清除`;
             }
         );
 
@@ -104,7 +103,7 @@ export default {
             try {
                 let initStateResp = await policy_lib.get_init_state(view_name);
                 if (initStateResp.init_state) {
-                    ret.push(`init state ${initStateResp.init_state}`);
+                    ret.push(`init state '${initStateResp.init_state}'`);
                 }
             } catch (err) {
                 // 忽略获取初始状态时的错误

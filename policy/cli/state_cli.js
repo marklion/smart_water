@@ -260,13 +260,12 @@ export default {
                 const assignmentsKey = `${actionType}_assignments`;
                 if (resp.state[assignmentsKey]) {
                     resp.state[assignmentsKey].forEach(assignment => {
-                        const isConstant = assignment.is_constant || false;
-                        const expression = isConstant ? assignment.expression : `"${assignment.expression}"`;
+                        const isConstant = assignment.is_constant ? 'true' : 'false';
                         if (!assignment.target_policy_name) {
-                            ret.push(`  ${actionType} assignment '${assignment.variable_name}' '${expression}'`);
+                            ret.push(`  ${actionType} assignment '${isConstant}' '${assignment.variable_name}' '${assignment.expression}'`);
                         }
                         else {
-                            ret.push(`  ${actionType} crossAssignment '${assignment.target_policy_name}' '${assignment.variable_name}' '${expression}'`);
+                            ret.push(`  ${actionType} crossAssignment '${isConstant}' '${assignment.target_policy_name}' '${assignment.variable_name}' '${assignment.expression}'`);
                         }
                     });
                 }

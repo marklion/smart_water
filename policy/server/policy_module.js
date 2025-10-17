@@ -581,7 +581,8 @@ export default {
                             mean: '转移规则列表',
                             explain: {
                                 target_state: { type: String, mean: '目标状态', example: 's2' },
-                                expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
+                                expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' },
+                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true}
                             }
                         }
                     }
@@ -976,8 +977,9 @@ export default {
             },
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
-                validateStateExists(policy, body.state_name);
-
+                if (body.state_name) {
+                    validateStateExists(policy, body.state_name);
+                }
                 // 设置初始状态
                 policy.init_state = body.state_name;
 
@@ -1044,7 +1046,7 @@ async function processPolicyExecution(policy) {
             execution_count: 0,
             is_first_execution: true, // 标记是否为第一次执行
             // 策略执行逻辑：先检查状态转换，需要转换就直接结束当前周期
-            executePolicyCycle: async function(policy, currentState) {
+            executePolicyCycle: async function (policy, currentState) {
                 console.log(`策略 ${policy.name} 执行第${this.execution_count}次，当前状态: ${this.current_state}，运行时间: ${this.runtime}`);
 
                 // 如果是第一次执行，先执行初始状态的enter动作
@@ -1066,7 +1068,7 @@ async function processPolicyExecution(policy) {
                 return false; // 返回 false 表示没有状态转换，正常执行完成
             },
             // 获取数据源读数的函数
-            getSource: async function(sourceName) {
+            getSource: async function (sourceName) {
                 try {
                     // 验证数据源是否存在
                     if (!policy.sources || policy.sources.length === 0) {
