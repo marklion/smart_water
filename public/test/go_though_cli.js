@@ -254,6 +254,11 @@ function convert_param(cmd, param) {
             param: 'is_constant',
             values: ['true', 'false']
         },
+        {
+            cmd:'list policy',
+            param:'policy_name',
+            values:['a']
+        }
     ];
     for (let item of exceptions) {
         if (item.cmd === cmd && item.param === param) {
@@ -526,6 +531,19 @@ function cmds_depend_prepare(cmd, parent) {
                 'return',
                 'state \'a = b.a + 1\'',
                 'return',
+            ],
+            teardown:[
+                'clear'
+            ],
+        },{
+            cmd:'list policy',
+            depends:[
+                'policy a',
+                'state a',
+                'return',
+                'init state a',
+                'return',
+                'scan period 10',
             ],
             teardown:[
                 'clear'
