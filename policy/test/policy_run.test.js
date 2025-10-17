@@ -57,8 +57,8 @@ policy
       do action 'fm' 'close'
       enter assignment 'false' 'delay_start' 'Date.now()'
       transformer 'next'
-        rule 'false' 'error' 'Date.now() - prs.variables.get("delay_start") > 2000 && prs.getSource("ll") > 4'
-        rule 'false' 'kongxian' 'Date.now() - prs.variables.get("delay_start") > 2000 && prs.getSource("ll") < 4'
+        rule 'false' 'error' 'Date.now() - prs.variables.get("delay_start") > 2000 && (await prs.getSource("ll")) > 4'
+        rule 'false' 'kongxian' 'Date.now() - prs.variables.get("delay_start") > 2000 && (await prs.getSource("ll")) < 4'
       return
     return
     state 'gongzuo'
