@@ -1,7 +1,7 @@
 import virtual_driver from './driver/virtual_driver.js';
 const driver_array = [
     {
-        name: '虚拟设备',
+        name: 'virtualDevice',
         config_method: '[log_file]',
         capability: ['open', 'close', 'readout', 'mock_readout'],
         driver: virtual_driver,
@@ -73,8 +73,8 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' },
-                driver_name: { type: String, have_to: true, mean: '驱动名称', example: '虚拟设备' },
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' },
+                driver_name: { type: String, have_to: true, mean: '驱动名称', example: 'virtualDevice' },
                 config_key: { type: String, have_to: true, mean: '配置json', example: 'log_file' },
                 longitude: { type: Number, have_to: true, mean: '经度', example: 111.670801 },
                 latitude: { type: Number, have_to: true, mean: '纬度', example: 40.818311 },
@@ -128,7 +128,7 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
                 result: { type: Boolean, mean: '删除结果', example: true }
@@ -158,8 +158,8 @@ export default {
                     type: Array,
                     mean: '设备列表',
                     explain: {
-                        device_name: { type: String, mean: '设备名称', example: '虚拟设备1' },
-                        driver_name: { type: String, mean: '驱动名称', example: '虚拟设备' },
+                        device_name: { type: String, mean: '设备名称', example: 'virtualDevice1' },
+                        driver_name: { type: String, mean: '驱动名称', example: 'virtualDevice' },
                         config_key: { type: String, mean: '配置json', example: 'log_file' },
                         capability: { type: String, mean: '能力集', example: '[]' },
                         farm_name: { type: String, mean: '所属农场', example: '农场1' },
@@ -203,7 +203,7 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
                 result: { type: Boolean, mean: '打开结果', example: true }
@@ -220,7 +220,7 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
                 result: { type: Boolean, mean: '关闭结果', example: true }
@@ -237,7 +237,7 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' },
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' },
                 value: { type: Number, have_to: true, mean: '模拟读数值', example: 100 }
             },
             result: {
@@ -255,7 +255,7 @@ export default {
             is_write: false,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
                 readout: { type: Number, mean: '设备示数', example: 100 }

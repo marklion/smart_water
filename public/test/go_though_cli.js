@@ -38,44 +38,44 @@ function parseCommandLine(line) {
         description
     };
 }
-const common_param_values = ['abcd', '12345', '汉字内容', 'a = b.a + 1'];
+const common_param_values = ['abcd', '12345', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'a = b.a + 1'];
 function convert_param(cmd, param) {
     let convert_ret = common_param_values;
     let exceptions = [
         {
             cmd: 'policy',
             param: 'view_name',
-            values: ['abcd', '汉字内容']
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'state',
             param: 'view_name',
-            values: ['abcd', '汉字内容']
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'transformer',
             param: 'view_name',
-            values: ['abcd', '汉字内容']
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'resource',
             param: 'view_name',
-            values: ['abcd', '汉字内容']
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'farm',
             param: 'view_name',
-            values: ['abcd', '汉字内容']
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'block',
             param: 'view_name',
-            values: ['abcd', '汉字内容']
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'add device',
             param: 'driver_name',
-            values: ['虚拟设备']
+            values: ['virtualDevice']
         },
         {
             cmd: 'add device',
@@ -105,17 +105,17 @@ function convert_param(cmd, param) {
         {
             cmd: 'enter action',
             param: 'device',
-            values: ['汉字内容', 'abcd']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
         },
         {
             cmd: 'exit action',
             param: 'device',
-            values: ['汉字内容', 'abcd']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
         },
         {
             cmd: 'do action',
             param: 'device',
-            values: ['汉字内容', 'abcd']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
         },
         {
             cmd: 'enter action',
@@ -165,17 +165,17 @@ function convert_param(cmd, param) {
         {
             cmd: 'del enter assignment',
             param: 'variable_name',
-            values: ['汉字内容']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'del do assignment',
             param: 'variable_name',
-            values: ['汉字内容']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'del exit assignment',
             param: 'variable_name',
-            values: ['汉字内容']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'del enter crossAssignment',
@@ -185,12 +185,12 @@ function convert_param(cmd, param) {
         {
             cmd: 'del enter crossAssignment',
             param: 'variable_name',
-            values: ['汉字内容']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'del do crossAssignment',
             param: 'variable_name',
-            values: ['汉字内容']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'del do crossAssignment',
@@ -199,7 +199,7 @@ function convert_param(cmd, param) {
         }, {
             cmd: 'del exit crossAssignment',
             param: 'variable_name',
-            values: ['汉字内容']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'del exit crossAssignment',
@@ -209,7 +209,7 @@ function convert_param(cmd, param) {
         {
             cmd:'del source',
             param:'name',
-            values:['abcd','汉字内容']
+            values:['abcd','LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd:'scan period',
@@ -219,7 +219,7 @@ function convert_param(cmd, param) {
         {
             cmd:'del user',
             param:'name',
-            values:['abcd','汉字内容']
+            values:['abcd','LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         }
     ];
     for (let item of exceptions) {
@@ -264,7 +264,7 @@ function cmds_depend_prepare(cmd, parent) {
         'farm',
         'add farm abcd 1 2 3',
         'add farm 12345 1 2 3',
-        'add farm \'汉字内容\' 1 2 3',
+        'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
         'add farm \'a = b.a + 1\' 1 2 3',
         'return',
         'block'
@@ -309,8 +309,8 @@ function cmds_depend_prepare(cmd, parent) {
             parent: 'sw_cli',
             depends: [
                 'device',
-                'add device abcd 虚拟设备 abcd 3 5',
-                'add device 汉字内容 虚拟设备 abcd 3 5',
+                'add device abcd virtualDevice abcd 3 5',
+                'add device LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa virtualDevice abcd 3 5',
                 'return',
             ],
             teardown: [
@@ -326,10 +326,10 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'del device',
             depends: [
-                'add device abcd 虚拟设备 abcd 3 5',
-                'add device 12345 虚拟设备 12345 4 5',
-                'add device \'汉字内容\' 虚拟设备 \'汉字内容\' 5 5',
-                'add device \'a = b.a + 1\' 虚拟设备 \'a = b.a + 1\' 3 3',
+                'add device abcd virtualDevice abcd 3 5',
+                'add device 12345 virtualDevice 12345 4 5',
+                'add device \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' virtualDevice \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 5 5',
+                'add device \'a = b.a + 1\' virtualDevice \'a = b.a + 1\' 3 3',
             ],
             teardown: [
                 'undo add device',
@@ -339,7 +339,7 @@ function cmds_depend_prepare(cmd, parent) {
             depends: [
                 'add farm abcd 1 2 3',
                 'add farm 12345 1 2 3',
-                'add farm \'汉字内容\' 1 2 3',
+                'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
                 'add farm \'a = b.a + 1\' 1 2 3',
             ],
             teardown: [
@@ -350,19 +350,19 @@ function cmds_depend_prepare(cmd, parent) {
             depends: farm_related_prepare.concat([
                 'add block abcd abcd 100',
                 'add block abcd 12345 100',
-                'add block abcd \'汉字内容\' 100',
+                'add block abcd \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 100',
                 'add block abcd \'a = b.a + 1\' 100',
                 'add block 12345 abcd 100',
                 'add block 12345 12345 100',
-                'add block 12345 \'汉字内容\' 100',
+                'add block 12345 \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 100',
                 'add block 12345 \'a = b.a + 1\' 100',
-                'add block \'汉字内容\' abcd 100',
-                'add block \'汉字内容\' 12345 100',
-                'add block \'汉字内容\' \'汉字内容\' 100',
-                'add block \'汉字内容\' \'a = b.a + 1\' 100',
+                'add block \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd 100',
+                'add block \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 12345 100',
+                'add block \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 100',
+                'add block \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' \'a = b.a + 1\' 100',
                 'add block \'a = b.a + 1\' abcd 100',
                 'add block \'a = b.a + 1\' 12345 100',
-                'add block \'a = b.a + 1\' \'汉字内容\' 100',
+                'add block \'a = b.a + 1\' \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 100',
                 'add block \'a = b.a + 1\' \'a = b.a + 1\' 100',
             ]),
             teardown: ([
@@ -375,7 +375,7 @@ function cmds_depend_prepare(cmd, parent) {
                 'return',
                 'policy 12345',
                 'return',
-                'policy \'汉字内容\'',
+                'policy \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\'',
                 'return',
                 'policy \'a = b.a + 1\'',
                 'return',
@@ -390,7 +390,7 @@ function cmds_depend_prepare(cmd, parent) {
                 'return',
                 'state 12345',
                 'return',
-                'state \'汉字内容\'',
+                'state \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\'',
                 'return',
                 'state \'a = b.a + 1\'',
                 'return',
@@ -401,7 +401,7 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'del enter assignment',
             depends: [
-                'enter assignment 汉字内容 abcd',
+                'enter assignment LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
             ],
             teardown: [
                 'undo enter assignment',
@@ -409,7 +409,7 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'del exit assignment',
             depends: [
-                'exit assignment 汉字内容 abcd',
+                'exit assignment LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
             ],
             teardown: [
                 'undo exit assignment',
@@ -418,7 +418,7 @@ function cmds_depend_prepare(cmd, parent) {
         {
             cmd: 'del do assignment',
             depends: [
-                'do assignment 汉字内容 abcd',
+                'do assignment LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd',
             ],
             teardown: [
                 'undo do assignment',
@@ -427,7 +427,7 @@ function cmds_depend_prepare(cmd, parent) {
         {
             cmd: 'del enter crossAssignment',
             depends: [
-                'enter crossAssignment abcd 汉字内容 abcd'
+                'enter crossAssignment abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
             ],
             teardown: [
                 'undo enter crossAssignment'
@@ -436,7 +436,7 @@ function cmds_depend_prepare(cmd, parent) {
         {
             cmd: 'del exit crossAssignment',
             depends: [
-                'exit crossAssignment abcd 汉字内容 abcd'
+                'exit crossAssignment abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
             ],
             teardown: [
                 'undo exit crossAssignment'
@@ -444,7 +444,7 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'del do crossAssignment',
             depends: [
-                'do crossAssignment abcd 汉字内容 abcd'
+                'do crossAssignment abcd LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa abcd'
             ],
             teardown: [
                 'undo do crossAssignment'
@@ -456,7 +456,7 @@ function cmds_depend_prepare(cmd, parent) {
                 'return',
                 'transformer 12345',
                 'return',
-                'transformer \'汉字内容\'',
+                'transformer \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\'',
                 'return',
                 'transformer \'a = b.a + 1\'',
                 'return',
@@ -468,7 +468,7 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'del source',
             depends: [
                 'source abcd a b',
-                'source 汉字内容 a b'
+                'source LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa a b'
             ],
             teardown: [
                 'undo source'
@@ -477,7 +477,7 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'del user',
             depends: [
                 'user abcd 12345',
-                'user 汉字内容 12345',
+                'user LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa 12345',
             ],
             teardown: [
                 'undo user'

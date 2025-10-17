@@ -20,8 +20,8 @@ describe('设备操作', () => {
     beforeEach(async () => {
         await cli.run_cmd('device');
         await cli.run_cmd('clear', 'device> ');
-        await cli.run_cmd(`add device d1 '虚拟设备' 'd1_device.log' 1 2`, 'device> ');
-        await cli.run_cmd(`add device d2 '虚拟设备' 'd2_device.log' 1 2`, 'device> ');
+        await cli.run_cmd(`add device d1 'virtualDevice' 'd1_device.log' 1 2`, 'device> ');
+        await cli.run_cmd(`add device d2 'virtualDevice' 'd2_device.log' 1 2`, 'device> ');
     })
     afterEach(async () => {
         await cli.run_cmd('clear', 'device> ');
