@@ -65,7 +65,9 @@ export default {
         return vorpal;
     },
     enter_view_hook: async function (args) {
-        await policy_lib.add_policy(args.view_name);
+        // 检查是否是轮灌组策略（通过名称判断，或者可以通过其他方式）
+        const is_irrigation_group = args.view_name.includes('轮灌组') || args.is_irrigation_group;
+        await policy_lib.add_policy(args.view_name, is_irrigation_group);
         let prompt = this.prompt_prefix + args.view_name + '>';
 
         this._vorpalInstance.delimiter(prompt);

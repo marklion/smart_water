@@ -340,12 +340,15 @@ const fetchAllWeatherData = async () => {
     loading.value = true
 
     try {
-        // 直接使用演示数据，避免API调用卡顿
-        currentWeather.value = generateTodayDemoData()
-        weeklyData.value = generateFutureDemoData()
+        // 并行获取今日天气和未来天气数据
+        await Promise.all([
+            fetchTodayWeather(),
+            fetchWeeklyWeather()
+        ])
+        console.log('所有天气数据加载完成')
     } catch (error) {
         console.error('天气数据初始化失败:', error)
-        // 确保有演示数据
+        // 确保有演示数据作为后备
         currentWeather.value = generateTodayDemoData()
         weeklyData.value = generateFutureDemoData()
     } finally {

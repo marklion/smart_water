@@ -12,6 +12,35 @@ export default {
         this._vorpalInstance = vorpal;
         cli_utils.add_sub_cli(vorpal, policy_detail_cli, prompt);
         vorpal.delimiter(prompt)
+        
+        // 轮灌组相关命令
+        vorpal.command('irrigation-groups', '列出所有轮灌组')
+            .action(async function(args, callback) {
+                try {
+                    const result = await policy_lib.get_irrigation_groups();
+                    if (result.err_msg) {
+                        throw { err_msg: result.err_msg };
+                    }
+                    
+                    if (!result.groups || result.groups.length === 0) {
+                        callback('暂无轮灌组数据');
+                        return;
+                    }
+                    
+                    let output = '\n=== 轮灌组列表 ===\n';
+                    output += '名称\t\t面积\t灌溉时间\t施肥量\t\t状态\t\t优先级\n';
+                    output += '─'.repeat(80) + '\n';
+                    
+                    result.groups.forEach(group => {
+                        const variables = group.variables || {};
+                        output += `${group.name}\t\t${variables.area || 0}亩\t${variables.irrigation_time || '12h'}\t\t${variables.fertilizer_amount || '30L/亩'}\t\t${group.current_state || '待机状态'}\t\t${variables.priority || 0}\n`;
+                    });
+                    
+                    callback(output);
+                } catch (error) {
+                    callback(`获取轮灌组列表失败: ${error.err_msg || error.message}`);
+                }
+            });
         cli_utils.make_undo_cmd(
             vorpal,
             'scan period <period_ms>',
