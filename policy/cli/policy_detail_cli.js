@@ -99,16 +99,6 @@ export default {
     make_bdr: async function (view_name) {
         let ret = [];
         try {
-            // 显示初始状态配置
-            try {
-                let initStateResp = await policy_lib.get_init_state(view_name);
-                if (initStateResp.init_state) {
-                    ret.push(`init state '${initStateResp.init_state}'`);
-                }
-            } catch (err) {
-                // 忽略获取初始状态时的错误
-            }
-
             let pageNo = 0;
             let total = 0;
             do {
@@ -127,6 +117,15 @@ export default {
         if (this._vorpalInstance) {
             this.cur_view_name = view_name;
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));
+        }
+        // 显示初始状态配置
+        try {
+            let initStateResp = await policy_lib.get_init_state(view_name);
+            if (initStateResp.init_state) {
+                ret.push(`init state '${initStateResp.init_state}'`);
+            }
+        } catch (err) {
+            // 忽略获取初始状态时的错误
         }
         return ret;
     },

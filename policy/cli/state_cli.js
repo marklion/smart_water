@@ -250,7 +250,7 @@ export default {
                 const actionsKey = `${actionType}_actions`;
                 if (resp.state[actionsKey]) {
                     resp.state[actionsKey].forEach(action => {
-                        ret.push(`  ${actionType} action '${action.device}' '${action.action}'`);
+                        ret.push(`${actionType} action '${action.device}' '${action.action}'`);
                     });
                 }
             });
@@ -262,10 +262,10 @@ export default {
                     resp.state[assignmentsKey].forEach(assignment => {
                         const isConstant = assignment.is_constant ? 'true' : 'false';
                         if (!assignment.target_policy_name) {
-                            ret.push(`  ${actionType} assignment '${isConstant}' '${assignment.variable_name}' '${assignment.expression}'`);
+                            ret.push(`${actionType} assignment '${isConstant}' '${assignment.variable_name}' '${assignment.expression}'`);
                         }
                         else {
-                            ret.push(`  ${actionType} crossAssignment '${isConstant}' '${assignment.target_policy_name}' '${assignment.variable_name}' '${assignment.expression}'`);
+                            ret.push(`${actionType} crossAssignment '${isConstant}' '${assignment.target_policy_name}' '${assignment.variable_name}' '${assignment.expression}'`);
                         }
                     });
                 }

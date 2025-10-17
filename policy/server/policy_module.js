@@ -1002,6 +1002,34 @@ export default {
                 return { init_state: policy.init_state || null };
             }
         },
+        get_policy_runtime:{
+            name: '获取策略运行时状态',
+            description: '获取策略的运行时状态信息',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true }
+            },
+            result: {
+                current_state: { type: String, mean: '当前状态名称', example: 's1' },
+                variables: { type: String, mean: '变量映射表', example: '{ temp: 25, humidity: 60 }' },
+            },
+            func: async function (body, token) {
+                let ret = {};
+                let runtimeState = policy_runtime_states.get(body.policy_name);
+                if (runtimeState)
+                {
+                    ret.current_state = runtimeState.current_state;
+                    ret.variables = JSON.stringify(runtimeState.variables);
+                }
+                else
+                {
+                    throw { err_msg: `策略 ${body.policy_name} 的运行时状态不存在` };
+                }
+
+                return ret;
+            }
+        },
     }
 }
 
@@ -1048,6 +1076,9 @@ async function processPolicyExecution(policy) {
             // 策略执行逻辑：先检查状态转换，需要转换就直接结束当前周期
             executePolicyCycle: async function (policy, currentState) {
                 console.log(`策略 ${policy.name} 执行第${this.execution_count}次，当前状态: ${this.current_state}，运行时间: ${this.runtime}`);
+                for (let variable of this.variables) {
+                    console.log(`  变量 ${variable}`);
+                }
 
                 // 如果是第一次执行，先执行初始状态的enter动作
                 if (this.is_first_execution) {
@@ -1231,10 +1262,8 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
 
         // 简化的上下文，只包含基本数据
         const context = {
-            ...Object.fromEntries(runtimeState.variables),
-            sensors: await getSensorData(),
-            devices: await getDeviceStatus(),
             getSource: runtimeState.getSource.bind(runtimeState), // 添加 getSource 函数
+            prs: runtimeState,
             Date: Date,
             Math: Math,
             abs: Math.abs,
@@ -1249,11 +1278,12 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
             cos: Math.cos,
             tan: Math.tan,
             log: Math.log,
-            exp: Math.exp
+            exp: Math.exp,
+            print: console.log
         };
 
         // 使用安全的 AST 求值器
-        const result = evaluator.evaluate(expression, context);
+        const result = await evaluator.evaluate(expression, context);
         return result;
     } catch (error) {
         console.error(`赋值表达式求值失败: ${expression}`, error);
@@ -1268,10 +1298,8 @@ async function evaluateTransitionExpression(expression, runtimeState) {
 
         // 简化的上下文，只包含基本数据
         const context = {
-            ...Object.fromEntries(runtimeState.variables),
-            sensors: await getSensorData(),
-            devices: await getDeviceStatus(),
             getSource: runtimeState.getSource.bind(runtimeState), // 添加 getSource 函数
+            prs: runtimeState,
             Date: Date,
             Math: Math,
             abs: Math.abs,
@@ -1279,11 +1307,12 @@ async function evaluateTransitionExpression(expression, runtimeState) {
             min: Math.min,
             round: Math.round,
             floor: Math.floor,
-            ceil: Math.ceil
+            ceil: Math.ceil,
+            print: console.log
         };
 
         // 使用安全的 AST 求值器
-        const result = evaluator.evaluate(expression, context);
+        const result = await evaluator.evaluate(expression, context);
         console.log(`表达式求值: ${expression} = ${result}`);
         return Boolean(result);
     } catch (error) {

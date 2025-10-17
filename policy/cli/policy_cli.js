@@ -42,6 +42,13 @@ export default {
                 }
             }
         );
+        cli_utils.make_display_cmd(vorpal, 'list policy <policy_name>', '列出策略状态', async (cmd_this, args, pageNo) => {
+            let result = await policy_lib.get_policy_runtime(args.policy_name);
+            cmd_this.log(`变量:${result.variables}`);
+            cmd_this.log(`当前状态:${result.current_state}`);
+
+            return 0;
+        });
         return vorpal;
     },
     make_bdr: async function () {

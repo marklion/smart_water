@@ -45,6 +45,13 @@ async function close_server() {
 
     print_test_log('Server closed successfully at ' + new Date().toLocaleTimeString());
 }
+async function wait_ms(ms) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, ms);
+    });
+}
 
 export default async function create_cli(processName) {
     let ret = {};
@@ -128,4 +135,4 @@ export default async function create_cli(processName) {
 
     return ret;
 }
-export { start_server, close_server, print_test_log };
+export { start_server, close_server, print_test_log, wait_ms };
