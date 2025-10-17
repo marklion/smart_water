@@ -13,15 +13,15 @@ export default{
             farm_name,
             block_name
         } = deviceConfig;
-        
+
         return await call_remote('/device_management/add_device', {
-            device_name: String(device_name),
-            driver_name: String(driver_name),
-            config_key: String(config_key),
+            device_name: device_name,
+            driver_name: driver_name,
+            config_key: config_key,
             longitude: Number.parseFloat(longitude),
             latitude: Number.parseFloat(latitude),
-            farm_name: String(farm_name),
-            block_name: String(block_name),
+            farm_name: farm_name,
+            block_name: block_name,
         }, token);
     },
     del_device: async function (device_name, token) {

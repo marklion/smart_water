@@ -19,23 +19,23 @@ function get_vorpal() {
         events.defaultMaxListeners = 1000;
         const vorpal = cli_utils.create_vorpal();
         const prompt = 'sw_cli> ';
-        vorpal.command('bdr', '列出所有配置')
-            .action(async function (args) {
-                try {
-                    this.log((await make_bdr()).join('\n'));
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
-        vorpal.command('set_sys_name <sys_name>', '设置系统名称')
-            .action(async function (args) {
-                try {
-                    await call_remote('/set_sys_name', { sys_name: args.sys_name });
-                    this.log('系统名称已设置为：' + args.sys_name);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
+        cli_utils.make_common_cmd(vorpal, 'bdr', '列出所有配置', async (cmd_this, args) => {
+            let cmd_ret = '';
+            try {
+                cmd_ret = (await make_bdr()).join('\n');
+            } catch (err) {
+                cmd_ret = 'Error: ' + (err.err_msg || '未知错误');
+            }
+            return cmd_ret;
+        });
+        cli_utils.make_undo_cmd(vorpal, 'set_sys_name <sys_name>', '设置系统名称', '清除系统名称', async (cmd_this, args) => {
+            await call_remote('/set_sys_name', { sys_name: args.sys_name });
+            cmd_this.log('系统名称已设置为：' + args.sys_name);
+        }, async (cmd_this, args) => {
+            await call_remote('/set_sys_name', { sys_name: 'no_name' });
+            cmd_this.log('系统名称已清除');
+        });
+
         cli_utils.add_sub_cli(vorpal, device_cli, prompt);
         cli_utils.add_sub_cli(vorpal, resource_cli, prompt);
         cli_utils.add_sub_cli(vorpal, policy_cli, prompt);
@@ -46,44 +46,70 @@ function get_vorpal() {
     return g_vorpal;
 }
 export default {
+    gothrough_vp: function (vp) {
+        let ret = [];
+        let cmds = vp.commands;
+        for (let cmd of cmds) {
+            let tmp_cmd = {
+                cmd: cmd._name,
+                desp: cmd._description,
+                args: []
+            };
+            let args = cmd._args;
+            for (let arg of args) {
+                tmp_cmd.args.push({
+                    name: arg.name,
+                    required: arg.required,
+                })
+            }
+            ret.push(tmp_cmd);
+        }
+        if (vp.sub_clies) {
+            for (let sub_cli of vp.sub_clies) {
+                let sub_vp = sub_cli._vorpalInstance;
+                let tmp_cmd = {
+                    cmd: sub_cli.command,
+                    desp: '进入 ' + sub_cli.name,
+                    sub_cmds: this.gothrough_vp(sub_vp)
+                }
+                ret.push(tmp_cmd);
+            }
+        }
+
+        return ret;
+    },
+    generate_cmd_tree: function () {
+        let vp = get_vorpal();
+        return this.gothrough_vp(vp);
+    },
     run_inactive: function () {
         let ins = this;
         const vorpal = get_vorpal();
-        vorpal.command('save [filename]', '保存当前配置到文件')
-            .action(async function (args) {
-                try {
-                    await ins.save_config(args.filename);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
-        vorpal.command('clear', '清除当前配置')
-            .action(async function (args) {
-                try {
-                    await cli_utils.clear_config(vorpal);
-                    this.log('当前配置已清除');
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
-        vorpal.command('restore [filename]', '从文件恢复配置')
-            .action(async function (args) {
-                try {
-                    await cli_utils.clear_config(vorpal);
-                    await ins.restore_config(args.filename);
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
-        vorpal.command('restart', '重启服务器')
-            .action(async function (args) {
-                try {
-                    await call_remote('/restart', {});
-                    this.log('服务器已重启');
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
+        cli_utils.make_common_cmd(vorpal, 'save [filename]', '保存当前配置到文件', async (cmd_this, args) => {
+            try {
+                await ins.save_config(args.filename);
+            } catch (err) {
+                return 'Error: ' + (err.err_msg || '未知错误');
+            }
+        });
+        cli_utils.make_common_cmd(vorpal, 'clear', '清除当前配置', async (cmd_this, args) => {
+            let cmd_ret = '';
+            try {
+                await cli_utils.clear_config(vorpal);
+                cmd_ret = '当前配置已清除';
+            } catch (err) {
+                cmd_ret = 'Error: ' + (err.err_msg || '未知错误');
+            }
+            return cmd_ret;
+        });
+        cli_utils.make_common_cmd(vorpal, 'restore [filename]', '从文件恢复配置', async (cmd_this, args) => {
+            try {
+                await cli_utils.clear_config(vorpal);
+                await ins.restore_config(args.filename);
+            } catch (err) {
+                return 'Error: ' + (err.err_msg || '未知错误');
+            }
+        });
 
         vorpal.show();
     },

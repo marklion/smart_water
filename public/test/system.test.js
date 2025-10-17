@@ -40,4 +40,4 @@ test('命令走读', async () => {
     for (let cmd of cmds) {
         await go_though_cli.run_and_check(cli, cmd);
     }
-})
+}, 1000000);

@@ -47,15 +47,6 @@ export default {
             await policy_lib.del_source(ins.cur_view_name, name);
             return `数据源 ${name} 删除成功`;
         });
-        
-        vorpal.command('bdr', '列出所有配置')
-            .action(async function (args) {
-                try {
-                    this.log((await ins.make_bdr(ins.cur_view_name)).join('\n'));
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
         return vorpal;
     },
     enter_view_hook: async function (args) {
@@ -100,8 +91,8 @@ export default {
                 if (resp.sources.length == 0) {
                     break;
                 }
-                ret = ret.concat(resp.sources.map(source => 
-                    `source ${source.name} ${source.device} ${source.data_type}`
+                ret = ret.concat(resp.sources.map(source =>
+                    `source '${source.name}' '${source.device}' '${source.data_type}'`
                 ));
                 total = resp.total;
                 pageNo++;

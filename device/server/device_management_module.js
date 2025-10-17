@@ -1,7 +1,7 @@
 import virtual_driver from './driver/virtual_driver.js';
 const driver_array = [
     {
-        name: '虚拟设备',
+        name: 'virtualDevice',
         config_method: '[log_file]',
         capability: ['open', 'close', 'readout', 'mock_readout'],
         driver: virtual_driver,
@@ -19,14 +19,14 @@ async function get_driver(device_name, capability) {
     if (driver_config.capability.indexOf(capability) === -1) {
         throw { err_msg: '驱动不支持该能力' };
     }
-    
+
     // 使用设备名称作为缓存键，确保每个设备只有一个驱动实例
     const cache_key = device_name;
     if (!driver_instances.has(cache_key)) {
         const driver_instance = await driver_config.driver(device.config_key);
         driver_instances.set(cache_key, driver_instance);
     }
-    
+
     return driver_instances.get(cache_key);
 }
 const device_array = []
@@ -73,8 +73,8 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' },
-                driver_name: { type: String, have_to: true, mean: '驱动名称', example: '虚拟设备' },
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' },
+                driver_name: { type: String, have_to: true, mean: '驱动名称', example: 'virtualDevice' },
                 config_key: { type: String, have_to: true, mean: '配置json', example: 'log_file' },
                 longitude: { type: Number, have_to: true, mean: '经度', example: 111.670801 },
                 latitude: { type: Number, have_to: true, mean: '纬度', example: 40.818311 },
@@ -88,12 +88,12 @@ export default {
                 if (driver_array.find(driver => driver.name === body.driver_name) === undefined) {
                     throw { err_msg: '驱动不存在' };
                 }
-                
+
                 // 验证必填的经度和纬度参数
                 if (body.longitude === undefined || body.latitude === undefined) {
                     throw { err_msg: '经度和纬度是必填参数' };
                 }
-                
+
                 // 验证坐标范围
                 if (body.longitude < -180 || body.longitude > 180) {
                     throw { err_msg: '经度必须在-180到180之间' };
@@ -101,7 +101,7 @@ export default {
                 if (body.latitude < -90 || body.latitude > 90) {
                     throw { err_msg: '纬度必须在-90到90之间' };
                 }
-                
+
                 let exist_device = device_array.find(device => device.device_name === body.device_name);
                 if (!exist_device) {
                     exist_device = {
@@ -113,9 +113,11 @@ export default {
                 exist_device.config_key = body.config_key;
                 exist_device.longitude = body.longitude;
                 exist_device.latitude = body.latitude;
-                if (body.farm_name && body.block_name) {
-                    exist_device.block_name = body.block_name;
+                if (body.farm_name) {
                     exist_device.farm_name = body.farm_name;
+                }
+                if (body.block_name) {
+                    exist_device.block_name = body.block_name;
                 }
                 return { result: true };
             }
@@ -126,7 +128,7 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
                 result: { type: Boolean, mean: '删除结果', example: true }
@@ -156,8 +158,8 @@ export default {
                     type: Array,
                     mean: '设备列表',
                     explain: {
-                        device_name: { type: String, mean: '设备名称', example: '虚拟设备1' },
-                        driver_name: { type: String, mean: '驱动名称', example: '虚拟设备' },
+                        device_name: { type: String, mean: '设备名称', example: 'virtualDevice1' },
+                        driver_name: { type: String, mean: '驱动名称', example: 'virtualDevice' },
                         config_key: { type: String, mean: '配置json', example: 'log_file' },
                         capability: { type: String, mean: '能力集', example: '[]' },
                         farm_name: { type: String, mean: '所属农场', example: '农场1' },
@@ -201,7 +203,7 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
                 result: { type: Boolean, mean: '打开结果', example: true }
@@ -218,7 +220,7 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
                 result: { type: Boolean, mean: '关闭结果', example: true }
@@ -235,7 +237,7 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' },
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' },
                 value: { type: Number, have_to: true, mean: '模拟读数值', example: 100 }
             },
             result: {
@@ -253,7 +255,7 @@ export default {
             is_write: false,
             is_get_api: false,
             params: {
-                device_name: { type: String, have_to: true, mean: '设备名称', example: '虚拟设备1' }
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
                 readout: { type: Number, mean: '设备示数', example: 100 }

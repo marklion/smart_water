@@ -29,7 +29,7 @@ export default {
             async (cmd_this, args) => {
                 let farm_name = args.farm_name;
                 let block_name = args.block_name;
-                let area = args.block_area;
+                let area = parseFloat(args.block_area);
                 let info = args.info || '';
                 let result = await resource_lib.add_block(farm_name, block_name, area, info);
                 if (result.result) {
@@ -55,14 +55,6 @@ export default {
             }
         });
         vorpal.delimiter(prompt)
-        vorpal.command('bdr', '列出所有配置')
-            .action(async function (args) {
-                try {
-                    this.log((await ins.make_bdr()).join('\n'));
-                } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
-                }
-            });
         return vorpal;
     },
     make_bdr: async function () {

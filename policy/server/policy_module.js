@@ -1,9 +1,9 @@
-import { 
-    ensureArrayExists, 
-    getPaginatedResult, 
-    findAndRemoveFromArray, 
-    addItemIfNotExists, 
-    mapArrayToNameOnly, 
+import {
+    ensureArrayExists,
+    getPaginatedResult,
+    findAndRemoveFromArray,
+    addItemIfNotExists,
+    mapArrayToNameOnly,
     mapArrayToFields,
     validateItemExists,
     validateNestedItemExists,
@@ -49,7 +49,7 @@ function validateVariableExists(policy, variable_name) {
     if (!policy.sources || policy.sources.length === 0) {
         throw { err_msg: `策略 ${policy.name} 中没有定义任何数据源，无法使用变量 ${variable_name}` };
     }
-    
+
     const sourceExists = policy.sources.some(source => source.name === variable_name);
     if (!sourceExists) {
         throw { err_msg: `变量 ${variable_name} 在策略 ${policy.name} 的数据源中不存在` };
@@ -61,16 +61,16 @@ async function validateDeviceAction(device_name, action) {
     try {
         const deviceModule = await import('../../device/server/device_management_module.js');
         const deviceResult = await deviceModule.default.methods.list_device.func({ pageNo: 0 });
-        
+
         if (!deviceResult || !deviceResult.devices) {
             throw { err_msg: '无法获取设备列表' };
         }
-        
+
         const device = deviceResult.devices.find(d => d.device_name === device_name);
         if (!device) {
             throw { err_msg: `设备 ${device_name} 不存在` };
         }
-        
+
         // 解析设备能力
         let capabilities = [];
         try {
@@ -78,12 +78,12 @@ async function validateDeviceAction(device_name, action) {
         } catch (e) {
             throw { err_msg: `设备 ${device_name} 的能力配置无效` };
         }
-        
+
         // 直接检查动作是否在设备能力中
         if (!capabilities.includes(action)) {
             throw { err_msg: `设备 ${device_name} 不支持动作 ${action}，设备支持的能力: ${capabilities.join(', ')}` };
         }
-        
+
         return true;
     } catch (error) {
         if (error.err_msg) {
@@ -97,10 +97,10 @@ async function validateDeviceAction(device_name, action) {
 function getActionListName(trigger) {
     const actionListMap = {
         'enter': 'enter_actions',
-        'do': 'do_actions', 
+        'do': 'do_actions',
         'exit': 'exit_actions'
     };
-    
+
     const listName = actionListMap[trigger];
     if (!listName) {
         throw { err_msg: '无效的触发类型，必须是 enter, do, 或 exit' };
@@ -112,11 +112,11 @@ function getActionListName(trigger) {
 function getActionList(state, trigger, shouldExist = false) {
     const listName = getActionListName(trigger);
     const actionList = state[listName];
-    
+
     if (shouldExist && !actionList) {
         throw { err_msg: '动作不存在' };
     }
-    
+
     return actionList;
 }
 
@@ -124,10 +124,10 @@ function getActionList(state, trigger, shouldExist = false) {
 function getAssignmentListName(trigger) {
     const assignmentListMap = {
         'enter': 'enter_assignments',
-        'do': 'do_assignments', 
+        'do': 'do_assignments',
         'exit': 'exit_assignments'
     };
-    
+
     const listName = assignmentListMap[trigger];
     if (!listName) {
         throw { err_msg: '无效的触发类型，必须是 enter, do, 或 exit' };
@@ -139,11 +139,11 @@ function getAssignmentListName(trigger) {
 function getAssignmentList(state, trigger, shouldExist = false) {
     const listName = getAssignmentListName(trigger);
     const assignmentList = state[listName];
-    
+
     if (shouldExist && !assignmentList) {
         throw { err_msg: '赋值表达式不存在' };
     }
-    
+
     return assignmentList;
 }
 
@@ -186,7 +186,7 @@ export default {
             result: {
                 policies: {
                     type: Array, mean: '策略列表', explain: {
-                        name: { type: String, mean: '策略名称', example: '策略1'},
+                        name: { type: String, mean: '策略名称', example: '策略1' },
                     }
                 }
             },
@@ -198,8 +198,8 @@ export default {
                 }
             },
         },
-        del_policy:{
-            name:'删除策略',
+        del_policy: {
+            name: '删除策略',
             description: '删除一个策略',
             is_write: true,
             is_get_api: false,
@@ -207,18 +207,18 @@ export default {
                 name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
             },
             result: {
-                result: { type: Boolean, mean: '操作结果', example: true}
+                result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
                 try {
                     // 先验证策略是否存在
                     validatePolicyExists(body.name);
-                    
+
                     if (findAndRemoveByName(policy_array, body.name)) {
                         return { result: true };
                     } else {
                         throw {
-                            err_msg:'策略删除失败',
+                            err_msg: '策略删除失败',
                         }
                     }
                 } catch (error) {
@@ -263,30 +263,30 @@ export default {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
             },
             result: {
-                states: { 
-                    type: Array, 
-                    mean: '状态列表', 
+                states: {
+                    type: Array,
+                    mean: '状态列表',
                     explain: {
                         name: { type: String, mean: '状态名称', example: 's1' },
-                        enter_actions: { 
-                            type: Array, 
-                            mean: '进入动作列表', 
+                        enter_actions: {
+                            type: Array,
+                            mean: '进入动作列表',
                             explain: {
                                 device: { type: String, mean: '设备名称', example: '阀门1' },
                                 action: { type: String, mean: '动作名称', example: '开启' }
                             }
                         },
-                        do_actions: { 
-                            type: Array, 
-                            mean: '状态内动作列表', 
+                        do_actions: {
+                            type: Array,
+                            mean: '状态内动作列表',
                             explain: {
                                 device: { type: String, mean: '设备名称', example: '阀门1' },
                                 action: { type: String, mean: '动作名称', example: '开启' }
                             }
                         },
-                        exit_actions: { 
-                            type: Array, 
-                            mean: '离开动作列表', 
+                        exit_actions: {
+                            type: Array,
+                            mean: '离开动作列表',
                             explain: {
                                 device: { type: String, mean: '设备名称', example: '阀门1' },
                                 action: { type: String, mean: '动作名称', example: '开启' }
@@ -316,14 +316,14 @@ export default {
                                 expression: { type: String, mean: '赋值表达式', example: 's.temperature' }
                             }
                         },
-                        transformers: { 
-                            type: Array, 
-                            mean: '转换器列表', 
+                        transformers: {
+                            type: Array,
+                            mean: '转换器列表',
                             explain: {
                                 name: { type: String, mean: '转换器名称', example: 't1' },
-                                rules: { 
-                                    type: Array, 
-                                    mean: '转移规则列表', 
+                                rules: {
+                                    type: Array,
+                                    mean: '转移规则列表',
                                     explain: {
                                         target_state: { type: String, mean: '目标状态', example: 's2' },
                                         expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
@@ -359,7 +359,7 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 validateStateExists(policy, body.state_name);
-                
+
                 const removed = findAndRemoveFromArray(policy.states, s => s.name === body.state_name);
                 if (!removed) {
                     throw { err_msg: '状态删除失败' };
@@ -377,24 +377,24 @@ export default {
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true }
             },
             result: {
-                state: { 
-                    type: Object, 
-                    mean: '状态信息', 
+                state: {
+                    type: Object,
+                    mean: '状态信息',
                     explain: {
-                        name: { type: String, mean: '状态名称', example: 's1'},
-                        enter_actions: { 
-                            type: Array, 
-                            mean: '进入动作列表', 
+                        name: { type: String, mean: '状态名称', example: 's1' },
+                        enter_actions: {
+                            type: Array,
+                            mean: '进入动作列表',
                             explain: ACTION_FIELD_SCHEMA
                         },
-                        transformers: { 
-                            type: Array, 
-                            mean: '转换器列表', 
+                        transformers: {
+                            type: Array,
+                            mean: '转换器列表',
                             explain: {
                                 name: { type: String, mean: '转换器名称', example: 't1' },
-                                rules: { 
-                                    type: Array, 
-                                    mean: '转移规则列表', 
+                                rules: {
+                                    type: Array,
+                                    mean: '转移规则列表',
                                     explain: {
                                         target_state: { type: String, mean: '目标状态', example: 's2' },
                                         expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
@@ -402,14 +402,14 @@ export default {
                                 }
                             }
                         },
-                        do_actions: { 
-                            type: Array, 
-                            mean: '状态内动作列表', 
+                        do_actions: {
+                            type: Array,
+                            mean: '状态内动作列表',
                             explain: ACTION_FIELD_SCHEMA
                         },
-                        exit_actions: { 
-                            type: Array, 
-                            mean: '离开动作列表', 
+                        exit_actions: {
+                            type: Array,
+                            mean: '离开动作列表',
                             explain: ACTION_FIELD_SCHEMA
                         },
                         enter_assignments: {
@@ -417,7 +417,8 @@ export default {
                             mean: '进入状态赋值表达式列表',
                             explain: {
                                 variable_name: { type: String, mean: '变量名', example: 'temp' },
-                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' }
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' },
+                                target_policy_name: { type: String, mean: '目标策略名称', example: '策略2' },
                             }
                         },
                         do_assignments: {
@@ -425,7 +426,8 @@ export default {
                             mean: '状态内赋值表达式列表',
                             explain: {
                                 variable_name: { type: String, mean: '变量名', example: 'temp' },
-                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' }
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' },
+                                target_policy_name: { type: String, mean: '目标策略名称', example: '策略2' },
                             }
                         },
                         exit_assignments: {
@@ -433,7 +435,8 @@ export default {
                             mean: '离开状态赋值表达式列表',
                             explain: {
                                 variable_name: { type: String, mean: '变量名', example: 'temp' },
-                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' }
+                                expression: { type: String, mean: '赋值表达式', example: 's.temperature + 10' },
+                                target_policy_name: { type: String, mean: '目标策略名称', example: '策略2' },
                             }
                         }
                     }
@@ -463,10 +466,10 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                
+
                 // 验证设备存在性和动作能力
                 await validateDeviceAction(body.device, body.action);
-                
+
                 let actionListName = getActionListName(body.trigger);
                 let actionList = ensureArrayExists(state, actionListName);
                 addItemIfNotExists(actionList, {
@@ -511,9 +514,9 @@ export default {
                 state_name: { type: String, mean: '状态名称', example: 's1', have_to: true }
             },
             result: {
-                transformers: { 
-                    type: Array, 
-                    mean: '转换器列表', 
+                transformers: {
+                    type: Array,
+                    mean: '转换器列表',
                     explain: {
                         name: { type: String, mean: '转换器名称', example: 't1' }
                     }
@@ -547,7 +550,7 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 validateTransformerExists(state, body.transformer_name);
-                
+
                 const removed = findAndRemoveFromArray(state.transformers, t => t.name === body.transformer_name);
                 if (!removed) {
                     throw { err_msg: '转换器删除失败' };
@@ -566,14 +569,14 @@ export default {
                 transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true }
             },
             result: {
-                transformer: { 
-                    type: Object, 
-                    mean: '转换器信息', 
+                transformer: {
+                    type: Object,
+                    mean: '转换器信息',
                     explain: {
-                        name: { type: String, mean: '转换器名称', example: 't1'},
-                        rules: { 
-                            type: Array, 
-                            mean: '转移规则列表', 
+                        name: { type: String, mean: '转换器名称', example: 't1' },
+                        rules: {
+                            type: Array,
+                            mean: '转移规则列表',
                             explain: {
                                 target_state: { type: String, mean: '目标状态', example: 's2' },
                                 expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' }
@@ -634,21 +637,21 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
                 let transformer = validateTransformerExists(state, body.transformer_name);
-                
+
                 if (!transformer.rules) {
                     throw { err_msg: '转换器规则列表不存在' };
                 }
-                
+
                 // 验证规则是否存在
                 const ruleExists = transformer.rules.some(rule => rule.target_state === body.target_state);
                 if (!ruleExists) {
                     throw { err_msg: `转换器规则不存在: 目标状态 ${body.target_state}` };
                 }
-                
-                const removed = findAndRemoveFromArray(transformer.rules, rule => 
+
+                const removed = findAndRemoveFromArray(transformer.rules, rule =>
                     rule.target_state === body.target_state
                 );
-                
+
                 if (!removed) {
                     throw { err_msg: '转换器规则删除失败' };
                 }
@@ -672,25 +675,25 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                
+
                 // 验证设备是否存在
                 await validateDeviceAction(body.device, body.action);
-                
+
                 let actionList = getActionList(state, body.trigger, true);
-                
+
                 // 验证动作是否存在
                 const actionExists = actionList.some(a => a.device === body.device && a.action === body.action);
                 if (!actionExists) {
                     throw { err_msg: `动作不存在: 设备 ${body.device} 执行 ${body.action}` };
                 }
-                
-                let actionRemoved = findAndRemoveFromArray(actionList, 
+
+                let actionRemoved = findAndRemoveFromArray(actionList,
                     a => a.device === body.device && a.action === body.action);
-                
+
                 if (!actionRemoved) {
                     throw { err_msg: '动作删除失败' };
                 }
-                
+
                 return { result: true };
             }
         },
@@ -713,21 +716,21 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                
+
                 // 如果是跨策略赋值，不验证变量存在性
                 if (body.target_policy_name) {
                     // 跨策略赋值逻辑
                     let assignmentList = ensureArrayExists(state, getAssignmentListName(body.trigger));
-                    
+
                     // 检查是否已存在相同变量名的赋值表达式
                     let existingAssignment = assignmentList.find(
                         a => a.variable_name === body.variable_name && a.target_policy_name === body.target_policy_name
                     );
-                    
+
                     if (existingAssignment) {
                         throw { err_msg: `变量 ${body.variable_name} 的跨策略赋值表达式已存在` };
                     }
-                    
+
                     assignmentList.push({
                         variable_name: body.variable_name,
                         expression: body.expression,
@@ -735,25 +738,25 @@ export default {
                     });
                 } else {
                     // 策略内赋值逻辑
-                    validateVariableExists(policy, body.variable_name);
-                    
+                    //validateVariableExists(policy, body.variable_name);
+
                     let assignmentList = ensureArrayExists(state, getAssignmentListName(body.trigger));
-                    
+
                     // 检查是否已存在相同变量名的赋值表达式
                     let existingAssignment = assignmentList.find(
                         a => a.variable_name === body.variable_name
                     );
-                    
+
                     if (existingAssignment) {
                         throw { err_msg: `变量 ${body.variable_name} 的赋值表达式已存在` };
                     }
-                    
+
                     assignmentList.push({
                         variable_name: body.variable_name,
                         expression: body.expression
                     });
                 }
-                
+
                 return { result: true };
             }
         },
@@ -775,40 +778,40 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let state = validateStateExists(policy, body.state_name);
-                
+
                 let assignmentList = getAssignmentList(state, body.trigger, true);
-                
+
                 // 验证赋值表达式是否存在
                 let assignmentExists;
                 if (body.target_policy_name) {
                     // 跨策略赋值验证
-                    assignmentExists = assignmentList.some(a => 
+                    assignmentExists = assignmentList.some(a =>
                         a.variable_name === body.variable_name && a.target_policy_name === body.target_policy_name);
                 } else {
                     // 策略内赋值验证
                     assignmentExists = assignmentList.some(a => a.variable_name === body.variable_name);
                 }
-                
+
                 if (!assignmentExists) {
                     const assignmentType = body.target_policy_name ? '跨策略赋值表达式' : '赋值表达式';
                     throw { err_msg: `${assignmentType}不存在: 变量 ${body.variable_name}` };
                 }
-                
+
                 let assignmentRemoved;
                 if (body.target_policy_name) {
                     // 跨策略赋值删除
-                    assignmentRemoved = findAndRemoveFromArray(assignmentList, 
+                    assignmentRemoved = findAndRemoveFromArray(assignmentList,
                         a => a.variable_name === body.variable_name && a.target_policy_name === body.target_policy_name);
                 } else {
                     // 策略内赋值删除
-                    assignmentRemoved = findAndRemoveFromArray(assignmentList, 
+                    assignmentRemoved = findAndRemoveFromArray(assignmentList,
                         a => a.variable_name === body.variable_name);
                 }
-                
+
                 if (!assignmentRemoved) {
                     throw { err_msg: '赋值表达式删除失败' };
                 }
-                
+
                 return { result: true };
             }
         },
@@ -846,9 +849,9 @@ export default {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
             },
             result: {
-                sources: { 
-                    type: Array, 
-                    mean: '数据源列表', 
+                sources: {
+                    type: Array,
+                    mean: '数据源列表',
                     explain: {
                         name: { type: String, mean: '数据源名称', example: '温度传感器1' },
                         device: { type: String, mean: '设备名称', example: '传感器1' },
@@ -881,13 +884,13 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let sources = validateArrayExists(policy, 'sources', '数据源');
-                
+
                 // 验证数据源是否存在
                 const sourceExists = sources.some(s => s.name === body.name);
                 if (!sourceExists) {
                     throw { err_msg: `数据源 ${body.name} 不存在` };
                 }
-                
+
                 const removed = findAndRemoveFromArray(sources, s => s.name === body.name);
                 if (!removed) {
                     throw { err_msg: '数据源删除失败' };
@@ -910,7 +913,7 @@ export default {
                 if (body.period_ms < 0) {
                     throw { err_msg: '扫描周期不能为负数' };
                 }
-                
+
                 if (scan_timer) {
                     clearInterval(scan_timer);
                     scan_timer = null;
@@ -919,7 +922,7 @@ export default {
                 if (scan_period_ms > 0) {
                     scan_timer = setInterval(scanAndExecutePolicies, scan_period_ms);
                 }
-                
+
                 return { result: true };
             }
         },
@@ -1015,7 +1018,7 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                 }
             }
         }
-        
+
         // 执行动作
         const actionListName = getActionListName(trigger);
         const actions = state[actionListName];
@@ -1080,8 +1083,8 @@ async function executeDeviceAction(device, action) {
             methodName = 'open_device';
         } else if (actionLower.includes('关闭') || actionLower.includes('close')) {
             methodName = 'close_device';
-        } else if (actionLower.includes('读取') || actionLower.includes('检查') || actionLower.includes('启动') || 
-                   actionLower.includes('监测') || actionLower.includes('read') || actionLower.includes('check')) {
+        } else if (actionLower.includes('读取') || actionLower.includes('检查') || actionLower.includes('启动') ||
+            actionLower.includes('监测') || actionLower.includes('read') || actionLower.includes('check')) {
             methodName = 'readout_device';
         } else if (actionLower.includes('模拟') || actionLower.includes('mock')) {
             methodName = 'mock_readout';
@@ -1102,7 +1105,7 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
     try {
         // 导入安全的 AST 表达式求值器
         const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
-        
+
         // 简化的上下文，只包含基本数据
         const context = {
             ...Object.fromEntries(runtimeState.variables),
@@ -1124,7 +1127,7 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
             log: Math.log,
             exp: Math.exp
         };
-        
+
         // 使用安全的 AST 求值器
         const result = evaluator.evaluate(expression, context);
         return result;
@@ -1138,7 +1141,7 @@ async function evaluateTransitionExpression(expression, runtimeState) {
     try {
         // 导入安全的 AST 表达式求值器
         const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
-        
+
         // 简化的上下文，只包含基本数据
         const context = {
             ...Object.fromEntries(runtimeState.variables),
@@ -1153,7 +1156,7 @@ async function evaluateTransitionExpression(expression, runtimeState) {
             floor: Math.floor,
             ceil: Math.ceil
         };
-        
+
         // 使用安全的 AST 求值器
         const result = evaluator.evaluate(expression, context);
         console.log(`表达式求值: ${expression} = ${result}`);

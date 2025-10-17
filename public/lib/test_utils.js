@@ -4,8 +4,11 @@ let g_server = null;
 function print_test_log(log, need_equal_sign = false) {
     let now = moment().format('YYYY-MM-DD HH:mm:ss:SSS');
     let real_log = log;
+    if (typeof log === 'object') {
+        real_log = JSON.stringify(log, null, 2);
+    }
     if (need_equal_sign) {
-        real_log = `=======${log}=======`;
+        real_log = `=======${real_log}=======`;
     }
     console.log(`[${now}] ${real_log}`);
 }
@@ -55,6 +58,7 @@ export default async function create_cli(processName) {
         cwd: process.cwd(),
         env: process.env,
         cols: 320,
+        rows: 600,
     });
     ret.output = '';
     ret.process.on('data', function (data) {

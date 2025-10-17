@@ -7,12 +7,10 @@ const JWT_EXPIRES_IN = '7d';
 
 let users = [];
 
-function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
-}
+
 
 function verifyPassword(password, hash) {
-    return hashPassword(password) === hash;
+    return password === hash;
 }
 
 function generateToken(username) {
@@ -52,7 +50,7 @@ export default {
                     throw { err_msg: '用户名和密码不能为空' };
                 }
                 const user = users.find(u => u.username === usernameStr);
-                
+
                 if (!user) {
                     throw { err_msg: '用户不存在' };
                 }
@@ -90,25 +88,25 @@ export default {
                 if (usernameStr.length < 3) {
                     throw { err_msg: '用户名长度不能少于3位' };
                 }
-                if (passwordStr.length < 6) {
-                    throw { err_msg: '密码长度不能少于6位' };
+                if (passwordStr.length < 3) {
+                    throw { err_msg: '密码长度不能少于3位' };
                 }
                 if (users.find(u => u.username === usernameStr)) {
                     throw { err_msg: '用户已存在' };
                 }
                 users.push({
                     username: usernameStr,
-                    password: hashPassword(passwordStr),
+                    password: passwordStr,
                     created_at: new Date().toISOString()
                 });
-                
+
                 return {
                     success: true,
                     username: usernameStr
                 };
             }
         },
-        
+
         del_user: {
             is_write: true,
             need_rbac: false,
@@ -128,7 +126,7 @@ export default {
                     throw { err_msg: '用户名不能为空' };
                 }
                 const userIndex = users.findIndex(u => u.username === usernameStr);
-                
+
                 if (userIndex === -1) {
                     throw { err_msg: '用户不存在' };
                 }
@@ -138,7 +136,7 @@ export default {
                     username: usernameStr
                 };
             }
-        },      
+        },
         list_users: {
             is_write: false,
             need_rbac: false,
@@ -146,12 +144,13 @@ export default {
             description: '获取所有用户列表',
             params: {},
             result: {
-                users: { 
-                    type: Array, 
-                    mean: '用户列表', 
+                users: {
+                    type: Array,
+                    mean: '用户列表',
                     example: [{ username: 'admin', created_at: '2024-01-01T00:00:00.000Z' }],
                     explain: {
                         username: { type: String, mean: '用户名', example: 'admin' },
+                        password: { type: String, mean: '密码', example: 'aaa' },
                         created_at: { type: String, mean: '创建时间', example: '2024-01-01T00:00:00.000Z' }
                     }
                 },
@@ -160,9 +159,10 @@ export default {
             func: async function(params) {
                 const userList = users.map(user => ({
                     username: user.username,
+                    password: user.password,
                     created_at: user.created_at
                 }));
-                
+
                 return {
                     users: userList,
                     total: userList.length
@@ -171,7 +171,5 @@ export default {
         }
     },
     verifyToken,
-    hashPassword,
-    verifyPassword,
     generateToken
 };
