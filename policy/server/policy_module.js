@@ -1055,7 +1055,7 @@ export default {
                         if (initialState && initialState.enter_assignments) {
                             initialState.enter_assignments.forEach(assignment => {
                                 if (assignment.variable_name === 'area') {
-                                    defaultArea = assignment.expression;
+                                    defaultArea = parseInt(assignment.expression);
                                 } else if (assignment.variable_name === 'status') {
                                     defaultStatus = assignment.expression.replace(/"/g, '');
                                 } else if (assignment.variable_name === 'irrigation_time') {
@@ -1077,13 +1077,13 @@ export default {
                         is_irrigation_group: true,
                         current_state: currentState, // 策略的运行时状态
                         variables: {
-                            area: variables.area || defaultArea,
+                            area: parseInt(variables.area) || defaultArea,
                             irrigation_time: variables.irrigation_time || defaultIrrigationTime,
                             fertilizer_amount: variables.fertilizer_amount || defaultFertilizerAmount,
-                            priority: variables.priority || defaultPriority,
-                            irrigated_volume: variables.irrigated_volume || 0,
-                            fertilized_volume: variables.fertilized_volume || 0,
-                            remaining_time: variables.remaining_time || 0
+                            priority: parseInt(variables.priority) || defaultPriority,
+                            irrigated_volume: parseInt(variables.irrigated_volume) || 0,
+                            fertilized_volume: parseInt(variables.fertilized_volume) || 0,
+                            remaining_time: parseInt(variables.remaining_time) || 0
                         }
                     };
                 });
