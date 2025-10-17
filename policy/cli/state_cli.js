@@ -72,12 +72,15 @@ function createDelActionCommand(vorpal, ins, trigger) {
 function createAssignmentCommand(vorpal, ins, trigger) {
     cli_utils.make_undo_cmd(
         vorpal,
-        `${trigger} assignment <variable_name> <expression>`,
-        `${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}赋值表达式`,
+        `${trigger} assignment <is_constant> <variable_name> <expression>`,
+        `${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}赋值表达式 (is_constant: true=常量/false=字符串)`,
         `撤销操作 - 删除所有${ASSIGNMENT_NAMES[trigger]}`,
         async (cmd_this, args) => {
-            await policy_lib.add_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, args.expression);
-            return `已添加${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name} = ${args.expression}`;
+            const isConstant = args.is_constant === 'true';
+            // 服务器端总是期望字符串类型的 expression 参数
+            const expression = String(args.expression);
+            await policy_lib.add_assignment(ins.policy_view.cur_view_name, ins.cur_view_name, trigger, args.variable_name, expression, null, isConstant);
+            return `已添加${ASSIGNMENT_NAMES[trigger]}: 变量 ${args.variable_name} = ${expression} (${isConstant ? '常量' : '字符串'})`;
         },
         async (cmd_this, args) => {
             const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
@@ -118,19 +121,23 @@ function createDelAssignmentCommand(vorpal, ins, trigger) {
 function createCrossPolicyAssignmentCommand(vorpal, ins, trigger) {
     cli_utils.make_undo_cmd(
         vorpal,
-        `${trigger} crossAssignment <policy_name> <variable_name> <expression>`,
-        `跨策略${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}跨策略变量赋值`,
+        `${trigger} crossAssignment <is_constant> <policy_name> <variable_name> <expression>`,
+        `跨策略${ASSIGNMENT_NAMES[trigger]} - 添加${TRIGGER_NAMES[trigger]}跨策略变量赋值 (is_constant: true=常量/false=字符串)`,
         `撤销操作 - 删除所有跨策略${ASSIGNMENT_NAMES[trigger]}`,
         async (cmd_this, args) => {
+            const isConstant = args.is_constant === 'true';
+            // 服务器端总是期望字符串类型的 expression 参数
+            const expression = String(args.expression);
             await policy_lib.add_assignment(
                 ins.policy_view.cur_view_name,
                 ins.cur_view_name,
                 trigger,
                 args.variable_name,
-                args.expression,
-                args.policy_name
+                expression,
+                args.policy_name,
+                isConstant
             );
-            return `已添加跨策略${ASSIGNMENT_NAMES[trigger]}: 策略 ${args.policy_name} 的变量 ${args.variable_name} = ${args.expression}`;
+            return `已添加跨策略${ASSIGNMENT_NAMES[trigger]}: 策略 ${args.policy_name} 的变量 ${args.variable_name} = ${expression} (${isConstant ? '常量' : '字符串'})`;
         },
         async (cmd_this, args) => {
             const resp = await policy_lib.get_state(ins.policy_view.cur_view_name, ins.cur_view_name);
@@ -253,11 +260,12 @@ export default {
                 const assignmentsKey = `${actionType}_assignments`;
                 if (resp.state[assignmentsKey]) {
                     resp.state[assignmentsKey].forEach(assignment => {
+                        const isConstant = assignment.is_constant ? 'true' : 'false';
                         if (!assignment.target_policy_name) {
-                            ret.push(`  ${actionType} assignment '${assignment.variable_name}' '${assignment.expression}'`);
+                            ret.push(`  ${actionType} assignment '${isConstant}' '${assignment.variable_name}' '${assignment.expression}'`);
                         }
                         else {
-                            ret.push(`  ${actionType} crossAssignment '${assignment.target_policy_name}' '${assignment.variable_name}' '${assignment.expression}'`);
+                            ret.push(`  ${actionType} crossAssignment '${isConstant}' '${assignment.target_policy_name}' '${assignment.variable_name}' '${assignment.expression}'`);
                         }
                     });
                 }

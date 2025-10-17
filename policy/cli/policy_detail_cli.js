@@ -47,6 +47,21 @@ export default {
             await policy_lib.del_source(ins.cur_view_name, name);
             return `数据源 ${name} 删除成功`;
         });
+
+        cli_utils.make_undo_cmd(vorpal,
+            'init state <state_name>',
+            '设置策略的初始状态',
+            '撤销操作 - 清除初始状态设置',
+            async (cmd_this, args) => {
+                await policy_lib.set_init_state(ins.cur_view_name, args.state_name);
+                return `策略 ${ins.cur_view_name} 的初始状态已设置为: ${args.state_name}`;
+            },
+            async (cmd_this, args) => {
+                await policy_lib.set_init_state(ins.cur_view_name, '');
+                return `初始状态设置已清除`;
+            }
+        );
+
         return vorpal;
     },
     enter_view_hook: async function (args) {
@@ -84,6 +99,16 @@ export default {
     make_bdr: async function (view_name) {
         let ret = [];
         try {
+            // 显示初始状态配置
+            try {
+                let initStateResp = await policy_lib.get_init_state(view_name);
+                if (initStateResp.init_state) {
+                    ret.push(`init state '${initStateResp.init_state}'`);
+                }
+            } catch (err) {
+                // 忽略获取初始状态时的错误
+            }
+
             let pageNo = 0;
             let total = 0;
             do {

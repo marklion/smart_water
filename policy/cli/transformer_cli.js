@@ -13,16 +13,19 @@ export default {
         this.prompt_prefix = prompt;
 
         // 添加 rule 命令
-        cli_utils.make_undo_cmd(vorpal, 'rule <target_state> <expression>', '创建一个状态转移条件', '删除所有转移规则',
+        cli_utils.make_undo_cmd(vorpal, 'rule <is_constant> <target_state> <expression>', '创建一个状态转移条件 (is_constant: true=常量/false=字符串)', '删除所有转移规则',
             async (cmd_this, args) => {
+                const isConstant = args.is_constant === 'true';
+                const expression = String(args.expression);
                 await policy_lib.add_transformer_rule(
                     ins.state_view.policy_view.cur_view_name,
                     ins.state_view.cur_view_name,
                     ins.cur_view_name,
                     args.target_state,
-                    args.expression
+                    expression,
+                    isConstant
                 );
-                return `已添加转移规则: 当条件满足时转移到状态 ${args.target_state}`;
+                return `已添加转移规则: 当条件满足时转移到状态 ${args.target_state} (${isConstant ? '常量' : '字符串'})`;
             },
             async (cmd_this, args) => {
                 const resp = await policy_lib.get_transformer(
@@ -77,7 +80,8 @@ export default {
         const resp = await policy_lib.get_transformer(this.state_view.policy_view.cur_view_name, this.state_view.cur_view_name, view_name);
         if (resp.transformer && resp.transformer.rules) {
             for (const rule of resp.transformer.rules) {
-                ret.push(`  rule '${rule.target_state}' '${rule.expression}'`);
+                const isConstant = rule.is_constant || false;
+                ret.push(`  rule '${isConstant}' '${rule.target_state}' '${rule.expression}'`);
             }
         }
         return ret;

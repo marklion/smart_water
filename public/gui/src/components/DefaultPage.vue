@@ -413,21 +413,81 @@ const onFarmChange = async (farmId) => {
       lng: selectedFarmData.longitude,
       lat: selectedFarmData.latitude
     }
-    console.log('地图中心点已更新到农场:', selectedFarmData.name, mapCenter.value)
   } else {
     // 如果没有坐标信息，使用默认坐标
     mapCenter.value = { lng: 111.670801, lat: 40.818311 }
-    console.log('使用默认地图中心点')
   }
 
   await loadFarmData(farmId)
 }
 
+// 更新设备实际状态 - 从策略执行状态获取
+const updateDeviceStatuses = async (devices) => {
+  try {
+    // 获取策略执行状态
+    const policyResponse = await call_remote('/policy/get_policy_execution_status', {})
+    
+    if (policyResponse && policyResponse.policies && policyResponse.policies.length > 0) {
+      // 获取策略中的设备动作状态
+      const policyDeviceActions = {}
+      for (const policy of policyResponse.policies) {
+        if (policy.device_actions) {
+          Object.assign(policyDeviceActions, policy.device_actions)
+        }
+      }
+      
+      // 根据策略动作更新设备状态
+      for (const device of devices) {
+        const deviceAction = policyDeviceActions[device.deviceName]
+        if (deviceAction === 'open') {
+          device.status = device.type === 'fertilizer' ? 'active' : 'open'
+        } else if (deviceAction === 'close') {
+          device.status = device.type === 'fertilizer' ? 'inactive' : 'closed'
+        } else {
+          // 如果没有策略控制，尝试读取设备实际状态
+          try {
+            const response = await call_remote('/device_management/readout_device', { 
+              device_name: device.deviceName 
+            })
+            if (response && response.readout !== undefined) {
+              if (response.readout > 0) {
+                device.status = device.type === 'fertilizer' ? 'active' : 'open'
+              } else {
+                device.status = device.type === 'fertilizer' ? 'inactive' : 'closed'
+              }
+            }
+          } catch (error) {
+            // 保持默认状态
+          }
+        }
+      }
+    } else {
+      // 如果没有策略执行状态，回退到原来的方式
+      for (const device of devices) {
+        try {
+          const response = await call_remote('/device_management/readout_device', { 
+            device_name: device.deviceName 
+          })
+          if (response && response.readout !== undefined) {
+            if (response.readout > 0) {
+              device.status = device.type === 'fertilizer' ? 'active' : 'open'
+            } else {
+              device.status = device.type === 'fertilizer' ? 'inactive' : 'closed'
+            }
+          }
+        } catch (error) {
+          // 保持默认状态
+        }
+      }
+    }
+  } catch (error) {
+    console.error('更新设备状态失败:', error)
+  }
+}
+
 // 加载真实设备数据
 const loadRealDeviceData = async (farmId) => {
   try {
-    console.log('开始加载真实设备数据，农场ID:', farmId)
-
     // 从设备管理API获取设备列表
     const deviceResponse = await call_remote('/device_management/list_device', {
       farm_name: farmId,
@@ -435,7 +495,6 @@ const loadRealDeviceData = async (farmId) => {
     })
 
     if (deviceResponse && deviceResponse.devices) {
-      console.log('获取到设备数据:', deviceResponse.devices)
 
       // 转换设备数据为地图标记格式
       const devices = deviceResponse.devices.map((device, index) => {
@@ -468,8 +527,8 @@ const loadRealDeviceData = async (farmId) => {
           label: device.device_name || `设备${index + 1}`,
           deviceName: device.device_name,
           deviceType: device.driver_name || '未知设备',
-          status: 'active', // 默认状态，可以从设备状态API获取
-          capability: device.capability ? device.capability.split(',') : ['readout'],
+          status: 'closed', // 默认状态设为关闭，需要从实际设备状态获取
+          capability: device.capability ? (typeof device.capability === 'string' ? JSON.parse(device.capability) : device.capability) : ['readout'],
           farmName: device.farm_name || farmId,
           blockName: device.block_name || '未知区块',
           showPopover: false,
@@ -482,15 +541,16 @@ const loadRealDeviceData = async (farmId) => {
       })
 
       mapMarkers.value = devices
-      console.log('设备数据转换完成，标记数量:', mapMarkers.value.length)
 
+      // 获取设备实际状态并更新统计
+      await updateDeviceStatuses(devices)
+      
       // 更新基本信息中的设备数量
       basicInfo.totalDevices = devices.length
       basicInfo.onlineDevices = devices.filter(d => d.status === 'active' || d.status === 'open').length
       basicInfo.offlineDevices = devices.length - basicInfo.onlineDevices
 
     } else {
-      console.log('未获取到设备数据，使用默认数据')
       // 如果没有获取到设备数据，使用默认的模拟数据
       mapMarkers.value = getDefaultDeviceData()
     }
@@ -624,16 +684,26 @@ const getDeviceStatusInfo = (marker) => {
 
 // 地图事件处理方法
 const onDeviceClick = (device) => {
-  console.log('设备被点击:', device)
   // 可以在这里添加额外的设备点击处理逻辑
 }
 
 const onDeviceToggle = (device) => {
-  console.log('设备状态切换:', device)
   // 更新本地设备状态
   const marker = mapMarkers.value.find(m => m.id === device.id)
   if (marker) {
     marker.status = device.status
+  }
+  
+  // 更新基本信息统计
+  updateBasicInfoStats()
+}
+
+// 更新基本信息统计
+const updateBasicInfoStats = () => {
+  if (mapMarkers.value && mapMarkers.value.length > 0) {
+    basicInfo.totalDevices = mapMarkers.value.length
+    basicInfo.onlineDevices = mapMarkers.value.filter(d => d.status === 'active' || d.status === 'open').length
+    basicInfo.offlineDevices = mapMarkers.value.length - basicInfo.onlineDevices
   }
 }
 

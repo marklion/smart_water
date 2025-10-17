@@ -19,11 +19,6 @@ export default {
                 }
             },
             result: {
-                irrigationGroups: {
-                    type: Number,
-                    mean: '轮灌组数量',
-                    example: 6
-                },
                 totalArea: {
                     type: Number,
                     mean: '农场总面积（亩）',
@@ -75,12 +70,8 @@ export default {
                         deviceList = [];
                     }
                     
-                    // 3. 轮灌组数据使用假数据（逻辑尚未实现）
-                    let policyList = [];
-                    
-                    // 4. 计算基础信息
+                    // 3. 计算基础信息
                     let totalArea = 0;
-                    let irrigationGroups = 0;
                     let totalDevices = 0;
                     let onlineDevices = 0;
                     let offlineDevices = 0;
@@ -92,8 +83,6 @@ export default {
                         }, 0);
                     }
                     
-                    // 计算轮灌组数量（使用假数据）
-                    irrigationGroups = farm.blocks ? farm.blocks.length : 6;
                     
                     // 根据农场名称推断作物类型
                     let cropName;
@@ -116,7 +105,6 @@ export default {
                     
                     
                     return {
-                        irrigationGroups,
                         totalArea,
                         cropName,
                         totalDevices,
@@ -128,7 +116,6 @@ export default {
                     console.error('监控中心数据获取失败:', error);
                     // 返回默认数据
                     return {
-                        irrigationGroups: 0,
                         totalArea: 0,
                         cropName: '未知',
                         totalDevices: 0,
@@ -214,91 +201,5 @@ export default {
                 };
             }
         },
-        
-        getIrrigationGroups: {
-            name: '获取轮灌组数据',
-            description: '获取轮灌组列表和状态',
-            is_write: false,
-            is_get_api: true,
-            params: {
-                farmName: {
-                    type: String,
-                    mean: '农场名称',
-                    example: '智慧农场',
-                    required: true
-                }
-            },
-            result: {
-                groups: {
-                    type: Array,
-                    mean: '轮灌组列表',
-                    explain: {
-                        id: { type: Number, mean: '组ID', example: 1 },
-                        name: { type: String, mean: '组名称', example: 'A区灌溉组' },
-                        status: { type: String, mean: '状态', example: '运行中' },
-                        progress: { type: Number, mean: '进度百分比', example: 75 },
-                        startTime: { type: String, mean: '开始时间', example: '09:00' },
-                        endTime: { type: String, mean: '结束时间', example: '11:30' }
-                    }
-                }
-            },
-            func: async function (body, token) {
-                const { farmName } = body;
-                
-                // 使用假数据返回轮灌组信息（逻辑尚未实现）
-                const groups = [
-                    {
-                        id: 1,
-                        name: 'A区灌溉组',
-                        status: '待机',
-                        progress: 0,
-                        startTime: '--',
-                        endTime: '--'
-                    },
-                    {
-                        id: 2,
-                        name: 'B区灌溉组',
-                        status: '待机',
-                        progress: 0,
-                        startTime: '--',
-                        endTime: '--'
-                    },
-                    {
-                        id: 3,
-                        name: 'C区灌溉组',
-                        status: '待机',
-                        progress: 0,
-                        startTime: '--',
-                        endTime: '--'
-                    },
-                    {
-                        id: 4,
-                        name: 'D区灌溉组',
-                        status: '待机',
-                        progress: 0,
-                        startTime: '--',
-                        endTime: '--'
-                    },
-                    {
-                        id: 5,
-                        name: 'E区灌溉组',
-                        status: '待机',
-                        progress: 0,
-                        startTime: '--',
-                        endTime: '--'
-                    },
-                    {
-                        id: 6,
-                        name: 'F区灌溉组',
-                        status: '待机',
-                        progress: 0,
-                        startTime: '--',
-                        endTime: '--'
-                    }
-                ];
-                
-                return groups;
-            }
-        }
     }
 };

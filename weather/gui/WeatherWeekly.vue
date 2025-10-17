@@ -284,7 +284,6 @@ const setupAutoSwitch = () => {
 
         if (totalDays > 1) {
             selectedDayIndex.value = (selectedDayIndex.value + 1) % totalDays
-            console.log(`自动切换到第 ${selectedDayIndex.value + 1} 天天气`)
         }
     }, 3000) // 每3秒切换一次
 }
@@ -344,7 +343,6 @@ const fetchAllWeatherData = async () => {
         // 直接使用演示数据，避免API调用卡顿
         currentWeather.value = generateTodayDemoData()
         weeklyData.value = generateFutureDemoData()
-        console.log('天气组件使用演示数据')
     } catch (error) {
         console.error('天气数据初始化失败:', error)
         // 确保有演示数据
@@ -429,13 +427,11 @@ const setupAutoRefresh = () => {
     };
 
     const interval = getRefreshInterval();
-    console.log(`设置自动刷新间隔: ${interval / 1000 / 60}分钟`)
 
     autoRefreshTimer = setTimeout(refresh, interval)
 }
 
 onMounted(() => {
-    console.log('天气组件已挂载')
     fetchAllWeatherData()
     setupAutoRefresh()
     setupAutoSwitch()
