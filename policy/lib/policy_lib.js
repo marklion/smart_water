@@ -1,7 +1,7 @@
 import call_remote from '../../public/lib/call_remote.js';
 export default {
-    add_policy: async function (name, token) {
-        return await call_remote('/policy/add_policy', { name }, token);
+    add_policy: async function (name, is_irrigation_group, token) {
+        return await call_remote('/policy/add_policy', { name, is_irrigation_group }, token);
     },
     list_policy: async function (pageNo, token) {
         return await call_remote('/policy/list_policy', { pageNo }, token);
@@ -142,6 +142,10 @@ export default {
     },
     get_init_state: async function (policy_name, token) {
         return await call_remote('/policy/get_init_state', { policy_name }, token);
+    },
+    // 轮灌组相关API
+    get_irrigation_groups: async function (token) {
+        return await call_remote('/policy/get_irrigation_groups', {}, token);
     },
     get_policy_runtime:async function(policy_name, token) {
         return await call_remote('/policy/get_policy_runtime', { policy_name }, token);

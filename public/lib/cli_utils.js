@@ -46,6 +46,10 @@ export default {
         let enter_cmd = sub_cli_definition.command;
         if (sub_cli_definition.enter_view_hook) {
             enter_cmd = enter_cmd + ' <view_name>';
+            // 如果是策略命令，添加轮灌组参数
+            if (sub_cli_definition.command === 'policy') {
+                enter_cmd = enter_cmd + ' [is_irrigation_group]';
+            }
         }
         if (sub_cli_definition.undo_hook) {
             this.make_common_cmd(cli, `undo ${sub_cli_definition.command} <view_name>`, '删除视图', async (cmd_this, args) => {
@@ -124,6 +128,10 @@ export default {
                     let enter_cmd = sub_cli.command;
                     if (view_name) {
                         enter_cmd = enter_cmd + ' ' + `'${view_name}'`;
+                        // 如果是策略命令且名称包含"轮灌组"，添加true参数
+                        if (sub_cli.command === 'policy' && view_name.includes('轮灌组')) {
+                            enter_cmd = enter_cmd + ' true';
+                        }
                     }
                     ret.push(enter_cmd);
                     let sub_bdr = await sub_cli.make_bdr(view_name);

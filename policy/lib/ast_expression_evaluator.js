@@ -181,21 +181,22 @@ class SafeExpressionEvaluator {
                 return context[node.name];
             case 'BinaryExpression':
                 return await this.evaluateBinaryExpression(node, context);
+            
             case 'UnaryExpression':
                 return await this.evaluateUnaryExpression(node, context);
+            
             case 'ConditionalExpression':
                 return await this.evaluateConditionalExpression(node, context);
+            
             case 'MemberExpression':
                 return await this.evaluateMemberExpression(node, context);
+            
             case 'CallExpression':
                 return await this.evaluateCallExpression(node, context);
+            
             case 'LogicalExpression':
                 return await this.evaluateLogicalExpression(node, context);
-            case 'AwaitExpression': {
-                // Evaluate the inner expression and await if it's a promise
-                const result = await this.evaluateNode(node.argument, context);
-                return result;
-            }
+            
             default:
                 throw new Error(`不支持的节点类型: ${node.type}`);
         }
@@ -204,7 +205,7 @@ class SafeExpressionEvaluator {
     async evaluateBinaryExpression(node, context) {
         const left = await this.evaluateNode(node.left, context);
         const right = await this.evaluateNode(node.right, context);
-
+        
         switch (node.operator) {
             case '+': return left + right;
             case '-': return left - right;
@@ -228,7 +229,7 @@ class SafeExpressionEvaluator {
 
     async evaluateUnaryExpression(node, context) {
         const argument = await this.evaluateNode(node.argument, context);
-
+        
         switch (node.operator) {
             case '+': return +argument;
             case '-': return -argument;
@@ -242,12 +243,16 @@ class SafeExpressionEvaluator {
     async evaluateConditionalExpression(node, context) {
         const test = await this.evaluateNode(node.test, context);
         return test ? await this.evaluateNode(node.consequent, context) : await this.evaluateNode(node.alternate, context);
+    async evaluateConditionalExpression(node, context) {
+        const test = await this.evaluateNode(node.test, context);
+        return test ? await this.evaluateNode(node.consequent, context) : await this.evaluateNode(node.alternate, context);
     }
 
     async evaluateMemberExpression(node, context) {
         const object = await this.evaluateNode(node.object, context);
-
+        
         if (node.computed) {
+            const property = await this.evaluateNode(node.property, context);
             const property = await this.evaluateNode(node.property, context);
             return object[property];
         } else {
@@ -255,15 +260,19 @@ class SafeExpressionEvaluator {
         }
     }
     async evaluateCallExpression(node, context) {
-        const argsPromises = node.arguments.map(arg => this.evaluateNode(arg, context));
-        const args = await Promise.all(argsPromises);
-
+        const args = await Promise.all(node.arguments.map(arg => this.evaluateNode(arg, context)));
+        
         if (node.callee.type === 'Identifier') {
             const func = context[node.callee.name];
             if (typeof func !== 'function') {
                 throw new Error(`不是函数: ${node.callee.name}`);
             }
-            return func(...args);
+            const result = func(...args);
+            // 如果函数返回Promise，等待它完成
+            if (result && typeof result.then === 'function') {
+                return await result;
+            }
+            return result;
         } else if (node.callee.type === 'MemberExpression') {
             const object = await this.evaluateNode(node.callee.object, context);
             const method = node.callee.property.name;
@@ -271,28 +280,34 @@ class SafeExpressionEvaluator {
             if (typeof func !== 'function') {
                 throw new Error(`不是函数: ${this.getMemberExpressionName(node.callee)}`);
             }
-            return func.apply(object, args);
+            const result = func.apply(object, args);
+            // 如果函数返回Promise，等待它完成
+            if (result && typeof result.then === 'function') {
+                return await result;
+            }
+            return result;
         }
 
         throw new Error('不支持的函数调用类型');
     }
     async evaluateLogicalExpression(node, context) {
         const left = await this.evaluateNode(node.left, context);
-
+        
         switch (node.operator) {
             case '&&':
-                return left ? await this.evaluateNode(node.right, context) : left;
+                return left && await this.evaluateNode(node.right, context);
             case '||':
-                return left ? left : await this.evaluateNode(node.right, context);
+                return left || await this.evaluateNode(node.right, context);
             default:
                 throw new Error(`不支持的逻辑运算符: ${node.operator}`);
         }
     }
     async evaluate(expression, context) {
+    async evaluate(expression, context) {
         // 解析表达式
         const ast = this.parseExpression(expression);
-
-        // 求值 (支持异步求值)
+        
+        // 求值
         return await this.evaluateNode(ast, context);
     }
 }

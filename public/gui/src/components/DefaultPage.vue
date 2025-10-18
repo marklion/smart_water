@@ -95,7 +95,7 @@
                 <el-table-column prop="id" label="轮灌组" width="110" align="left" />
                 <el-table-column prop="area" label="面积/亩" width="110" align="left" />
                 <el-table-column prop="irrigationMethod" label="灌溉方式" width="110" align="left" />
-                <el-table-column prop="irrigationStrategy" label="灌溉策略" width="110" align="left" />
+                <el-table-column prop="name" label="策略名称" width="110" align="left" />
                 <el-table-column prop="fertilizerStrategy" label="施肥策略" width="110" align="left" />
                 <el-table-column prop="irrigatedVolume" label="已灌溉量" width="110" align="left" />
                 <el-table-column prop="fertilizedVolume" label="已施肥量" width="110" align="left" />
@@ -253,9 +253,10 @@ const mapMarkers = shallowRef([])
 const irrigationGroups = shallowRef([
   {
     id: 1,
+    name: '轮灌组1',
     area: 80,
     irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
+    irrigationTime: '12h',
     fertilizerStrategy: '30L/亩',
     irrigatedVolume: '1200m³',
     fertilizedVolume: '48m³',
@@ -264,9 +265,10 @@ const irrigationGroups = shallowRef([
   },
   {
     id: 2,
+    name: '轮灌组2',
     area: 75,
     irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
+    irrigationTime: '12h',
     fertilizerStrategy: '30L/亩',
     irrigatedVolume: '195m³',
     fertilizedVolume: '-m³',
@@ -275,9 +277,10 @@ const irrigationGroups = shallowRef([
   },
   {
     id: 3,
+    name: '轮灌组3',
     area: 80,
     irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
+    irrigationTime: '12h',
     fertilizerStrategy: '30L/亩',
     irrigatedVolume: '-m³',
     fertilizedVolume: '-m³',
@@ -286,9 +289,10 @@ const irrigationGroups = shallowRef([
   },
   {
     id: 4,
+    name: '轮灌组4',
     area: 90,
     irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
+    irrigationTime: '12h',
     fertilizerStrategy: '30L/亩',
     irrigatedVolume: '-m³',
     fertilizedVolume: '-m³',
@@ -297,9 +301,10 @@ const irrigationGroups = shallowRef([
   },
   {
     id: 5,
+    name: '轮灌组5',
     area: 68,
     irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
+    irrigationTime: '12h',
     fertilizerStrategy: '30L/亩',
     irrigatedVolume: '-m³',
     fertilizedVolume: '-m³',
@@ -308,9 +313,10 @@ const irrigationGroups = shallowRef([
   },
   {
     id: 6,
+    name: '轮灌组6',
     area: 50,
     irrigationMethod: '同上',
-    irrigationStrategy: '10h',
+    irrigationTime: '10h',
     fertilizerStrategy: '30L/亩',
     irrigatedVolume: '-m³',
     fertilizedVolume: '-m³',
@@ -387,6 +393,9 @@ const loadFarmData = async (farmId) => {
 
     // 加载真实设备数据
     await loadRealDeviceData(farmId)
+    
+    // 加载轮灌组数据
+    await loadIrrigationGroups()
   } catch (error) {
     console.error('加载农场数据失败:', error)
     // 使用模拟数据
@@ -424,60 +433,25 @@ const onFarmChange = async (farmId) => {
 // 更新设备实际状态 - 从策略执行状态获取
 const updateDeviceStatuses = async (devices) => {
   try {
-    // 获取策略执行状态
-    const policyResponse = await call_remote('/policy/get_policy_execution_status', {})
+    // 暂时注释掉策略执行状态获取，因为API不存在
+    // TODO: 实现策略执行状态API或使用其他方式获取设备状态
     
-    if (policyResponse && policyResponse.policies && policyResponse.policies.length > 0) {
-      // 获取策略中的设备动作状态
-      const policyDeviceActions = {}
-      for (const policy of policyResponse.policies) {
-        if (policy.device_actions) {
-          Object.assign(policyDeviceActions, policy.device_actions)
-        }
-      }
-      
-      // 根据策略动作更新设备状态
-      for (const device of devices) {
-        const deviceAction = policyDeviceActions[device.deviceName]
-        if (deviceAction === 'open') {
-          device.status = device.type === 'fertilizer' ? 'active' : 'open'
-        } else if (deviceAction === 'close') {
-          device.status = device.type === 'fertilizer' ? 'inactive' : 'closed'
-        } else {
-          // 如果没有策略控制，尝试读取设备实际状态
-          try {
-            const response = await call_remote('/device_management/readout_device', { 
-              device_name: device.deviceName 
-            })
-            if (response && response.readout !== undefined) {
-              if (response.readout > 0) {
-                device.status = device.type === 'fertilizer' ? 'active' : 'open'
-              } else {
-                device.status = device.type === 'fertilizer' ? 'inactive' : 'closed'
-              }
-            }
-          } catch (error) {
-            // 保持默认状态
+    // 直接读取设备实际状态
+    for (const device of devices) {
+      try {
+        const response = await call_remote('/device_management/readout_device', { 
+          device_name: device.deviceName 
+        })
+        if (response && response.readout !== undefined) {
+          if (response.readout > 0) {
+            device.status = device.type === 'fertilizer' ? 'active' : 'open'
+          } else {
+            device.status = device.type === 'fertilizer' ? 'inactive' : 'closed'
           }
         }
-      }
-    } else {
-      // 如果没有策略执行状态，回退到原来的方式
-      for (const device of devices) {
-        try {
-          const response = await call_remote('/device_management/readout_device', { 
-            device_name: device.deviceName 
-          })
-          if (response && response.readout !== undefined) {
-            if (response.readout > 0) {
-              device.status = device.type === 'fertilizer' ? 'active' : 'open'
-            } else {
-              device.status = device.type === 'fertilizer' ? 'inactive' : 'closed'
-            }
-          }
-        } catch (error) {
-          // 保持默认状态
-        }
+      } catch (error) {
+        // 保持默认状态
+        console.warn(`获取设备 ${device.deviceName} 状态失败:`, error)
       }
     }
   } catch (error) {
@@ -725,6 +699,74 @@ const toggleDevice = async (marker) => {
 
 
 // 组件挂载时加载数据
+// 加载轮灌组数据
+const loadIrrigationGroups = async () => {
+  try {
+    const response = await call_remote('/policy/get_irrigation_groups', {})
+    console.log('轮灌组API响应:', response)
+    
+    if (response && response.groups && Array.isArray(response.groups)) {
+      console.log('轮灌组数据:', response.groups)
+      // 转换轮灌组数据为前端显示格式
+      const groups = response.groups.map((group, index) => {
+        console.log(`轮灌组 ${index + 1}:`, group)
+        console.log(`轮灌组 ${index + 1} 变量:`, group.variables)
+               return {
+                 id: index + 1,
+                 name: group.name, // 策略名称
+                 area: parseInt(group.variables.area) || 0,
+                 irrigationMethod: '顺序',
+                 irrigationTime: group.variables.irrigation_time || '12h', // 灌溉时间
+                 fertilizerStrategy: group.variables.fertilizer_amount || '30L/亩',
+                 irrigatedVolume: group.variables.irrigated_volume ? group.variables.irrigated_volume + 'm³' : '0m³',
+                 fertilizedVolume: group.variables.fertilized_volume ? group.variables.fertilized_volume + 'm³' : '0m³',
+                 status: group.current_state || '待机状态', // 策略的运行时状态
+                 remainingTime: parseInt(group.variables.remaining_time) || 0
+               }
+      })
+      
+      console.log('转换后的轮灌组数据:', groups)
+      irrigationGroups.value = groups
+      basicInfo.irrigationGroups = groups.length
+    } else {
+      // 如果没有轮灌组数据，使用模拟数据
+      irrigationGroups.value = [
+        {
+          id: 1,
+          name: '轮灌组1',
+          area: 80,
+          irrigationMethod: '顺序',
+          irrigationTime: '12h',
+          fertilizerStrategy: '30L/亩',
+          irrigatedVolume: '1200m³',
+          fertilizedVolume: '48m³',
+          status: '执行完成',
+          remainingTime: 0
+        }
+      ]
+      basicInfo.irrigationGroups = irrigationGroups.value.length
+    }
+  } catch (error) {
+    console.error('加载轮灌组数据失败:', error)
+    // 使用模拟数据
+    irrigationGroups.value = [
+      {
+        id: 1,
+        name: '轮灌组1',
+        area: 80,
+        irrigationMethod: '顺序',
+        irrigationTime: '12h',
+        fertilizerStrategy: '30L/亩',
+        irrigatedVolume: '1200m³',
+        fertilizedVolume: '48m³',
+        status: '执行完成',
+        remainingTime: 0
+      }
+    ]
+    basicInfo.irrigationGroups = irrigationGroups.value.length
+  }
+}
+
 onMounted(() => {
   loadFarmList()
   getSystemName()
