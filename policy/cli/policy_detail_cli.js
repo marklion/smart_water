@@ -112,11 +112,6 @@ export default {
             }
         );
 
-        cli_utils.make_common_cmd(vorpal, 'runtime assignment <is_constant> <variable_name> <expression>', '直接给某个策略的某个变量赋值', async (cmd_this, args) => {
-            const is_constant = args.is_constant === 'true' || args.is_constant === '1';
-            await policy_lib.runtime_assignment(ins.cur_view_name, args.variable_name, args.expression, is_constant);
-            return `策略 ${ins.cur_view_name} 的运行时变量赋值已设置: ${args.variable_name} = ${args.expression}`;
-        });
 
         return vorpal;
     },

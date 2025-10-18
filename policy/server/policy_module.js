@@ -1223,26 +1223,35 @@ export default {
                             value = body.expression;
                         }
                     } else {
-                        // 如果是动态表达式，使用表达式求值器
-                        try {
-                            const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
-                            const context = {
-                                ...Object.fromEntries(runtimeState.variables),
-                                sensors: await getSensorData(),
-                                devices: await getDeviceStatus(),
-                                Date: Date,
-                                Math: Math,
-                                abs: Math.abs,
-                                max: Math.max,
-                                min: Math.min,
-                                round: Math.round,
-                                floor: Math.floor,
-                                ceil: Math.ceil
-                            };
-                            value = await evaluator.evaluate(body.expression, context);
-                        } catch (evalError) {
-                            console.error(`表达式求值失败: ${body.expression}`, evalError);
-                            throw { err_msg: `表达式求值失败: ${evalError.message}` };
+                        // 如果是动态表达式，先检查是否是简单的字符串字面量
+                        if (body.expression.startsWith('"') && body.expression.endsWith('"') && body.expression.length > 2) {
+                            // 如果是字符串字面量，直接使用
+                            value = body.expression.slice(1, -1);
+                        } else if (body.expression.includes(' ') && !body.expression.includes('(') && !body.expression.includes('+') && !body.expression.includes('-') && !body.expression.includes('*') && !body.expression.includes('/')) {
+                            // 如果是包含空格的简单字符串（不是表达式），直接使用
+                            value = body.expression;
+                        } else {
+                            // 否则使用表达式求值器
+                            try {
+                                const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+                                const context = {
+                                    ...Object.fromEntries(runtimeState.variables),
+                                    sensors: await getSensorData(),
+                                    devices: await getDeviceStatus(),
+                                    Date: Date,
+                                    Math: Math,
+                                    abs: Math.abs,
+                                    max: Math.max,
+                                    min: Math.min,
+                                    round: Math.round,
+                                    floor: Math.floor,
+                                    ceil: Math.ceil
+                                };
+                                value = await evaluator.evaluate(body.expression, context);
+                            } catch (evalError) {
+                                console.error(`表达式求值失败: ${body.expression}`, evalError);
+                                throw { err_msg: `表达式求值失败: ${evalError.message}` };
+                            }
                         }
                     }
                     

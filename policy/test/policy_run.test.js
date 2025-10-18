@@ -116,6 +116,140 @@ return
   }, 40000);
 });
 
+describe('策略变量赋值测试', () => {
+  const test_config = `
+set_sys_name 'no_name'
+device
+  add device 'fm' 'virtualDevice' 'fm.log' '2' '3'
+  add device 'ylb' 'virtualDevice' 'ylb.log' '2' '3'
+  add device 'llj' 'virtualDevice' 'llj.log' '2' '3'
+return
+resource
+  farm
+  return
+  block
+  return
+return
+policy
+  scan period '800'
+  policy 'test_policy'
+    source 'll' 'llj' 'readout'
+    source 'yl' 'ylb' 'readout'
+    state 'state1'
+      enter action 'fm' 'close'
+      transformer 'next'
+        rule 'false' 'state2' 'prs.variables.get("test_var") > 10'
+      return
+    return
+    state 'state2'
+      do action 'fm' 'open'
+      transformer 'next'
+        rule 'false' 'state1' 'prs.variables.get("test_var") < 5'
+      return
+    return
+    init state 'state1'
+  return
+return
+web
+return
+    `
+
+  beforeEach(async () => {
+    await cli.run_cmd('clear');
+    for (const line of test_config.trim().split('\n')) {
+      await cli.run_cmd(line.trim());
+    }
+  });
+
+  afterEach(async () => {
+    await cli.clear_config();
+  });
+
+  test('init assignment - 初始化变量赋值测试', async () => {
+    // 测试初始化变量赋值
+    await cli.run_cmd('policy');
+    await cli.run_cmd('policy test_policy');
+    
+    // 添加初始化变量赋值
+    let result = await cli.run_cmd('init assignment true test_var 15');
+    expect(result).toContain('初始化变量赋值已设置: test_var = 15');
+    
+    // 添加另一个初始化变量赋值
+    result = await cli.run_cmd('init assignment false test_string "hello world"');
+    expect(result).toContain('初始化变量赋值已设置: test_string = hello world');
+    
+    // 尝试添加重复的变量名，应该失败
+    try {
+      result = await cli.run_cmd('init assignment true test_var 20');
+      // 如果命令没有抛出异常，检查返回结果
+      expect(result).toContain('已存在');
+    } catch (error) {
+      // 期望抛出异常
+      expect(error.message).toContain('已存在');
+    }
+    
+    await cli.run_cmd('return');
+  }, 10000);
+
+  test('runtime assignment - 运行时变量赋值测试', async () => {
+    // 测试运行时变量赋值
+    await cli.run_cmd('policy');
+    
+    // 先创建一个简单的策略
+    await cli.run_cmd('policy test_policy');
+    await cli.run_cmd('source ll llj readout');
+    await cli.run_cmd('source yl ylb readout');
+    await cli.run_cmd('state state1');
+    await cli.run_cmd('return');
+    await cli.run_cmd('init state state1');
+    await cli.run_cmd('return');
+    await cli.run_cmd('return');
+    
+    // 确保在policy模块下执行runtime assignment
+    await cli.run_cmd('policy');
+    
+    // 添加运行时变量赋值（常量）
+    let result = await cli.run_cmd('runtime assignment test_policy true test_var 25');
+    expect(result).toContain('运行时变量赋值已设置: test_var = 25');
+    
+    // 添加运行时变量赋值（字符串）
+    result = await cli.run_cmd('runtime assignment test_policy false test_string "runtime value"');
+    expect(result).toContain('运行时变量赋值已设置: test_string = runtime value');
+    
+    // 测试动态表达式赋值
+    result = await cli.run_cmd('runtime assignment test_policy false dynamic_var "Date.now()"');
+    expect(result).toContain('运行时变量赋值已设置: dynamic_var = Date.now()');
+    
+    await cli.run_cmd('return');
+  }, 10000);
+
+  test('变量赋值验证 - 检查赋值后的变量值', async () => {
+    // 先设置一些运行时变量
+    await cli.run_cmd('policy');
+    
+    // 设置运行时变量
+    await cli.run_cmd('runtime assignment test_policy true test_var 30');
+    await cli.run_cmd('runtime assignment test_policy false test_string "verification test"');
+    
+    // 检查策略运行时状态
+    let runtime_result = await cli.run_cmd('list policy test_policy');
+    expect(runtime_result).toContain('变量:');
+    expect(runtime_result).toContain('test_var');
+    expect(runtime_result).toContain('test_string');
+    
+    // 验证变量值是否正确
+    const variablesMatch = runtime_result.match(/变量:({.*})/);
+    if (variablesMatch) {
+      const variables = JSON.parse(variablesMatch[1]);
+      expect(variables.test_var).toBe(30);
+      expect(variables.test_string).toBe('verification test');
+    }
+    
+    await cli.run_cmd('return');
+  }, 10000);
+
+});
+
 describe('多策略运行', () => {
   const config = `
 set_sys_name 'no_name'
