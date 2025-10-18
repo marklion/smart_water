@@ -10,7 +10,8 @@ class SafeExpressionEvaluator {
             'ConditionalExpression', // 三元表达式 (condition ? trueValue : falseValue)
             'MemberExpression',  // 成员表达式 (object.property)
             'CallExpression',    // 函数调用
-            'LogicalExpression'  // 逻辑表达式 (&&, ||)
+            'LogicalExpression',  // 逻辑表达式 (&&, ||),
+            'AwaitExpression'    // Await 表达式
         ]);
 
         // 允许的二元运算符
@@ -23,18 +24,18 @@ class SafeExpressionEvaluator {
 
         // 允许的一元运算符
         this.allowedUnaryOperators = new Set([
-            '+', '-', '!'                      // 正号、负号、逻辑非
+            '+', '-', '!', 'typeof'                      // 正号、负号、逻辑非
         ]);
 
         // 允许的函数调用
         this.allowedFunctions = new Set([
             'abs', 'max', 'min', 'round', 'floor', 'ceil', 'sqrt', 'pow',
-            'sin', 'cos', 'tan', 'log', 'exp', 'getSource'
+            'sin', 'cos', 'tan', 'log', 'exp', 'getSource', 'print'
         ]);
 
         // 允许的全局对象
         this.allowedGlobals = new Set([
-            'Math', 'Date'
+            'Math', 'Date', 'prs.variables', 'prs', 'variables'
         ]);
 
         // 危险函数名列表
@@ -49,7 +50,8 @@ class SafeExpressionEvaluator {
             // 使用 acorn 解析表达式
             const ast = Parser.parseExpressionAt(expression, 0, {
                 ecmaVersion: 2020,
-                sourceType: 'script'
+                sourceType: 'script',
+                allowAwaitOutsideFunction: true
             });
 
             // 验证 AST 的安全性
@@ -66,7 +68,7 @@ class SafeExpressionEvaluator {
         }
 
         const nodeType = node.type;
-        
+
         if (!this.allowedNodeTypes.has(nodeType)) {
             throw new Error(`不允许的节点类型: ${nodeType}`);
         }
@@ -97,7 +99,7 @@ class SafeExpressionEvaluator {
             if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') {
                 continue;
             }
-            
+
             const value = node[key];
             if (Array.isArray(value)) {
                 value.forEach(item => {
@@ -132,30 +134,24 @@ class SafeExpressionEvaluator {
                 console.log(`警告: 函数 ${node.callee.name} 不在预定义列表中，将在运行时验证`);
             }
         } else if (node.callee.type === 'MemberExpression') {
-            // 允许 Math.abs() 这样的调用
-            if (node.callee.object.type === 'Identifier' && 
-                this.allowedGlobals.has(node.callee.object.name)) {
-                // Math 对象的函数调用是允许的
-                return;
-            }
-            throw new Error(`不允许的函数调用: ${this.getMemberExpressionName(node.callee)}`);
+            return;
         } else {
             throw new Error('不允许的函数调用类型');
         }
     }
 
     validateMemberExpression(node) {
-        if (node.object.type === 'Identifier' && 
+        if (node.object.type === 'Identifier' &&
             this.allowedGlobals.has(node.object.name)) {
             // 允许访问 Math 和 Date 对象的属性
             return;
         }
-        
+
         // 允许访问对象的属性，如 sensors.temperature
         if (node.object.type === 'Identifier' || node.object.type === 'MemberExpression') {
             return;
         }
-        
+
         throw new Error(`不允许的成员访问: ${this.getMemberExpressionName(node)}`);
     }
 
@@ -170,11 +166,10 @@ class SafeExpressionEvaluator {
         }
         return 'unknown';
     }
-    evaluateNode(node, context) {
+    async evaluateNode(node, context) {
         switch (node.type) {
             case 'Literal':
                 return node.value;
-            
             case 'Identifier':
                 // 检查是否为危险函数名
                 if (this.dangerousFunctions.has(node.name)) {
@@ -184,34 +179,32 @@ class SafeExpressionEvaluator {
                     throw new Error(`未定义的变量: ${node.name}`);
                 }
                 return context[node.name];
-            
             case 'BinaryExpression':
-                return this.evaluateBinaryExpression(node, context);
-            
+                return await this.evaluateBinaryExpression(node, context);
             case 'UnaryExpression':
-                return this.evaluateUnaryExpression(node, context);
-            
+                return await this.evaluateUnaryExpression(node, context);
             case 'ConditionalExpression':
-                return this.evaluateConditionalExpression(node, context);
-            
+                return await this.evaluateConditionalExpression(node, context);
             case 'MemberExpression':
-                return this.evaluateMemberExpression(node, context);
-            
+                return await this.evaluateMemberExpression(node, context);
             case 'CallExpression':
-                return this.evaluateCallExpression(node, context);
-            
+                return await this.evaluateCallExpression(node, context);
             case 'LogicalExpression':
-                return this.evaluateLogicalExpression(node, context);
-            
+                return await this.evaluateLogicalExpression(node, context);
+            case 'AwaitExpression': {
+                // Evaluate the inner expression and await if it's a promise
+                const result = await this.evaluateNode(node.argument, context);
+                return result;
+            }
             default:
                 throw new Error(`不支持的节点类型: ${node.type}`);
         }
     }
 
-    evaluateBinaryExpression(node, context) {
-        const left = this.evaluateNode(node.left, context);
-        const right = this.evaluateNode(node.right, context);
-        
+    async evaluateBinaryExpression(node, context) {
+        const left = await this.evaluateNode(node.left, context);
+        const right = await this.evaluateNode(node.right, context);
+
         switch (node.operator) {
             case '+': return left + right;
             case '-': return left - right;
@@ -233,36 +226,38 @@ class SafeExpressionEvaluator {
         }
     }
 
-    evaluateUnaryExpression(node, context) {
-        const argument = this.evaluateNode(node.argument, context);
-        
+    async evaluateUnaryExpression(node, context) {
+        const argument = await this.evaluateNode(node.argument, context);
+
         switch (node.operator) {
             case '+': return +argument;
             case '-': return -argument;
             case '!': return !argument;
+            case 'typeof': return typeof argument;
             default:
                 throw new Error(`不支持的一元运算符: ${node.operator}`);
         }
     }
 
-    evaluateConditionalExpression(node, context) {
-        const test = this.evaluateNode(node.test, context);
-        return test ? this.evaluateNode(node.consequent, context) : this.evaluateNode(node.alternate, context);
+    async evaluateConditionalExpression(node, context) {
+        const test = await this.evaluateNode(node.test, context);
+        return test ? await this.evaluateNode(node.consequent, context) : await this.evaluateNode(node.alternate, context);
     }
 
-    evaluateMemberExpression(node, context) {
-        const object = this.evaluateNode(node.object, context);
-        
+    async evaluateMemberExpression(node, context) {
+        const object = await this.evaluateNode(node.object, context);
+
         if (node.computed) {
-            const property = this.evaluateNode(node.property, context);
+            const property = await this.evaluateNode(node.property, context);
             return object[property];
         } else {
             return object[node.property.name];
         }
     }
-    evaluateCallExpression(node, context) {
-        const args = node.arguments.map(arg => this.evaluateNode(arg, context));
-        
+    async evaluateCallExpression(node, context) {
+        const argsPromises = node.arguments.map(arg => this.evaluateNode(arg, context));
+        const args = await Promise.all(argsPromises);
+
         if (node.callee.type === 'Identifier') {
             const func = context[node.callee.name];
             if (typeof func !== 'function') {
@@ -270,7 +265,7 @@ class SafeExpressionEvaluator {
             }
             return func(...args);
         } else if (node.callee.type === 'MemberExpression') {
-            const object = this.evaluateNode(node.callee.object, context);
+            const object = await this.evaluateNode(node.callee.object, context);
             const method = node.callee.property.name;
             const func = object[method];
             if (typeof func !== 'function') {
@@ -278,27 +273,27 @@ class SafeExpressionEvaluator {
             }
             return func.apply(object, args);
         }
-        
+
         throw new Error('不支持的函数调用类型');
     }
-    evaluateLogicalExpression(node, context) {
-        const left = this.evaluateNode(node.left, context);
-        
+    async evaluateLogicalExpression(node, context) {
+        const left = await this.evaluateNode(node.left, context);
+
         switch (node.operator) {
             case '&&':
-                return left && this.evaluateNode(node.right, context);
+                return left ? await this.evaluateNode(node.right, context) : left;
             case '||':
-                return left || this.evaluateNode(node.right, context);
+                return left ? left : await this.evaluateNode(node.right, context);
             default:
                 throw new Error(`不支持的逻辑运算符: ${node.operator}`);
         }
     }
-    evaluate(expression, context) {
+    async evaluate(expression, context) {
         // 解析表达式
         const ast = this.parseExpression(expression);
-        
-        // 求值
-        return this.evaluateNode(ast, context);
+
+        // 求值 (支持异步求值)
+        return await this.evaluateNode(ast, context);
     }
 }
 

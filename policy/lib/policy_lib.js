@@ -22,75 +22,75 @@ export default {
         return await call_remote('/policy/get_state', { policy_name, state_name }, token);
     },
     add_state_action: async function (policy_name, state_name, trigger, device, action, token) {
-        return await call_remote('/policy/add_state_action', { 
-            policy_name, 
-            state_name, 
-            trigger, 
-            device, 
-            action 
+        return await call_remote('/policy/add_state_action', {
+            policy_name,
+            state_name,
+            trigger,
+            device,
+            action
         }, token);
     },
     del_state_action: async function (policy_name, state_name, trigger, device, action, token) {
-        return await call_remote('/policy/del_state_action', { 
-            policy_name, 
-            state_name, 
-            trigger, 
-            device, 
-            action 
+        return await call_remote('/policy/del_state_action', {
+            policy_name,
+            state_name,
+            trigger,
+            device,
+            action
         }, token);
     },
     add_transformer: async function (policy_name, state_name, transformer_name, token) {
-        return await call_remote('/policy/add_transformer', { 
-            policy_name, 
-            state_name, 
-            transformer_name 
+        return await call_remote('/policy/add_transformer', {
+            policy_name,
+            state_name,
+            transformer_name
         }, token);
     },
     list_transformers: async function (policy_name, state_name, pageNo, token) {
-        return await call_remote('/policy/list_transformers', { 
-            policy_name, 
-            state_name, 
-            pageNo 
+        return await call_remote('/policy/list_transformers', {
+            policy_name,
+            state_name,
+            pageNo
         }, token);
     },
     del_transformer: async function (policy_name, state_name, transformer_name, token) {
-        return await call_remote('/policy/del_transformer', { 
-            policy_name, 
-            state_name, 
-            transformer_name 
+        return await call_remote('/policy/del_transformer', {
+            policy_name,
+            state_name,
+            transformer_name
         }, token);
     },
     get_transformer: async function (policy_name, state_name, transformer_name, token) {
-        return await call_remote('/policy/get_transformer', { 
-            policy_name, 
-            state_name, 
-            transformer_name 
+        return await call_remote('/policy/get_transformer', {
+            policy_name,
+            state_name,
+            transformer_name
         }, token);
     },
     add_transformer_rule: async function (policy_name, state_name, transformer_name, target_state, expression, is_constant = false, token) {
-        return await call_remote('/policy/add_transformer_rule', { 
-            policy_name, 
-            state_name, 
-            transformer_name, 
-            target_state, 
+        return await call_remote('/policy/add_transformer_rule', {
+            policy_name,
+            state_name,
+            transformer_name,
+            target_state,
             expression,
             is_constant
         }, token);
     },
     del_transformer_rule: async function (policy_name, state_name, transformer_name, target_state, token) {
-        return await call_remote('/policy/del_transformer_rule', { 
-            policy_name, 
-            state_name, 
-            transformer_name, 
-            target_state 
+        return await call_remote('/policy/del_transformer_rule', {
+            policy_name,
+            state_name,
+            transformer_name,
+            target_state
         }, token);
     },
     add_source: async function (policy_name, name, device, data_type, token) {
-        return await call_remote('/policy/add_source', { 
-            policy_name, 
-            name, 
-            device, 
-            data_type 
+        return await call_remote('/policy/add_source', {
+            policy_name,
+            name,
+            device,
+            data_type
         }, token);
     },
     list_sources: async function (policy_name, pageNo, token) {
@@ -100,35 +100,35 @@ export default {
         return await call_remote('/policy/del_source', { policy_name, name }, token);
     },
     add_assignment: async function (policy_name, state_name, trigger, variable_name, expression, target_policy_name = null, is_constant = false, token) {
-        const params = { 
-            policy_name, 
-            state_name, 
-            trigger, 
-            variable_name, 
+        const params = {
+            policy_name,
+            state_name,
+            trigger,
+            variable_name,
             expression,
             is_constant
         };
-        
+
         // 如果是跨策略赋值，添加target_policy_name参数
         if (target_policy_name) {
             params.target_policy_name = target_policy_name;
         }
-        
+
         return await call_remote('/policy/add_assignment', params, token);
     },
     del_assignment: async function (policy_name, state_name, trigger, variable_name, target_policy_name = null, token) {
-        const params = { 
-            policy_name, 
-            state_name, 
-            trigger, 
-            variable_name 
+        const params = {
+            policy_name,
+            state_name,
+            trigger,
+            variable_name
         };
-        
+
         // 如果是跨策略赋值，添加target_policy_name参数
         if (target_policy_name) {
             params.target_policy_name = target_policy_name;
         }
-        
+
         return await call_remote('/policy/del_assignment', params, token);
     },
     set_scan_period: async function (period_ms, token) {
@@ -142,5 +142,8 @@ export default {
     },
     get_init_state: async function (policy_name, token) {
         return await call_remote('/policy/get_init_state', { policy_name }, token);
-    }
+    },
+    get_policy_runtime:async function(policy_name, token) {
+        return await call_remote('/policy/get_policy_runtime', { policy_name }, token);
+    },
 }
