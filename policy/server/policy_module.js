@@ -182,6 +182,7 @@ export default {
             is_get_api: false,
             params: {
                 name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                is_irrigation_group: { type: Boolean, mean: '是否为轮灌组策略', example: false },
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -190,7 +191,8 @@ export default {
                 try {
                     addItemIfNotExists(policy_array, {
                         name: body.name,
-                        states: []
+                        states: [],
+                        is_irrigation_group: body.is_irrigation_group || false
                     }, policy => policy.name === body.name);
                     return { result: true };
                 } catch (error) {
@@ -211,6 +213,14 @@ export default {
                 policies: {
                     type: Array, mean: '策略列表', explain: {
                         name: { type: String, mean: '策略名称', example: '策略1' },
+                        is_irrigation_group: { type: Boolean, mean: '是否为轮灌组策略', example: false },
+                        init_variables: {
+                            type: Array, mean: '初始化变量列表', explain: {
+                                variable_name: { type: String, mean: '变量名', example: 'temp' },
+                                expression: { type: String, mean: '赋值表达式', example: '25' },
+                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true }
+                            }
+                        }
                     }
                 }
             },
@@ -1031,6 +1041,223 @@ export default {
                 return { init_state: policy.init_state || null };
             }
         },
+        get_irrigation_groups: {
+            name: '获取轮灌组列表',
+            description: '获取所有轮灌组策略及其变量信息',
+            is_write: false,
+            is_get_api: true,
+            params: {},
+            result: {
+                groups: {
+                    type: Array, mean: '轮灌组列表', explain: {
+                        name: { type: String, mean: '策略名称', example: '轮灌组1' },
+                        is_irrigation_group: { type: Boolean, mean: '是否为轮灌组策略', example: true },
+                        current_state: { type: String, mean: '策略运行时状态', example: '待机状态' },
+                        variables: {
+                            type: Object, mean: '轮灌组变量', explain: {
+                                area: { type: Number, mean: '面积(亩)', example: 80 },
+                                irrigation_time: { type: String, mean: '灌溉时间', example: '12h' },
+                                fertilizer_amount: { type: String, mean: '施肥量', example: '30L/亩' },
+                                priority: { type: Number, mean: '优先级', example: 1 },
+                                irrigated_volume: { type: Number, mean: '已灌溉量', example: 0 },
+                                fertilized_volume: { type: Number, mean: '已施肥量', example: 0 },
+                                remaining_time: { type: Number, mean: '剩余时间', example: 0 }
+                            }
+                        }
+                    }
+                }
+            },
+            func: async function (body, token) {
+                const irrigationGroups = policy_array.filter(policy => policy.is_irrigation_group);
+                console.log('找到的轮灌组策略:', irrigationGroups);
+                
+                // 获取每个轮灌组的运行时变量
+                const groupsWithVariables = irrigationGroups.map(policy => {
+                    const runtimeState = policy_runtime_states.get(policy.name);
+                    const variables = runtimeState ? Object.fromEntries(runtimeState.variables) : {};
+                    console.log(`策略 ${policy.name} 的运行时状态:`, runtimeState);
+                    console.log(`策略 ${policy.name} 的变量:`, variables);
+                    
+                    // 从策略配置中获取默认值（如果运行时变量没有设置）
+                    let defaultArea = 80;
+                    let defaultStatus = '排队中';
+                    let defaultIrrigationTime = '12h';
+                    let defaultFertilizerAmount = '30L/亩';
+                    let defaultPriority = 1;
+                    
+                    // 尝试从策略的初始状态中获取默认值
+                    if (policy.states && policy.states.length > 0) {
+                        const initialState = policy.states.find(state => state.name === '待机状态');
+                        if (initialState && initialState.enter_assignments) {
+                            initialState.enter_assignments.forEach(assignment => {
+                                if (assignment.variable_name === 'area') {
+                                    defaultArea = parseInt(assignment.expression);
+                                } else if (assignment.variable_name === 'status') {
+                                    defaultStatus = assignment.expression.replace(/"/g, '');
+                                } else if (assignment.variable_name === 'irrigation_time') {
+                                    defaultIrrigationTime = assignment.expression.replace(/"/g, '');
+                                } else if (assignment.variable_name === 'fertilizer_amount') {
+                                    defaultFertilizerAmount = assignment.expression.replace(/"/g, '');
+                                } else if (assignment.variable_name === 'priority') {
+                                    defaultPriority = parseInt(assignment.expression);
+                                }
+                            });
+                        }
+                    }
+                    
+                    // 获取策略的运行时状态
+                    const currentState = runtimeState ? runtimeState.current_state : '待机状态';
+                    
+                    return {
+                        name: policy.name,
+                        is_irrigation_group: true,
+                        current_state: currentState, // 策略的运行时状态
+                        variables: {
+                                area: parseInt(variables.area) || defaultArea,
+                            irrigation_time: variables.irrigation_time || defaultIrrigationTime,
+                            fertilizer_amount: variables.fertilizer_amount || defaultFertilizerAmount,
+                            priority: parseInt(variables.priority) || defaultPriority,
+                            irrigated_volume: parseInt(variables.irrigated_volume) || 0,
+                            fertilized_volume: parseInt(variables.fertilized_volume) || 0,
+                            remaining_time: parseInt(variables.remaining_time) || 0
+                        }
+                    };
+                });
+                
+                console.log('返回的轮灌组数据:', groupsWithVariables);
+                return {
+                    groups: groupsWithVariables
+                };
+            }
+        },
+        init_assignment: {
+            name: '初始化策略变量赋值',
+            description: '创建策略时给策略变量赋初值',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true },
+                expression: { type: String, mean: '赋值表达式', example: '25', have_to: true },
+                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true, have_to: false }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                try {
+                    let policy = validatePolicyExists(body.policy_name);
+                    
+                    // 确保策略有初始化变量存储
+                    if (!policy.init_variables) {
+                        policy.init_variables = [];
+                    }
+                    
+                    // 检查是否已存在相同变量名的初始化赋值
+                    const existingAssignment = policy.init_variables.find(
+                        a => a.variable_name === body.variable_name
+                    );
+                    
+                    if (existingAssignment) {
+                        throw { err_msg: `变量 ${body.variable_name} 的初始化赋值已存在` };
+                    }
+                    
+                    // 添加初始化变量赋值
+                    policy.init_variables.push({
+                        variable_name: body.variable_name,
+                        expression: body.expression,
+                        is_constant: body.is_constant || false
+                    });
+                    
+                    return { result: true };
+                } catch (error) {
+                    throw {
+                        err_msg: error.err_msg || '初始化变量赋值失败'
+                    };
+                }
+            }
+        },
+        runtime_assignment: {
+            name: '运行时策略变量赋值',
+            description: '直接给某个策略的某个变量赋值',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true },
+                expression: { type: String, mean: '赋值表达式', example: '30', have_to: true },
+                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true, have_to: false }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                try {
+                    // 验证策略是否存在
+                    validatePolicyExists(body.policy_name);
+                    
+                    // 获取或创建策略的运行时状态
+                    let runtimeState = policy_runtime_states.get(body.policy_name);
+                    if (!runtimeState) {
+                        // 如果策略还没有运行时状态，创建一个基本的运行时状态
+                        runtimeState = {
+                            current_state: null,
+                            variables: new Map(),
+                            last_execution_time: Date.now(),
+                            start_time: Date.now(),
+                            execution_count: 0,
+                            is_first_execution: true
+                        };
+                        policy_runtime_states.set(body.policy_name, runtimeState);
+                    }
+                    
+                    // 计算表达式的值
+                    let value;
+                    if (body.is_constant) {
+                        // 如果是常量表达式，直接解析
+                        const numericValue = parseFloat(body.expression);
+                        if (!isNaN(numericValue)) {
+                            value = numericValue;
+                        } else {
+                            // 如果不是数字，尝试作为字符串处理
+                            value = body.expression;
+                        }
+                    } else {
+                        // 如果是动态表达式，使用表达式求值器
+                        try {
+                            const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+                            const context = {
+                                ...Object.fromEntries(runtimeState.variables),
+                                sensors: await getSensorData(),
+                                devices: await getDeviceStatus(),
+                                Date: Date,
+                                Math: Math,
+                                abs: Math.abs,
+                                max: Math.max,
+                                min: Math.min,
+                                round: Math.round,
+                                floor: Math.floor,
+                                ceil: Math.ceil
+                            };
+                            value = await evaluator.evaluate(body.expression, context);
+                        } catch (evalError) {
+                            console.error(`表达式求值失败: ${body.expression}`, evalError);
+                            throw { err_msg: `表达式求值失败: ${evalError.message}` };
+                        }
+                    }
+                    
+                    // 设置变量值
+                    runtimeState.variables.set(body.variable_name, value);
+                    console.log(`策略 ${body.policy_name} 运行时变量赋值: ${body.variable_name} = ${value}`);
+                    
+                    return { result: true };
+                } catch (error) {
+                    throw {
+                        err_msg: error.err_msg || '运行时变量赋值失败'
+                    };
+                }
+            }
+        },
         get_policy_runtime: {
             name: '获取策略运行时状态',
             description: '获取策略的运行时状态信息',
@@ -1247,8 +1474,11 @@ async function processPolicyExecution(policy) {
                     const deviceData = { readout };
 
                     if (deviceData && deviceData.readout !== undefined) {
-                        console.log(`获取数据源 ${sourceName} 的读数: ${deviceData.readout}`);
-                        return deviceData.readout;
+                        console.log(`获取数据源 ${sourceName} 的读数: ${deviceData.readout} (类型: ${typeof deviceData.readout})`);
+                        // 确保返回数字类型
+                        const numericValue = parseFloat(deviceData.readout);
+                        console.log(`转换后的数值: ${numericValue} (类型: ${typeof numericValue})`);
+                        return numericValue;
                     } else {
                         console.warn(`数据源 ${sourceName} 的读数获取失败，返回默认值 0`);
                         return 0;
@@ -1259,6 +1489,51 @@ async function processPolicyExecution(policy) {
                 }
             }
         };
+        
+        // 应用初始化变量赋值
+        if (policy.init_variables && policy.init_variables.length > 0) {
+            for (const initVar of policy.init_variables) {
+                try {
+                    let value;
+                    if (initVar.is_constant) {
+                        // 如果是常量表达式，直接解析
+                        const numericValue = parseFloat(initVar.expression);
+                        if (!isNaN(numericValue)) {
+                            value = numericValue;
+                        } else {
+                            // 如果不是数字，尝试作为字符串处理
+                            value = initVar.expression;
+                        }
+                    } else {
+                        // 如果是动态表达式，使用表达式求值器
+                        try {
+                            const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+                            const context = {
+                                sensors: await getSensorData(),
+                                devices: await getDeviceStatus(),
+                                Date: Date,
+                                Math: Math,
+                                abs: Math.abs,
+                                max: Math.max,
+                                min: Math.min,
+                                round: Math.round,
+                                floor: Math.floor,
+                                ceil: Math.ceil
+                            };
+                            value = await evaluator.evaluate(initVar.expression, context);
+                        } catch (evalError) {
+                            console.error(`初始化变量表达式求值失败: ${initVar.expression}`, evalError);
+                            value = initVar.expression; // 出错时使用原始表达式
+                        }
+                    }
+                    runtimeState.variables.set(initVar.variable_name, value);
+                    console.log(`策略 ${policy.name} 初始化变量赋值: ${initVar.variable_name} = ${value}`);
+                } catch (error) {
+                    console.error(`初始化变量赋值失败: ${initVar.variable_name}`, error);
+                }
+            }
+        }
+        
         policy_runtime_states.set(policy.name, runtimeState);
         console.log(`策略 ${policy.name} 初始化，进入状态: ${runtimeState.current_state}`);
         await executeStateActions(policy, initialState, 'enter', runtimeState);
@@ -1427,7 +1702,9 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
         };
 
         // 使用安全的 AST 求值器
-        const result = await evaluator.evaluate(expression, context);
+        console.log(`表达式求值: ${expression}`);
+        const result = await await evaluator.evaluate(expression, context);
+        console.log(`表达式求值结果: ${result} (类型: ${typeof result})`);
         return result;
     } catch (error) {
         console.error(`赋值表达式求值失败: ${expression}`, error);
