@@ -82,7 +82,7 @@ describe('产生告警测试', () => {
         res = await cli.run_cmd('list warnings');
         top_warning = res.trim().split('\n')[0];
         expect(top_warning).toContain('warning_B');
-        await wait_ms(1050);
+        await wait_ms(950);
         res = await cli.run_cmd('list warnings');
         top_warning = res.trim().split('\n')[0];
         expect(top_warning).toContain('warning_A');
