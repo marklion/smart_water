@@ -222,7 +222,17 @@ function convert_param(cmd, param) {
             values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
+            cmd: 'init assignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
             cmd: 'enter assignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
+            cmd: 'runtime assignment',
             param: 'is_constant',
             values: ['true', 'false']
         },
@@ -537,8 +547,16 @@ function cmds_depend_prepare(cmd, parent) {
                 'return',
             ],
             teardown:[
-                'clear'
+                'undo init state'
             ],
+        },{
+            cmd: 'init assignment',
+            depends: [
+                'policy abcd'
+            ],
+            teardown: [
+                'undo init assignment'
+            ]
         },{
             cmd:'list policy',
             depends:[
@@ -600,6 +618,10 @@ export default {
             {
                 prompt: 'device',
                 cmd: 'mock readout'
+            },
+            {
+                prompt: 'sw_cli',
+                cmd: 'set_sys_name'
             },
         ];
         for (let item of whitelist) {

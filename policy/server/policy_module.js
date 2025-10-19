@@ -1177,6 +1177,36 @@ export default {
                 }
             }
         },
+        undo_init_assignment: {
+            name: '删除所有初始化变量赋值',
+            description: '删除策略的所有初始化变量赋值',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                try {
+                    // 查找策略，如果不存在则直接返回成功（可能已被删除）
+                    let policy = policy_array.find(p => p.name === body.policy_name);
+                    if (!policy) {
+                        return { result: true };
+                    }
+                    
+                    // 清空初始化变量数组
+                    policy.init_variables = [];
+                    
+                    return { result: true };
+                } catch (error) {
+                    throw {
+                        err_msg: error.err_msg || '删除初始化变量赋值失败'
+                    };
+                }
+            }
+        },
         runtime_assignment: {
             name: '运行时策略变量赋值',
             description: '直接给某个策略的某个变量赋值',

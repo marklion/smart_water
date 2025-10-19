@@ -151,6 +151,9 @@ export default {
             is_constant 
         }, token);
     },
+    undo_init_assignment: async function (policy_name, token) {
+        return await call_remote('/policy/undo_init_assignment', { policy_name }, token);
+    },
     runtime_assignment: async function (policy_name, variable_name, expression, is_constant = false, token) {
         return await call_remote('/policy/runtime_assignment', { 
             policy_name, 
