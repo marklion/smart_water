@@ -43,14 +43,14 @@ describe('产生告警测试', () => {
         policy 'a'
             state 'a'
             enter assignment 'false' 'begin' 'Date.now()'
-            enter assignment 'false' 'cur' '"waring_A"'
+            enter assignment 'false' 'cur' '"warning_A"'
             warning '\`\${prs.variables.get("cur")}\`'
             transformer 'tob'
                 rule 'false' 'b' 'Date.now() - prs.variables.get("begin") > 1000'
             return
             return
             state 'b'
-            enter assignment 'false' 'cur' '"waring_B"'
+            enter assignment 'false' 'cur' '"warning_B"'
             enter assignment 'false' 'begin' 'Date.now()'
             warning '\`\${prs.variables.get("cur")}\`'
             transformer 'toa'
@@ -77,14 +77,14 @@ describe('产生告警测试', () => {
         await wait_ms(200);
         let res = await cli.run_cmd('list warnings');
         let top_warning = res.trim().split('\n')[0];
-        expect(top_warning).toContain('waring_A');
+        expect(top_warning).toContain('warning_A');
         await wait_ms(1050);
         res = await cli.run_cmd('list warnings');
         top_warning = res.trim().split('\n')[0];
-        expect(top_warning).toContain('waring_B');
+        expect(top_warning).toContain('warning_B');
         await wait_ms(1050);
         res = await cli.run_cmd('list warnings');
         top_warning = res.trim().split('\n')[0];
-        expect(top_warning).toContain('waring_A');
+        expect(top_warning).toContain('warning_A');
     });
 });
