@@ -146,4 +146,7 @@ export default {
     get_policy_runtime:async function(policy_name, token) {
         return await call_remote('/policy/get_policy_runtime', { policy_name }, token);
     },
+    set_state_warning: async function (policy_name, state_name, warning_template, token) {
+        return await call_remote('/policy/set_state_warning', { policy_name, state_name, warning_template }, token);
+    },
 }

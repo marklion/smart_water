@@ -10,7 +10,8 @@ import {
     findAndRemoveByName,
     validateArrayExists
 } from '../../public/server/common_utils.js';
-
+import warning_lib from '../../warning/lib/warning_lib.js';
+import evaluator from '../lib/ast_expression_evaluator.js';
 import deviceModule, { get_driver } from '../../device/server/device_management_module.js';
 
 const policy_array = []
@@ -385,6 +386,7 @@ export default {
                             mean: '进入动作列表',
                             explain: ACTION_FIELD_SCHEMA
                         },
+                        warning_template: { type: String, mean: '告警模板', example: '温度过高' },
                         transformers: {
                             type: Array,
                             mean: '转换器列表',
@@ -582,7 +584,7 @@ export default {
                             explain: {
                                 target_state: { type: String, mean: '目标状态', example: 's2' },
                                 expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' },
-                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true}
+                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true }
                             }
                         }
                     }
@@ -1002,7 +1004,7 @@ export default {
                 return { init_state: policy.init_state || null };
             }
         },
-        get_policy_runtime:{
+        get_policy_runtime: {
             name: '获取策略运行时状态',
             description: '获取策略的运行时状态信息',
             is_write: false,
@@ -1017,20 +1019,44 @@ export default {
             func: async function (body, token) {
                 let ret = {};
                 let runtimeState = policy_runtime_states.get(body.policy_name);
-                if (runtimeState)
-                {
+                if (runtimeState) {
                     ret.current_state = runtimeState.current_state;
                     ret.variables = JSON.stringify(runtimeState.variables);
                 }
-                else
-                {
+                else {
                     throw { err_msg: `策略 ${body.policy_name} 的运行时状态不存在` };
                 }
 
                 return ret;
             }
         },
-    }
+        set_state_warning: {
+            name: '设置状态告警标记',
+            description: '为策略状态设置或清除告警标记',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                warning_template: { type: String, mean: '告警模板', example: '温度过高', have_to: false },
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                if (body.warning_template) {
+                    state.warning_template = body.warning_template;
+                }
+                else {
+                    delete state.warning_template;
+                }
+
+                return { result: true };
+            }
+        },
+    },
 }
 
 async function scanAndExecutePolicies() {
@@ -1078,13 +1104,6 @@ async function processPolicyExecution(policy) {
                 console.log(`策略 ${policy.name} 执行第${this.execution_count}次，当前状态: ${this.current_state}，运行时间: ${this.runtime}`);
                 for (let variable of this.variables) {
                     console.log(`  变量 ${variable}`);
-                }
-
-                // 如果是第一次执行，先执行初始状态的enter动作
-                if (this.is_first_execution) {
-                    console.log(`策略 ${policy.name} 第一次执行，执行初始状态 ${this.current_state} 的enter动作`);
-                    await executeStateActions(policy, currentState, 'enter', this);
-                    this.is_first_execution = false;
                 }
 
                 // 先检查是否需要状态转换，如果需要转换就直接转换并结束当前执行周期
@@ -1183,6 +1202,11 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                 }
             }
         }
+        if (trigger == 'enter'  && state.warning_template) {
+            //产生告警
+            let content = await evaluateAssignmentExpression(state.warning_template, runtimeState);
+            await warning_lib.generate_warning(content);
+        }
     } catch (error) {
         console.error(`执行状态动作失败: 策略=${policy.name}, 状态=${state.name}, 触发=${trigger}`, error);
     }
@@ -1257,9 +1281,6 @@ async function executeDeviceAction(device, action) {
 
 async function evaluateAssignmentExpression(expression, runtimeState) {
     try {
-        // 导入安全的 AST 表达式求值器
-        const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
-
         // 简化的上下文，只包含基本数据
         const context = {
             getSource: runtimeState.getSource.bind(runtimeState), // 添加 getSource 函数
@@ -1293,9 +1314,6 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
 
 async function evaluateTransitionExpression(expression, runtimeState) {
     try {
-        // 导入安全的 AST 表达式求值器
-        const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
-
         // 简化的上下文，只包含基本数据
         const context = {
             getSource: runtimeState.getSource.bind(runtimeState), // 添加 getSource 函数
@@ -1318,57 +1336,5 @@ async function evaluateTransitionExpression(expression, runtimeState) {
     } catch (error) {
         console.error(`表达式求值失败: ${expression}`, error);
         return false;
-    }
-}
-
-async function getSensorData() {
-    try {
-        // 获取设备列表
-        const result = await deviceModule.methods.list_device.func({});
-        const sensors = {};
-
-        if (result && result.devices) {
-            const getDriver = await getDriverFunction();
-            for (const device of result.devices) {
-                try {
-                    const driver = await getDriver(device.device_name, 'readout');
-                    const readout = await driver.readout();
-                    sensors[device.device_name] = readout;
-                } catch (deviceError) {
-                    console.warn(`获取设备 ${device.device_name} 数据失败:`, deviceError.message);
-                    sensors[device.device_name] = 0;
-                }
-            }
-        }
-        return sensors;
-    } catch (error) {
-        console.error('获取传感器数据失败:', error);
-        return {};
-    }
-}
-
-async function getDeviceStatus() {
-    try {
-        // 获取设备列表
-        const result = await deviceModule.methods.list_device.func({});
-        const devices = {};
-
-        if (result && result.devices) {
-            const getDriver = await getDriverFunction();
-            for (const device of result.devices) {
-                try {
-                    const driver = await getDriver(device.device_name, 'readout');
-                    const readout = await driver.readout();
-                    devices[device.device_name] = readout > 0 ? 1 : 0;
-                } catch (deviceError) {
-                    console.warn(`获取设备 ${device.device_name} 状态失败:`, deviceError.message);
-                    devices[device.device_name] = 0;
-                }
-            }
-        }
-        return devices;
-    } catch (error) {
-        console.error('获取设备状态失败:', error);
-        return {};
     }
 }

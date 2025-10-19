@@ -209,6 +209,15 @@ export default {
             createCrossPolicyAssignmentCommand(vorpal, ins, actionType);
             createDelCrossPolicyAssignmentCommand(vorpal, ins, actionType);
         });
+        cli_utils.make_undo_cmd(vorpal,
+            'warning <warning_template>', '设置状态告警模板', '撤销告警标记',
+            async (cmd_this, args) => {
+                await policy_lib.set_state_warning(ins.policy_view.cur_view_name, ins.cur_view_name, args.warning_template);
+                cmd_this.log("已设置告警模板");
+            }, async (cmd_this, args) => {
+                await policy_lib.set_state_warning(ins.policy_view.cur_view_name, ins.cur_view_name, "");
+                cmd_this.log("已撤销告警");
+            });
 
         transformer_cli.state_view = ins;
         cli_utils.add_sub_cli(vorpal, transformer_cli, prompt);
@@ -270,6 +279,9 @@ export default {
                     });
                 }
             });
+            if (resp.state.warning_template) {
+                ret.push(`warning '${resp.state.warning_template}'`);
+            }
         }
 
         if (this._vorpalInstance) {
