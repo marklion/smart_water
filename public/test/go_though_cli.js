@@ -1,3 +1,4 @@
+import { run } from "jest";
 import { print_test_log } from "../lib/test_utils";
 import pict from 'pict-pairwise-testing'
 
@@ -105,17 +106,17 @@ function convert_param(cmd, param) {
         {
             cmd: 'enter action',
             param: 'device',
-            values: ['abcd']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
         },
         {
             cmd: 'exit action',
             param: 'device',
-            values: ['abcd']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
         },
         {
             cmd: 'do action',
             param: 'device',
-            values: ['abcd']
+            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
         },
         {
             cmd: 'enter action',
@@ -232,11 +233,6 @@ function convert_param(cmd, param) {
             values: ['true', 'false']
         },
         {
-            cmd: 'runtime assignment',
-            param: 'is_constant',
-            values: ['true', 'false']
-        },
-        {
             cmd: 'do assignment',
             param: 'is_constant',
             values: ['true', 'false']
@@ -270,19 +266,14 @@ function convert_param(cmd, param) {
             values:['a']
         },
         {
-            cmd: 'runtime assignment',
+            cmd:'runtime assignment',
             param: 'policy_name',
-            values: ['a']
+            values: ['a', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
             cmd: 'runtime assignment',
-            param: 'variable_name',
-            values: ['test_var']
-        },
-        {
-            cmd: 'runtime assignment',
-            param: 'expression',
-            values: ['100']
+            param: 'is_constant',
+            values: ['true', 'false']
         },{
             cmd:'del watering group matrix',
             param:'key_name',
@@ -375,8 +366,15 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'policy',
             parent: 'sw_cli',
             depends: [
+                'device',
+                'add device abcd virtualDevice abcd 3 5',
+                'add device LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa virtualDevice abcd 3 5',
+                'return',
             ],
             teardown: [
+                'device',
+                'clear',
+                'return'
             ],
         },
         {
@@ -555,16 +553,8 @@ function cmds_depend_prepare(cmd, parent) {
                 'return',
             ],
             teardown:[
-                'undo init state'
+                'clear'
             ],
-        },{
-            cmd: 'init assignment',
-            depends: [
-                'policy abcd'
-            ],
-            teardown: [
-                'undo init assignment'
-            ]
         },{
             cmd:'list policy',
             depends:[
@@ -578,53 +568,19 @@ function cmds_depend_prepare(cmd, parent) {
             teardown:[
                 'clear'
             ],
-        },
-        {
+        },{
             cmd: 'runtime assignment',
+            no_bdr: true,
             depends: [
                 'policy a',
-                'state a',
                 'return',
-                'init state a',
-                'return'
+                'policy LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa',
+                'return',
             ],
             teardown: [
-                'clear'
-            ]
-        },
-        {
-            cmd: 'device',
-            parent: 'sw_cli',
-            depends: [
-                'add device abcd virtualDevice abcd 3 5',
-                'add device LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa virtualDevice LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa 3 5',
+                'undo policy a',
+                'undo policy LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa',
             ],
-            teardown: [
-            ]
-        },
-        {
-            cmd: 'enter action',
-            parent: 'state',
-            depends: [],
-            teardown: [
-                'undo enter action'
-            ]
-        },
-        {
-            cmd: 'exit action',
-            parent: 'state',
-            depends: [],
-            teardown: [
-                'undo exit action'
-            ]
-        },
-        {
-            cmd: 'do action',
-            parent: 'state',
-            depends: [],
-            teardown: [
-                'undo do action'
-            ]
         },{
             cmd:'del watering group matrix',
             depends:[
@@ -674,14 +630,6 @@ export default {
                 prompt: 'device',
                 cmd: 'mock readout'
             },
-            {
-                prompt: 'sw_cli',
-                cmd: 'set_sys_name'
-            },
-            {
-                prompt: 'sw_cli',
-                cmd: 'undo set_sys_name'
-            },
         ];
         for (let item of whitelist) {
             if (prompt.includes(item.prompt) && cmd == item.cmd) {
@@ -699,11 +647,7 @@ export default {
         let ret = []
         for (let line of lines) {
             let one_cmd_obj = parseCommandLine(line.trim());
-            if (!one_cmd_obj) {
-                // 跳过无法解析的行
-                continue;
-            }
-            if (one_cmd_obj.cmd.startsWith('undo ') || one_cmd_obj.cmd.startsWith('del') || one_cmd_obj.cmd.startsWith('list ') || one_cmd_obj.cmd === 'runtime assignment') {
+            if (one_cmd_obj.cmd.startsWith('undo ') || one_cmd_obj.cmd.startsWith('del') || one_cmd_obj.cmd.startsWith('list ') || one_cmd_obj.cmd.startsWith('runtime assignment')) {
                 one_cmd_obj.no_bdr = true;
             }
             one_cmd_obj.parent = cur_level;

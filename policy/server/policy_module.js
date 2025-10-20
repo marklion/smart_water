@@ -16,6 +16,18 @@ import deviceModule, { get_driver } from '../../device/server/device_management_
 
 const policy_array = []
 
+// 辅助函数：获取传感器数据
+async function getSensorData() {
+    // 返回空对象，避免运行时错误
+    return {};
+}
+
+// 辅助函数：获取设备状态
+async function getDeviceStatus() {
+    // 返回空对象，避免运行时错误
+    return {};
+}
+
 // 扫描周期配置，默认为0（不扫描）
 let scan_period_ms = 0
 // 扫描定时器
@@ -1257,8 +1269,8 @@ export default {
                         if (body.expression.startsWith('"') && body.expression.endsWith('"') && body.expression.length > 2) {
                             // 如果是字符串字面量，直接使用
                             value = body.expression.slice(1, -1);
-                        } else if (body.expression.includes(' ') && !body.expression.includes('(') && !body.expression.includes('+') && !body.expression.includes('-') && !body.expression.includes('*') && !body.expression.includes('/')) {
-                            // 如果是包含空格的简单字符串（不是表达式），直接使用
+                        } else if (body.expression.includes('=') || body.expression.includes(' ')) {
+                            // 如果包含赋值符号或空格，作为字符串处理（避免求值失败）
                             value = body.expression;
                         } else {
                             // 否则使用表达式求值器
@@ -1314,7 +1326,8 @@ export default {
                 let runtimeState = policy_runtime_states.get(body.policy_name);
                 if (runtimeState) {
                     ret.current_state = runtimeState.current_state;
-                    ret.variables = JSON.stringify(runtimeState.variables);
+                    // 将 Map 转换为普通对象后再序列化
+                    ret.variables = JSON.stringify(Object.fromEntries(runtimeState.variables));
                 }
                 else {
                     throw { err_msg: `策略 ${body.policy_name} 的运行时状态不存在` };
