@@ -239,6 +239,7 @@ export default {
                     validatePolicyExists(body.name);
 
                     if (findAndRemoveByName(policy_array, body.name)) {
+                        policy_runtime_states.delete(body.name);
                         return { result: true };
                     } else {
                         throw {

@@ -183,6 +183,7 @@ return
     await cli.run_cmd('scan period 450');
   });
   afterEach(async () => {
+    await cli.run_cmd('return');
     await cli.clear_config();
   });
   async function check_p1_state(expected_state) {
