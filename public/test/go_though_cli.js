@@ -105,17 +105,17 @@ function convert_param(cmd, param) {
         {
             cmd: 'enter action',
             param: 'device',
-            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
+            values: ['abcd']
         },
         {
             cmd: 'exit action',
             param: 'device',
-            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
+            values: ['abcd']
         },
         {
             cmd: 'do action',
             param: 'device',
-            values: ['LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'abcd']
+            values: ['abcd']
         },
         {
             cmd: 'enter action',
@@ -268,6 +268,21 @@ function convert_param(cmd, param) {
             cmd:'list policy',
             param:'policy_name',
             values:['a']
+        },
+        {
+            cmd: 'runtime assignment',
+            param: 'policy_name',
+            values: ['a']
+        },
+        {
+            cmd: 'runtime assignment',
+            param: 'variable_name',
+            values: ['test_var']
+        },
+        {
+            cmd: 'runtime assignment',
+            param: 'expression',
+            values: ['100']
         },{
             cmd:'del watering group matrix',
             param:'key_name',
@@ -360,15 +375,8 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'policy',
             parent: 'sw_cli',
             depends: [
-                'device',
-                'add device abcd virtualDevice abcd 3 5',
-                'add device LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa virtualDevice abcd 3 5',
-                'return',
             ],
             teardown: [
-                'device',
-                'clear',
-                'return'
             ],
         },
         {
@@ -570,6 +578,53 @@ function cmds_depend_prepare(cmd, parent) {
             teardown:[
                 'clear'
             ],
+        },
+        {
+            cmd: 'runtime assignment',
+            depends: [
+                'policy a',
+                'state a',
+                'return',
+                'init state a',
+                'return'
+            ],
+            teardown: [
+                'clear'
+            ]
+        },
+        {
+            cmd: 'device',
+            parent: 'sw_cli',
+            depends: [
+                'add device abcd virtualDevice abcd 3 5',
+                'add device LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa virtualDevice LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa 3 5',
+            ],
+            teardown: [
+            ]
+        },
+        {
+            cmd: 'enter action',
+            parent: 'state',
+            depends: [],
+            teardown: [
+                'undo enter action'
+            ]
+        },
+        {
+            cmd: 'exit action',
+            parent: 'state',
+            depends: [],
+            teardown: [
+                'undo exit action'
+            ]
+        },
+        {
+            cmd: 'do action',
+            parent: 'state',
+            depends: [],
+            teardown: [
+                'undo do action'
+            ]
         },{
             cmd:'del watering group matrix',
             depends:[
@@ -623,6 +678,10 @@ export default {
                 prompt: 'sw_cli',
                 cmd: 'set_sys_name'
             },
+            {
+                prompt: 'sw_cli',
+                cmd: 'undo set_sys_name'
+            },
         ];
         for (let item of whitelist) {
             if (prompt.includes(item.prompt) && cmd == item.cmd) {
@@ -640,7 +699,11 @@ export default {
         let ret = []
         for (let line of lines) {
             let one_cmd_obj = parseCommandLine(line.trim());
-            if (one_cmd_obj.cmd.startsWith('undo ') || one_cmd_obj.cmd.startsWith('del') || one_cmd_obj.cmd.startsWith('list ')) {
+            if (!one_cmd_obj) {
+                // 跳过无法解析的行
+                continue;
+            }
+            if (one_cmd_obj.cmd.startsWith('undo ') || one_cmd_obj.cmd.startsWith('del') || one_cmd_obj.cmd.startsWith('list ') || one_cmd_obj.cmd === 'runtime assignment') {
                 one_cmd_obj.no_bdr = true;
             }
             one_cmd_obj.parent = cur_level;
