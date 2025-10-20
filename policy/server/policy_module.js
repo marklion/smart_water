@@ -582,7 +582,7 @@ export default {
                             explain: {
                                 target_state: { type: String, mean: '目标状态', example: 's2' },
                                 expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' },
-                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true}
+                                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true }
                             }
                         }
                     }
@@ -1002,7 +1002,7 @@ export default {
                 return { init_state: policy.init_state || null };
             }
         },
-        get_policy_runtime:{
+        get_policy_runtime: {
             name: '获取策略运行时状态',
             description: '获取策略的运行时状态信息',
             is_write: false,
@@ -1017,13 +1017,11 @@ export default {
             func: async function (body, token) {
                 let ret = {};
                 let runtimeState = policy_runtime_states.get(body.policy_name);
-                if (runtimeState)
-                {
+                if (runtimeState) {
                     ret.current_state = runtimeState.current_state;
                     ret.variables = JSON.stringify(runtimeState.variables);
                 }
-                else
-                {
+                else {
                     throw { err_msg: `策略 ${body.policy_name} 的运行时状态不存在` };
                 }
 
@@ -1162,7 +1160,17 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
             for (const assignment of assignments) {
                 try {
                     const value = await evaluateAssignmentExpression(assignment.expression, runtimeState);
-                    runtimeState.variables.set(assignment.variable_name, value);
+                    let rs = runtimeState;
+                    if (assignment.target_policy_name) {
+                        // 跨策略赋值
+                        let targetRuntimeState = policy_runtime_states.get(assignment.target_policy_name);
+                        if (targetRuntimeState) {
+                            rs = targetRuntimeState;
+                        }
+                    }
+                    if (rs) {
+                        rs.variables.set(assignment.variable_name, value);
+                    }
                     console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 赋值: ${assignment.variable_name} = ${value}`);
                 } catch (error) {
                     console.error(`赋值表达式执行失败: ${assignment.variable_name} = ${assignment.expression}`, error);
