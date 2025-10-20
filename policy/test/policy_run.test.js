@@ -198,7 +198,7 @@ return
     await check_p1_state('empty');
   })
   test('轮灌组变量获取', async () => {
-    await wait_ms(580);
+    await wait_ms(1080);
     let resp = await cli.run_cmd('list watering groups');
     expect(resp).toContain('lgz1|40|apple|12|11|34|90|wfm1|ffm1|empty');
   });
