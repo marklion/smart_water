@@ -1181,8 +1181,22 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
             for (const assignment of assignments) {
                 try {
                     const value = await evaluateAssignmentExpression(assignment.expression, runtimeState);
-                    runtimeState.variables.set(assignment.variable_name, value);
-                    console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 赋值: ${assignment.variable_name} = ${value}`);
+                    let rs = runtimeState;
+                    if (assignment.target_policy_name) {
+                        // 跨策略赋值
+                        let targetRuntimeState = policy_runtime_states.get(assignment.target_policy_name);
+                        if (targetRuntimeState) {
+                            rs = targetRuntimeState;
+                        }
+                    }
+                    if (rs) {
+                        rs.variables.set(assignment.variable_name, value);
+                        console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 赋值: ${assignment.variable_name} = ${value}`);
+                    }
+                    else
+                    {
+                        console.error(`目标策略 ${assignment.target_policy_name} 的运行时状态不存在，无法赋值变量 ${assignment.variable_name}`);
+                    }
                 } catch (error) {
                     console.error(`赋值表达式执行失败: ${assignment.variable_name} = ${assignment.expression}`, error);
                 }

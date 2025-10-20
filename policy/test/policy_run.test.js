@@ -88,7 +88,7 @@ return
   afterEach(async () => {
     await cli.clear_config();
   });
-  async function check_state(expected_state) {
+  async function check_lgz1_state(expected_state) {
     await cli.run_cmd('policy');
     let cur_state = await cli.run_cmd('list policy lgz1')
     expect(cur_state).toContain(`当前状态:${expected_state}`);
@@ -97,16 +97,16 @@ return
   test('正常运行两圈', async () => {
     let turn = 2;
     while (turn > 0) {
-      await check_state('kongxian');
+      await check_lgz1_state('kongxian');
       await wait_ms(6000);
-      await check_state('zhengzaikaifa');
+      await check_lgz1_state('zhengzaikaifa');
       await cli.run_cmd('device');
       await cli.run_cmd('mock readout llj 5');
       await cli.run_cmd('return');
       await wait_ms(1500);
-      await check_state('gongzuo');
+      await check_lgz1_state('gongzuo');
       await wait_ms(6500);
-      await check_state('zhengzaiguanfa');
+      await check_lgz1_state('zhengzaiguanfa');
       await cli.run_cmd('device');
       await cli.run_cmd('mock readout llj 3');
       await cli.run_cmd('return');
@@ -115,3 +115,65 @@ return
     }
   }, 40000);
 });
+
+describe('多策略运行', () => {
+  const config = `
+set_sys_name 'no_name'
+device
+return
+resource
+  farm
+  return
+  block
+  return
+return
+policy
+  policy 'p2'
+    state 'manual'
+      do crossAssignment 'false' 'p1' 'should_move' 'true'
+    return
+    init state 'manual'
+  return
+  policy 'p1'
+    state 'empty'
+      enter assignment 'false' 'should_move' 'false'
+      transformer 'next'
+        rule 'false' 'work' 'prs.variables.get("should_move") == true'
+      return
+    return
+    state 'work'
+      enter assignment 'false' 'should_move' 'false'
+      transformer 'next'
+        rule 'false' 'empty' 'prs.variables.get("should_move") == true'
+      return
+    return
+    init state 'empty'
+  return
+return
+web
+return
+    `
+  beforeEach(async () => {
+    await cli.run_cmd('clear');
+    for (const line of config.trim().split('\n')) {
+      await cli.run_cmd(line.trim());
+    }
+    await cli.run_cmd('policy');
+    await cli.run_cmd('scan period 450');
+  });
+  afterEach(async () => {
+    await cli.clear_config();
+  });
+  async function check_p1_state(expected_state) {
+    let cur_state = await cli.run_cmd('list policy p1')
+    expect(cur_state).toContain(`当前状态:${expected_state}`);
+  }
+  test('跨策略变量赋值', async () => {
+    await wait_ms(480);
+    await check_p1_state('empty');
+    await wait_ms(500);
+    await check_p1_state('work');
+    await wait_ms(500);
+    await check_p1_state('empty');
+  })
+})
