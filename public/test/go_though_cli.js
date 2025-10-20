@@ -274,6 +274,16 @@ function convert_param(cmd, param) {
             cmd: 'runtime assignment',
             param: 'is_constant',
             values: ['true', 'false']
+        },
+        {
+            cmd: 'runtime assignment',
+            param: 'variable_name',
+            values: ['var1', 'var2']
+        },
+        {
+            cmd: 'runtime assignment',
+            param: 'expression',
+            values: ['"abcd"', '12345', '1 + 1', '"test_string"']
         },{
             cmd:'del watering group matrix',
             param:'key_name',
