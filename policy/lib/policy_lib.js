@@ -155,4 +155,7 @@ export default {
     get_watering_group_matrix: async function (policy_name, token) {
         return await call_remote('/policy/get_watering_group_matrix', { policy_name }, token);
     },
+    list_watering_groups:async function(pageNo, token) {
+        return await call_remote('/policy/list_watering_groups', { pageNo }, token);
+    },
 }

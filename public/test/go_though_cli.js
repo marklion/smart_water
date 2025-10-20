@@ -258,6 +258,10 @@ function convert_param(cmd, param) {
             cmd:'list policy',
             param:'policy_name',
             values:['a']
+        },{
+            cmd:'del watering group matrix',
+            param:'key_name',
+            values:['abcd','defg']
         }
     ];
     for (let item of exceptions) {
@@ -547,6 +551,15 @@ function cmds_depend_prepare(cmd, parent) {
             ],
             teardown:[
                 'clear'
+            ],
+        },{
+            cmd:'del watering group matrix',
+            depends:[
+                'watering group matrix abcd abcd',
+                'watering group matrix defg abcd',
+            ],
+            teardown:[
+                'undo watering group matrix'
             ],
         }
     ];

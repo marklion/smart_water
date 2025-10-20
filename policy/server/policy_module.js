@@ -159,6 +159,17 @@ function getAssignmentList(state, trigger, shouldExist = false) {
 
     return assignmentList;
 }
+function getWaterGroupVariable(matrix, key_name, runtime_state) {
+    let ret = null;
+    for (let item of matrix) {
+        if (item.key_name === key_name && runtime_state) {
+            ret = runtime_state.variables.get(item.value_name);
+            break;
+        }
+    }
+
+    return ret;
+}
 
 export default {
     name: 'policy',
@@ -1103,6 +1114,55 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 return { matrix: policy.watering_group_matrix || [] };
+            },
+        },
+        list_watering_groups: {
+            name: '列出轮灌组',
+            description: '列出策略的所有轮灌组',
+            is_write: false,
+            is_get_api: true,
+            params: {},
+            result: {
+                groups: {
+                    type: Array, mean: '轮灌组列表', explain: {
+                        name: { type: String, mean: '轮灌组名称', example: '组1' },
+                        area: { type: Number, mean: '轮灌组面积', example: 100 },
+                        method: { type: String, mean: '轮灌组灌溉方式', example: '滴灌' },
+                        fert_rate: { type: Number, mean: '轮灌组施肥率(L/亩)', example: 1.5 },
+                        total_water: { type: Number, mean: '轮灌组总用水量(L)', example: 5000 },
+                        total_fert: { type: Number, mean: '轮灌组总施肥量(L)', example: 50 },
+                        minute_left: { type: Number, mean: '轮灌组剩余分钟数', example: 30 },
+                        cur_state: { type: String, mean: '轮灌组当前状态', example: '灌溉中' },
+                        water_valve: { type: String, mean: '水阀设备名称', example: '水阀1' },
+                        fert_valve: { type: String, mean: '肥阀设备名称', example: '肥阀1' },
+                    }
+                }
+            },
+            func:async function(body, token) {
+                let groups = [];
+                for (let policy of policy_array) {
+                    if (policy.watering_group_matrix)
+                    {
+                        let policy_runtime = policy_runtime_states.get(policy.name);
+                        groups.push({
+                            name: policy.name,
+                            area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
+                            method: getWaterGroupVariable(policy.watering_group_matrix, 'method', policy_runtime),
+                            fert_rate: getWaterGroupVariable(policy.watering_group_matrix, 'fert_rate', policy_runtime),
+                            total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
+                            total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
+                            minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
+                            water_valve: getWaterGroupVariable(policy.watering_group_matrix, 'water_valve', policy_runtime),
+                            fert_valve: getWaterGroupVariable(policy.watering_group_matrix, 'fert_valve', policy_runtime),
+                            cur_state: policy_runtime ? policy_runtime.current_state : '未知',
+                        });
+                    }
+                }
+                let ret = {
+                    groups: groups.slice(body.pageNo * 20, (body.pageNo + 1) * 20),
+                    total: groups.length,
+                }
+                return ret;
             },
         },
     }

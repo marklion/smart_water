@@ -9,7 +9,8 @@
     "scripts": {
         "start_server": "cross-env NODE_ENV=development PORT=47147 node ./public/server/index.js",
         "dev_server": "cross-env NODE_ENV=development PORT=47147 nodemon --watch ./ --exec babel-node ./public/server/index.js",
-        "dev_cli": "nodemon --no-restartable -I --quiet --watch ./ --exec babel-node ./public/cli/index.js",
+        "dev_test_cli": "nodemon --no-restartable -I --quiet --watch ./ --exec babel-node ./public/cli/index.js",
+        "dev_cli": "node --trace-warnings ./public/cli/index.js",
         "dev_gui": "vite --config public/gui/vite.config.js",
         "build": "rm -rf dist && vite build --config public/gui/vite.config.js && rollup -c rollup_server.config.js && rollup -c rollup_cli.config.js",
         "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles --runInBand",
