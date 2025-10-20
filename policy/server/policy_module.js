@@ -1170,8 +1170,12 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                     }
                     if (rs) {
                         rs.variables.set(assignment.variable_name, value);
+                        console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 赋值: ${assignment.variable_name} = ${value}`);
                     }
-                    console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 赋值: ${assignment.variable_name} = ${value}`);
+                    else
+                    {
+                        console.error(`目标策略 ${assignment.target_policy_name} 的运行时状态不存在，无法赋值变量 ${assignment.variable_name}`);
+                    }
                 } catch (error) {
                     console.error(`赋值表达式执行失败: ${assignment.variable_name} = ${assignment.expression}`, error);
                 }
