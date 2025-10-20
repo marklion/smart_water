@@ -11,7 +11,9 @@ class SafeExpressionEvaluator {
             'MemberExpression',  // 成员表达式 (object.property)
             'CallExpression',    // 函数调用
             'LogicalExpression',  // 逻辑表达式 (&&, ||),
-            'AwaitExpression'    // Await 表达式
+            'AwaitExpression',    // Await 表达式
+            'TemplateLiteral',  // 模板字符串
+            'TemplateElement' // 模板字符串元素
         ]);
 
         // 允许的二元运算符
@@ -191,6 +193,19 @@ class SafeExpressionEvaluator {
                 return await this.evaluateCallExpression(node, context);
             case 'LogicalExpression':
                 return await this.evaluateLogicalExpression(node, context);
+            case 'TemplateLiteral': {
+                const expressions = await Promise.all(
+                    node.expressions.map(expr => this.evaluateNode(expr, context))
+                );
+                let result = '';
+                for (let i = 0; i < node.quasis.length; i++) {
+                    result += node.quasis[i].value.cooked;
+                    if (i < expressions.length) {
+                        result += expressions[i];
+                    }
+                }
+                return result;
+            }
             case 'AwaitExpression': {
                 // Evaluate the inner expression and await if it's a promise
                 const result = await this.evaluateNode(node.argument, context);
@@ -200,7 +215,6 @@ class SafeExpressionEvaluator {
                 throw new Error(`不支持的节点类型: ${node.type}`);
         }
     }
-
     async evaluateBinaryExpression(node, context) {
         const left = await this.evaluateNode(node.left, context);
         const right = await this.evaluateNode(node.right, context);
