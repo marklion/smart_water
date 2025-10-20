@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "kill-dev-terminals",
+            "type": "shell",
+            "command": "${command:workbench.action.terminal.killAll}", // 调用 VS Code 命令来关闭所有终端（首选）
+            "problemMatcher": []
+        }
+    ]
+}

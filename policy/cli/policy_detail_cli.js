@@ -61,6 +61,40 @@ export default {
                 return `初始状态设置已清除`;
             }
         );
+        cli_utils.make_undo_cmd(vorpal,
+            'watering group matrix <key_name> <value_name>',
+            '新增轮灌组变量定义',
+            '撤销操作 - 清除轮灌组变量定义',
+            async (cmd_this, args) => {
+                let resp = await policy_lib.get_watering_group_matrix(ins.cur_view_name);
+                let matrix = resp.matrix || [];
+                let found_define = matrix.find(item => item.key_name === args.key_name);
+                if (found_define) {
+                    found_define.value_name = args.value_name;
+                }
+                else {
+                    matrix.push({ key_name: args.key_name, value_name: args.value_name });
+                }
+                await policy_lib.set_watering_group_matrix(ins.cur_view_name, matrix);
+                return `轮灌组变量定义已添加: ${args.key_name} -> ${args.value_name}`;
+            },
+            async (cmd_this, args) => {
+                // 清除轮灌组变量定义
+                await policy_lib.set_watering_group_matrix(ins.cur_view_name, []);
+                return `轮灌组变量定义已清除`;
+            }
+        );
+        cli_utils.make_common_cmd(vorpal,
+            'del watering group matrix <key_name>',
+            '删除轮灌组变量定义',
+            async (cmd_this, args) => {
+                let key_name = args.key_name;
+                let resp = await policy_lib.get_watering_group_matrix(ins.cur_view_name);
+                let matrix = resp.matrix || [];
+                matrix = matrix.filter(item => item.key_name !== key_name);
+                await policy_lib.set_watering_group_matrix(ins.cur_view_name, matrix);
+                return `轮灌组变量定义已删除: ${key_name}`;
+            });
 
         return vorpal;
     },
@@ -126,6 +160,11 @@ export default {
             }
         } catch (err) {
             // 忽略获取初始状态时的错误
+        }
+        let matrixResp = await policy_lib.get_watering_group_matrix(view_name);
+        let matrix = matrixResp.matrix || [];
+        for (let item of matrix) {
+            ret.push(`watering group matrix '${item.key_name}' '${item.value_name}'`);
         }
         return ret;
     },

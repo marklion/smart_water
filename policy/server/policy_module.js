@@ -35,6 +35,21 @@ const ACTION_PARAMS_SCHEMA = {
     action: { type: String, mean: '动作名称', example: '开启', have_to: true }
 };
 
+function make_watering_group_matrix_data(is_req) {
+    let ret = {
+        type: Array, mean: '轮灌组矩阵', explain: {
+            key_name: { type: String, mean: '轮灌组变量名', example: 'group_id' },
+            value_name: { type: String, mean: '轮灌组变量值', example: 'group_1' }
+        }
+    }
+    if (is_req) {
+        ret.have_to = false;
+        ret.explain.key_name.have_to = true;
+        ret.explain.value_name.have_to = true;
+    }
+    return ret;
+}
+
 // 公共验证函数
 function validatePolicyExists(policy_name) {
     return validateItemExists(policy_array, policy_name, '策略');
@@ -1056,8 +1071,42 @@ export default {
                 return { result: true };
             }
         },
-    },
-}
+        set_watering_group_matrix: {
+            name: '设置轮灌组矩阵',
+            description: '为策略设置轮灌组矩阵',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                matrix: make_watering_group_matrix_data(true),
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                policy.watering_group_matrix = body.matrix;
+                return { result: true};
+            },
+        },
+        get_watering_group_matrix: {
+            name: '获取轮灌组矩阵',
+            description: '获取策略的轮灌组矩阵',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+            },
+            result: {
+                matrix: make_watering_group_matrix_data(false),
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                return { matrix: policy.watering_group_matrix || [] };
+            },
+        },
+    }
+};
 
 async function scanAndExecutePolicies() {
     try {
@@ -1193,8 +1242,7 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                         rs.variables.set(assignment.variable_name, value);
                         console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 赋值: ${assignment.variable_name} = ${value}`);
                     }
-                    else
-                    {
+                    else {
                         console.error(`目标策略 ${assignment.target_policy_name} 的运行时状态不存在，无法赋值变量 ${assignment.variable_name}`);
                     }
                 } catch (error) {
@@ -1216,7 +1264,7 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                 }
             }
         }
-        if (trigger == 'enter'  && state.warning_template) {
+        if (trigger == 'enter' && state.warning_template) {
             //产生告警
             let content = await evaluateAssignmentExpression(state.warning_template, runtimeState);
             await warning_lib.generate_warning(content);
