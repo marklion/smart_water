@@ -665,7 +665,7 @@ export default {
         let help_resp = await cli.run_cmd('help');
         print_test_log(`Collect commands from prompt: ${cli.current_prompt}`);
         let lines = help_resp.split('\n');
-        lines = lines.filter(line => !/^return|^help|^bdr|^exit|^save|^restore|^restart|^clear|^Commands:/.test(line.trim()));
+        lines = lines.filter(line => !/^return|^help|^bdr|^exit|^save|^restore|^restart|^clear|^list warnings|^Commands:/.test(line.trim()));
         let ret = []
         for (let line of lines) {
             let one_cmd_obj = parseCommandLine(line.trim());
@@ -712,6 +712,12 @@ export default {
                 let bdr = await cli.run_cmd('bdr');
                 expect(bdr).toContain(cmd.trim());
                 await cli.run_cmd('clear');
+                // 确保 clear 后返回到正确的提示符（最多返回10层避免无限循环）
+                let return_count = 0;
+                while (cli.current_prompt !== orig_prompt && return_count < 10) {
+                    await cli.run_cmd('return');
+                    return_count++;
+                }
             }
             if (cmd_obj.params.length > 0 || !is_view_cmd) {
                 let bdr = await cli.run_cmd('bdr');
