@@ -209,6 +209,7 @@ import { Warning, Refresh } from '@element-plus/icons-vue'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import call_remote from '../../../lib/call_remote.js'
+import { fetchMapConfig } from '../config/mapConfig.js'
 
 const route = useRoute()
 const systemName = ref('智能灌溉管理系统')
@@ -423,8 +424,9 @@ const onFarmChange = async (farmId) => {
       lat: selectedFarmData.latitude
     }
   } else {
-    // 如果没有坐标信息，使用默认坐标
-    mapCenter.value = { lng: 111.670801, lat: 40.818311 }
+    // 如果没有坐标信息，从后端获取默认坐标
+    const config = await fetchMapConfig()
+    mapCenter.value = config.center
   }
 
   await loadFarmData(farmId)
@@ -748,8 +750,21 @@ const loadWarningData = async () => {
   }
 }
 
+// 初始化地图配置
+const initMapConfig = async () => {
+  try {
+    const config = await fetchMapConfig()
+    mapCenter.value = config.center
+    mapZoom.value = config.zoom
+    console.log('地图配置已从后端加载')
+  } catch (error) {
+    console.error('加载地图配置失败，使用默认值:', error)
+  }
+}
+
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
+  await initMapConfig()
   loadFarmList()
   getSystemName()
   loadWarningData()

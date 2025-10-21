@@ -40,6 +40,7 @@ async function init_super_user() {
     await module_install(app, (await import('../../weather/server/weather_module.js')).default);
     await module_install(app, (await import('../../monitoring/server/monitoring_module.js')).default);
     await module_install(app, (await import('../../warning/server/warning_module.js')).default);
+    await module_install(app, (await import('../../config/server/config_module.js')).default);
 }
 // 托管前端静态文件
 let web_dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'web');

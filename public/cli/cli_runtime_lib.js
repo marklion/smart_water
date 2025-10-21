@@ -4,6 +4,8 @@ import resource_cli from '../../resource/cli/resource_cli.js';
 import policy_cli from '../../policy/cli/policy_cli.js';
 import web_cli from '../../web/cli/web_cli.js';
 import warning_cli from '../../warning/cli/warning_cli.js';
+import weather_cli from '../../weather/cli/weather_cli.js';
+import config_cli from '../../config/cli/config_cli.js';
 import call_remote from '../lib/call_remote.js';
 import events from 'events';
 let g_vorpal = undefined;
@@ -42,6 +44,8 @@ function get_vorpal() {
         cli_utils.add_sub_cli(vorpal, policy_cli, prompt);
         cli_utils.add_sub_cli(vorpal, web_cli, prompt);
         cli_utils.add_sub_cli(vorpal, warning_cli, prompt);
+        cli_utils.add_sub_cli(vorpal, weather_cli, prompt);
+        cli_utils.add_sub_cli(vorpal, config_cli, prompt);
         vorpal.delimiter(prompt);
         g_vorpal = vorpal;
     }

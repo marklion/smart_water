@@ -1,3 +1,5 @@
+import call_remote from '../../../lib/call_remote.js'
+
 // 地图配置文件
 export const mapConfig = {
   // 高德地图API配置
@@ -8,7 +10,7 @@ export const mapConfig = {
     plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.Geocoder', 'AMap.PlaceSearch']
   },
   
-  // 默认地图中心点（呼和浩特市）
+  // 默认地图中心点（呼和浩特市）- 默认值，实际会从后端获取
   defaultCenter: {
     lng: 111.670801, // 呼和浩特市经度
     lat: 40.818311   // 呼和浩特市纬度
@@ -99,5 +101,34 @@ export const convertXYToLngLat = (x, y, centerLng, centerLat, mapWidth = 1000, m
   return {
     lng: centerLng + offsetX,
     lat: centerLat - offsetY  // 注意Y轴方向相反
+  }
+}
+
+// 从后端获取地图默认配置
+export const fetchMapConfig = async () => {
+  try {
+    const centerResult = await call_remote('/config/get_map_center', {})
+    const zoomResult = await call_remote('/config/get_map_zoom', {})
+    
+    if (centerResult.center) {
+      mapConfig.defaultCenter = centerResult.center
+      console.log('从后端获取地图默认中心点:', centerResult.center)
+    }
+    
+    if (zoomResult.zoom !== undefined) {
+      mapConfig.defaultZoom = zoomResult.zoom
+      console.log('从后端获取地图默认缩放级别:', zoomResult.zoom)
+    }
+    
+    return {
+      center: mapConfig.defaultCenter,
+      zoom: mapConfig.defaultZoom
+    }
+  } catch (error) {
+    console.error('获取地图配置失败，使用默认值:', error)
+    return {
+      center: mapConfig.defaultCenter,
+      zoom: mapConfig.defaultZoom
+    }
   }
 }

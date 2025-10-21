@@ -57,6 +57,7 @@ import call_remote from '../../public/lib/call_remote.js'
 const weeklyData = ref([])
 const currentWeather = ref(null)
 const loading = ref(false)
+const defaultCity = ref('呼和浩特') // 默认城市，从后端获取
 let autoRefreshTimer = null
 
 // 自动切换相关
@@ -232,7 +233,7 @@ const getSelectedTemperature = () => {
 // 获取选中的城市
 const getSelectedCity = () => {
     const data = getSelectedWeatherData()
-    return data?.city || '呼和浩特'
+    return data?.city || defaultCity.value
 }
 
 // 获取选中的温度范围
@@ -291,7 +292,7 @@ const setupAutoSwitch = () => {
 // 获取今日天气数据（实时温度）- 调用后端接口
 const fetchTodayWeather = async () => {
     try {
-        const result = await call_remote('/weather/get_today_weather', { city: '呼和浩特' })
+        const result = await call_remote('/weather/get_today_weather', {})
         console.log('后端今日天气响应:', result)
 
         if (result.weather_data) {
@@ -316,7 +317,7 @@ const fetchTodayWeather = async () => {
 // 获取未来6天天气数据 - 调用后端接口
 const fetchWeeklyWeather = async () => {
     try {
-        const result = await call_remote('/weather/get_future_weather', { city: '呼和浩特' })
+        const result = await call_remote('/weather/get_future_weather', {})
         console.log('后端未来天气响应:', result)
 
         if (result.future_weather && Array.isArray(result.future_weather)) {
@@ -361,12 +362,27 @@ const fetchAllWeatherData = async () => {
     }
 }
 
+// 获取默认城市
+const fetchDefaultCity = async () => {
+    try {
+        const result = await call_remote('/config/get_weather_city', {})
+        if (result.city) {
+            defaultCity.value = result.city
+            console.log('默认城市获取成功:', result.city)
+        }
+    } catch (error) {
+        console.error('获取默认城市失败:', error)
+        // 使用默认值
+        console.log('使用默认城市: 呼和浩特')
+    }
+}
+
 // 生成今日天气演示数据 - 根据实际API数据结构
 const generateTodayDemoData = () => {
     return {
         nums: 5,
         cityid: "101080101",
-        city: "呼和浩特",
+        city: defaultCity.value,
         date: "2025-09-11",
         week: "星期四",
         update_time: "14:40",
@@ -439,7 +455,9 @@ const setupAutoRefresh = () => {
     autoRefreshTimer = setTimeout(refresh, interval)
 }
 
-onMounted(() => {
+onMounted(async () => {
+    // 先获取默认城市，再获取天气数据
+    await fetchDefaultCity()
     fetchAllWeatherData()
     setupAutoRefresh()
     setupAutoSwitch()
