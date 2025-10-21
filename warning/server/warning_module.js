@@ -33,18 +33,22 @@ export default {
             description: '列出所有告警',
             is_write: false,
             is_get_api: true,
-            params: {},
+            params: {
+                pageNo: { type: Number, mean: '页码', example: 0, have_to: false }
+            },
             result: {
                 warnings: {
                     type: Array, mean: '告警列表', explain: {
                         content: { type: String, mean: '告警内容', example: '水位过高' }
                     }
                 },
+                total: { type: Number, mean: '总数', example: 10 }
             },
             func: async function (body, token) {
                 let warnings = [];
                 let total = 0;
                 try {
+                    const pageNo = body.pageNo || 0;
                     const filePath = path.join(process.cwd(), 'warning.log');
                     const data = await fs.promises.readFile(filePath, 'utf8').catch(err => {
                         if (err.code === 'ENOENT') return '';
@@ -53,7 +57,7 @@ export default {
                     const lines = data.split(/\r?\n/).filter(l => l.trim().length > 0);
                     lines.reverse();
                     total = lines.length;
-                    const lastLines = lines.slice(body.pageNo * 20, (body.pageNo + 1) * 20)
+                    const lastLines = lines.slice(pageNo * 20, (pageNo + 1) * 20)
                     warnings = lastLines.map(content => ({ content }));
                 } catch (err) {
                     console.error('Failed to read warnings:', err);

@@ -279,15 +279,24 @@ export default {
                     });
                 }
             });
+            
+            // 显示告警模板
             if (resp.state.warning_template) {
+                ret.push('');  // 空行分隔
+                ret.push('--- 告警模板 ---');
                 ret.push(`warning '${resp.state.warning_template}'`);
             }
         }
 
         if (this._vorpalInstance) {
             this.cur_view_name = view_name;
+            // 显示状态转移
             let sub_bdr = await cli_utils.make_sub_bdr(this._vorpalInstance);
-            ret = ret.concat(sub_bdr);
+            if (sub_bdr.length > 0) {
+                ret.push('');  // 空行分隔
+                ret.push('--- 状态转移 ---');
+                ret = ret.concat(sub_bdr);
+            }
         }
 
         return ret;

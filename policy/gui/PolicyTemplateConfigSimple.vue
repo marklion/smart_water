@@ -286,6 +286,21 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- 告警模板区域 -->
+                            <div v-if="state.warning_template" class="state-section warning-section">
+                                <div class="section-header">
+                                    <el-icon class="section-icon warning-icon">
+                                        <WarningFilled />
+                                    </el-icon>
+                                    <span class="section-name">告警模板</span>
+                                </div>
+                                <div class="warning-template-content">
+                                    <div class="warning-template-tag">
+                                        {{ state.warning_template }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div v-else-if="currentPolicy && !stateLoading[currentPolicy.name]" class="empty-content">
@@ -303,7 +318,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, Document, Setting, VideoPlay, Switch, Right, DataLine, Tools, Edit, Close } from '@element-plus/icons-vue'
+import { Refresh, Document, Setting, VideoPlay, Switch, Right, DataLine, Tools, Edit, Close, WarningFilled } from '@element-plus/icons-vue'
 import PageContent from '../../public/gui/src/components/PageContent.vue'
 import PolicyStatsOverview from './PolicyStatsOverview.vue'
 import SearchComponent from '../../public/gui/src/components/SearchComponent.vue'
@@ -491,7 +506,8 @@ const loadStatesData = async (policyName) => {
                     enter_variable_assignments: stateDetail.state.enter_assignments || [],
                     hold_variable_assignments: stateDetail.state.do_assignments || [],
                     exit_variable_assignments: stateDetail.state.exit_assignments || [],
-                    transformers: stateDetail.state.transformers || []
+                    transformers: stateDetail.state.transformers || [],
+                    warning_template: stateDetail.state.warning_template || ''
                 }
 
                 console.log(`状态 ${processedState.name} 的转换器:`, processedState.transformers)
@@ -508,7 +524,8 @@ const loadStatesData = async (policyName) => {
                     enter_variable_assignments: [],
                     hold_variable_assignments: [],
                     exit_variable_assignments: [],
-                    transformers: []
+                    transformers: [],
+                    warning_template: ''
                 })
             }
         }
@@ -1289,6 +1306,44 @@ onMounted(() => {
     color: #94a3b8;
     font-style: italic;
     font-size: 12px;
+}
+
+/* 告警模板样式 */
+.warning-section {
+    background: #fef5f5;
+    border-left: 3px solid #f56c6c;
+    overflow: hidden;
+}
+
+.warning-section .section-icon.warning-icon {
+    color: #f56c6c;
+}
+
+.warning-template-content {
+    padding: 12px;
+    overflow: hidden;
+}
+
+.warning-template-tag {
+    width: 100%;
+    padding: 12px 16px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    border: 1px solid #fbc4c4;
+    background: #fff;
+    color: #d03050;
+    display: block;
+    box-sizing: border-box;
+}
+
+.warning-template-tag:hover {
+    background: #fef5f5;
+    border-color: #f56c6c;
 }
 
 .empty-content {
