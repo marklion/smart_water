@@ -143,6 +143,25 @@ export default {
     get_init_state: async function (policy_name, token) {
         return await call_remote('/policy/get_init_state', { policy_name }, token);
     },
+    init_assignment: async function (policy_name, variable_name, expression, is_constant = false, token) {
+        return await call_remote('/policy/init_assignment', { 
+            policy_name, 
+            variable_name, 
+            expression, 
+            is_constant 
+        }, token);
+    },
+    undo_init_assignment: async function (policy_name, token) {
+        return await call_remote('/policy/undo_init_assignment', { policy_name }, token);
+    },
+    runtime_assignment: async function (policy_name, variable_name, expression, is_constant = false, token) {
+        return await call_remote('/policy/runtime_assignment', { 
+            policy_name, 
+            variable_name, 
+            expression, 
+            is_constant 
+        }, token);
+    },
     get_policy_runtime:async function(policy_name, token) {
         return await call_remote('/policy/get_policy_runtime', { policy_name }, token);
     },

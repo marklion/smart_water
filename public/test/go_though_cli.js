@@ -222,6 +222,11 @@ function convert_param(cmd, param) {
             values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
+            cmd: 'init assignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
             cmd: 'enter assignment',
             param: 'is_constant',
             values: ['true', 'false']
@@ -258,6 +263,26 @@ function convert_param(cmd, param) {
             cmd:'list policy',
             param:'policy_name',
             values:['a']
+        },
+        {
+            cmd:'runtime assignment',
+            param: 'policy_name',
+            values: ['a', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
+        },
+        {
+            cmd: 'runtime assignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
+            cmd: 'runtime assignment',
+            param: 'variable_name',
+            values: ['var1', 'var2']
+        },
+        {
+            cmd: 'runtime assignment',
+            param: 'expression',
+            values: ['"abcd"', '12345', '1 + 1', '"test_string"']
         },{
             cmd:'del watering group matrix',
             param:'key_name',
@@ -553,6 +578,19 @@ function cmds_depend_prepare(cmd, parent) {
                 'clear'
             ],
         },{
+            cmd: 'runtime assignment',
+            no_bdr: true,
+            depends: [
+                'policy a',
+                'return',
+                'policy LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa',
+                'return',
+            ],
+            teardown: [
+                'undo policy a',
+                'undo policy LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa',
+            ],
+        },{
             cmd:'del watering group matrix',
             depends:[
                 'watering group matrix abcd abcd',
@@ -618,7 +656,7 @@ export default {
         let ret = []
         for (let line of lines) {
             let one_cmd_obj = parseCommandLine(line.trim());
-            if (one_cmd_obj.cmd.startsWith('undo ') || one_cmd_obj.cmd.startsWith('del') || one_cmd_obj.cmd.startsWith('list ')) {
+            if (one_cmd_obj.cmd.startsWith('undo ') || one_cmd_obj.cmd.startsWith('del') || one_cmd_obj.cmd.startsWith('list ') || one_cmd_obj.cmd.startsWith('runtime assignment')) {
                 one_cmd_obj.no_bdr = true;
             }
             one_cmd_obj.parent = cur_level;

@@ -49,6 +49,12 @@ export default {
 
             return 0;
         });
+        
+        cli_utils.make_common_cmd(vorpal, 'runtime assignment <policy_name> <is_constant> <variable_name> <expression>', '直接给某个策略的某个变量赋值', async (cmd_this, args) => {
+            const is_constant = args.is_constant === 'true' || args.is_constant === '1';
+            await policy_lib.runtime_assignment(args.policy_name, args.variable_name, args.expression, is_constant);
+            return `策略 ${args.policy_name} 的运行时变量赋值已设置: ${args.variable_name} = ${args.expression}`;
+        });
         cli_utils.make_display_cmd(vorpal, 'list watering groups', '列出所有轮灌组运行状态', async (cmd_this, args, pageNo) => {
             let result = await policy_lib.list_watering_groups(pageNo);
             let lines = result.groups;
