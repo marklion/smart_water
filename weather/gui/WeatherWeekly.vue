@@ -58,6 +58,7 @@ const weeklyData = ref([])
 const currentWeather = ref(null)
 const loading = ref(false)
 const defaultCity = ref('呼和浩特') // 默认城市，从后端获取
+const currentCity = ref('') // 当前显示的城市
 let autoRefreshTimer = null
 
 // 自动切换相关
@@ -232,8 +233,8 @@ const getSelectedTemperature = () => {
 
 // 获取选中的城市
 const getSelectedCity = () => {
-    const data = getSelectedWeatherData()
-    return data?.city || defaultCity.value
+    // 优先显示用户选择的城市，而不是从天气数据中取（天气API可能返回不同的城市名）
+    return currentCity.value || defaultCity.value || '呼和浩特'
 }
 
 // 获取选中的温度范围
@@ -292,47 +293,34 @@ const setupAutoSwitch = () => {
 // 获取今日天气数据（实时温度）- 调用后端接口
 const fetchTodayWeather = async () => {
     try {
-        const result = await call_remote('/weather/get_today_weather', {})
-        console.log('后端今日天气响应:', result)
+        const city = currentCity.value || defaultCity.value
+        const result = await call_remote('/weather/get_today_weather', { city })
 
         if (result.weather_data) {
             currentWeather.value = result.weather_data
-            console.log('今日天气数据加载成功')
-            console.log('今日天气数据字段:', Object.keys(result.weather_data))
-            console.log('tem_day:', result.weather_data.tem_day)
-            console.log('tem_night:', result.weather_data.tem_night)
-            console.log('今日天气数据获取成功')
         } else {
             throw new Error('今日天气数据获取失败')
         }
     } catch (error) {
         console.error('获取今日天气失败:', error)
-        // 使用演示数据
         currentWeather.value = generateTodayDemoData()
-        // 静默处理，不显示警告消息
-        console.log('今日天气使用演示数据')
     }
 }
 
 // 获取未来6天天气数据 - 调用后端接口
 const fetchWeeklyWeather = async () => {
     try {
-        const result = await call_remote('/weather/get_future_weather', {})
-        console.log('后端未来天气响应:', result)
+        const city = currentCity.value || defaultCity.value
+        const result = await call_remote('/weather/get_future_weather', { city })
 
         if (result.future_weather && Array.isArray(result.future_weather)) {
             weeklyData.value = result.future_weather
-            console.log('未来天气数据加载成功，共', result.future_weather.length, '天')
-            console.log('未来天气预报数据获取成功')
         } else {
             throw new Error('未来天气数据获取失败')
         }
     } catch (error) {
         console.error('获取未来天气失败:', error)
-        // 使用演示数据
         weeklyData.value = generateFutureDemoData()
-        // 静默处理，不显示警告消息
-        console.log('未来天气使用演示数据')
     }
 }
 
@@ -341,16 +329,12 @@ const fetchAllWeatherData = async () => {
     loading.value = true
 
     try {
-        // 先尝试从后端API获取真实数据
-        console.log('开始获取天气数据...')
         await Promise.all([
             fetchTodayWeather(),
             fetchWeeklyWeather()
         ])
-        console.log('天气数据获取完成')
     } catch (error) {
         console.error('天气数据初始化失败:', error)
-        // API调用失败时使用演示数据
         if (!currentWeather.value) {
             currentWeather.value = generateTodayDemoData()
         }
@@ -362,20 +346,66 @@ const fetchAllWeatherData = async () => {
     }
 }
 
+// 从 localStorage 读取用户上次选择的城市
+const loadCityFromStorage = () => {
+    try {
+        const savedCity = localStorage.getItem('weather_selected_city')
+        if (savedCity) {
+            return savedCity
+        }
+    } catch (error) {
+        console.warn('读取本地城市失败:', error)
+    }
+    return null
+}
+
+// 保存城市到 localStorage
+const saveCityToStorage = (city) => {
+    try {
+        localStorage.setItem('weather_selected_city', city)
+    } catch (error) {
+        console.warn('保存城市到本地失败:', error)
+    }
+}
+
 // 获取默认城市
 const fetchDefaultCity = async () => {
+    // 优先使用浏览器保存的城市
+    const savedCity = loadCityFromStorage()
+    if (savedCity) {
+        currentCity.value = savedCity
+        defaultCity.value = savedCity
+        return
+    }
+    
+    // 如果没有保存，则从后端获取默认城市
     try {
         const result = await call_remote('/config/get_weather_city', {})
         if (result.city) {
             defaultCity.value = result.city
-            console.log('默认城市获取成功:', result.city)
+            currentCity.value = result.city
         }
     } catch (error) {
         console.error('获取默认城市失败:', error)
-        // 使用默认值
-        console.log('使用默认城市: 呼和浩特')
+        defaultCity.value = '呼和浩特'
+        currentCity.value = '呼和浩特'
     }
 }
+
+// 暴露给父组件的方法：更新城市
+const updateCity = (city) => {
+    if (city) {
+        currentCity.value = city
+        defaultCity.value = city
+        saveCityToStorage(city)
+        fetchAllWeatherData()
+    }
+}
+
+// 暴露给父组件
+defineExpose({
+    updateCity
+})
 
 // 生成今日天气演示数据 - 根据实际API数据结构
 const generateTodayDemoData = () => {
@@ -456,7 +486,6 @@ const setupAutoRefresh = () => {
 }
 
 onMounted(async () => {
-    // 先获取默认城市，再获取天气数据
     await fetchDefaultCity()
     fetchAllWeatherData()
     setupAutoRefresh()
@@ -467,12 +496,10 @@ onUnmounted(() => {
     if (autoRefreshTimer) {
         clearInterval(autoRefreshTimer)
         autoRefreshTimer = null
-        console.log('一周天气自动刷新定时器已清除')
     }
     if (autoSwitchTimer) {
         clearInterval(autoSwitchTimer)
         autoSwitchTimer = null
-        console.log('天气自动切换定时器已清除')
     }
 })
 </script>

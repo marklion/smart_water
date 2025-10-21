@@ -2,13 +2,20 @@
   <div class="default-page">
     <!-- 监控中心特殊布局 -->
     <div v-if="route.name === '监控中心'" class="monitoring-center">
-      <!-- 顶部农场选择器 -->
+      <!-- 顶部农场选择器和城市切换 -->
       <div class="farm-selector-header">
         <div class="selector-container">
           <span class="selector-label">选择农场：</span>
           <el-select v-model="selectedFarm" class="farm-select-main" size="large" @change="onFarmChange">
             <el-option v-for="farm in farmList" :key="farm.id" :label="farm.name" :value="farm.id" />
           </el-select>
+
+          <span class="selector-label" style="margin-left: 32px;">切换城市：</span>
+          <el-input v-model="cityInput" placeholder="输入城市名，如：北京" class="city-input" size="large" clearable
+            @keyup.enter="handleCityChange" style="width: 200px;" />
+          <el-button type="primary" size="large" @click="handleCityChange" :loading="cityChanging">
+            切换
+          </el-button>
         </div>
       </div>
 
@@ -61,7 +68,7 @@
                 </div>
               </template>
               <div class="weather-content">
-                <WeatherWeekly />
+                <WeatherWeekly ref="weatherRef" />
               </div>
             </el-card>
           </div>
@@ -93,7 +100,8 @@
                 </div>
               </template>
 
-              <el-table :data="irrigationGroups" style="width: 100%" :row-class-name="tableRowClassName" v-loading="irrigationGroupsLoading">
+              <el-table :data="irrigationGroups" style="width: 100%" :row-class-name="tableRowClassName"
+                v-loading="irrigationGroupsLoading">
 
                 <el-table-column prop="name" label="轮灌组" width="150" align="left" show-overflow-tooltip />
                 <el-table-column prop="area" label="面积/亩" width="100" align="center" />
@@ -102,7 +110,7 @@
                 <el-table-column prop="total_water" label="总用水量(L)" width="120" align="center" />
                 <el-table-column prop="total_fert" label="总施肥量(L)" width="120" align="center" />
                 <el-table-column prop="minute_left" label="剩余时间(分)" width="120" align="center" />
-                
+
                 <el-table-column prop="cur_state" label="当前状态" width="120" align="center">
                   <template #default="{ row }">
                     <el-tag :type="getStatusTagType(row.cur_state)" size="default" effect="dark" round>
@@ -209,7 +217,7 @@ import { Warning, Refresh } from '@element-plus/icons-vue'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import call_remote from '../../../lib/call_remote.js'
-import { fetchMapConfig } from '../config/mapConfig.js'
+import { fetchMapConfig, getCityLocation, saveMapCenterToStorage } from '../config/mapConfig.js'
 
 const route = useRoute()
 const systemName = ref('智能灌溉管理系统')
@@ -251,6 +259,12 @@ const pageDescription = computed(() => {
 
 // 监控中心数据
 const selectedFarm = ref('')
+
+// 城市切换相关
+const cityInput = ref('')
+const cityChanging = ref(false)
+const currentCity = ref('')
+const weatherRef = ref(null) // 天气组件引用
 
 // 农场列表数据 - 使用shallowRef优化性能
 const farmList = shallowRef([])
@@ -394,7 +408,7 @@ const loadFarmData = async (farmId) => {
 
     // 加载真实设备数据
     await loadRealDeviceData(farmId)
-    
+
     // 加载轮灌组数据
     await loadWateringGroups()
   } catch (error) {
@@ -437,7 +451,7 @@ const updateDeviceStatuses = async (devices) => {
   try {
     // 获取策略执行状态
     const policyResponse = await call_remote('/policy/get_policy_execution_status', {})
-    
+
     if (policyResponse && policyResponse.policies && policyResponse.policies.length > 0) {
       // 获取策略中的设备动作状态
       const policyDeviceActions = {}
@@ -446,7 +460,7 @@ const updateDeviceStatuses = async (devices) => {
           Object.assign(policyDeviceActions, policy.device_actions)
         }
       }
-      
+
       // 根据策略动作更新设备状态
       for (const device of devices) {
         const deviceAction = policyDeviceActions[device.deviceName]
@@ -457,8 +471,8 @@ const updateDeviceStatuses = async (devices) => {
         } else {
           // 如果没有策略控制，尝试读取设备实际状态
           try {
-            const response = await call_remote('/device_management/readout_device', { 
-              device_name: device.deviceName 
+            const response = await call_remote('/device_management/readout_device', {
+              device_name: device.deviceName
             })
             if (response && response.readout !== undefined) {
               if (response.readout > 0) {
@@ -476,8 +490,8 @@ const updateDeviceStatuses = async (devices) => {
       // 如果没有策略执行状态，回退到原来的方式
       for (const device of devices) {
         try {
-          const response = await call_remote('/device_management/readout_device', { 
-            device_name: device.deviceName 
+          const response = await call_remote('/device_management/readout_device', {
+            device_name: device.deviceName
           })
           if (response && response.readout !== undefined) {
             if (response.readout > 0) {
@@ -555,7 +569,7 @@ const loadRealDeviceData = async (farmId) => {
 
       // 获取设备实际状态并更新统计
       await updateDeviceStatuses(devices)
-      
+
       // 更新基本信息中的设备数量
       basicInfo.totalDevices = devices.length
       basicInfo.onlineDevices = devices.filter(d => d.status === 'active' || d.status === 'open').length
@@ -704,7 +718,7 @@ const onDeviceToggle = (device) => {
   if (marker) {
     marker.status = device.status
   }
-  
+
   // 更新基本信息统计
   updateBasicInfoStats()
 }
@@ -756,9 +770,57 @@ const initMapConfig = async () => {
     const config = await fetchMapConfig()
     mapCenter.value = config.center
     mapZoom.value = config.zoom
-    console.log('地图配置已从后端加载')
+
+    // 加载保存的城市
+    const savedCity = localStorage.getItem('weather_selected_city')
+    if (savedCity) {
+      currentCity.value = savedCity
+    }
   } catch (error) {
     console.error('加载地图配置失败，使用默认值:', error)
+  }
+}
+
+// 处理城市切换
+const handleCityChange = async () => {
+  const city = (cityInput.value || '').trim()
+  if (!city) {
+    ElMessage.warning('请输入城市名称')
+    return
+  }
+
+  cityChanging.value = true
+  try {
+    // 1. 获取城市坐标
+    const cityLocation = await getCityLocation(city)
+
+    // 2. 更新地图中心点
+    mapCenter.value = cityLocation
+    mapZoom.value = 13
+
+    // 3. 保存到 localStorage
+    saveMapCenterToStorage(cityLocation)
+    localStorage.setItem('weather_selected_city', city)
+    currentCity.value = city
+
+    // 4. 直接调用天气组件的方法更新天气（更安全）
+    if (weatherRef.value && weatherRef.value.updateCity) {
+      weatherRef.value.updateCity(city)
+    }
+
+    // 5. 可选：保存到后端
+    try {
+      await call_remote('/config/set_weather_city', { city })
+    } catch (error) {
+      console.warn('后端保存城市失败:', error)
+    }
+
+    ElMessage.success(`已切换到 ${city}，地图已定位`)
+  } catch (error) {
+    console.error('城市切换失败:', error)
+    ElMessage.error('未能找到该城市，请检查城市名称')
+  } finally {
+    cityChanging.value = false
   }
 }
 
