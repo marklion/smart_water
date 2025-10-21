@@ -287,6 +287,10 @@ function convert_param(cmd, param) {
             cmd:'del watering group matrix',
             param:'key_name',
             values:['abcd','defg']
+        },{
+            cmd:'shutdown device',
+            param:'device_name',
+            values:['abcd','ffff']
         }
     ];
     for (let item of exceptions) {
@@ -598,6 +602,15 @@ function cmds_depend_prepare(cmd, parent) {
             ],
             teardown:[
                 'undo watering group matrix'
+            ],
+        },{
+            cmd:'shutdown device',
+            depends:[
+                'add device abcd virtualDevice abcd 3 5',
+                'add device ffff virtualDevice abcd 3 5',
+            ],
+            teardown:[
+                'undo add device',
             ],
         }
     ];
