@@ -63,7 +63,18 @@ export default {
         cli_utils.make_display_cmd(vorpal, 'list device [farm_name] [block_name]', '列出设备', async (cmd_this, args, pageNo) => {
             let devices = (await device_management_lib.list_device(pageNo, args.farm_name, args.block_name, this.token)).devices;
             if (devices.length > 0) {
-                cmd_this.log(devices.map(device => `${device.device_name} - ${device.driver_name} (${device.config_key}) : ${device.capability}`).join('\n'));
+                cmd_this.log(devices.map(device => {
+                    let ret = `${device.device_name} - ${device.driver_name} (${device.config_key}) : ${device.capability}\n`
+                    ret += ` 位置: (${device.longitude || ''}, ${device.latitude || ''})\n`;
+                    ret += ` 所属农场: ${device.farm_name || ''}\n`;
+                    ret += ` 所属区块: ${device.block_name || ''}\n`;
+                    ret += ` 运行时信息: \n`;
+                    for (let info of device.runtime_info || []) {
+                        ret += `   - ${info.title}: ${info.text}\n`;
+                    }
+                    ret += '------------------------';
+                    return ret;
+                }).join('\n'));
             } else if (pageNo === 0) {
                 // 只在第一页时显示无设备信息
                 cmd_this.log('没有找到设备');
@@ -89,6 +100,10 @@ export default {
         cli_utils.make_common_cmd(vorpal, 'mock readout <device_name> <value>', '模拟设备读数', async (cmd_this, args) => {
             await device_management_lib.mock_readout(args.device_name, Number.parseFloat(args.value), this.token);
             return `设备 ${args.device_name} 模拟读数为: ${args.value}`;
+        });
+        cli_utils.make_common_cmd(vorpal, 'shutdown device <device_name>', '设备急停', async (cmd_this, args) => {
+            await device_management_lib.shutdown_device(args.device_name);
+            return `设备 ${args.device_name} 已急停`;
         });
         vorpal.delimiter(prompt)
         return vorpal;

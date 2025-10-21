@@ -42,4 +42,7 @@ export default{
     mock_readout: async function (device_name, value, token) {
         return await call_remote('/device_management/mock_readout', { device_name, value }, token);
     },
+    shutdown_device: async function (device_name, token) {
+        return await call_remote('/device_management/shutdown_device', { device_name }, token);
+    },
 }

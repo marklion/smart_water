@@ -226,7 +226,7 @@ export default {
                     let all_finished = false;
                     while (all_finished == false) {
                         let got_count = await func(this, cleaned_args, cur_page);
-                        if (got_count <= 0) {
+                        if (got_count < 20) {
                             all_finished = true;
                         } else {
                             let result = await this.prompt(
