@@ -34,7 +34,6 @@ export default {
             is_write: false,
             is_get_api: true,
             params: {
-                pageNo: { type: Number, mean: '页码', example: 0, have_to: false }
             },
             result: {
                 warnings: {
