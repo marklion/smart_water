@@ -3,7 +3,9 @@ const driver_array = [
     {
         name: 'virtualDevice',
         config_method: '[log_file]',
-        capability: ['open', 'close', 'readout', 'mock_readout'],
+        capability: [
+            'open', 'close', 'readout', 'mock_readout',
+            'is_opened', 'status_map', 'shutdown'],
         driver: virtual_driver,
     }
 ];
@@ -165,7 +167,13 @@ export default {
                         farm_name: { type: String, mean: '所属农场', example: '农场1' },
                         block_name: { type: String, mean: '所属区块', example: '区块1' },
                         longitude: { type: Number, mean: '经度', example: 111.670801 },
-                        latitude: { type: Number, mean: '纬度', example: 40.818311 }
+                        latitude: { type: Number, mean: '纬度', example: 40.818311 },
+                        runtime_info: {
+                            type: Array, mean: '运行时信息', explain: {
+                                title: { type: String, mean: '信息标题', example: '开关是否打开' },
+                                text: { type: String, mean: '信息内容', example: 'true' },
+                            }
+                        },
                     }
                 },
             },
@@ -191,6 +199,20 @@ export default {
                     });
                 });
                 let current_page_content = filtered_devices.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                for (let device_info of current_page_content) {
+                    let single_driver = await get_driver(device_info.device_name, 'status_map');
+                    if (single_driver) {
+                        let sm = single_driver.status_map();
+                        device_info.runtime_info = []
+                        for (let item of sm) {
+                            let tmp_runtime = {
+                                title: item.text,
+                            }
+                            tmp_runtime.text = String(await single_driver[item.func]());
+                            device_info.runtime_info.push(tmp_runtime);
+                        }
+                    }
+                }
                 return {
                     devices: current_page_content,
                     total: filtered_devices.length,
@@ -265,6 +287,23 @@ export default {
                 let readout = await driver.readout();
                 return { readout };
             },
+        },
+        shutdown_device: {
+            name: '急停设备',
+            description: '急停指定设备',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
+            },
+            result: {
+                result: { type: Boolean, mean: '急停结果', example: true }
+            },
+            func: async function (body, token) {
+                let driver = await get_driver(body.device_name, 'shutdown');
+                await driver.shutdown();
+                return { result: true };
+            }
         },
     }
 }

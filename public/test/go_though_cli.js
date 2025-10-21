@@ -287,6 +287,10 @@ function convert_param(cmd, param) {
             cmd:'del watering group matrix',
             param:'key_name',
             values:['abcd','defg']
+        },{
+            cmd:'shutdown device',
+            param:'device_name',
+            values:['abcd','ffff']
         }
     ];
     for (let item of exceptions) {
@@ -599,6 +603,15 @@ function cmds_depend_prepare(cmd, parent) {
             teardown:[
                 'undo watering group matrix'
             ],
+        },{
+            cmd:'shutdown device',
+            depends:[
+                'add device abcd virtualDevice abcd 3 5',
+                'add device ffff virtualDevice abcd 3 5',
+            ],
+            teardown:[
+                'undo add device',
+            ],
         }
     ];
     let ret = { depends: [], teardown: [] };
@@ -656,7 +669,12 @@ export default {
         let ret = []
         for (let line of lines) {
             let one_cmd_obj = parseCommandLine(line.trim());
-            if (one_cmd_obj.cmd.startsWith('undo ') || one_cmd_obj.cmd.startsWith('del') || one_cmd_obj.cmd.startsWith('list ') || one_cmd_obj.cmd.startsWith('runtime assignment')) {
+            if (one_cmd_obj.cmd.startsWith('undo ') ||
+                one_cmd_obj.cmd.startsWith('del') ||
+                one_cmd_obj.cmd.startsWith('list ') ||
+                one_cmd_obj.cmd.startsWith('runtime assignment') ||
+                one_cmd_obj.cmd.startsWith('shutdown device')
+            ) {
                 one_cmd_obj.no_bdr = true;
             }
             one_cmd_obj.parent = cur_level;

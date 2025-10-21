@@ -13,9 +13,10 @@ export default async function (log_file_path) {
         }
         actual_log_path = path.join(logDir, log_file_path);
     }
-    
+
     let ret = {
         log_file: actual_log_path,
+        m_is_opened:false,
         mock_value: null, // 存储模拟值
         read_last_line:async function() {
             return new Promise((resolve, reject) => {
@@ -68,10 +69,12 @@ export default async function (log_file_path) {
         },
         open: async function () {
             await this.write_log('打开阀门');
+            this.m_is_opened = true;
             return { status: 'opened', message: '阀门已成功打开' };
         },
         close: async function () {
             await this.write_log('关闭阀门');
+            this.m_is_opened = false;
             return { status: 'closed', message: '阀门已成功关闭' };
         },
         readout: async function () {
@@ -83,17 +86,16 @@ export default async function (log_file_path) {
                 await this.write_log(`[读取] ${details}`);
                 return this.mock_value;
             }
-            
             let lastLine = await this.read_last_line();
             lastLine = lastLine.replace(/\[.*?\]\s*/, '');
             const value = parseFloat(lastLine) || 0;
-            
+
             // 记录读取操作
             const deviceType = this.getDeviceType();
             const unit = this.getUnit();
             const details = `当前${deviceType}: ${value}${unit}`;
             await this.write_log(`[读取] ${details}`);
-            
+
             return value;
         },
         mock_readout: async function (value) {
@@ -115,7 +117,20 @@ export default async function (log_file_path) {
             if (fileName.includes('流量计')) return 'L/min';
             if (fileName.includes('阀门')) return '';
             return '';
-        }
+        },
+        is_opened:async function() {
+            return this.m_is_opened;
+        },
+        status_map:function() {
+            let ret = [];
+            ret.push({text:'开关是否打开', func:'is_opened'});
+            ret.push({text:'当前仪表读数', func:'readout'});
+            return ret;
+        },
+        shutdown:async function() {
+            await this.write_log('设备急停');
+            this.m_is_opened = false;
+        },
     }
     return ret;
 }
