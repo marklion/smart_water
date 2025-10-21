@@ -1,4 +1,3 @@
-import { run } from "jest";
 import { print_test_log } from "../lib/test_utils";
 import pict from 'pict-pairwise-testing'
 
