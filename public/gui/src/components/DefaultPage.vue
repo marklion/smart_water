@@ -87,28 +87,32 @@
               <template #header>
                 <div class="card-header">
                   <span class="card-title">轮灌组详情</span>
+                  <el-button type="primary" size="small" @click="loadWateringGroups" :icon="Refresh">
+                    刷新
+                  </el-button>
                 </div>
               </template>
 
-              <el-table :data="irrigationGroups" style="width: 100%" :row-class-name="tableRowClassName">
+              <el-table :data="irrigationGroups" style="width: 100%" :row-class-name="tableRowClassName" v-loading="irrigationGroupsLoading">
 
-                <el-table-column prop="id" label="轮灌组" width="110" align="left" />
-                <el-table-column prop="area" label="面积/亩" width="110" align="left" />
-                <el-table-column prop="irrigationMethod" label="灌溉方式" width="110" align="left" />
-                <el-table-column prop="irrigationStrategy" label="灌溉策略" width="110" align="left" />
-                <el-table-column prop="fertilizerStrategy" label="施肥策略" width="110" align="left" />
-                <el-table-column prop="irrigatedVolume" label="已灌溉量" width="110" align="left" />
-                <el-table-column prop="fertilizedVolume" label="已施肥量" width="110" align="left" />
-
-                <el-table-column prop="status" label="灌溉状态" width="110" align="left">
+                <el-table-column prop="name" label="轮灌组" width="150" align="left" show-overflow-tooltip />
+                <el-table-column prop="area" label="面积/亩" width="100" align="center" />
+                <el-table-column prop="method" label="灌溉方式" width="100" align="center" />
+                <el-table-column prop="fert_rate" label="施肥率(L/亩)" width="120" align="center" />
+                <el-table-column prop="total_water" label="总用水量(L)" width="120" align="center" />
+                <el-table-column prop="total_fert" label="总施肥量(L)" width="120" align="center" />
+                <el-table-column prop="minute_left" label="剩余时间(分)" width="120" align="center" />
+                
+                <el-table-column prop="cur_state" label="当前状态" width="120" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="getStatusTagType(row.status)" size="default" effect="dark" round>
-                      {{ row.status }}
+                    <el-tag :type="getStatusTagType(row.cur_state)" size="default" effect="dark" round>
+                      {{ row.cur_state || '未知' }}
                     </el-tag>
                   </template>
                 </el-table-column>
 
-                <el-table-column prop="remainingTime" label="剩余灌溉时间" width="110" align="center" />
+                <el-table-column prop="water_valve" label="水阀" width="120" align="left" show-overflow-tooltip />
+                <el-table-column prop="fert_valve" label="肥阀" width="120" align="left" show-overflow-tooltip />
               </el-table>
             </el-card>
           </div>
@@ -175,6 +179,7 @@
 import { computed, reactive, ref, onMounted, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import call_remote from '../../../lib/call_remote.js'
@@ -249,81 +254,16 @@ const mapZoom = ref(15)
 // 地图标记点 - 使用shallowRef优化性能，从真实设备数据获取
 const mapMarkers = shallowRef([])
 
-// 轮灌组数据 - 使用shallowRef优化性能
-const irrigationGroups = shallowRef([
-  {
-    id: 1,
-    area: 80,
-    irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
-    fertilizerStrategy: '30L/亩',
-    irrigatedVolume: '1200m³',
-    fertilizedVolume: '48m³',
-    status: '执行完成',
-    remainingTime: '0'
-  },
-  {
-    id: 2,
-    area: 75,
-    irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
-    fertilizerStrategy: '30L/亩',
-    irrigatedVolume: '195m³',
-    fertilizedVolume: '-m³',
-    status: '执行中',
-    remainingTime: '06:12:05'
-  },
-  {
-    id: 3,
-    area: 80,
-    irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
-    fertilizerStrategy: '30L/亩',
-    irrigatedVolume: '-m³',
-    fertilizedVolume: '-m³',
-    status: '排队中',
-    remainingTime: '-'
-  },
-  {
-    id: 4,
-    area: 90,
-    irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
-    fertilizerStrategy: '30L/亩',
-    irrigatedVolume: '-m³',
-    fertilizedVolume: '-m³',
-    status: '排队中',
-    remainingTime: '-'
-  },
-  {
-    id: 5,
-    area: 68,
-    irrigationMethod: '顺序',
-    irrigationStrategy: '12h',
-    fertilizerStrategy: '30L/亩',
-    irrigatedVolume: '-m³',
-    fertilizedVolume: '-m³',
-    status: '排队中',
-    remainingTime: '-'
-  },
-  {
-    id: 6,
-    area: 50,
-    irrigationMethod: '同上',
-    irrigationStrategy: '10h',
-    fertilizerStrategy: '30L/亩',
-    irrigatedVolume: '-m³',
-    fertilizedVolume: '-m³',
-    status: '排队中',
-    remainingTime: '-'
-  }
-])
+// 轮灌组数据 - 从API加载
+const irrigationGroups = shallowRef([])
+const irrigationGroupsLoading = ref(false)
 
 // 表格行样式类名
 const tableRowClassName = ({ row }) => {
-  if (row.status === '执行中') {
+  const status = row.cur_state || row.status
+  if (status && (status.includes('执行中') || status.includes('灌溉中') || status.includes('running'))) {
     return 'success-row'
-  } else if (row.status === '暂停') {
+  } else if (status && (status.includes('暂停') || status.includes('warning'))) {
     return 'warning-row'
   }
   return ''
@@ -333,15 +273,17 @@ const tableRowClassName = ({ row }) => {
 const getStatusTagType = (status) => {
   switch (status) {
     case '执行中':
-      return 'success'
+    case '灌溉中':
+      return 'success'  // 绿色
     case '执行完成':
-      return 'primary'
+      return 'primary'  // 蓝色
     case '排队中':
-      return 'warning'
+    case '待机状态':
+      return 'warning'  // 橙色
     case '暂停':
-      return 'danger'
+      return 'danger'   // 红色
     default:
-      return 'info'
+      return 'info'     // 灰色
   }
 }
 
@@ -372,6 +314,38 @@ const loadFarmList = async () => {
   }
 }
 
+// 加载轮灌组数据
+const loadWateringGroups = async () => {
+  irrigationGroupsLoading.value = true
+  try {
+    const response = await call_remote('/policy/list_watering_groups', { pageNo: 0 })
+    if (response && response.groups) {
+      irrigationGroups.value = response.groups.map(group => ({
+        name: group.name || '未命名',
+        area: group.area ?? '-',
+        method: group.method || '-',
+        fert_rate: group.fert_rate ?? '-',
+        total_water: group.total_water ?? '-',
+        total_fert: group.total_fert ?? '-',
+        minute_left: group.minute_left ?? '-',
+        cur_state: group.cur_state || '未知',
+        water_valve: group.water_valve || '-',
+        fert_valve: group.fert_valve || '-'
+      }))
+      // 更新基本信息中的轮灌组数量
+      basicInfo.irrigationGroups = irrigationGroups.value.length
+    } else {
+      irrigationGroups.value = []
+    }
+  } catch (error) {
+    console.error('加载轮灌组数据失败:', error)
+    ElMessage.error('加载轮灌组数据失败')
+    irrigationGroups.value = []
+  } finally {
+    irrigationGroupsLoading.value = false
+  }
+}
+
 const loadFarmData = async (farmId) => {
   try {
     // 加载基本信息 - 使用监控中心模块
@@ -387,6 +361,9 @@ const loadFarmData = async (farmId) => {
 
     // 加载真实设备数据
     await loadRealDeviceData(farmId)
+    
+    // 加载轮灌组数据
+    await loadWateringGroups()
   } catch (error) {
     console.error('加载农场数据失败:', error)
     // 使用模拟数据
