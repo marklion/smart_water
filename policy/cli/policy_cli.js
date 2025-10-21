@@ -49,6 +49,14 @@ export default {
 
             return 0;
         });
+        cli_utils.make_display_cmd(vorpal, 'list watering groups', '列出所有轮灌组运行状态', async (cmd_this, args, pageNo) => {
+            let result = await policy_lib.list_watering_groups(pageNo);
+            let lines = result.groups;
+            for (let line of lines) {
+                cmd_this.log(`${line.name}|${line.area}|${line.method}|${line.fert_rate}|${line.total_water}|${line.total_fert}|${line.minute_left}|${line.water_valve}|${line.fert_valve}|${line.cur_state}`);
+            }
+            return lines.length;
+        });
         return vorpal;
     },
     make_bdr: async function () {

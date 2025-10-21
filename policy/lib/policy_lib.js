@@ -149,4 +149,13 @@ export default {
     set_state_warning: async function (policy_name, state_name, warning_template, token) {
         return await call_remote('/policy/set_state_warning', { policy_name, state_name, warning_template }, token);
     },
+    set_watering_group_matrix: async function (policy_name, matrix, token) {
+        return await call_remote('/policy/set_watering_group_matrix', { policy_name, matrix }, token);
+    },
+    get_watering_group_matrix: async function (policy_name, token) {
+        return await call_remote('/policy/get_watering_group_matrix', { policy_name }, token);
+    },
+    list_watering_groups:async function(pageNo, token) {
+        return await call_remote('/policy/list_watering_groups', { pageNo }, token);
+    },
 }

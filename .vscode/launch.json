@@ -1,0 +1,70 @@
+// .vscode/launch.json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Dev Server",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev_server"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "postDebugTask": "kill-dev-terminals"
+        },
+        {
+            "name": "Dev CLI",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev_test_cli"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "postDebugTask": "kill-dev-terminals"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Whole",
+            "configurations": [
+                "Dev Server",
+                "Dev CLI"
+            ]
+        }
+    ]
+}
+
+/*
+说明（可选）:
+- 点击 "Start Dev Server + Dev CLI" 会同时启动两个调试终端，分别运行 npm run dev_server 和 npm run dev_cli。
+- 要在调试结束时关闭这两个终端，请在 .vscode/tasks.json 中添加一个名为 "kill-dev-terminals" 的任务。示例（跨平台处理需按需调整）:
+
+.vscode/tasks.json 示例:
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "kill-dev-terminals",
+            "type": "shell",
+            "command": "${command:workbench.action.terminal.killAll}", // 调用 VS Code 命令来关闭所有终端（首选）
+            "problemMatcher": []
+        }
+    ]
+}
+
+- 如果你的 VS Code 版本/环境不支持在任务中直接调用内置命令，可改为使用平台相关命令（例如 macOS/Linux 使用 pkill，Windows 使用 taskkill），但请注意跨平台兼容性和安全性。
+*/

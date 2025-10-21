@@ -35,6 +35,21 @@ const ACTION_PARAMS_SCHEMA = {
     action: { type: String, mean: '动作名称', example: '开启', have_to: true }
 };
 
+function make_watering_group_matrix_data(is_req) {
+    let ret = {
+        type: Array, mean: '轮灌组矩阵', explain: {
+            key_name: { type: String, mean: '轮灌组变量名', example: 'group_id' },
+            value_name: { type: String, mean: '轮灌组变量值', example: 'group_1' }
+        }
+    }
+    if (is_req) {
+        ret.have_to = false;
+        ret.explain.key_name.have_to = true;
+        ret.explain.value_name.have_to = true;
+    }
+    return ret;
+}
+
 // 公共验证函数
 function validatePolicyExists(policy_name) {
     return validateItemExists(policy_array, policy_name, '策略');
@@ -144,6 +159,17 @@ function getAssignmentList(state, trigger, shouldExist = false) {
 
     return assignmentList;
 }
+function getWaterGroupVariable(matrix, key_name, runtime_state) {
+    let ret = null;
+    for (let item of matrix) {
+        if (item.key_name === key_name && runtime_state) {
+            ret = runtime_state.variables.get(item.value_name);
+            break;
+        }
+    }
+
+    return ret;
+}
 
 export default {
     name: 'policy',
@@ -213,6 +239,7 @@ export default {
                     validatePolicyExists(body.name);
 
                     if (findAndRemoveByName(policy_array, body.name)) {
+                        policy_runtime_states.delete(body.name);
                         return { result: true };
                     } else {
                         throw {
@@ -1056,8 +1083,91 @@ export default {
                 return { result: true };
             }
         },
-    },
-}
+        set_watering_group_matrix: {
+            name: '设置轮灌组矩阵',
+            description: '为策略设置轮灌组矩阵',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                matrix: make_watering_group_matrix_data(true),
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                policy.watering_group_matrix = body.matrix;
+                return { result: true};
+            },
+        },
+        get_watering_group_matrix: {
+            name: '获取轮灌组矩阵',
+            description: '获取策略的轮灌组矩阵',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+            },
+            result: {
+                matrix: make_watering_group_matrix_data(false),
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                return { matrix: policy.watering_group_matrix || [] };
+            },
+        },
+        list_watering_groups: {
+            name: '列出轮灌组',
+            description: '列出策略的所有轮灌组',
+            is_write: false,
+            is_get_api: true,
+            params: {},
+            result: {
+                groups: {
+                    type: Array, mean: '轮灌组列表', explain: {
+                        name: { type: String, mean: '轮灌组名称', example: '组1' },
+                        area: { type: Number, mean: '轮灌组面积', example: 100 },
+                        method: { type: String, mean: '轮灌组灌溉方式', example: '滴灌' },
+                        fert_rate: { type: Number, mean: '轮灌组施肥率(L/亩)', example: 1.5 },
+                        total_water: { type: Number, mean: '轮灌组总用水量(L)', example: 5000 },
+                        total_fert: { type: Number, mean: '轮灌组总施肥量(L)', example: 50 },
+                        minute_left: { type: Number, mean: '轮灌组剩余分钟数', example: 30 },
+                        cur_state: { type: String, mean: '轮灌组当前状态', example: '灌溉中' },
+                        water_valve: { type: String, mean: '水阀设备名称', example: '水阀1' },
+                        fert_valve: { type: String, mean: '肥阀设备名称', example: '肥阀1' },
+                    }
+                }
+            },
+            func:async function(body, token) {
+                let groups = [];
+                for (let policy of policy_array) {
+                    if (policy.watering_group_matrix)
+                    {
+                        let policy_runtime = policy_runtime_states.get(policy.name);
+                        groups.push({
+                            name: policy.name,
+                            area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
+                            method: getWaterGroupVariable(policy.watering_group_matrix, 'method', policy_runtime),
+                            fert_rate: getWaterGroupVariable(policy.watering_group_matrix, 'fert_rate', policy_runtime),
+                            total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
+                            total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
+                            minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
+                            water_valve: getWaterGroupVariable(policy.watering_group_matrix, 'water_valve', policy_runtime),
+                            fert_valve: getWaterGroupVariable(policy.watering_group_matrix, 'fert_valve', policy_runtime),
+                            cur_state: policy_runtime ? policy_runtime.current_state : '未知',
+                        });
+                    }
+                }
+                let ret = {
+                    groups: groups.slice(body.pageNo * 20, (body.pageNo + 1) * 20),
+                    total: groups.length,
+                }
+                return ret;
+            },
+        },
+    }
+};
 
 async function scanAndExecutePolicies() {
     try {
@@ -1193,8 +1303,7 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                         rs.variables.set(assignment.variable_name, value);
                         console.log(`策略 ${policy.name} 状态 ${state.name} ${trigger} 赋值: ${assignment.variable_name} = ${value}`);
                     }
-                    else
-                    {
+                    else {
                         console.error(`目标策略 ${assignment.target_policy_name} 的运行时状态不存在，无法赋值变量 ${assignment.variable_name}`);
                     }
                 } catch (error) {
@@ -1216,7 +1325,7 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                 }
             }
         }
-        if (trigger == 'enter'  && state.warning_template) {
+        if (trigger == 'enter' && state.warning_template) {
             //产生告警
             let content = await evaluateAssignmentExpression(state.warning_template, runtimeState);
             await warning_lib.generate_warning(content);

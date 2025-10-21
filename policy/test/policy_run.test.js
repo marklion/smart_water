@@ -149,6 +149,27 @@ policy
     return
     init state 'empty'
   return
+  policy 'lgz1'
+    state 'empty'
+      enter assignment 'false' 'area' '40'
+      enter assignment 'false' 'method' '"apple"'
+      enter assignment 'false' 'fr' '12'
+      enter assignment 'false' 'tw' '11'
+      enter assignment 'false' 'tf' '34'
+      enter assignment 'false' 'ml' '90'
+      enter assignment 'false' 'wv' '"wfm1"'
+      enter assignment 'false' 'fv' '"ffm1"'
+    return
+    init state 'empty'
+    watering group matrix 'area' 'area'
+    watering group matrix 'method' 'method'
+    watering group matrix 'fert_rate' 'fr'
+    watering group matrix 'total_water' 'tw'
+    watering group matrix 'total_fert' 'tf'
+    watering group matrix 'minute_left' 'ml'
+    watering group matrix 'fert_valve' 'fv'
+    watering group matrix 'water_valve' 'wv'
+  return
 return
 web
 return
@@ -162,6 +183,7 @@ return
     await cli.run_cmd('scan period 450');
   });
   afterEach(async () => {
+    await cli.run_cmd('return');
     await cli.clear_config();
   });
   async function check_p1_state(expected_state) {
@@ -176,4 +198,9 @@ return
     await wait_ms(500);
     await check_p1_state('empty');
   })
+  test('轮灌组变量获取', async () => {
+    await wait_ms(1080);
+    let resp = await cli.run_cmd('list watering groups');
+    expect(resp).toContain('lgz1|40|apple|12|11|34|90|wfm1|ffm1|empty');
+  });
 })
