@@ -656,7 +656,12 @@ export default {
         let ret = []
         for (let line of lines) {
             let one_cmd_obj = parseCommandLine(line.trim());
-            if (one_cmd_obj.cmd.startsWith('undo ') || one_cmd_obj.cmd.startsWith('del') || one_cmd_obj.cmd.startsWith('list ') || one_cmd_obj.cmd.startsWith('runtime assignment')) {
+            if (one_cmd_obj.cmd.startsWith('undo ') ||
+                one_cmd_obj.cmd.startsWith('del') ||
+                one_cmd_obj.cmd.startsWith('list ') ||
+                one_cmd_obj.cmd.startsWith('runtime assignment') ||
+                one_cmd_obj.cmd.startsWith('shutdown device')
+            ) {
                 one_cmd_obj.no_bdr = true;
             }
             one_cmd_obj.parent = cur_level;
