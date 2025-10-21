@@ -279,6 +279,8 @@ export default {
                     });
                 }
             });
+            
+            // 显示告警模板
             if (resp.state.warning_template) {
                 ret.push(`warning '${resp.state.warning_template}'`);
             }
@@ -286,8 +288,11 @@ export default {
 
         if (this._vorpalInstance) {
             this.cur_view_name = view_name;
+            // 状态转移配置
             let sub_bdr = await cli_utils.make_sub_bdr(this._vorpalInstance);
-            ret = ret.concat(sub_bdr);
+            if (sub_bdr.length > 0) {
+                ret = ret.concat(sub_bdr);
+            }
         }
 
         return ret;

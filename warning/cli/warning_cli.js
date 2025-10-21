@@ -13,6 +13,9 @@ export default {
             let warnings = (await warning_lib.list_warnings(pageNo, this.token)).warnings;
             if (warnings.length > 0) {
                 cmd_this.log(warnings.map(warning => `${warning.content}`).join('\n'));
+                cmd_this.log(`\n共 ${result.total} 条告警，显示最新 ${warnings.length} 条`);
+            } else {
+                cmd_this.log('暂无告警');
             }
             return warnings.length;
         });
