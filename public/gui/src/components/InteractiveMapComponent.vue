@@ -107,7 +107,7 @@
         </div>
 
         <!-- 运行时信息区域 -->
-        <div v-if="selectedDevice.runtime_info && selectedDevice.runtime_info.length > 0" class="runtime-info-section"
+        <div v-if="(selectedDevice.runtime_info && selectedDevice.runtime_info.length > 0) || selectedDevice.is_online !== undefined" class="runtime-info-section"
           :class="{ loading: refreshingRuntimeInfo }">
           <div class="section-title">
             <el-icon>
@@ -118,6 +118,20 @@
               :loading="refreshingRuntimeInfo" circle />
           </div>
           <div class="runtime-info-list">
+            <!-- 设备在线状态 -->
+            <div v-if="selectedDevice.is_online !== undefined" class="runtime-info-item online-status-item">
+              <div class="info-label">
+                <el-icon class="status-icon" :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
+                  <CircleCheck v-if="selectedDevice.is_online" />
+                  <CircleClose v-else />
+                </el-icon>
+                设备在线状态：
+              </div>
+              <div class="info-value" :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
+                {{ selectedDevice.is_online ? '在线' : '离线' }}
+              </div>
+            </div>
+            <!-- 其他运行时信息 -->
             <div v-for="(info, index) in selectedDevice.runtime_info" :key="index" class="runtime-info-item">
               <div class="info-label">{{ info.title }}：</div>
               <div class="info-value">{{ info.text }}</div>
@@ -184,7 +198,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, watch, getCurrentInstance } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning } from '@element-plus/icons-vue'
+import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
 
@@ -554,8 +568,18 @@ const createMarkerContent = (device) => {
   const deviceType = getDeviceType(device)
   const iconName = getDeviceIcon(deviceType)
   const deviceName = device.label || device.device_name || device.deviceName
-  const isOpen = getDeviceStatus(device)
-  const statusClass = isOpen ? 'active' : 'inactive'
+  
+  // 根据在线状态设置颜色
+  let statusClass = 'offline' // 默认离线状态
+  if (device.is_online === true) {
+    statusClass = 'online'
+  } else if (device.is_online === false) {
+    statusClass = 'offline'
+  } else {
+    // 如果没有在线状态信息，使用原来的开关状态
+    const isOpen = getDeviceStatus(device)
+    statusClass = isOpen ? 'active' : 'inactive'
+  }
 
   return `
     <div class="device-marker ${deviceType} ${statusClass}">
@@ -574,6 +598,11 @@ const createMarkerContent = (device) => {
 const onDeviceClick = (device) => {
   selectedDevice.value = device
   emit('device-click', device)
+
+  // 调试输出设备数据
+  console.log('选中的设备数据:', device)
+  console.log('设备在线状态:', device.is_online)
+  console.log('设备运行时信息:', device.runtime_info)
 
   // 启动自动刷新定时器
   startRuntimeInfoAutoRefresh()
@@ -857,9 +886,15 @@ const refreshRuntimeInfo = async () => {
         device.device_name === (selectedDevice.value.device_name || selectedDevice.value.deviceName)
       )
 
-      if (currentDevice && currentDevice.runtime_info) {
+      if (currentDevice) {
         // 更新运行时信息
-        selectedDevice.value.runtime_info = currentDevice.runtime_info
+        if (currentDevice.runtime_info) {
+          selectedDevice.value.runtime_info = currentDevice.runtime_info
+        }
+        // 更新在线状态
+        if (currentDevice.is_online !== undefined) {
+          selectedDevice.value.is_online = currentDevice.is_online
+        }
         ElMessage.success('运行时信息已更新')
       }
     }
@@ -1286,6 +1321,49 @@ onUnmounted(() => {
   border-color: #409eff;
 }
 
+/* 在线状态特殊样式 */
+.online-status-item {
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.08) 0%, rgba(103, 194, 58, 0.03) 100%) !important;
+  border-left: 4px solid #67c23a !important;
+}
+
+.online-status-item .status-icon {
+  font-size: 14px;
+  margin-right: 6px;
+}
+
+.online-status-item .status-icon.online {
+  color: #67c23a;
+}
+
+.online-status-item .status-icon.offline {
+  color: #f56c6c;
+}
+
+.online-status-item .info-value.online {
+  background: rgba(103, 194, 58, 0.1) !important;
+  border-color: #67c23a !important;
+  color: #67c23a !important;
+  font-weight: 700;
+}
+
+.online-status-item .info-value.offline {
+  background: rgba(245, 108, 108, 0.1) !important;
+  border-color: #f56c6c !important;
+  color: #f56c6c !important;
+  font-weight: 700;
+}
+
+.online-status-item .info-value.online:hover {
+  background: rgba(103, 194, 58, 0.2) !important;
+  border-color: #67c23a !important;
+}
+
+.online-status-item .info-value.offline:hover {
+  background: rgba(245, 108, 108, 0.2) !important;
+  border-color: #f56c6c !important;
+}
+
 /* 运行时信息加载状态 */
 .runtime-info-section.loading .runtime-info-item {
   opacity: 0.6;
@@ -1445,6 +1523,28 @@ onUnmounted(() => {
 }
 
 :deep(.device-marker.inactive .marker-icon) {
+  border-color: #f56c6c !important;
+  background: rgba(245, 108, 108, 0.2) !important;
+}
+
+/* 在线/离线状态颜色 */
+:deep(.device-marker.online) {
+  border-color: #67c23a !important;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
+}
+
+:deep(.device-marker.online .marker-icon) {
+  border-color: #67c23a !important;
+  background: rgba(103, 194, 58, 0.2) !important;
+  animation: pulse-green 2s infinite;
+}
+
+:deep(.device-marker.offline) {
+  border-color: #f56c6c !important;
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.3);
+}
+
+:deep(.device-marker.offline .marker-icon) {
   border-color: #f56c6c !important;
   background: rgba(245, 108, 108, 0.2) !important;
 }

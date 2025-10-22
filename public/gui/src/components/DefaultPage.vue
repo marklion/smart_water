@@ -215,7 +215,7 @@ const weatherRef = ref(null) // 天气组件引用
 
 // 基本信息数据
 const basicInfo = reactive({
-  irrigationGroups: 0,
+  waterGroupCount: 0,
   farmArea: '0亩',
   cropName: '',
   totalDevices: 0,
@@ -225,7 +225,7 @@ const basicInfo = reactive({
 
 // 基本信息卡片配置
 const basicInfoItems = [
-  { key: 'irrigationGroups', label: '轮灌组数量', valueClass: '' },
+  { key: 'waterGroupCount', label: '轮灌组数量', valueClass: '' },
   { key: 'farmArea', label: '农场面积', valueClass: '' },
   { key: 'cropName', label: '作物名称', valueClass: '' },
   { key: 'totalDevices', label: '设备总数量', valueClass: '' },
@@ -260,7 +260,6 @@ const mapMarkers = shallowRef([])
 const activeIrrigationTab = ref('watering')
 
 // 组件引用
-const wateringGroupRef = ref(null)
 const policyRuntimeRef = ref(null)
 
 
@@ -271,12 +270,16 @@ const loadFarmData = async (farmId) => {
   try {
     console.log('正在加载农场数据:', farmId)
 
+    // 更新地图中心点 - 根据农场位置信息
+    await updateMapCenterForFarm(farmId)
+
     // 加载基本信息 - 使用监控中心模块
     const basicResponse = await call_remote('/monitoring/getBasicInfo', { farmName: farmId })
     console.log('基本信息响应:', basicResponse)
 
     if (basicResponse) {
-      // 轮灌组数量从 WateringGroupStatus 组件获取，不在这里设置
+      // 直接从后端API获取所有基础信息，包括轮灌组数量
+      basicInfo.waterGroupCount = basicResponse.waterGroupCount || 0
       basicInfo.farmArea = `${basicResponse.totalArea || 0}亩`
       basicInfo.cropName = basicResponse.cropName || '未知'
       basicInfo.totalDevices = basicResponse.totalDevices || 0
@@ -284,6 +287,7 @@ const loadFarmData = async (farmId) => {
       basicInfo.offlineDevices = basicResponse.offlineDevices || 0
     } else {
       // 如果 API 没有返回数据，使用默认值
+      basicInfo.waterGroupCount = 0
       basicInfo.farmArea = '0亩'
       basicInfo.cropName = '未知'
       basicInfo.totalDevices = 0
@@ -297,15 +301,10 @@ const loadFarmData = async (farmId) => {
     // 加载实时数据
     await loadRealtimeData(farmId)
 
-    // 延迟更新轮灌组数量，等待 WateringGroupStatus 组件加载完成
-    setTimeout(() => {
-      updateIrrigationGroupsCount()
-    }, 500)
-
   } catch (error) {
     console.error('加载农场数据失败:', error)
     // 使用默认值而不是硬编码的模拟数据
-    basicInfo.irrigationGroups = 0
+    basicInfo.waterGroupCount = 0
     basicInfo.farmArea = '0亩'
     basicInfo.cropName = '未知'
     basicInfo.totalDevices = 0
@@ -350,21 +349,66 @@ const loadRealtimeData = async (farmId) => {
   }
 }
 
+// 更新地图中心点 - 根据农场位置信息
+const updateMapCenterForFarm = async (farmId) => {
+  try {
+    // 首先尝试从全局农场列表中获取农场位置信息
+    if (window.farmList && window.farmList.length > 0) {
+      const farm = window.farmList.find(f => f.id === farmId)
+      if (farm && farm.longitude && farm.latitude) {
+        console.log('使用农场位置信息:', farm.longitude, farm.latitude)
+        mapCenter.value = { lng: farm.longitude, lat: farm.latitude }
+        mapZoom.value = 15
+        return
+      }
+    }
+
+    // 如果农场没有位置信息，尝试从设备数据中获取位置
+    try {
+      const deviceResponse = await call_remote('/device_management/list_device', {
+        farm_name: farmId,
+        pageNo: 0
+      })
+
+      if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
+        // 查找有真实坐标的设备
+        const deviceWithLocation = deviceResponse.devices.find(device => 
+          device.longitude && device.latitude
+        )
+
+        if (deviceWithLocation) {
+          console.log('使用设备位置信息:', deviceWithLocation.longitude, deviceWithLocation.latitude)
+          mapCenter.value = { 
+            lng: deviceWithLocation.longitude, 
+            lat: deviceWithLocation.latitude 
+          }
+          mapZoom.value = 15
+          return
+        }
+      }
+    } catch (error) {
+      console.warn('获取设备位置信息失败:', error)
+    }
+
+    // 如果都没有位置信息，使用默认位置
+    console.log('使用默认地图位置')
+    mapCenter.value = { lng: 111.670801, lat: 40.818311 } // 默认呼和浩特市坐标
+    mapZoom.value = 15
+
+  } catch (error) {
+    console.error('更新地图中心点失败:', error)
+    // 出错时使用默认位置
+    mapCenter.value = { lng: 111.670801, lat: 40.818311 }
+    mapZoom.value = 15
+  }
+}
+
 // 处理农场切换事件
 const handleFarmChange = async (farmId) => {
   selectedFarm.value = farmId
   await loadFarmData(farmId)
-
-  // 更新轮灌组数量 - 从 WateringGroupStatus 组件获取
-  updateIrrigationGroupsCount()
 }
 
-// 更新轮灌组数量
-const updateIrrigationGroupsCount = () => {
-  if (wateringGroupRef.value && wateringGroupRef.value.irrigationGroups) {
-    basicInfo.irrigationGroups = wateringGroupRef.value.irrigationGroups.length
-  }
-}
 
 // 处理城市切换事件
 const handleCityChangeEvent = async (cityData) => {
@@ -434,6 +478,9 @@ const updateDeviceStatuses = async (devices) => {
         }
       }
     }
+    
+    // 更新基本信息统计
+    updateBasicInfoStats()
   } catch (error) {
     console.error('更新设备状态失败:', error)
   }
@@ -490,7 +537,11 @@ const loadRealDeviceData = async (farmId) => {
           originalDevice: device,
           // 保存真实坐标
           longitude: device.longitude,
-          latitude: device.latitude
+          latitude: device.latitude,
+          // 保存在线状态
+          is_online: device.is_online,
+          // 保存运行时信息
+          runtime_info: device.runtime_info
         }
       })
 
@@ -499,10 +550,16 @@ const loadRealDeviceData = async (farmId) => {
       // 获取设备实际状态并更新统计
       await updateDeviceStatuses(devices)
 
-      // 更新基本信息中的设备数量
+      // 更新基本信息中的设备数量 - 根据在线状态计算
       basicInfo.totalDevices = devices.length
-      basicInfo.onlineDevices = devices.filter(d => d.status === 'active' || d.status === 'open').length
-      basicInfo.offlineDevices = devices.length - basicInfo.onlineDevices
+      basicInfo.onlineDevices = devices.filter(d => d.is_online === true).length
+      basicInfo.offlineDevices = devices.filter(d => d.is_online === false).length
+      
+      console.log('设备数据加载完成，统计信息:', {
+        total: basicInfo.totalDevices,
+        online: basicInfo.onlineDevices,
+        offline: basicInfo.offlineDevices
+      })
 
     } else {
       // 如果没有获取到设备数据，使用默认的模拟数据
@@ -579,6 +636,9 @@ const openDevice = async (deviceName) => {
         }
       }
       ElMessage.success(`设备 ${deviceName} 打开成功`)
+      
+      // 更新基本信息统计
+      updateBasicInfoStats()
     }
   } catch (error) {
     console.error('打开设备失败:', error)
@@ -600,6 +660,9 @@ const closeDevice = async (deviceName) => {
         }
       }
       ElMessage.success(`设备 ${deviceName} 关闭成功`)
+      
+      // 更新基本信息统计
+      updateBasicInfoStats()
     }
   } catch (error) {
     console.error('关闭设备失败:', error)
@@ -656,8 +719,19 @@ const onDeviceToggle = (device) => {
 const updateBasicInfoStats = () => {
   if (mapMarkers.value && mapMarkers.value.length > 0) {
     basicInfo.totalDevices = mapMarkers.value.length
-    basicInfo.onlineDevices = mapMarkers.value.filter(d => d.status === 'active' || d.status === 'open').length
-    basicInfo.offlineDevices = mapMarkers.value.length - basicInfo.onlineDevices
+    
+    // 根据设备的在线状态计算在线和离线设备数量
+    const onlineDevices = mapMarkers.value.filter(d => d.is_online === true).length
+    const offlineDevices = mapMarkers.value.filter(d => d.is_online === false).length
+    
+    basicInfo.onlineDevices = onlineDevices
+    basicInfo.offlineDevices = offlineDevices
+    
+    console.log('设备统计更新:', {
+      total: basicInfo.totalDevices,
+      online: basicInfo.onlineDevices,
+      offline: basicInfo.offlineDevices
+    })
   }
 }
 
@@ -714,18 +788,13 @@ const initMapConfig = async () => {
 // Tab切换处理
 const handleIrrigationTabChange = (tabName) => {
   // Tab切换时刷新对应组件数据
-  if (tabName === 'watering' && wateringGroupRef.value) {
-    wateringGroupRef.value.refresh()
-  } else if (tabName === 'runtime' && policyRuntimeRef.value) {
+  if (tabName === 'runtime' && policyRuntimeRef.value) {
     policyRuntimeRef.value.refresh()
   }
 }
 
 // 刷新轮灌组数据
 const refreshIrrigationData = async () => {
-  if (wateringGroupRef.value) {
-    wateringGroupRef.value.refresh()
-  }
   if (policyRuntimeRef.value) {
     policyRuntimeRef.value.refresh()
   }
