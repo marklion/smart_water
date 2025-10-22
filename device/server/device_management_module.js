@@ -174,6 +174,7 @@ export default {
                                 text: { type: String, mean: '信息内容', example: 'true' },
                             }
                         },
+                        is_online: { type: Boolean, mean: '设备是否在线', example: true },
                     }
                 },
             },
@@ -211,6 +212,7 @@ export default {
                             tmp_runtime.text = String(await single_driver[item.func]());
                             device_info.runtime_info.push(tmp_runtime);
                         }
+                        device_info.is_online = await single_driver.is_online();
                     }
                 }
                 return {
