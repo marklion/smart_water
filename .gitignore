@@ -30,3 +30,4 @@ test_reports/
 public/server/web
 /*.log
 /device/log/
+st_*.txt

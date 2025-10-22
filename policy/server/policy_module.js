@@ -14,6 +14,7 @@ import warning_lib from '../../warning/lib/warning_lib.js';
 import evaluator from '../lib/ast_expression_evaluator.js';
 import deviceModule, { get_driver } from '../../device/server/device_management_module.js';
 import resource_lib from '../../resource/lib/resource_lib.js';
+import statistic_lib from '../../statistic/lib/statistic_lib.js';
 
 const policy_array = []
 
@@ -641,7 +642,16 @@ export default {
                                 expression: { type: String, mean: '转移条件表达式', example: 's.cur_pressure <= 40' },
                                 is_constant: { type: Boolean, mean: '是否为常量表达式', example: true }
                             }
-                        }
+                        },
+                        statistic_items: {
+                            type: Array,
+                            mean: '统计项列表',
+                            explain: {
+                                item_name: { type: String, mean: '统计项名称', example: 'total_watered_volume' },
+                                expression: { type: String, mean: '统计项表达式', example: 's.watered_volume + 100' },
+                                target_state: { type: String, mean: '目标状态', example: 's2' }
+                            }
+                        },
                     }
                 }
             },
@@ -716,6 +726,63 @@ export default {
 
                 if (!removed) {
                     throw { err_msg: '转换器规则删除失败' };
+                }
+                return { result: true };
+            }
+        },
+        add_transformer_statistic_item:{
+            name: '添加转换器统计项',
+            description: '向转换器添加一个统计项',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true },
+                target_state: { type: String, mean: '目标状态', example: 's2', have_to: true },
+                item_name: { type: String, mean: '统计项名称', example: 'total_watered_volume', have_to: true },
+                expression: { type: String, mean: '统计项表达式', example: 's.watered_volume + 100', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                let transformer = validateTransformerExists(state, body.transformer_name);
+                let statistic_items = ensureArrayExists(transformer, 'statistic_items');
+                addItemIfNotExists(statistic_items, {
+                    item_name: body.item_name,
+                    expression: body.expression,
+                    target_state: body.target_state,
+                }, item => item.item_name === body.item_name && item.target_state === body.target_state);
+                return { result: true };
+            }
+        },
+        del_transformer_statistic_item:{
+            name: '删除转换器统计项',
+            description: '从转换器中删除一个统计项',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                state_name: { type: String, mean: '状态名称', example: 's1', have_to: true },
+                transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true },
+                item_name: { type: String, mean: '统计项名称', example: 'total_watered_volume', have_to: true },
+                target_state: { type: String, mean: '目标状态', example: 's2', have_to: true },
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let state = validateStateExists(policy, body.state_name);
+                let transformer = validateTransformerExists(state, body.transformer_name);
+                let statistic_items = ensureArrayExists(transformer, 'statistic_items');
+                let itemRemoved = findAndRemoveFromArray(statistic_items,
+                    item => item.item_name === body.item_name && item.target_state === body.target_state);
+                if (!itemRemoved) {
+                    throw { err_msg: '统计项删除失败' };
                 }
                 return { result: true };
             }
@@ -1628,6 +1695,17 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
     }
 }
 
+async function executeStatisticUpdate(target_state, transformer, runtimeState) {
+    if (transformer.statistic_items) {
+        let statistic_item = transformer.statistic_items.find(s => s.target_state === target_state);
+        if (statistic_item) {
+            let value = await evaluateAssignmentExpression(statistic_item.expression, runtimeState);
+            await statistic_lib.update_item(statistic_item.item_name, String(value));
+        }
+    }
+
+}
+
 async function checkStateTransitions(policy, currentState, runtimeState) {
     if (!currentState.transformers || currentState.transformers.length === 0) {
         return false; // 没有转换器，返回 false 表示没有发生状态转换
@@ -1641,6 +1719,7 @@ async function checkStateTransitions(policy, currentState, runtimeState) {
                 console.log(`策略 ${policy.name} 检查转换条件: ${rule.expression} -> ${rule.target_state}`);
                 const shouldTransition = await evaluateTransitionExpression(rule.expression, runtimeState);
                 if (shouldTransition) {
+                    await executeStatisticUpdate(rule.target_state, transformer, runtimeState);
                     await performStateTransition(policy, currentState, rule.target_state, runtimeState);
                     return true; // 发生了状态转换，返回 true
                 }
