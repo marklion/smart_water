@@ -2,26 +2,6 @@
   <div class="default-page">
     <!-- 监控中心特殊布局 -->
     <div v-if="route.name === '监控中心'" class="monitoring-center">
-<<<<<<< HEAD
-      <!-- 顶部农场选择器和城市切换 -->
-      <div class="farm-selector-header">
-        <div class="selector-container">
-          <span class="selector-label">选择农场：</span>
-          <el-select v-model="selectedFarm" class="farm-select-main" size="large" @change="onFarmChange">
-            <el-option v-for="farm in farmList" :key="farm.id" :label="farm.name" :value="farm.id" />
-          </el-select>
-
-          <span class="selector-label" style="margin-left: 32px;">切换城市：</span>
-          <el-input v-model="cityInput" placeholder="输入城市名，如：北京" class="city-input" size="large" clearable
-            @keyup.enter="handleCityChange" style="width: 200px;" />
-          <el-button type="primary" size="large" @click="handleCityChange" :loading="cityChanging">
-            切换
-          </el-button>
-          
-        </div>
-      </div>
-=======
->>>>>>> 58dfedc (DPKW-59-增加策略动态数据的展示界面)
 
       <!-- 内容包装器 -->
       <div class="content-wrapper">
@@ -276,26 +256,12 @@ const mapZoom = ref(15)
 const mapMarkers = shallowRef([])
 
 
-<<<<<<< HEAD
-
-// 表格行样式类名
-const tableRowClassName = ({ row }) => {
-  const status = row.cur_state || row.status
-  if (status && (status.includes('执行中') || status.includes('灌溉中') || status.includes('running'))) {
-    return 'success-row'
-  } else if (status && (status.includes('暂停') || status.includes('warning'))) {
-    return 'warning-row'
-  }
-  return ''
-}
-=======
 // Tab切换相关
 const activeIrrigationTab = ref('watering')
 
 // 组件引用
 const wateringGroupRef = ref(null)
 const policyRuntimeRef = ref(null)
->>>>>>> 58dfedc (DPKW-59-增加策略动态数据的展示界面)
 
 
 // API接口方法
@@ -755,8 +721,6 @@ const handleIrrigationTabChange = (tabName) => {
   }
 }
 
-<<<<<<< HEAD
-=======
 // 刷新轮灌组数据
 const refreshIrrigationData = async () => {
   if (wateringGroupRef.value) {
@@ -766,8 +730,6 @@ const refreshIrrigationData = async () => {
     policyRuntimeRef.value.refresh()
   }
 }
-
->>>>>>> 58dfedc (DPKW-59-增加策略动态数据的展示界面)
 
 // 组件挂载时加载数据
 onMounted(async () => {
