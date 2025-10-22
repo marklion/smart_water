@@ -47,6 +47,38 @@ export default {
                 }
                 return `已删除 ${deletedCount} 个转移规则`;
             });
+        cli_utils.make_undo_cmd(vorpal, 'statistic <target_state> <item_name> <expresstion>', '指定统计项赋值条件','删除所有统计项',
+            async (cmd_this, args) => {
+                await policy_lib.add_transformer_statistic_item(
+                    ins.state_view.policy_view.cur_view_name,
+                    ins.state_view.cur_view_name,
+                    ins.cur_view_name,
+                    args.target_state,
+                    args.item_name,
+                    args.expresstion
+                );
+                return `已设置统计项: ${args.item_name} 在状态 ${args.target_state} 下的赋值条件为 ${args.expresstion}`;
+            }, async (cmd_this, args) => {
+                const resp = await policy_lib.get_transformer(
+                    ins.state_view.policy_view.cur_view_name,
+                    ins.state_view.cur_view_name,
+                    ins.cur_view_name
+                );
+                let deletedCount = 0;
+                if (resp.transformer && resp.transformer.statistic_items) {
+                    for (const item of resp.transformer.statistic_items) {
+                        await policy_lib.del_transformer_statistic_item(
+                            ins.state_view.policy_view.cur_view_name,
+                            ins.state_view.cur_view_name,
+                            ins.cur_view_name,
+                            item.target_state,
+                            item.item_name,
+                        );
+                        deletedCount++;
+                    }
+                }
+                return `已删除 ${deletedCount} 个统计项`;
+            });
 
         return vorpal;
     },
@@ -82,6 +114,11 @@ export default {
             for (const rule of resp.transformer.rules) {
                 const isConstant = rule.is_constant || false;
                 ret.push(`rule '${isConstant}' '${rule.target_state}' '${rule.expression}'`);
+            }
+        }
+        if (resp.transformer && resp.transformer.statistic_items) {
+            for (const item of resp.transformer.statistic_items) {
+                ret.push(`statistic '${item.target_state}' '${item.item_name}' '${item.expression}'`);
             }
         }
         return ret;
