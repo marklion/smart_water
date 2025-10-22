@@ -76,30 +76,7 @@
             <RealtimeDataCard :farm-name="selectedFarm" ref="realtimeDataRef" />
 
             <!-- 告警信息卡片 -->
-            <el-card class="warning-card" shadow="hover">
-              <template #header>
-                <div class="card-header">
-                  <span class="card-title">系统告警</span>
-                  <el-badge :value="warningData.total" :max="99" class="warning-badge" />
-                </div>
-              </template>
-
-              <div class="warning-list">
-                <el-scrollbar height="300px" v-if="warningData.warnings.length > 0">
-                  <div class="warning-item" v-for="(warning, index) in warningData.warnings" :key="index">
-                    <div class="warning-icon">
-                      <el-icon :size="16" color="#f56c6c">
-                        <Warning />
-                      </el-icon>
-                    </div>
-                    <div class="warning-content">
-                      <div class="warning-text">{{ warning.content }}</div>
-                    </div>
-                  </div>
-                </el-scrollbar>
-                <el-empty v-else description="暂无告警信息" :image-size="80" />
-              </div>
-            </el-card>
+            <WarningCard ref="warningCardRef" />
           </div>
         </div>
 
@@ -129,40 +106,20 @@
 <script setup>
 import { computed, reactive, ref, onMounted, shallowRef, watch, inject } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Warning, Refresh, Monitor } from '@element-plus/icons-vue'
+import { Refresh } from '@element-plus/icons-vue'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import WateringGroupStatus from '../../../../policy/gui/WateringGroupStatus.vue'
 import PolicyRuntimeStatus from '../../../../policy/gui/PolicyRuntimeStatus.vue'
 import BasicInfoCard from '../../../../monitoring/gui/BasicInfoCard.vue'
 import RealtimeDataCard from '../../../../monitoring/gui/RealtimeDataCard.vue'
+import WarningCard from '../../../../monitoring/gui/WarningCard.vue'
 import call_remote from '../../../lib/call_remote.js'
-import { fetchMapConfig, getCityLocation, saveMapCenterToStorage } from '../config/mapConfig.js'
+import { fetchMapConfig } from '../config/mapConfig.js'
 
 const route = useRoute()
-const systemName = ref('智能灌溉管理系统')
-
 // 注入城市变化数据
 const cityChangeData = inject('cityChangeData', ref({ city: '', location: null, timestamp: null }))
-
-// 获取系统名称
-const getSystemName = async () => {
-  try {
-    const response = await fetch('/api/v1/get_sys_name', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    const data = await response.json()
-    if (data.err_msg === '' && data.result.sys_name && data.result.sys_name !== 'no name') {
-      systemName.value = data.result.sys_name
-    }
-  } catch (error) {
-    console.error('获取系统名称失败:', error)
-  }
-}
 
 const pageTitle = computed(() => {
   return route.name || '页面'
@@ -207,11 +164,6 @@ const basicInfoItems = [
 
 // 实时数据已移至 RealtimeDataCard 组件中管理
 
-// 告警数据
-const warningData = reactive({
-  warnings: [],
-  total: 0
-})
 
 // 地图配置
 const mapCenter = ref({ lng: 111.670801, lat: 40.818311 }) // 默认呼和浩特市坐标
@@ -227,6 +179,7 @@ const activeIrrigationTab = ref('watering')
 // 组件引用
 const policyRuntimeRef = ref(null)
 const realtimeDataRef = ref(null)
+const warningCardRef = ref(null)
 
 
 // API接口方法
@@ -483,142 +436,19 @@ const loadRealDeviceData = async (farmId) => {
       
 
     } else {
-      // 如果没有获取到设备数据，使用默认的模拟数据
-      mapMarkers.value = getDefaultDeviceData()
+      // 如果没有获取到设备数据，使用空数组
+      mapMarkers.value = []
     }
 
   } catch (error) {
     console.error('加载真实设备数据失败:', error)
-    // 出错时使用默认数据
-    mapMarkers.value = getDefaultDeviceData()
+    // 出错时使用空数组
+    mapMarkers.value = []
   }
 }
 
-// 获取默认设备数据（作为备用）
-const getDefaultDeviceData = () => {
-  return [
-    {
-      id: 1,
-      x: 20,
-      y: 30,
-      type: 'valve',
-      label: '电磁阀1',
-      deviceName: '温室1号主灌溉管道阀门1',
-      deviceType: '电磁阀',
-      status: 'closed',
-      capability: ['open', 'close', 'readout'],
-      farmName: '温室1号',
-      blockName: '主灌溉管道',
-      showPopover: false
-    },
-    {
-      id: 2,
-      x: 60,
-      y: 45,
-      type: 'valve',
-      label: '电磁阀2',
-      deviceName: '温室1号施肥管道阀门1',
-      deviceType: '电磁阀',
-      status: 'open',
-      capability: ['open', 'close', 'readout'],
-      farmName: '温室1号',
-      blockName: '施肥管道',
-      showPopover: false
-    },
-    {
-      id: 3,
-      x: 80,
-      y: 25,
-      type: 'flowmeter',
-      label: '流量计1',
-      deviceName: '温室1号主灌溉管道流量计1',
-      deviceType: '流量计',
-      status: 'active',
-      capability: ['readout'],
-      farmName: '温室1号',
-      blockName: '主灌溉管道',
-      showPopover: false
-    }
-  ]
-}
 
-// 设备控制方法
-const openDevice = async (deviceName) => {
-  try {
-    const response = await call_remote('/device_management/open_device', { device_name: deviceName })
-    if (response.result) {
-      // 更新标记点状态
-      const marker = mapMarkers.value.find(m => m.deviceName === deviceName)
-      if (marker) {
-        if (marker.type === 'fertilizer') {
-          marker.status = 'active'
-        } else {
-          marker.status = 'open'
-        }
-      }
-      ElMessage.success(`设备 ${deviceName} 打开成功`)
-      
-      // 更新基本信息统计
-      updateBasicInfoStats()
-    }
-  } catch (error) {
-    console.error('打开设备失败:', error)
-    ElMessage.error(`打开设备失败: ${error.message || error}`)
-  }
-}
 
-const closeDevice = async (deviceName) => {
-  try {
-    const response = await call_remote('/device_management/close_device', { device_name: deviceName })
-    if (response.result) {
-      // 更新标记点状态
-      const marker = mapMarkers.value.find(m => m.deviceName === deviceName)
-      if (marker) {
-        if (marker.type === 'fertilizer') {
-          marker.status = 'inactive'
-        } else {
-          marker.status = 'closed'
-        }
-      }
-      ElMessage.success(`设备 ${deviceName} 关闭成功`)
-      
-      // 更新基本信息统计
-      updateBasicInfoStats()
-    }
-  } catch (error) {
-    console.error('关闭设备失败:', error)
-    ElMessage.error(`关闭设备失败: ${error.message || error}`)
-  }
-}
-
-const readDeviceStatus = async (deviceName) => {
-  try {
-    const response = await call_remote('/device_management/readout_device', { device_name: deviceName })
-    return response.readout
-  } catch (error) {
-    console.error('读取设备状态失败:', error)
-    return null
-  }
-}
-
-// 获取设备状态信息
-const getDeviceStatusInfo = (marker) => {
-  const statusText = {
-    'open': '开启',
-    'closed': '关闭',
-    'active': '运行中',
-    'inactive': '停止'
-  }
-
-  return {
-    deviceName: marker.deviceName,
-    deviceType: marker.deviceType,
-    status: statusText[marker.status] || marker.status,
-    farmName: marker.farmName,
-    blockName: marker.blockName,
-    capability: marker.capability
-  }
-}
 
 // 地图事件处理方法
 const onDeviceClick = (device) => {
@@ -651,37 +481,8 @@ const updateBasicInfoStats = () => {
   }
 }
 
-// 设备控制方法
-const toggleDevice = async (marker) => {
-  try {
-    if (marker.status === 'open' || marker.status === 'active') {
-      await closeDevice(marker.deviceName)
-      marker.status = 'closed'
-    } else {
-      await openDevice(marker.deviceName)
-      marker.status = 'open'
-    }
-    ElMessage.success('设备操作成功')
-  } catch (error) {
-    ElMessage.error('设备操作失败: ' + error.message)
-  }
-}
 
 
-// 加载告警数据
-const loadWarningData = async () => {
-  try {
-    const response = await call_remote('/warning/list_warnings', { pageNo: 0 })
-    if (response) {
-      warningData.warnings = response.warnings || []
-      warningData.total = response.total || 0
-    }
-  } catch (error) {
-    console.error('加载告警数据失败:', error)
-    warningData.warnings = []
-    warningData.total = 0
-  }
-}
 
 // 初始化地图配置
 const initMapConfig = async () => {
@@ -719,8 +520,6 @@ const refreshIrrigationData = async () => {
 // 组件挂载时加载数据
 onMounted(async () => {
   await initMapConfig()
-  getSystemName()
-  loadWarningData()
 
   // 添加全局事件监听器
   window.addEventListener('farmChanged', (event) => {
@@ -986,8 +785,7 @@ html {
 .weather-card,
 .map-card,
 .irrigation-card,
-.realtime-card,
-.warning-card {
+.realtime-card {
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
   border-radius: 16px;
   box-shadow:
@@ -1004,8 +802,7 @@ html {
 .weather-card::before,
 .map-card::before,
 .irrigation-card::before,
-.realtime-card::before,
-.warning-card::before {
+.realtime-card::before {
   content: '';
   position: absolute;
   top: 0;
@@ -1020,8 +817,7 @@ html {
 .weather-card:hover,
 .map-card:hover,
 .irrigation-card:hover,
-.realtime-card:hover,
-.warning-card:hover {
+.realtime-card:hover {
   transform: translateY(-4px);
   box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.08),
@@ -2143,93 +1939,6 @@ html {
   padding: 20px 0;
 }
 
-/* 告警卡片样式 */
-.warning-card {
-  min-height: 350px;
-}
-
-.warning-badge {
-  margin-left: auto;
-}
-
-.warning-list {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.warning-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 12px;
-  margin-bottom: 8px;
-  background: linear-gradient(145deg, #ffffff, #fef5f5);
-  border-radius: 8px;
-  border-left: 3px solid #f56c6c;
-  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.1);
-  transition: all 0.2s ease;
-}
-
-.warning-item:hover {
-  transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.2);
-  background: linear-gradient(145deg, #fef5f5, #fff0f0);
-}
-
-.warning-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(245, 108, 108, 0.1);
-  border-radius: 50%;
-  margin-right: 12px;
-}
-
-.warning-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.warning-text {
-  font-size: 14px;
-  color: #303133;
-  line-height: 1.6;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-/* 响应式告警文字 */
-@media (min-width: 1600px) {
-  .warning-text {
-    font-size: 14px;
-  }
-}
-
-@media (min-width: 1200px) and (max-width: 1599px) {
-  .warning-text {
-    font-size: 13px;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1199px) {
-  .warning-text {
-    font-size: 13px;
-  }
-}
-
-@media (max-width: 767px) {
-  .warning-text {
-    font-size: 12px;
-  }
-  
-  .warning-item {
-    padding: 10px;
-  }
-}
 
 /* 急停对话框样式 */
 .emergency-stop-content {
