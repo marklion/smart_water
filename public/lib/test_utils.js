@@ -126,7 +126,7 @@ export default async function create_cli(processName) {
         ret.output = '';
         ret.process.write(cmd + '\n');
         let wait_gap = 10;
-        if (cmd == 'clear' || cmd == 'restore')
+        if (cmd === 'clear' || cmd.startsWith('restore'))
         {
             wait_gap = 200;
         }
