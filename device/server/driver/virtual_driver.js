@@ -2,7 +2,22 @@ import fs from 'fs';
 import path from 'path';
 import moment from 'moment';
 
-export default async function (log_file_path) {
+export default async function (config) {
+    // 支持传入配置对象或直接传入日志文件路径（向后兼容）
+    let log_file_path, device_type, device_name;
+    
+    if (typeof config === 'string') {
+        // 向后兼容：直接传入日志文件路径
+        log_file_path = config;
+        device_type = 'valve'; // 默认类型
+        device_name = 'unknown'; // 默认名称
+    } else {
+        // 新方式：传入配置对象
+        log_file_path = config.log_file;
+        device_type = config.device_type || 'valve';
+        device_name = config.device_name || 'unknown';
+    }
+    
     // 如果传入的是相对路径或简单文件名，则使用统一的日志目录
     let actual_log_path = log_file_path;
     if (!path.isAbsolute(log_file_path) && !log_file_path.includes('/')) {
