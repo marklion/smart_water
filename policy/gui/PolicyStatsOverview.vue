@@ -106,7 +106,7 @@ const loadStatsData = async () => {
         const token = localStorage.getItem('auth_token')
 
         // 获取策略总数
-        const policiesResult = await policy_lib.list_policy(0, token)
+        const policiesResult = await policy_lib.list_policy(0, null, token)
         totalPolicies.value = policiesResult.total || 0
 
         // 计算状态总数、动作总数、数据源总数
