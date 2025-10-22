@@ -594,7 +594,6 @@ export default {
 
         // 图表点击事件
         const showChartDetail = (type) => {
-            console.log('显示图表详情:', type)
         }
 
         // 返回按钮

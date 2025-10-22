@@ -73,62 +73,10 @@
           <!-- 右侧信息面板 -->
           <div class="right-panel">
             <!-- 实时数据卡片 -->
-            <el-card class="realtime-card" shadow="hover">
-              <template #header>
-                <div class="card-header">
-                  <span class="card-title">实时数据</span>
-                </div>
-              </template>
-
-              <div class="realtime-data">
-                <div class="data-item">
-                  <div class="data-label">总计流量</div>
-                  <div class="data-value">{{ realtimeData.totalFlow }}</div>
-                </div>
-                <div class="data-item">
-                  <div class="data-label">主管流量</div>
-                  <div class="data-value">{{ realtimeData.mainPipeFlow }}</div>
-                </div>
-                <div class="data-item">
-                  <div class="data-label">主管管压力</div>
-                  <div class="data-value">{{ realtimeData.mainPipePressure }}</div>
-                </div>
-                <div class="data-item">
-                  <div class="data-label">肥料流量</div>
-                  <div class="data-value">{{ realtimeData.fertilizerFlow }}</div>
-                </div>
-                <div class="data-item">
-                  <div class="data-label">总施肥量</div>
-                  <div class="data-value">{{ realtimeData.totalFertilizer }}</div>
-                </div>
-              </div>
-            </el-card>
+            <RealtimeDataCard :farm-name="selectedFarm" ref="realtimeDataRef" />
 
             <!-- 告警信息卡片 -->
-            <el-card class="warning-card" shadow="hover">
-              <template #header>
-                <div class="card-header">
-                  <span class="card-title">系统告警</span>
-                  <el-badge :value="warningData.total" :max="99" class="warning-badge" />
-                </div>
-              </template>
-
-              <div class="warning-list">
-                <el-scrollbar height="300px" v-if="warningData.warnings.length > 0">
-                  <div class="warning-item" v-for="(warning, index) in warningData.warnings" :key="index">
-                    <div class="warning-icon">
-                      <el-icon :size="16" color="#f56c6c">
-                        <Warning />
-                      </el-icon>
-                    </div>
-                    <div class="warning-content">
-                      <div class="warning-text">{{ warning.content }}</div>
-                    </div>
-                  </div>
-                </el-scrollbar>
-                <el-empty v-else description="暂无告警信息" :image-size="80" />
-              </div>
-            </el-card>
+            <WarningCard ref="warningCardRef" />
           </div>
         </div>
 
@@ -158,39 +106,20 @@
 <script setup>
 import { computed, reactive, ref, onMounted, shallowRef, watch, inject } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Warning, Refresh, Monitor } from '@element-plus/icons-vue'
+import { Refresh } from '@element-plus/icons-vue'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import WateringGroupStatus from '../../../../policy/gui/WateringGroupStatus.vue'
 import PolicyRuntimeStatus from '../../../../policy/gui/PolicyRuntimeStatus.vue'
 import BasicInfoCard from '../../../../monitoring/gui/BasicInfoCard.vue'
+import RealtimeDataCard from '../../../../monitoring/gui/RealtimeDataCard.vue'
+import WarningCard from '../../../../monitoring/gui/WarningCard.vue'
 import call_remote from '../../../lib/call_remote.js'
-import { fetchMapConfig, getCityLocation, saveMapCenterToStorage } from '../config/mapConfig.js'
+import { fetchMapConfig } from '../config/mapConfig.js'
 
 const route = useRoute()
-const systemName = ref('智能灌溉管理系统')
-
 // 注入城市变化数据
 const cityChangeData = inject('cityChangeData', ref({ city: '', location: null, timestamp: null }))
-
-// 获取系统名称
-const getSystemName = async () => {
-  try {
-    const response = await fetch('/api/v1/get_sys_name', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    const data = await response.json()
-    if (data.err_msg === '' && data.result.sys_name && data.result.sys_name !== 'no name') {
-      systemName.value = data.result.sys_name
-    }
-  } catch (error) {
-    console.error('获取系统名称失败:', error)
-  }
-}
 
 const pageTitle = computed(() => {
   return route.name || '页面'
@@ -233,20 +162,8 @@ const basicInfoItems = [
   { key: 'offlineDevices', label: '离线设备', valueClass: 'offline' }
 ]
 
-// 实时数据
-const realtimeData = reactive({
-  totalFlow: '0 m³',
-  mainPipeFlow: '0 m³/h',
-  mainPipePressure: '0 mpa',
-  fertilizerFlow: '0 L/h',
-  totalFertilizer: '0 m³'
-})
+// 实时数据已移至 RealtimeDataCard 组件中管理
 
-// 告警数据
-const warningData = reactive({
-  warnings: [],
-  total: 0
-})
 
 // 地图配置
 const mapCenter = ref({ lng: 111.670801, lat: 40.818311 }) // 默认呼和浩特市坐标
@@ -261,6 +178,8 @@ const activeIrrigationTab = ref('watering')
 
 // 组件引用
 const policyRuntimeRef = ref(null)
+const realtimeDataRef = ref(null)
+const warningCardRef = ref(null)
 
 
 // API接口方法
@@ -268,14 +187,12 @@ const policyRuntimeRef = ref(null)
 
 const loadFarmData = async (farmId) => {
   try {
-    console.log('正在加载农场数据:', farmId)
 
     // 更新地图中心点 - 根据农场位置信息
     await updateMapCenterForFarm(farmId)
 
     // 加载基本信息 - 使用监控中心模块
     const basicResponse = await call_remote('/monitoring/getBasicInfo', { farmName: farmId })
-    console.log('基本信息响应:', basicResponse)
 
     if (basicResponse) {
       // 直接从后端API获取所有基础信息，包括轮灌组数量
@@ -298,9 +215,6 @@ const loadFarmData = async (farmId) => {
     // 加载真实设备数据
     await loadRealDeviceData(farmId)
 
-    // 加载实时数据
-    await loadRealtimeData(farmId)
-
   } catch (error) {
     console.error('加载农场数据失败:', error)
     // 使用默认值而不是硬编码的模拟数据
@@ -311,43 +225,11 @@ const loadFarmData = async (farmId) => {
     basicInfo.onlineDevices = 0
     basicInfo.offlineDevices = 0
 
-    realtimeData.totalFlow = '0 m³'
-    realtimeData.mainPipeFlow = '0 m³/h'
-    realtimeData.mainPipePressure = '0 mpa'
-    realtimeData.fertilizerFlow = '0 L/h'
-    realtimeData.totalFertilizer = '0 m³'
+    // 实时数据由 RealtimeDataCard 组件管理
   }
 }
 
-// 加载实时数据
-const loadRealtimeData = async (farmId) => {
-  try {
-    console.log('正在加载实时数据:', farmId)
-    const realtimeResponse = await call_remote('/monitoring/getRealtimeData', { farmName: farmId })
-    console.log('实时数据响应:', realtimeResponse)
-
-    if (realtimeResponse) {
-      realtimeData.totalFlow = `${realtimeResponse.totalFlow || 0} m³`
-      realtimeData.mainPipeFlow = `${realtimeResponse.mainPipeFlow || 0} m³/h`
-      realtimeData.mainPipePressure = `${realtimeResponse.mainPipePressure || 0} mpa`
-      realtimeData.fertilizerFlow = `${realtimeResponse.fertilizerFlow || 0} L/h`
-      realtimeData.totalFertilizer = `${realtimeResponse.totalFertilizer || 0} m³`
-    } else {
-      realtimeData.totalFlow = '0 m³'
-      realtimeData.mainPipeFlow = '0 m³/h'
-      realtimeData.mainPipePressure = '0 mpa'
-      realtimeData.fertilizerFlow = '0 L/h'
-      realtimeData.totalFertilizer = '0 m³'
-    }
-  } catch (error) {
-    console.error('加载实时数据失败:', error)
-    realtimeData.totalFlow = '0 m³'
-    realtimeData.mainPipeFlow = '0 m³/h'
-    realtimeData.mainPipePressure = '0 mpa'
-    realtimeData.fertilizerFlow = '0 L/h'
-    realtimeData.totalFertilizer = '0 m³'
-  }
-}
+// 实时数据加载已移至 RealtimeDataCard 组件中
 
 // 更新地图中心点 - 根据农场位置信息
 const updateMapCenterForFarm = async (farmId) => {
@@ -356,7 +238,6 @@ const updateMapCenterForFarm = async (farmId) => {
     if (window.farmList && window.farmList.length > 0) {
       const farm = window.farmList.find(f => f.id === farmId)
       if (farm && farm.longitude && farm.latitude) {
-        console.log('使用农场位置信息:', farm.longitude, farm.latitude)
         mapCenter.value = { lng: farm.longitude, lat: farm.latitude }
         mapZoom.value = 15
         return
@@ -377,7 +258,6 @@ const updateMapCenterForFarm = async (farmId) => {
         )
 
         if (deviceWithLocation) {
-          console.log('使用设备位置信息:', deviceWithLocation.longitude, deviceWithLocation.latitude)
           mapCenter.value = { 
             lng: deviceWithLocation.longitude, 
             lat: deviceWithLocation.latitude 
@@ -391,7 +271,6 @@ const updateMapCenterForFarm = async (farmId) => {
     }
 
     // 如果都没有位置信息，使用默认位置
-    console.log('使用默认地图位置')
     mapCenter.value = { lng: 111.670801, lat: 40.818311 } // 默认呼和浩特市坐标
     mapZoom.value = 15
 
@@ -555,149 +434,21 @@ const loadRealDeviceData = async (farmId) => {
       basicInfo.onlineDevices = devices.filter(d => d.is_online === true).length
       basicInfo.offlineDevices = devices.filter(d => d.is_online === false).length
       
-      console.log('设备数据加载完成，统计信息:', {
-        total: basicInfo.totalDevices,
-        online: basicInfo.onlineDevices,
-        offline: basicInfo.offlineDevices
-      })
 
     } else {
-      // 如果没有获取到设备数据，使用默认的模拟数据
-      mapMarkers.value = getDefaultDeviceData()
+      // 如果没有获取到设备数据，使用空数组
+      mapMarkers.value = []
     }
 
   } catch (error) {
     console.error('加载真实设备数据失败:', error)
-    // 出错时使用默认数据
-    mapMarkers.value = getDefaultDeviceData()
+    // 出错时使用空数组
+    mapMarkers.value = []
   }
 }
 
-// 获取默认设备数据（作为备用）
-const getDefaultDeviceData = () => {
-  return [
-    {
-      id: 1,
-      x: 20,
-      y: 30,
-      type: 'valve',
-      label: '电磁阀1',
-      deviceName: '温室1号主灌溉管道阀门1',
-      deviceType: '电磁阀',
-      status: 'closed',
-      capability: ['open', 'close', 'readout'],
-      farmName: '温室1号',
-      blockName: '主灌溉管道',
-      showPopover: false
-    },
-    {
-      id: 2,
-      x: 60,
-      y: 45,
-      type: 'valve',
-      label: '电磁阀2',
-      deviceName: '温室1号施肥管道阀门1',
-      deviceType: '电磁阀',
-      status: 'open',
-      capability: ['open', 'close', 'readout'],
-      farmName: '温室1号',
-      blockName: '施肥管道',
-      showPopover: false
-    },
-    {
-      id: 3,
-      x: 80,
-      y: 25,
-      type: 'flowmeter',
-      label: '流量计1',
-      deviceName: '温室1号主灌溉管道流量计1',
-      deviceType: '流量计',
-      status: 'active',
-      capability: ['readout'],
-      farmName: '温室1号',
-      blockName: '主灌溉管道',
-      showPopover: false
-    }
-  ]
-}
 
-// 设备控制方法
-const openDevice = async (deviceName) => {
-  try {
-    const response = await call_remote('/device_management/open_device', { device_name: deviceName })
-    if (response.result) {
-      // 更新标记点状态
-      const marker = mapMarkers.value.find(m => m.deviceName === deviceName)
-      if (marker) {
-        if (marker.type === 'fertilizer') {
-          marker.status = 'active'
-        } else {
-          marker.status = 'open'
-        }
-      }
-      ElMessage.success(`设备 ${deviceName} 打开成功`)
-      
-      // 更新基本信息统计
-      updateBasicInfoStats()
-    }
-  } catch (error) {
-    console.error('打开设备失败:', error)
-    ElMessage.error(`打开设备失败: ${error.message || error}`)
-  }
-}
 
-const closeDevice = async (deviceName) => {
-  try {
-    const response = await call_remote('/device_management/close_device', { device_name: deviceName })
-    if (response.result) {
-      // 更新标记点状态
-      const marker = mapMarkers.value.find(m => m.deviceName === deviceName)
-      if (marker) {
-        if (marker.type === 'fertilizer') {
-          marker.status = 'inactive'
-        } else {
-          marker.status = 'closed'
-        }
-      }
-      ElMessage.success(`设备 ${deviceName} 关闭成功`)
-      
-      // 更新基本信息统计
-      updateBasicInfoStats()
-    }
-  } catch (error) {
-    console.error('关闭设备失败:', error)
-    ElMessage.error(`关闭设备失败: ${error.message || error}`)
-  }
-}
-
-const readDeviceStatus = async (deviceName) => {
-  try {
-    const response = await call_remote('/device_management/readout_device', { device_name: deviceName })
-    return response.readout
-  } catch (error) {
-    console.error('读取设备状态失败:', error)
-    return null
-  }
-}
-
-// 获取设备状态信息
-const getDeviceStatusInfo = (marker) => {
-  const statusText = {
-    'open': '开启',
-    'closed': '关闭',
-    'active': '运行中',
-    'inactive': '停止'
-  }
-
-  return {
-    deviceName: marker.deviceName,
-    deviceType: marker.deviceType,
-    status: statusText[marker.status] || marker.status,
-    farmName: marker.farmName,
-    blockName: marker.blockName,
-    capability: marker.capability
-  }
-}
 
 // 地图事件处理方法
 const onDeviceClick = (device) => {
@@ -727,45 +478,11 @@ const updateBasicInfoStats = () => {
     basicInfo.onlineDevices = onlineDevices
     basicInfo.offlineDevices = offlineDevices
     
-    console.log('设备统计更新:', {
-      total: basicInfo.totalDevices,
-      online: basicInfo.onlineDevices,
-      offline: basicInfo.offlineDevices
-    })
-  }
-}
-
-// 设备控制方法
-const toggleDevice = async (marker) => {
-  try {
-    if (marker.status === 'open' || marker.status === 'active') {
-      await closeDevice(marker.deviceName)
-      marker.status = 'closed'
-    } else {
-      await openDevice(marker.deviceName)
-      marker.status = 'open'
-    }
-    ElMessage.success('设备操作成功')
-  } catch (error) {
-    ElMessage.error('设备操作失败: ' + error.message)
   }
 }
 
 
-// 加载告警数据
-const loadWarningData = async () => {
-  try {
-    const response = await call_remote('/warning/list_warnings', { pageNo: 0 })
-    if (response) {
-      warningData.warnings = response.warnings || []
-      warningData.total = response.total || 0
-    }
-  } catch (error) {
-    console.error('加载告警数据失败:', error)
-    warningData.warnings = []
-    warningData.total = 0
-  }
-}
+
 
 // 初始化地图配置
 const initMapConfig = async () => {
@@ -777,7 +494,7 @@ const initMapConfig = async () => {
     // 加载保存的城市
     const savedCity = localStorage.getItem('weather_selected_city')
     if (savedCity) {
-      currentCity.value = savedCity
+      cityChangeData.value.city = savedCity
     }
   } catch (error) {
     console.error('加载地图配置失败，使用默认值:', error)
@@ -803,8 +520,6 @@ const refreshIrrigationData = async () => {
 // 组件挂载时加载数据
 onMounted(async () => {
   await initMapConfig()
-  getSystemName()
-  loadWarningData()
 
   // 添加全局事件监听器
   window.addEventListener('farmChanged', (event) => {
@@ -817,12 +532,10 @@ onMounted(async () => {
     // 先尝试从 localStorage 获取上次选中的农场
     const savedFarm = localStorage.getItem('selectedFarm')
     if (savedFarm) {
-      console.log('从 localStorage 恢复农场:', savedFarm)
       selectedFarm.value = savedFarm
       await loadFarmData(savedFarm)
     } else {
       // 如果没有保存的农场，等待 MainLayout 触发事件
-      console.log('等待 MainLayout 触发初始农场数据加载')
     }
   }
 })
@@ -830,7 +543,6 @@ onMounted(async () => {
 // 监听路由变化，当切换到监控中心时重新加载数据
 watch(() => route.name, async (newRouteName, oldRouteName) => {
   if (newRouteName === '监控中心' && oldRouteName !== '监控中心') {
-    console.log('切换到监控中心页面，重新加载数据')
     
     // 获取当前选中的农场
     const currentFarm = localStorage.getItem('selectedFarm')
@@ -839,7 +551,6 @@ watch(() => route.name, async (newRouteName, oldRouteName) => {
       await loadFarmData(currentFarm)
     } else {
       // 如果没有保存的农场，等待 MainLayout 触发事件
-      console.log('等待 MainLayout 触发农场数据加载')
     }
   }
 })
@@ -848,7 +559,6 @@ watch(() => route.name, async (newRouteName, oldRouteName) => {
 watch(cityChangeData, (newCityData, oldCityData) => {
   if (newCityData && newCityData.city && newCityData.location && 
       (!oldCityData || newCityData.timestamp !== oldCityData.timestamp)) {
-    console.log('检测到城市变化:', newCityData)
     handleCityChangeEvent(newCityData)
   }
 }, { deep: true })
@@ -1075,8 +785,7 @@ html {
 .weather-card,
 .map-card,
 .irrigation-card,
-.realtime-card,
-.warning-card {
+.realtime-card {
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
   border-radius: 16px;
   box-shadow:
@@ -1093,8 +802,7 @@ html {
 .weather-card::before,
 .map-card::before,
 .irrigation-card::before,
-.realtime-card::before,
-.warning-card::before {
+.realtime-card::before {
   content: '';
   position: absolute;
   top: 0;
@@ -1109,8 +817,7 @@ html {
 .weather-card:hover,
 .map-card:hover,
 .irrigation-card:hover,
-.realtime-card:hover,
-.warning-card:hover {
+.realtime-card:hover {
   transform: translateY(-4px);
   box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.08),
@@ -2232,93 +1939,6 @@ html {
   padding: 20px 0;
 }
 
-/* 告警卡片样式 */
-.warning-card {
-  min-height: 350px;
-}
-
-.warning-badge {
-  margin-left: auto;
-}
-
-.warning-list {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.warning-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 12px;
-  margin-bottom: 8px;
-  background: linear-gradient(145deg, #ffffff, #fef5f5);
-  border-radius: 8px;
-  border-left: 3px solid #f56c6c;
-  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.1);
-  transition: all 0.2s ease;
-}
-
-.warning-item:hover {
-  transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.2);
-  background: linear-gradient(145deg, #fef5f5, #fff0f0);
-}
-
-.warning-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(245, 108, 108, 0.1);
-  border-radius: 50%;
-  margin-right: 12px;
-}
-
-.warning-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.warning-text {
-  font-size: 14px;
-  color: #303133;
-  line-height: 1.6;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-/* 响应式告警文字 */
-@media (min-width: 1600px) {
-  .warning-text {
-    font-size: 14px;
-  }
-}
-
-@media (min-width: 1200px) and (max-width: 1599px) {
-  .warning-text {
-    font-size: 13px;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1199px) {
-  .warning-text {
-    font-size: 13px;
-  }
-}
-
-@media (max-width: 767px) {
-  .warning-text {
-    font-size: 12px;
-  }
-  
-  .warning-item {
-    padding: 10px;
-  }
-}
 
 /* 急停对话框样式 */
 .emergency-stop-content {
