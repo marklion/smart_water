@@ -207,7 +207,6 @@ function refreshData() {
 
 // 搜索事件处理
 const onSearch = (params) => {
-    console.log('搜索参数:', params, '当前标签:', activeTab.value);
     if (activeTab.value === 'drivers') {
         driverSearchParams.value = params;
         if (driverPageContentRef.value) {
@@ -223,7 +222,6 @@ const onSearch = (params) => {
 
 // 搜索重置事件处理
 const onSearchReset = () => {
-    console.log('重置搜索');
     driverSearchParams.value = { searchText: '', filters: {} };
     deviceSearchParams.value = { searchText: '', filters: {} };
     farmFilter.value = '';

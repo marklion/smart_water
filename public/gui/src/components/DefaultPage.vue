@@ -73,36 +73,7 @@
           <!-- 右侧信息面板 -->
           <div class="right-panel">
             <!-- 实时数据卡片 -->
-            <el-card class="realtime-card" shadow="hover">
-              <template #header>
-                <div class="card-header">
-                  <span class="card-title">实时数据</span>
-                </div>
-              </template>
-
-              <div class="realtime-data">
-                <div class="data-item">
-                  <div class="data-label">总计流量</div>
-                  <div class="data-value">{{ realtimeData.totalFlow }}</div>
-                </div>
-                <div class="data-item">
-                  <div class="data-label">主管流量</div>
-                  <div class="data-value">{{ realtimeData.mainPipeFlow }}</div>
-                </div>
-                <div class="data-item">
-                  <div class="data-label">主管管压力</div>
-                  <div class="data-value">{{ realtimeData.mainPipePressure }}</div>
-                </div>
-                <div class="data-item">
-                  <div class="data-label">肥料流量</div>
-                  <div class="data-value">{{ realtimeData.fertilizerFlow }}</div>
-                </div>
-                <div class="data-item">
-                  <div class="data-label">总施肥量</div>
-                  <div class="data-value">{{ realtimeData.totalFertilizer }}</div>
-                </div>
-              </div>
-            </el-card>
+            <RealtimeDataCard :farm-name="selectedFarm" ref="realtimeDataRef" />
 
             <!-- 告警信息卡片 -->
             <el-card class="warning-card" shadow="hover">
@@ -165,6 +136,7 @@ import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import WateringGroupStatus from '../../../../policy/gui/WateringGroupStatus.vue'
 import PolicyRuntimeStatus from '../../../../policy/gui/PolicyRuntimeStatus.vue'
 import BasicInfoCard from '../../../../monitoring/gui/BasicInfoCard.vue'
+import RealtimeDataCard from '../../../../monitoring/gui/RealtimeDataCard.vue'
 import call_remote from '../../../lib/call_remote.js'
 import { fetchMapConfig, getCityLocation, saveMapCenterToStorage } from '../config/mapConfig.js'
 
@@ -233,14 +205,7 @@ const basicInfoItems = [
   { key: 'offlineDevices', label: '离线设备', valueClass: 'offline' }
 ]
 
-// 实时数据
-const realtimeData = reactive({
-  totalFlow: '0 m³',
-  mainPipeFlow: '0 m³/h',
-  mainPipePressure: '0 mpa',
-  fertilizerFlow: '0 L/h',
-  totalFertilizer: '0 m³'
-})
+// 实时数据已移至 RealtimeDataCard 组件中管理
 
 // 告警数据
 const warningData = reactive({
@@ -261,6 +226,7 @@ const activeIrrigationTab = ref('watering')
 
 // 组件引用
 const policyRuntimeRef = ref(null)
+const realtimeDataRef = ref(null)
 
 
 // API接口方法
@@ -268,14 +234,12 @@ const policyRuntimeRef = ref(null)
 
 const loadFarmData = async (farmId) => {
   try {
-    console.log('正在加载农场数据:', farmId)
 
     // 更新地图中心点 - 根据农场位置信息
     await updateMapCenterForFarm(farmId)
 
     // 加载基本信息 - 使用监控中心模块
     const basicResponse = await call_remote('/monitoring/getBasicInfo', { farmName: farmId })
-    console.log('基本信息响应:', basicResponse)
 
     if (basicResponse) {
       // 直接从后端API获取所有基础信息，包括轮灌组数量
@@ -298,9 +262,6 @@ const loadFarmData = async (farmId) => {
     // 加载真实设备数据
     await loadRealDeviceData(farmId)
 
-    // 加载实时数据
-    await loadRealtimeData(farmId)
-
   } catch (error) {
     console.error('加载农场数据失败:', error)
     // 使用默认值而不是硬编码的模拟数据
@@ -311,43 +272,11 @@ const loadFarmData = async (farmId) => {
     basicInfo.onlineDevices = 0
     basicInfo.offlineDevices = 0
 
-    realtimeData.totalFlow = '0 m³'
-    realtimeData.mainPipeFlow = '0 m³/h'
-    realtimeData.mainPipePressure = '0 mpa'
-    realtimeData.fertilizerFlow = '0 L/h'
-    realtimeData.totalFertilizer = '0 m³'
+    // 实时数据由 RealtimeDataCard 组件管理
   }
 }
 
-// 加载实时数据
-const loadRealtimeData = async (farmId) => {
-  try {
-    console.log('正在加载实时数据:', farmId)
-    const realtimeResponse = await call_remote('/monitoring/getRealtimeData', { farmName: farmId })
-    console.log('实时数据响应:', realtimeResponse)
-
-    if (realtimeResponse) {
-      realtimeData.totalFlow = `${realtimeResponse.totalFlow || 0} m³`
-      realtimeData.mainPipeFlow = `${realtimeResponse.mainPipeFlow || 0} m³/h`
-      realtimeData.mainPipePressure = `${realtimeResponse.mainPipePressure || 0} mpa`
-      realtimeData.fertilizerFlow = `${realtimeResponse.fertilizerFlow || 0} L/h`
-      realtimeData.totalFertilizer = `${realtimeResponse.totalFertilizer || 0} m³`
-    } else {
-      realtimeData.totalFlow = '0 m³'
-      realtimeData.mainPipeFlow = '0 m³/h'
-      realtimeData.mainPipePressure = '0 mpa'
-      realtimeData.fertilizerFlow = '0 L/h'
-      realtimeData.totalFertilizer = '0 m³'
-    }
-  } catch (error) {
-    console.error('加载实时数据失败:', error)
-    realtimeData.totalFlow = '0 m³'
-    realtimeData.mainPipeFlow = '0 m³/h'
-    realtimeData.mainPipePressure = '0 mpa'
-    realtimeData.fertilizerFlow = '0 L/h'
-    realtimeData.totalFertilizer = '0 m³'
-  }
-}
+// 实时数据加载已移至 RealtimeDataCard 组件中
 
 // 更新地图中心点 - 根据农场位置信息
 const updateMapCenterForFarm = async (farmId) => {
@@ -356,7 +285,6 @@ const updateMapCenterForFarm = async (farmId) => {
     if (window.farmList && window.farmList.length > 0) {
       const farm = window.farmList.find(f => f.id === farmId)
       if (farm && farm.longitude && farm.latitude) {
-        console.log('使用农场位置信息:', farm.longitude, farm.latitude)
         mapCenter.value = { lng: farm.longitude, lat: farm.latitude }
         mapZoom.value = 15
         return
@@ -377,7 +305,6 @@ const updateMapCenterForFarm = async (farmId) => {
         )
 
         if (deviceWithLocation) {
-          console.log('使用设备位置信息:', deviceWithLocation.longitude, deviceWithLocation.latitude)
           mapCenter.value = { 
             lng: deviceWithLocation.longitude, 
             lat: deviceWithLocation.latitude 
@@ -391,7 +318,6 @@ const updateMapCenterForFarm = async (farmId) => {
     }
 
     // 如果都没有位置信息，使用默认位置
-    console.log('使用默认地图位置')
     mapCenter.value = { lng: 111.670801, lat: 40.818311 } // 默认呼和浩特市坐标
     mapZoom.value = 15
 
@@ -555,11 +481,6 @@ const loadRealDeviceData = async (farmId) => {
       basicInfo.onlineDevices = devices.filter(d => d.is_online === true).length
       basicInfo.offlineDevices = devices.filter(d => d.is_online === false).length
       
-      console.log('设备数据加载完成，统计信息:', {
-        total: basicInfo.totalDevices,
-        online: basicInfo.onlineDevices,
-        offline: basicInfo.offlineDevices
-      })
 
     } else {
       // 如果没有获取到设备数据，使用默认的模拟数据
@@ -727,11 +648,6 @@ const updateBasicInfoStats = () => {
     basicInfo.onlineDevices = onlineDevices
     basicInfo.offlineDevices = offlineDevices
     
-    console.log('设备统计更新:', {
-      total: basicInfo.totalDevices,
-      online: basicInfo.onlineDevices,
-      offline: basicInfo.offlineDevices
-    })
   }
 }
 
@@ -777,7 +693,7 @@ const initMapConfig = async () => {
     // 加载保存的城市
     const savedCity = localStorage.getItem('weather_selected_city')
     if (savedCity) {
-      currentCity.value = savedCity
+      cityChangeData.value.city = savedCity
     }
   } catch (error) {
     console.error('加载地图配置失败，使用默认值:', error)
@@ -817,12 +733,10 @@ onMounted(async () => {
     // 先尝试从 localStorage 获取上次选中的农场
     const savedFarm = localStorage.getItem('selectedFarm')
     if (savedFarm) {
-      console.log('从 localStorage 恢复农场:', savedFarm)
       selectedFarm.value = savedFarm
       await loadFarmData(savedFarm)
     } else {
       // 如果没有保存的农场，等待 MainLayout 触发事件
-      console.log('等待 MainLayout 触发初始农场数据加载')
     }
   }
 })
@@ -830,7 +744,6 @@ onMounted(async () => {
 // 监听路由变化，当切换到监控中心时重新加载数据
 watch(() => route.name, async (newRouteName, oldRouteName) => {
   if (newRouteName === '监控中心' && oldRouteName !== '监控中心') {
-    console.log('切换到监控中心页面，重新加载数据')
     
     // 获取当前选中的农场
     const currentFarm = localStorage.getItem('selectedFarm')
@@ -839,7 +752,6 @@ watch(() => route.name, async (newRouteName, oldRouteName) => {
       await loadFarmData(currentFarm)
     } else {
       // 如果没有保存的农场，等待 MainLayout 触发事件
-      console.log('等待 MainLayout 触发农场数据加载')
     }
   }
 })
@@ -848,7 +760,6 @@ watch(() => route.name, async (newRouteName, oldRouteName) => {
 watch(cityChangeData, (newCityData, oldCityData) => {
   if (newCityData && newCityData.city && newCityData.location && 
       (!oldCityData || newCityData.timestamp !== oldCityData.timestamp)) {
-    console.log('检测到城市变化:', newCityData)
     handleCityChangeEvent(newCityData)
   }
 }, { deep: true })

@@ -599,10 +599,6 @@ const onDeviceClick = (device) => {
   selectedDevice.value = device
   emit('device-click', device)
 
-  // 调试输出设备数据
-  console.log('选中的设备数据:', device)
-  console.log('设备在线状态:', device.is_online)
-  console.log('设备运行时信息:', device.runtime_info)
 
   // 启动自动刷新定时器
   startRuntimeInfoAutoRefresh()

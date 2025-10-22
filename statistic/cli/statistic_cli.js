@@ -27,6 +27,10 @@ export default {
             }
             return items.length;
         });
+        cli_utils.make_common_cmd(vorpal, 'update item <item_name> <value>', '更新统计项', async (cmd_this, args) => {
+            await statistic_lib.update_item(args.item_name, args.value, this.token);
+            return `统计项 ${args.item_name} 已更新为: ${args.value}`;
+        });
         vorpal.delimiter(prompt)
         return vorpal;
     },
