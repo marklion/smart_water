@@ -3,6 +3,17 @@
     <!-- 地图容器 -->
     <div id="amap-container" class="amap-container"></div>
 
+    <!-- 紧急停止按钮 -->
+    <div class="emergency-stop-control">
+      <el-button type="danger" size="large" @click="showEmergencyStopDialog" class="emergency-stop-btn"
+        :loading="emergencyStopLoading">
+        <el-icon>
+          <Warning />
+        </el-icon>
+        紧急停止
+      </el-button>
+    </div>
+
     <!-- 地图控件 -->
     <div class="map-controls">
       <el-dropdown trigger="click" @command="handleMapLayerCommand">
@@ -75,14 +86,6 @@
             <span class="value">{{ selectedDevice.deviceType }}</span>
           </div>
           <div class="detail-item">
-            <span class="label">设备状态：</span>
-            <el-tag
-              :type="selectedDevice.status === 'open' || selectedDevice.status === 'active' ? 'success' : 'danger'"
-              size="small">
-              {{ selectedDevice.status === 'open' || selectedDevice.status === 'active' ? '开启' : '关闭' }}
-            </el-tag>
-          </div>
-          <div class="detail-item">
             <span class="label">所属农场：</span>
             <span class="value">{{ selectedDevice.farmName }}</span>
           </div>
@@ -103,17 +106,43 @@
           </div>
         </div>
 
-        <div class="device-actions"
-          v-if="hasDeviceCapability(selectedDevice, 'open') || hasDeviceCapability(selectedDevice, 'close')">
-          <el-button v-if="hasDeviceCapability(selectedDevice, 'open') && hasDeviceCapability(selectedDevice, 'close')"
-            :type="selectedDevice.status === 'open' || selectedDevice.status === 'active' ? 'danger' : 'success'"
-            size="small" @click="toggleDevice(selectedDevice)">
-            {{ selectedDevice.status === 'open' || selectedDevice.status === 'active' ? '关闭设备' : '开启设备' }}
-          </el-button>
-          <el-button v-if="hasDeviceCapability(selectedDevice, 'readout')" type="primary" size="small"
-            @click="readDeviceStatus(selectedDevice.deviceName)">
-            读取数据
-          </el-button>
+        <!-- 运行时信息区域 -->
+        <div v-if="selectedDevice.runtime_info && selectedDevice.runtime_info.length > 0" class="runtime-info-section"
+          :class="{ loading: refreshingRuntimeInfo }">
+          <div class="section-title">
+            <el-icon>
+              <Monitor />
+            </el-icon>
+            <span>运行时信息</span>
+            <el-button size="small" type="primary" :icon="Refresh" @click="refreshRuntimeInfo"
+              :loading="refreshingRuntimeInfo" circle />
+          </div>
+          <div class="runtime-info-list">
+            <div v-for="(info, index) in selectedDevice.runtime_info" :key="index" class="runtime-info-item">
+              <div class="info-label">{{ info.title }}：</div>
+              <div class="info-value">{{ info.text }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDevice)">
+          <div class="device-controls-container">
+            <!-- 动态生成的设备操作按钮 -->
+            <div v-for="buttonGroup in getDeviceButtonGroups(selectedDevice)" :key="buttonGroup.key"
+              :class="buttonGroup.containerClass">
+              <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
+                :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize" :class="buttonConfig.buttonClass"
+                @click="handleDeviceAction(buttonConfig.action, selectedDevice.deviceName || selectedDevice.device_name)">
+                <el-icon v-if="buttonConfig.icon" class="mr-1">
+                  <VideoPlay v-if="buttonConfig.icon === 'VideoPlay'" />
+                  <VideoPause v-else-if="buttonConfig.icon === 'VideoPause'" />
+                  <Monitor v-else-if="buttonConfig.icon === 'Monitor'" />
+                  <Close v-else-if="buttonConfig.icon === 'Close'" />
+                </el-icon>
+                {{ buttonConfig.buttonText }}
+              </el-button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -123,13 +152,39 @@
       <div class="loading-spinner"></div>
       <p>地图加载中...</p>
     </div>
+
+    <!-- 紧急停止对话框 -->
+    <el-dialog v-model="emergencyStopDialogVisible" title="紧急停止" width="600px" :close-on-click-modal="false"
+      :close-on-press-escape="false">
+      <div class="emergency-stop-content">
+        <div class="emergency-warning">
+          <el-icon size="24" color="#f56c6c">
+            <Warning />
+          </el-icon>
+          <span>请选择需要执行急停的地块：</span>
+        </div>
+
+        <el-checkbox-group v-model="selectedBlocks" class="block-selection">
+          <el-checkbox v-for="block in availableBlocks" :key="block.id" :label="block.id" class="block-checkbox">
+            {{ block.name }}
+          </el-checkbox>
+        </el-checkbox-group>
+
+        <div class="emergency-actions">
+          <el-button @click="cancelEmergencyStop">取消</el-button>
+          <el-button type="danger" @click="executeEmergencyStop" :loading="emergencyStopLoading">
+            执行急停
+          </el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch, getCurrentInstance } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid } from '@element-plus/icons-vue'
+import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
 
@@ -150,17 +205,28 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['device-click', 'device-toggle'])
+const emit = defineEmits(['device-click'])
 
 // 响应式数据
 const selectedDevice = ref(null)
 const loading = ref(true)
 const currentLayerType = ref('卫星地图')
+const refreshingRuntimeInfo = ref(false)
+const deviceStatuses = ref({}) // 跟踪设备状态
+
+// 紧急停止相关数据
+const emergencyStopDialogVisible = ref(false)
+const selectedBlocks = ref([])
+const availableBlocks = ref([])
+const emergencyStopLoading = ref(false)
+
 let map = null
 // 图层管理
 let satelliteLayer = null
 let trafficLayer = null
 let markers = []
+// 自动刷新定时器
+let runtimeInfoTimer = null
 
 // 地图初始化
 const initMap = async () => {
@@ -300,7 +366,7 @@ const createDeviceMarker = (device) => {
       // 为设备添加类型信息
       const deviceWithType = {
         ...device,
-        type: getDeviceTypeFromName(device.device_name || device.deviceName)
+        type: getDeviceType(device)
       }
       onDeviceClick(deviceWithType)
     })
@@ -315,13 +381,39 @@ const createDeviceMarker = (device) => {
   }
 }
 
-// 根据设备名称推断设备类型
-const getDeviceTypeFromName = (deviceName) => {
+// 获取设备类型代码 - 用于图标和动作集映射
+const getDeviceType = (device) => {
+  // 优先使用后端返回的设备类型代码
+  if (device.device_type) {
+    // 如果是虚拟设备，从设备名称判断具体类型
+    if (device.device_type === '虚拟设备') {
+      const deviceName = device.device_name || device.deviceName || ''
+      if (deviceName.includes('流量计')) return 'flowmeter'
+      if (deviceName.includes('阀门')) return 'valve'
+      if (deviceName.includes('施肥机')) return 'fertilizer'
+      if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
+      return 'valve' // 默认类型
+    }
+    // 如果不是虚拟设备，直接返回具体类型
+    return device.device_type
+  }
+
+  // 如果没有device_type，则从设备名称推断（向后兼容）
+  const deviceName = device.device_name || device.deviceName || ''
   if (deviceName.includes('流量计')) return 'flowmeter'
   if (deviceName.includes('阀门')) return 'valve'
   if (deviceName.includes('施肥机')) return 'fertilizer'
   if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
+
   return 'valve' // 默认类型
+}
+
+// 检查设备是否具有任何能力
+const hasAnyDeviceCapability = (device) => {
+  if (!device) return false
+
+  const allCapabilities = ['open', 'close', 'readout', 'shutdown']
+  return allCapabilities.some(capability => hasDeviceCapability(device, capability))
 }
 
 // 检查设备是否具有特定能力
@@ -348,13 +440,122 @@ const hasDeviceCapability = (device, capability) => {
   return false
 }
 
+// 获取设备按钮分组（动态生成，开启和关闭按钮放在同一行）
+const getDeviceButtonGroups = (device) => {
+  if (!device) return []
+
+  // 获取设备类型
+  const deviceType = getDeviceType(device)
+
+  // 获取设备能力集
+  let capabilities = []
+  if (device.capability) {
+    if (Array.isArray(device.capability)) {
+      capabilities = device.capability
+    } else {
+      try {
+        capabilities = JSON.parse(device.capability)
+      } catch (e) {
+        capabilities = device.capability.split(',').map(c => c.trim())
+      }
+    }
+  }
+
+  // 使用全局函数获取按钮配置
+  const buttonConfigs = getCurrentInstance().appContext.config.globalProperties.$getDeviceButtonConfig(capabilities, deviceType)
+
+  // 将按钮分组：开启和关闭按钮放在同一行，其他按钮各自一行
+  const groups = []
+
+  // 检查是否有开启和关闭按钮
+  const openButton = buttonConfigs.find(config => config.capability === 'open')
+  const closeButton = buttonConfigs.find(config => config.capability === 'close')
+
+  if (openButton && closeButton) {
+    // 开启和关闭按钮放在同一行
+    groups.push({
+      key: 'open-close-group',
+      containerClass: 'device-control-row',
+      buttons: [openButton, closeButton]
+    })
+  } else {
+    // 如果只有一个，单独显示
+    if (openButton) {
+      groups.push({
+        key: 'open-group',
+        containerClass: 'full-width-buttons-container',
+        buttons: [openButton]
+      })
+    }
+    if (closeButton) {
+      groups.push({
+        key: 'close-group',
+        containerClass: 'full-width-buttons-container',
+        buttons: [closeButton]
+      })
+    }
+  }
+
+  // 其他按钮各自一行
+  const otherButtons = buttonConfigs.filter(config =>
+    config.capability !== 'open' && config.capability !== 'close'
+  )
+
+  otherButtons.forEach(button => {
+    groups.push({
+      key: `${button.capability}-group`,
+      containerClass: 'full-width-buttons-container',
+      buttons: [button]
+    })
+  })
+
+  return groups
+}
+
+// 处理设备操作
+const handleDeviceAction = async (action, deviceName) => {
+  try {
+    switch (action) {
+      case 'openDevice':
+        await openDevice(deviceName)
+        break
+      case 'closeDevice':
+        await closeDevice(deviceName)
+        break
+      case 'readDeviceStatus':
+        await readDeviceStatus(deviceName)
+        break
+      case 'shutdownDevice':
+        await shutdownDevice(deviceName)
+        break
+      default:
+        console.warn('未知的设备操作:', action)
+    }
+  } catch (error) {
+    console.error('设备操作失败:', error)
+    ElMessage.error(`设备操作失败: ${error.message || error}`)
+  }
+}
+
+// 获取设备状态
+const getDeviceStatus = (device) => {
+  if (!device) return false
+  const deviceName = device.deviceName || device.device_name
+  return deviceStatuses.value[deviceName] || false
+}
+
+// 设置设备状态
+const setDeviceStatus = (deviceName, status) => {
+  deviceStatuses.value[deviceName] = status
+}
+
 // 创建标记内容
 const createMarkerContent = (device) => {
-  const statusClass = device.status === 'open' || device.status === 'active' ? 'active' : 'inactive'
-  const deviceType = getDeviceTypeFromName(device.device_name || device.deviceName)
+  const deviceType = getDeviceType(device)
   const iconName = getDeviceIcon(deviceType)
   const deviceName = device.label || device.device_name || device.deviceName
-  const statusText = getStatusText(device.status)
+  const isOpen = getDeviceStatus(device)
+  const statusClass = isOpen ? 'active' : 'inactive'
 
   return `
     <div class="device-marker ${deviceType} ${statusClass}">
@@ -363,34 +564,26 @@ const createMarkerContent = (device) => {
       </div>
       <div class="marker-info">
         <div class="device-name">${deviceName}</div>
-        <div class="device-status">${statusText}</div>
       </div>
     </div>
   `
 }
 
-// 获取状态文本
-const getStatusText = (status) => {
-  const statusMap = {
-    'open': '开',
-    'closed': '关',
-    'active': '运行',
-    'inactive': '停止'
-  }
-  return statusMap[status] || status
-}
 
 // 设备点击事件
 const onDeviceClick = (device) => {
   selectedDevice.value = device
   emit('device-click', device)
+
+  // 启动自动刷新定时器
+  startRuntimeInfoAutoRefresh()
 }
 
 // 地图点击事件
 const onMapClick = (e) => {
   // 点击地图空白区域时关闭设备面板
   if (selectedDevice.value) {
-    selectedDevice.value = null
+    closeDevicePanel()
   }
 }
 
@@ -549,75 +742,13 @@ const clearMarkers = () => {
 
 // 关闭设备面板
 const closeDevicePanel = () => {
+  // 停止自动刷新定时器
+  stopRuntimeInfoAutoRefresh()
   selectedDevice.value = null
 }
 
-// 更新设备状态 - 安全地更新设备状态，避免直接修改原对象
-const updateDeviceStatus = (deviceName, newStatus) => {
-  if (selectedDevice.value &&
-    (selectedDevice.value.device_name || selectedDevice.value.deviceName) === deviceName) {
-    selectedDevice.value = { ...selectedDevice.value, status: newStatus }
-  }
-}
 
-// 设备控制方法
-const toggleDevice = async (device) => {
-  try {
-    const deviceName = device.device_name || device.deviceName
 
-    // 检查设备是否支持开关操作
-    if (!hasDeviceCapability(device, 'open') || !hasDeviceCapability(device, 'close')) {
-      ElMessage.warning('该设备不支持开关操作')
-      return
-    }
-
-    let newStatus
-    if (device.status === 'open' || device.status === 'active') {
-      await closeDevice(deviceName)
-      // 根据设备类型确定关闭状态
-      const deviceType = device.type || getDeviceTypeFromName(deviceName)
-      newStatus = deviceType === 'fertilizer' ? 'inactive' : 'closed'
-    } else {
-      await openDevice(deviceName)
-      // 根据设备类型确定开启状态
-      const deviceType = device.type || getDeviceTypeFromName(deviceName)
-      newStatus = deviceType === 'fertilizer' ? 'active' : 'open'
-    }
-
-    // 更新当前选中设备的状态
-    updateDeviceStatus(deviceName, newStatus)
-    const updatedDevice = { ...device, status: newStatus }
-    emit('device-toggle', updatedDevice)
-    initDeviceMarkers()
-    ElMessage.success('设备操作成功')
-  } catch (error) {
-    ElMessage.error('设备操作失败: ' + error.message)
-  }
-}
-
-const openDevice = async (deviceName) => {
-  try {
-    const response = await call_remote('/device_management/open_device', { device_name: deviceName })
-    if (response.result) {
-      ElMessage.success(`设备 ${deviceName} 打开成功`)
-    }
-  } catch (error) {
-    console.error('打开设备失败:', error)
-    ElMessage.error(`打开设备失败: ${error.message || error}`)
-  }
-}
-
-const closeDevice = async (deviceName) => {
-  try {
-    const response = await call_remote('/device_management/close_device', { device_name: deviceName })
-    if (response.result) {
-      ElMessage.success(`设备 ${deviceName} 关闭成功`)
-    }
-  } catch (error) {
-    console.error('关闭设备失败:', error)
-    ElMessage.error(`关闭设备失败: ${error.message || error}`)
-  }
-}
 
 const readDeviceStatus = async (deviceName) => {
   try {
@@ -628,6 +759,219 @@ const readDeviceStatus = async (deviceName) => {
     console.error('读取设备状态失败:', error)
     ElMessage.error('读取设备状态失败')
     return null
+  }
+}
+
+// 设备切换函数
+const toggleDevice = async (device) => {
+  try {
+    const deviceName = device.deviceName || device.device_name
+    const currentStatus = getDeviceStatus(device)
+
+    if (currentStatus) {
+      // 当前是开启状态，执行关闭操作
+      await closeDevice(deviceName)
+      setDeviceStatus(deviceName, false)
+      ElMessage.success(`设备 ${deviceName} 已关闭`)
+    } else {
+      // 当前是关闭状态，执行开启操作
+      await openDevice(deviceName)
+      setDeviceStatus(deviceName, true)
+      ElMessage.success(`设备 ${deviceName} 已开启`)
+    }
+
+    // 重新渲染设备标记以更新颜色
+    initDeviceMarkers()
+  } catch (error) {
+    console.error('设备切换失败:', error)
+    ElMessage.error(`设备切换失败: ${error.message || error}`)
+  }
+}
+
+// 打开设备
+const openDevice = async (deviceName) => {
+  try {
+    const response = await call_remote('/device_management/open_device', { device_name: deviceName })
+    if (response.result) {
+      setDeviceStatus(deviceName, true)
+      ElMessage.success(`设备 ${deviceName} 已开启`)
+      // 重新渲染设备标记以更新状态
+      initDeviceMarkers()
+    }
+  } catch (error) {
+    console.error('打开设备失败:', error)
+    ElMessage.error(`打开设备失败: ${error.message || error}`)
+    throw error
+  }
+}
+
+// 关闭设备
+const closeDevice = async (deviceName) => {
+  try {
+    const response = await call_remote('/device_management/close_device', { device_name: deviceName })
+    if (response.result) {
+      setDeviceStatus(deviceName, false)
+      ElMessage.success(`设备 ${deviceName} 已关闭`)
+      // 重新渲染设备标记以更新状态
+      initDeviceMarkers()
+    }
+  } catch (error) {
+    console.error('关闭设备失败:', error)
+    ElMessage.error(`关闭设备失败: ${error.message || error}`)
+    throw error
+  }
+}
+
+// 关机设备
+const shutdownDevice = async (deviceName) => {
+  try {
+    const response = await call_remote('/device_management/shutdown_device', { device_name: deviceName })
+    if (response.result) {
+      ElMessage.success(`设备 ${deviceName} 关机成功`)
+    }
+  } catch (error) {
+    console.error('设备关机失败:', error)
+    ElMessage.error(`设备关机失败: ${error.message || error}`)
+  }
+}
+
+
+
+// 刷新运行时信息
+const refreshRuntimeInfo = async () => {
+  if (!selectedDevice.value) return
+
+  try {
+    refreshingRuntimeInfo.value = true
+
+    // 获取最新的设备列表，包含运行时信息
+    const response = await call_remote('/device_management/list_device', {
+      pageNo: 0,
+      farm_name: selectedDevice.value.farmName,
+      block_name: selectedDevice.value.blockName
+    })
+
+    if (response.devices && response.devices.length > 0) {
+      // 找到当前选中的设备
+      const currentDevice = response.devices.find(device =>
+        device.device_name === (selectedDevice.value.device_name || selectedDevice.value.deviceName)
+      )
+
+      if (currentDevice && currentDevice.runtime_info) {
+        // 更新运行时信息
+        selectedDevice.value.runtime_info = currentDevice.runtime_info
+        ElMessage.success('运行时信息已更新')
+      }
+    }
+  } catch (error) {
+    console.error('刷新运行时信息失败:', error)
+    ElMessage.error('刷新运行时信息失败')
+  } finally {
+    refreshingRuntimeInfo.value = false
+  }
+}
+
+// 启动自动刷新定时器
+const startRuntimeInfoAutoRefresh = () => {
+  // 清除现有定时器
+  if (runtimeInfoTimer) {
+    clearInterval(runtimeInfoTimer)
+  }
+
+  // 每30秒自动刷新一次运行时信息
+  runtimeInfoTimer = setInterval(() => {
+    if (selectedDevice.value && selectedDevice.value.runtime_info) {
+      refreshRuntimeInfo()
+    }
+  }, 30000) // 30秒
+}
+
+// 停止自动刷新定时器
+const stopRuntimeInfoAutoRefresh = () => {
+  if (runtimeInfoTimer) {
+    clearInterval(runtimeInfoTimer)
+    runtimeInfoTimer = null
+  }
+}
+
+// 紧急停止相关方法
+const showEmergencyStopDialog = async () => {
+  try {
+    // 获取可用地块列表
+    await loadAvailableBlocks()
+    emergencyStopDialogVisible.value = true
+    selectedBlocks.value = []
+  } catch (error) {
+    console.error('加载地块列表失败:', error)
+    ElMessage.error('加载地块列表失败')
+  }
+}
+
+const loadAvailableBlocks = async () => {
+  try {
+    // 从设备数据中提取地块信息
+    const blockSet = new Set()
+    props.devices.forEach(device => {
+      if (device.blockName || device.block_name) {
+        blockSet.add(device.blockName || device.block_name)
+      }
+    })
+
+    availableBlocks.value = Array.from(blockSet).map(blockName => ({
+      id: blockName,
+      name: blockName
+    }))
+  } catch (error) {
+    console.error('加载地块列表失败:', error)
+    availableBlocks.value = []
+  }
+}
+
+const cancelEmergencyStop = () => {
+  emergencyStopDialogVisible.value = false
+  selectedBlocks.value = []
+}
+
+const executeEmergencyStop = async () => {
+  if (selectedBlocks.value.length === 0) {
+    ElMessage.warning('请选择至少一个地块')
+    return
+  }
+
+  emergencyStopLoading.value = true
+  try {
+    // 获取当前农场名称
+    const currentFarm = props.devices.length > 0 ? (props.devices[0].farmName || props.devices[0].farm_name) : '默认农场'
+
+    // 执行急停操作
+    const response = await call_remote('/device_management/emergency_stop', {
+      farm_name: currentFarm,
+      block_names: selectedBlocks.value
+    })
+
+    if (response.result) {
+      const stoppedCount = response.stopped_devices ? response.stopped_devices.length : 0
+      const failedCount = response.failed_devices ? response.failed_devices.length : 0
+
+      if (failedCount === 0) {
+        ElMessage.success(`急停操作执行成功，共急停 ${stoppedCount} 个设备`)
+      } else {
+        ElMessage.warning(`急停操作部分成功：成功 ${stoppedCount} 个，失败 ${failedCount} 个设备`)
+      }
+
+      emergencyStopDialogVisible.value = false
+      selectedBlocks.value = []
+
+      // 刷新设备状态
+      emit('device-click', null) // 触发父组件刷新
+    } else {
+      ElMessage.error('急停操作执行失败')
+    }
+  } catch (error) {
+    console.error('急停操作失败:', error)
+    ElMessage.error(`急停操作失败: ${error.message || error}`)
+  } finally {
+    emergencyStopLoading.value = false
   }
 }
 
@@ -654,10 +998,13 @@ onMounted(() => {
 
 // 组件卸载
 onUnmounted(() => {
+  // 停止自动刷新定时器
+  stopRuntimeInfoAutoRefresh()
+
   if (map) {
     // 清除所有图层
     clearAllLayers()
-    
+
     // 清除所有标记
     for (const marker of markers) {
       if (marker) {
@@ -665,7 +1012,7 @@ onUnmounted(() => {
       }
     }
     markers = []
-    
+
     // 销毁地图实例
     map.destroy()
     map = null
@@ -687,6 +1034,36 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   min-height: 400px;
+}
+
+/* 紧急停止按钮样式 */
+.emergency-stop-control {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+}
+
+.emergency-stop-btn {
+  background: linear-gradient(135deg, #ff4757, #ff3742);
+  border: none;
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
+  transition: all 0.3s ease;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
+.emergency-stop-btn:hover {
+  background: linear-gradient(135deg, #ff3742, #ff2f3a);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+}
+
+.emergency-stop-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
 }
 
 /* 地图控件样式 */
@@ -720,7 +1097,7 @@ onUnmounted(() => {
   position: absolute;
   top: 20px;
   left: 20px;
-  width: 320px;
+  width: 280px;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
@@ -769,7 +1146,166 @@ onUnmounted(() => {
 
 .device-actions {
   display: flex;
+  flex-direction: column;
   gap: 10px;
+}
+
+.device-controls-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.device-control-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.full-width-buttons-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.half-width-button {
+  flex: 1;
+  width: calc(50% - 4px);
+  margin: 0;
+  padding: 0;
+}
+
+.full-width-button {
+  width: 100% !important;
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 0;
+}
+
+/* 强制Element Plus按钮对齐 */
+:deep(.full-width-button) {
+  width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+:deep(.half-width-button) {
+  flex: 1 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* 运行时信息样式 */
+.runtime-info-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.runtime-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.runtime-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.08) 0%, rgba(64, 158, 255, 0.03) 100%);
+  border-radius: 8px;
+  border-left: 4px solid #409eff;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.runtime-info-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #409eff, #67c23a);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.runtime-info-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+}
+
+.runtime-info-item:hover::before {
+  opacity: 1;
+}
+
+.info-label {
+  font-weight: 500;
+  color: #666;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-label::before {
+  content: '●';
+  color: #409eff;
+  font-size: 8px;
+}
+
+.info-value {
+  font-weight: 600;
+  color: #333;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(64, 158, 255, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.info-value:hover {
+  background: rgba(64, 158, 255, 0.1);
+  border-color: #409eff;
+}
+
+/* 运行时信息加载状态 */
+.runtime-info-section.loading .runtime-info-item {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.runtime-info-section.loading .info-value {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* 加载状态 */
@@ -869,14 +1405,6 @@ onUnmounted(() => {
   max-width: 80px;
 }
 
-:deep(.device-status) {
-  font-size: 10px;
-  font-weight: 500;
-  padding: 2px 6px;
-  border-radius: 10px;
-  text-align: center;
-  white-space: nowrap;
-}
 
 /* 设备类型颜色 */
 :deep(.device-marker.valve .marker-icon) {
@@ -900,29 +1428,29 @@ onUnmounted(() => {
 }
 
 /* 设备状态颜色 */
-:deep(.device-marker.active .device-status) {
-  background: #67c23a;
-  color: white;
+:deep(.device-marker.active) {
+  border-color: #67c23a !important;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
 }
 
 :deep(.device-marker.active .marker-icon) {
-  border-color: #67c23a;
-  background: rgba(103, 194, 58, 0.1);
-  animation: pulse-active 2s infinite;
+  border-color: #67c23a !important;
+  background: rgba(103, 194, 58, 0.2) !important;
+  animation: pulse-green 2s infinite;
 }
 
-:deep(.device-marker.inactive .device-status) {
-  background: #f56c6c;
-  color: white;
+:deep(.device-marker.inactive) {
+  border-color: #f56c6c !important;
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.3);
 }
 
 :deep(.device-marker.inactive .marker-icon) {
-  border-color: #f56c6c;
-  background: rgba(245, 108, 108, 0.1);
+  border-color: #f56c6c !important;
+  background: rgba(245, 108, 108, 0.2) !important;
 }
 
-/* 活跃设备脉冲动画 */
-@keyframes pulse-active {
+/* 绿色脉冲动画 */
+@keyframes pulse-green {
   0% {
     box-shadow: 0 0 0 0 rgba(103, 194, 58, 0.4);
   }
@@ -936,6 +1464,63 @@ onUnmounted(() => {
   }
 }
 
+
+/* 紧急停止对话框样式 */
+.emergency-stop-content {
+  padding: 20px;
+}
+
+.emergency-warning {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fff5f5, #ffe6e6);
+  border-radius: 8px;
+  border-left: 4px solid #f56c6c;
+  font-size: 16px;
+  font-weight: 600;
+  color: #d32f2f;
+}
+
+.block-selection {
+  margin-bottom: 24px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.block-checkbox {
+  display: block;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.2s ease;
+}
+
+.block-checkbox:hover {
+  background: #f5f7fa;
+  border-color: #409eff;
+}
+
+.block-checkbox:last-child {
+  margin-bottom: 0;
+}
+
+.emergency-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e4e7ed;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .map-controls {
@@ -943,14 +1528,44 @@ onUnmounted(() => {
     right: 10px;
   }
 
+  .emergency-stop-control {
+    top: 10px;
+    left: 10px;
+  }
+
   .device-info-panel {
     top: 10px;
-    left: 10px;   width: calc(100% - 20px);
+    left: 10px;
+    width: calc(100% - 20px);
     max-width: 300px;
   }
-  
+
   .control-group {
     flex-direction: column;
+  }
+
+  .emergency-stop-content {
+    padding: 16px;
+  }
+
+  .emergency-warning {
+    font-size: 14px;
+    padding: 12px;
+  }
+
+  .block-selection {
+    max-height: 200px;
+    padding: 12px;
+  }
+
+  .block-checkbox {
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .emergency-actions {
+    flex-direction: column;
+    gap: 8px;
   }
 }
 </style>

@@ -2,7 +2,22 @@ import fs from 'fs';
 import path from 'path';
 import moment from 'moment';
 
-export default async function (log_file_path) {
+export default async function (config) {
+    // 支持传入配置对象或直接传入日志文件路径（向后兼容）
+    let log_file_path, device_type, device_name;
+    
+    if (typeof config === 'string') {
+        // 向后兼容：直接传入日志文件路径
+        log_file_path = config;
+        device_type = 'valve'; // 默认类型
+        device_name = 'unknown'; // 默认名称
+    } else {
+        // 新方式：传入配置对象
+        log_file_path = config.log_file;
+        device_type = config.device_type || 'valve';
+        device_name = config.device_name || 'unknown';
+    }
+    
     // 如果传入的是相对路径或简单文件名，则使用统一的日志目录
     let actual_log_path = log_file_path;
     if (!path.isAbsolute(log_file_path) && !log_file_path.includes('/')) {
@@ -107,16 +122,33 @@ export default async function (log_file_path) {
             return { status: 'mocked', value: value, message: `已设置模拟值为 ${value}${unit}` };
         },
         getDeviceType: function() {
-            const fileName = this.log_file.split('/').pop().replace('.log', '');
-            if (fileName.includes('流量计')) return '流量';
-            if (fileName.includes('阀门')) return '阀门状态';
-            return '设备状态';
+            // 虚拟驱动程序统一返回"虚拟设备"
+            return '虚拟设备';
         },
         getUnit: function() {
-            const fileName = this.log_file.split('/').pop().replace('.log', '');
-            if (fileName.includes('流量计')) return 'L/min';
-            if (fileName.includes('阀门')) return '';
-            return '';
+            // 根据设备类型返回对应的单位
+            const unitMap = {
+                'flowmeter': 'L/min',
+                'valve': '',
+                'fertilizer': 'kg/h',
+                'sensor': '',
+                'pump': '',
+                'temperature': '°C',
+                'humidity': '%',
+                'pressure': 'Pa'
+            };
+            return unitMap[device_type] || '';
+        },
+        getDeviceName: function() {
+            return device_name;
+        },
+        getDeviceTypeCode: function() {
+            return device_type;
+        },
+        // 获取设备类型用于前端图标和动作集映射
+        getDeviceTypeForUI: function() {
+            // 返回设备类型代码，用于前端映射图标和动作集
+            return device_type;
         },
         is_opened:async function() {
             return this.m_is_opened;

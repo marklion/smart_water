@@ -102,7 +102,7 @@ export default {
             return `设备 ${args.device_name} 模拟读数为: ${args.value}`;
         });
         cli_utils.make_common_cmd(vorpal, 'shutdown device <device_name>', '设备急停', async (cmd_this, args) => {
-            await device_management_lib.shutdown_device(args.device_name);
+            await device_management_lib.shutdown_device(args.device_name, this.token);
             return `设备 ${args.device_name} 已急停`;
         });
         vorpal.delimiter(prompt)

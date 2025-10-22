@@ -26,14 +26,14 @@ describe('设备操作', () => {
         await cli.run_cmd('clear');
         await cli.run_cmd('return');
     })
-    get_device_info = async (device_name) => {
-        result = await cli.run_cmd('list device');
+    const get_device_info = async (device_name) => {
+        let result = await cli.run_cmd('list device');
         let infos = result.split('------------------------');
         let ret = '';
         for (let info of infos) {
             info = info.split('\n').filter(line => line.trim().length > 0).join('\n');
             let top1 = info.split('\n')[0];
-            if (top1.startsWith(device_name + ' - ')) {
+            if (top1 && top1.includes(device_name + ' - ')) {
                 ret = info;
                 break;
             }
