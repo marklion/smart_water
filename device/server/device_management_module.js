@@ -25,7 +25,13 @@ export async function get_driver(device_name, capability) {
     // 使用设备名称作为缓存键，确保每个设备只有一个驱动实例
     const cache_key = device_name;
     if (!driver_instances.has(cache_key)) {
-        const driver_instance = await driver_config.driver(device.config_key);
+        // 构建驱动配置，包含设备类型信息
+        const driver_config_obj = {
+            log_file: device.config_key,
+            device_type: device.device_type || 'valve', // 默认阀门类型
+            device_name: device_name
+        };
+        const driver_instance = await driver_config.driver(driver_config_obj);
         driver_instances.set(cache_key, driver_instance);
     }
 
@@ -78,6 +84,7 @@ export default {
                 device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' },
                 driver_name: { type: String, have_to: true, mean: '驱动名称', example: 'virtualDevice' },
                 config_key: { type: String, have_to: true, mean: '配置json', example: 'log_file' },
+                device_type: { type: String, have_to: false, mean: '设备类型', example: 'flowmeter', options: ['valve', 'flowmeter', 'fertilizer', 'sensor', 'pump', 'temperature', 'humidity', 'pressure'] },
                 longitude: { type: Number, have_to: true, mean: '经度', example: 111.670801 },
                 latitude: { type: Number, have_to: true, mean: '纬度', example: 40.818311 },
                 farm_name: { type: String, have_to: false, mean: '所属农场', example: '农场1' },
@@ -113,6 +120,7 @@ export default {
                 }
                 exist_device.driver_name = body.driver_name;
                 exist_device.config_key = body.config_key;
+                exist_device.device_type = body.device_type || 'valve'; // 保存设备类型
                 exist_device.longitude = body.longitude;
                 exist_device.latitude = body.latitude;
                 if (body.farm_name) {
@@ -163,6 +171,7 @@ export default {
                         device_name: { type: String, mean: '设备名称', example: 'virtualDevice1' },
                         driver_name: { type: String, mean: '驱动名称', example: 'virtualDevice' },
                         config_key: { type: String, mean: '配置json', example: 'log_file' },
+                        device_type: { type: String, mean: '设备类型', example: 'flowmeter' },
                         capability: { type: String, mean: '能力集', example: '[]' },
                         farm_name: { type: String, mean: '所属农场', example: '农场1' },
                         block_name: { type: String, mean: '所属区块', example: '区块1' },
@@ -191,6 +200,7 @@ export default {
                         device_name: device.device_name,
                         driver_name: device.driver_name,
                         config_key: device.config_key,
+                        device_type: device.device_type || 'valve',
                         capability: JSON.stringify(capability),
                         farm_name: device.farm_name || '',
                         block_name: device.block_name || '',
@@ -198,7 +208,8 @@ export default {
                         latitude: device.latitude || null
                     });
                 });
-                let current_page_content = filtered_devices.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                let pageNo = body.pageNo || 0;
+                let current_page_content = filtered_devices.slice(pageNo * 20, (pageNo + 1) * 20);
                 for (let device_info of current_page_content) {
                     let single_driver = await get_driver(device_info.device_name, 'status_map');
                     if (single_driver) {
@@ -305,5 +316,90 @@ export default {
                 return { result: true };
             }
         },
+        emergency_stop: {
+            name: '批量急停',
+            description: '批量急停指定地块的所有设备',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, have_to: true, mean: '农场名称', example: '温室1号' },
+                block_names: { 
+                    type: Array, 
+                    have_to: true, 
+                    mean: '地块名称列表', 
+                    explain: {
+                        name: { type: String, mean: '地块名称', example: '主灌溉管道' }
+                    }
+                }
+            },
+            result: {
+                result: { type: Boolean, mean: '急停结果', example: true },
+                stopped_devices: { 
+                    type: Array, 
+                    mean: '已急停的设备列表', 
+                    explain: {
+                        device_name: { type: String, mean: '设备名称', example: '设备1' }
+                    }
+                },
+                failed_devices: { 
+                    type: Array, 
+                    mean: '急停失败的设备列表', 
+                    explain: {
+                        device_name: { type: String, mean: '设备名称', example: '设备3' },
+                        reason: { type: String, mean: '失败原因', example: '急停失败' }
+                    }
+                }
+            },
+            func: async function (body, token) {
+                try {
+                    let stoppedDevices = [];
+                    let failedDevices = [];
+                    
+                    // 获取指定农场和地块下的所有设备
+                    let targetDevices = device_array.filter(device => 
+                        device.farm_name === body.farm_name && 
+                        body.block_names.includes(device.block_name)
+                    );
+                    
+                    console.log(`找到 ${targetDevices.length} 个设备需要急停`);
+                    
+                    // 遍历每个设备，调用shutdown_device接口
+                    for (let device of targetDevices) {
+                        try {
+                            console.log(`正在急停设备: ${device.device_name}`);
+                            
+                            // 直接调用shutdown逻辑
+                            let driver = await get_driver(device.device_name, 'shutdown');
+                            await driver.shutdown();
+                            
+                            stoppedDevices.push(device.device_name);
+                            console.log(`设备 ${device.device_name} 急停成功`);
+                        } catch (error) {
+                            console.error(`急停设备 ${device.device_name} 失败:`, error);
+                            failedDevices.push({
+                                device_name: device.device_name,
+                                reason: error.message || '急停失败'
+                            });
+                        }
+                    }
+                    
+                    console.log(`急停完成: 成功 ${stoppedDevices.length} 个，失败 ${failedDevices.length} 个`);
+                    
+                    return { 
+                        result: true, 
+                        stopped_devices: stoppedDevices,
+                        failed_devices: failedDevices
+                    };
+                } catch (error) {
+                    console.error('批量急停失败:', error);
+                    return { 
+                        result: false, 
+                        stopped_devices: [],
+                        failed_devices: [],
+                        error: error.message || '批量急停失败'
+                    };
+                }
+            }
+        }
     }
 }

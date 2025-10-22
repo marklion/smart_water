@@ -36,7 +36,11 @@ export const mapConfig = {
       'valve': '电磁阀',
       'flowmeter': '流量计', 
       'fertilizer': '施肥机',
-      'sensor': '流量计'  // 传感器使用流量计图标，或者可以添加专门的传感器图标
+      'sensor': '流量计',  // 传感器使用流量计图标
+      'pump': '电磁阀',    // 泵使用电磁阀图标
+      'temperature': '流量计',  // 温度传感器使用流量计图标
+      'humidity': '流量计',     // 湿度传感器使用流量计图标
+      'pressure': '流量计'      // 压力传感器使用流量计图标
     },
     
     // 设备状态颜色
@@ -49,10 +53,14 @@ export const mapConfig = {
     
     // 设备类型颜色
     typeColors: {
-      'valve': '#409eff',
-      'flowmeter': '#e6a23c',
-      'fertilizer': '#9c27b0',
-      'sensor': '#67c23a'  // 传感器使用绿色
+      'valve': '#409eff',      // 阀门 - 蓝色
+      'flowmeter': '#e6a23c', // 流量计 - 橙色
+      'fertilizer': '#9c27b0', // 施肥机 - 紫色
+      'sensor': '#67c23a',     // 传感器 - 绿色
+      'pump': '#409eff',       // 泵 - 蓝色（与阀门相同）
+      'temperature': '#ff6b6b', // 温度传感器 - 红色
+      'humidity': '#4ecdc4',    // 湿度传感器 - 青色
+      'pressure': '#feca57'     // 压力传感器 - 黄色
     }
   },
   

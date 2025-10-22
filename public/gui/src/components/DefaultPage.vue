@@ -16,6 +16,7 @@
           <el-button type="primary" size="large" @click="handleCityChange" :loading="cityChanging">
             切换
           </el-button>
+          
         </div>
       </div>
 
@@ -188,6 +189,7 @@
         </div>
 
       </div>
+
     </div>
 
     <!-- 其他页面的默认布局 -->
@@ -304,6 +306,7 @@ const mapMarkers = shallowRef([])
 // 轮灌组数据 - 从API加载
 const irrigationGroups = shallowRef([])
 const irrigationGroupsLoading = ref(false)
+
 
 // 表格行样式类名
 const tableRowClassName = ({ row }) => {
@@ -446,30 +449,25 @@ const onFarmChange = async (farmId) => {
   await loadFarmData(farmId)
 }
 
-// 更新设备实际状态 - 从策略执行状态获取
+// 更新设备实际状态
 const updateDeviceStatuses = async (devices) => {
   try {
-    // 获取策略执行状态
-    const policyResponse = await call_remote('/policy/get_policy_execution_status', {})
-
-    if (policyResponse && policyResponse.policies && policyResponse.policies.length > 0) {
-      // 获取策略中的设备动作状态
-      const policyDeviceActions = {}
-      for (const policy of policyResponse.policies) {
-        if (policy.device_actions) {
-          Object.assign(policyDeviceActions, policy.device_actions)
-        }
-      }
-
-      // 根据策略动作更新设备状态
+    // 从设备管理API获取最新的设备信息（包含运行时信息）
+    const deviceResponse = await call_remote('/device_management/list_device', {
+      pageNo: 0
+    })
+    
+    if (deviceResponse && deviceResponse.devices) {
+      // 更新设备状态和运行时信息
       for (const device of devices) {
-        const deviceAction = policyDeviceActions[device.deviceName]
-        if (deviceAction === 'open') {
-          device.status = device.type === 'fertilizer' ? 'active' : 'open'
-        } else if (deviceAction === 'close') {
-          device.status = device.type === 'fertilizer' ? 'inactive' : 'closed'
-        } else {
-          // 如果没有策略控制，尝试读取设备实际状态
+        const latestDeviceInfo = deviceResponse.devices.find(d => d.device_name === device.deviceName)
+        if (latestDeviceInfo) {
+          // 更新运行时信息
+          if (latestDeviceInfo.runtime_info) {
+            device.runtime_info = latestDeviceInfo.runtime_info
+          }
+          
+          // 根据运行时信息或设备读数更新状态
           try {
             const response = await call_remote('/device_management/readout_device', {
               device_name: device.deviceName
@@ -487,7 +485,7 @@ const updateDeviceStatuses = async (devices) => {
         }
       }
     } else {
-      // 如果没有策略执行状态，回退到原来的方式
+      // 如果没有获取到最新设备信息，使用原有方式
       for (const device of devices) {
         try {
           const response = await call_remote('/device_management/readout_device', {
@@ -824,6 +822,7 @@ const handleCityChange = async () => {
   }
 }
 
+
 // 组件挂载时加载数据
 onMounted(async () => {
   await initMapConfig()
@@ -920,6 +919,7 @@ html {
 .farm-select-main {
   min-width: 200px;
 }
+
 
 /* 内容包装器 */
 .content-wrapper {
@@ -1317,7 +1317,7 @@ html {
 
 .map-container {
   width: 100%;
-  height: 500px;
+  height: 700px;
   position: relative;
   border-radius: 16px;
   overflow: hidden;
@@ -1325,36 +1325,36 @@ html {
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  min-height: 300px;
-  max-height: 600px;
+  min-height: 500px;
+  max-height: 800px;
 }
 
 /* 响应式地图容器高度 */
 @media (min-width: 1600px) {
+  .map-container {
+    height: 800px;
+    min-height: 700px;
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1599px) {
+  .map-container {
+    height: 700px;
+    min-height: 600px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
   .map-container {
     height: 600px;
     min-height: 500px;
   }
 }
 
-@media (min-width: 1200px) and (max-width: 1599px) {
+@media (max-width: 767px) {
   .map-container {
     height: 500px;
     min-height: 400px;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1199px) {
-  .map-container {
-    height: 400px;
-    min-height: 300px;
-  }
-}
-
-@media (max-width: 767px) {
-  .map-container {
-    height: 300px;
-    min-height: 250px;
   }
 }
 
@@ -2115,7 +2115,7 @@ html {
   }
 
   .map-container {
-    height: 250px;
+    height: 400px;
   }
 
   .el-table {
@@ -2151,7 +2151,7 @@ html {
   }
 
   .map-container {
-    height: 300px;
+    height: 450px;
   }
 }
 
@@ -2204,7 +2204,7 @@ html {
   }
 
   .map-container {
-    height: 200px;
+    height: 350px;
   }
 
   .el-table {
@@ -2227,7 +2227,7 @@ html {
   }
 
   .map-container {
-    height: 200px;
+    height: 300px;
   }
 }
 
@@ -2323,6 +2323,89 @@ html {
   
   .warning-item {
     padding: 10px;
+  }
+}
+
+/* 急停对话框样式 */
+.emergency-stop-content {
+  padding: 20px;
+}
+
+.emergency-warning {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fff5f5, #ffe6e6);
+  border-radius: 8px;
+  border-left: 4px solid #f56c6c;
+  font-size: 16px;
+  font-weight: 600;
+  color: #d32f2f;
+}
+
+.block-selection {
+  margin-bottom: 24px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.block-checkbox {
+  display: block;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.2s ease;
+}
+
+.block-checkbox:hover {
+  background: #f5f7fa;
+  border-color: #409eff;
+}
+
+.block-checkbox:last-child {
+  margin-bottom: 0;
+}
+
+.emergency-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e4e7ed;
+}
+
+/* 响应式急停对话框 */
+@media (max-width: 767px) {
+  .emergency-stop-content {
+    padding: 16px;
+  }
+  
+  .emergency-warning {
+    font-size: 14px;
+    padding: 12px;
+  }
+  
+  .block-selection {
+    max-height: 200px;
+    padding: 12px;
+  }
+  
+  .block-checkbox {
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+  
+  .emergency-actions {
+    flex-direction: column;
+    gap: 8px;
   }
 }
 </style>
