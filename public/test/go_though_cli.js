@@ -291,6 +291,10 @@ function convert_param(cmd, param) {
             cmd:'shutdown device',
             param:'device_name',
             values:['abcd','ffff']
+        },{
+            cmd:'match farm',
+            param:'farm_name',
+            values:['abcd','LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         }
     ];
     for (let item of exceptions) {
@@ -379,6 +383,12 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'policy',
             parent: 'sw_cli',
             depends: [
+                'resource',
+                'farm',
+                'add farm abcd a 2 3',
+                'add farm LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa a 2 3',
+                'return',
+                'return',
                 'device',
                 'add device abcd virtualDevice abcd 3 5',
                 'add device LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa virtualDevice abcd 3 5',
@@ -387,7 +397,10 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'device',
                 'clear',
-                'return'
+                'return',
+                'resource',
+                'clear',
+                'return',
             ],
         },
         {
@@ -553,9 +566,9 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'undo user'
             ]
-        },{
-            cmd:'init state',
-            depends:[
+        }, {
+            cmd: 'init state',
+            depends: [
                 'state abcd',
                 'return',
                 'state 12345',
@@ -565,23 +578,23 @@ function cmds_depend_prepare(cmd, parent) {
                 'state \'a = b.a + 1\'',
                 'return',
             ],
-            teardown:[
+            teardown: [
                 'clear'
             ],
-        },{
-            cmd:'list policy',
-            depends:[
+        }, {
+            cmd: 'list policy',
+            depends: [
                 'policy a',
                 'state a',
                 'return',
                 'init state a',
                 'return',
-                'scan period 10',
+                'scan period 2',
             ],
-            teardown:[
+            teardown: [
                 'clear'
             ],
-        },{
+        }, {
             cmd: 'runtime assignment',
             no_bdr: true,
             depends: [
@@ -594,22 +607,22 @@ function cmds_depend_prepare(cmd, parent) {
                 'undo policy a',
                 'undo policy LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa',
             ],
-        },{
-            cmd:'del watering group matrix',
-            depends:[
+        }, {
+            cmd: 'del watering group matrix',
+            depends: [
                 'watering group matrix abcd abcd',
                 'watering group matrix defg abcd',
             ],
-            teardown:[
+            teardown: [
                 'undo watering group matrix'
             ],
-        },{
-            cmd:'shutdown device',
-            depends:[
+        }, {
+            cmd: 'shutdown device',
+            depends: [
                 'add device abcd virtualDevice abcd 3 5',
                 'add device ffff virtualDevice abcd 3 5',
             ],
-            teardown:[
+            teardown: [
                 'undo add device',
             ],
         }

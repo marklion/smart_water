@@ -1,18 +1,5 @@
 import cli_utils from '../../public/lib/cli_utils.js';
 import resource_lib from '../lib/resource_lib.js';
-async function get_all_farms() {
-    let farms = [];
-    let pageNo = 0;
-    while (true) {
-        let result = await resource_lib.list_farm(pageNo);
-        if (result.farms.length === 0) {
-            break;
-        }
-        farms = farms.concat(result.farms);
-        pageNo++;
-    }
-    return farms;
-}
 export default {
     command: 'farm',
     name: '农场管理',
@@ -39,7 +26,7 @@ export default {
                     return `农场 ${name} 添加失败`;
                 }
             }, async (cmd_this, args) => {
-                let farms = await get_all_farms();
+                let farms = await resource_lib.get_all_farms();
                 for (let farm of farms) {
                     await resource_lib.del_farm(farm.name);
                 }
@@ -59,7 +46,7 @@ export default {
     },
     make_bdr: async function () {
         let ret = []
-        let farms = await get_all_farms()
+        let farms = await resource_lib.get_all_farms()
         for (let farm of farms) {
             ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.longitude || ''}' '${farm.latitude || ''}' '${farm.info || ''}'`);
         }

@@ -116,7 +116,19 @@ export default {
                 }
             }
         );
-
+        cli_utils.make_undo_cmd(vorpal,
+            'match farm <farm_name>',
+            '将策略与农场匹配',
+            '撤销操作 - 解除策略与农场的匹配',
+            async (cmd_this, args) => {
+                await policy_lib.match_policy_farm(ins.cur_view_name, args.farm_name);
+                return `策略 ${ins.cur_view_name} 已与农场 ${args.farm_name} 匹配`;
+            },
+            async (cmd_this, args) => {
+                await policy_lib.match_policy_farm(ins.cur_view_name, null);
+                return `策略 ${ins.cur_view_name} 已解除与农场的匹配`;
+            }
+        )
 
         return vorpal;
     },
@@ -205,6 +217,10 @@ export default {
             }
         } catch (err) {
             // 忽略获取初始状态时的错误
+        }
+        let matched_farm_resp = await policy_lib.get_matched_farm(view_name);
+        if (matched_farm_resp.farm_name) {
+            ret.push(`match farm '${matched_farm_resp.farm_name}'`);
         }
         let matrixResp = await policy_lib.get_watering_group_matrix(view_name);
         let matrix = matrixResp.matrix || [];

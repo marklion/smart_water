@@ -1,5 +1,6 @@
 import pty from 'node-pty';
 import moment from 'moment';
+import axios from 'axios';
 let g_server = null;
 function print_test_log(log, need_equal_sign = false) {
     let now = moment().format('YYYY-MM-DD HH:mm:ss:SSS');
@@ -52,6 +53,24 @@ async function wait_ms(ms) {
         }, ms);
     });
 }
+async function call_api(path, params) {
+    let real_path = `http://localhost:47147/api/v1${path}`;
+    let ret = '';
+    try {
+        console.log(`send req:${JSON.stringify(params)} to ${real_path}`);
+        const response = await axios.post(real_path, params);
+        console.log(`recv resp:${JSON.stringify(response.data)}`);
+
+        if (response.data.err_msg) {
+            throw new Error(response.data.err_msg);
+        }
+        ret = response.data.result;
+    } catch (error) {
+        console.error('Error calling API:', error);
+        throw error;
+    }
+    return ret;
+}
 
 export default async function create_cli(processName) {
     let ret = {};
@@ -74,7 +93,7 @@ export default async function create_cli(processName) {
             ret.process.write('y\n');
         }
     });
-    async function waitForPrompt(prompt) {
+    async function waitForPrompt(prompt, wait_gap = 10) {
         return new Promise((resolve) => {
             const checkOutput = setInterval(() => {
                 let lines = ret.output.split('\n');
@@ -100,13 +119,18 @@ export default async function create_cli(processName) {
                         content: outputBeforePrompt,
                     });
                 }
-            }, 100);
+            }, wait_gap);
         });
     }
     ret.run_cmd = async function (cmd, prompt = '> ') {
         ret.output = '';
         ret.process.write(cmd + '\n');
-        let resp = await waitForPrompt(prompt);
+        let wait_gap = 10;
+        if (cmd == 'clear' || cmd == 'restore')
+        {
+            wait_gap = 200;
+        }
+        let resp = await waitForPrompt(prompt, wait_gap);
         print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
         ret.current_prompt = resp.prompt;
 
@@ -135,4 +159,4 @@ export default async function create_cli(processName) {
 
     return ret;
 }
-export { start_server, close_server, print_test_log, wait_ms };
+export { start_server, close_server, print_test_log, wait_ms, call_api };
