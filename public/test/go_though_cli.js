@@ -665,7 +665,7 @@ export default {
         let help_resp = await cli.run_cmd('help');
         print_test_log(`Collect commands from prompt: ${cli.current_prompt}`);
         let lines = help_resp.split('\n');
-        lines = lines.filter(line => !/^return|^help|^bdr|^exit|^save|^restore|^restart|^clear|^Commands:/.test(line.trim()));
+        lines = lines.filter(line => !/^return|^help|^bdr|^exit|^save|^restore|^restart|^clear|^list warnings|^Commands:/.test(line.trim()));
         let ret = []
         for (let line of lines) {
             let one_cmd_obj = parseCommandLine(line.trim());

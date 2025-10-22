@@ -1,3 +1,5 @@
+import call_remote from '../../../lib/call_remote.js'
+
 // 地图配置文件
 export const mapConfig = {
   // 高德地图API配置
@@ -8,7 +10,7 @@ export const mapConfig = {
     plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.Geocoder', 'AMap.PlaceSearch']
   },
   
-  // 默认地图中心点（呼和浩特市）
+  // 默认地图中心点（呼和浩特市）- 默认值，实际会从后端获取
   defaultCenter: {
     lng: 111.670801, // 呼和浩特市经度
     lat: 40.818311   // 呼和浩特市纬度
@@ -99,5 +101,88 @@ export const convertXYToLngLat = (x, y, centerLng, centerLat, mapWidth = 1000, m
   return {
     lng: centerLng + offsetX,
     lat: centerLat - offsetY  // 注意Y轴方向相反
+  }
+}
+
+// 从 localStorage 读取地图中心点
+export const loadMapCenterFromStorage = () => {
+  try {
+    const savedCenter = localStorage.getItem('map_center')
+    if (savedCenter) {
+      return JSON.parse(savedCenter)
+    }
+  } catch (error) {
+    console.warn('读取本地地图中心点失败:', error)
+  }
+  return null
+}
+
+// 保存地图中心点到 localStorage
+export const saveMapCenterToStorage = (center) => {
+  try {
+    localStorage.setItem('map_center', JSON.stringify(center))
+  } catch (error) {
+    console.warn('保存地图中心点到本地失败:', error)
+  }
+}
+
+// 从浏览器或后端获取地图配置
+export const fetchMapConfig = async () => {
+  // 优先使用浏览器保存的地图中心点
+  const savedCenter = loadMapCenterFromStorage()
+  if (savedCenter) {
+    return {
+      center: savedCenter,
+      zoom: mapConfig.defaultZoom
+    }
+  }
+  
+  // 如果没有保存，则从后端获取
+  try {
+    const centerResult = await call_remote('/config/get_map_center', {})
+    const zoomResult = await call_remote('/config/get_map_zoom', {})
+    
+    if (centerResult.center) {
+      mapConfig.defaultCenter = centerResult.center
+    }
+    
+    if (zoomResult.zoom !== undefined) {
+      mapConfig.defaultZoom = zoomResult.zoom
+    }
+    
+    return {
+      center: mapConfig.defaultCenter,
+      zoom: mapConfig.defaultZoom
+    }
+  } catch (error) {
+    console.error('获取地图配置失败，使用默认值:', error)
+    return {
+      center: mapConfig.defaultCenter,
+      zoom: mapConfig.defaultZoom
+    }
+  }
+}
+
+// 通过城市名获取坐标（调用高德地图API）
+export const getCityLocation = async (cityName) => {
+  try {
+    const key = mapConfig.amap.key
+    const url = `https://restapi.amap.com/v3/geocode/geo?key=${key}&address=${encodeURIComponent(cityName)}`
+    
+    const response = await fetch(url)
+    const data = await response.json()
+    
+    if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
+      const location = data.geocodes[0].location.split(',')
+      const lng = parseFloat(location[0])
+      const lat = parseFloat(location[1])
+      
+      return { lng, lat }
+    } else {
+      throw new Error(`未找到城市"${cityName}"的坐标信息`)
+    }
+  } catch (error) {
+    console.error('获取城市坐标失败:', error)
+    throw error
   }
 }

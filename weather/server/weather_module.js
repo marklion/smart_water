@@ -4,8 +4,22 @@ const WEATHER_CONFIG = {
     appid: '81915193',
     appsecret: 'Jpmg6Qza',
     unescape: '1',
-    baseUrl: 'https://v1.yiketianqi.com/free',
-    defaultCity: '呼和浩特'
+    baseUrl: 'https://v1.yiketianqi.com/free'
+};
+
+// 导入配置模块以获取默认城市
+let configModule = null;
+const getDefaultCity = async () => {
+    if (!configModule) {
+        configModule = (await import('../../config/server/config_module.js')).default;
+    }
+    try {
+        const result = await configModule.methods.get_weather_city.func({}, null);
+        return result.city || '呼和浩特';
+    } catch (error) {
+        console.error('获取默认城市失败，使用呼和浩特:', error);
+        return '呼和浩特';
+    }
 };
 
 let weatherCache = {
@@ -100,7 +114,10 @@ function getApiStats() {
 }
 
 // 获取今日天气
-async function getTodayWeather(city = WEATHER_CONFIG.defaultCity) {
+async function getTodayWeather(city) {
+    if (!city) {
+        city = await getDefaultCity();
+    }
     const cacheKey = `today_${city}`;
     
     // 检查缓存
@@ -147,7 +164,10 @@ async function getTodayWeather(city = WEATHER_CONFIG.defaultCity) {
 }
 
 // 获取一周天气
-async function getWeeklyWeather(city = WEATHER_CONFIG.defaultCity) {
+async function getWeeklyWeather(city) {
+    if (!city) {
+        city = await getDefaultCity();
+    }
     const cacheKey = `weekly_${city}`;
     
     // 检查缓存
@@ -197,7 +217,10 @@ async function getWeeklyWeather(city = WEATHER_CONFIG.defaultCity) {
         throw error;
     }
 }
-async function getCompleteWeather(city = WEATHER_CONFIG.defaultCity) {
+async function getCompleteWeather(city) {
+    if (!city) {
+        city = await getDefaultCity();
+    }
     try {
         const [todayData, weeklyData] = await Promise.all([
             getTodayWeather(city),
@@ -255,7 +278,7 @@ export default {
             },
             func: async function (body, token) {
                 try {
-                    const city = body.city || WEATHER_CONFIG.defaultCity;
+                    const city = body.city || await getDefaultCity();
                     const data = await getTodayWeather(city);
                     return { weather_data: data };
                 } catch (error) {
@@ -287,7 +310,7 @@ export default {
             },
             func: async function (body, token) {
                 try {
-                    const city = body.city || WEATHER_CONFIG.defaultCity;
+                    const city = body.city || await getDefaultCity();
                     const data = await getWeeklyWeather(city);
                     return { future_weather: data.data };
                 } catch (error) {
@@ -317,7 +340,7 @@ export default {
             },
             func: async function (body, token) {
                 try {
-                    const city = body.city || WEATHER_CONFIG.defaultCity;
+                    const city = body.city || await getDefaultCity();
                     const data = await getCompleteWeather(city);
                     return { complete_weather: data };
                 } catch (error) {
@@ -382,6 +405,6 @@ export default {
                     throw { err_msg: error.message };
                 }
             }
-        }
+        },
     }
 };
