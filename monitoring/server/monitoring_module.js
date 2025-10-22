@@ -150,69 +150,6 @@ export default {
                     };
                 }
             }
-        },
-        getWaterGroupCount: {
-            name: '获取轮灌组数量',
-            description: '获取监控中心页面所需的基础信息',
-            is_write: false,
-            is_get_api: true,
-            params: {
-                farmName: {
-                    type: String,
-                    mean: '农场名称',
-                    example: '智慧农场',
-                    required: true
-                }
-            },
-            result: {
-                waterGroupCount: {
-                    type: Number,
-                    mean: '轮灌组数量',
-                    example: 10
-                }
-            },
-            func: async function (body, token) {
-                const { farmName } = body;
-                
-                try {
-                    // 1. 从资源模块获取农场和地块数据
-                    const resourceModule = (await import('../../resource/server/resource_module.js')).default;
-                    const farmListResult = await resourceModule.methods.list_farm.func({ pageNo: 0 }, token);
-                    const farms = farmListResult.farms || [];
-                    const farm = farms.find(f => f.name === farmName);
-                    
-                    if (!farm) {
-                        throw new Error(`农场 ${farmName} 不存在`);
-                    }
-                    
-                    // 2. 从设备管理模块获取设备数据
-                    const deviceModule = (await import('../../device/server/device_management_module.js')).default;
-                    let deviceList = [];
-                    try {
-                        const deviceResult = await deviceModule.methods.list_device.func({ farm_name: farmName, pageNo: 0 }, token);
-                        deviceList = deviceResult.devices || [];
-                    } catch (error) {
-                        console.warn('获取设备列表失败，使用空列表:', error.message || error);
-                        deviceList = [];
-                    }
-                    
-                    // 3. 计算轮灌组数量
-                    let waterGroupCount = 0;
-                    if (deviceList.length > 0) {
-                        waterGroupCount = deviceList.filter(device => device.type === 'watering_group').length;
-                    }
-                    
-                    return {
-                        waterGroupCount
-                    };
-                    
-                } catch (error) {
-                    console.error('监控中心数据获取失败:', error);
-                    return {
-                        waterGroupCount: 0
-                    };
-                }
-            }       
         }
     }
 };
