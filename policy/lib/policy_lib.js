@@ -3,8 +3,8 @@ export default {
     add_policy: async function (name, token) {
         return await call_remote('/policy/add_policy', { name }, token);
     },
-    list_policy: async function (pageNo, token) {
-        return await call_remote('/policy/list_policy', { pageNo }, token);
+    list_policy: async function (pageNo, farm_name, token) {
+        return await call_remote('/policy/list_policy', { pageNo, farm_name }, token);
     },
     del_policy: async function (name, token) {
         return await call_remote('/policy/del_policy', { name }, token);
@@ -144,22 +144,22 @@ export default {
         return await call_remote('/policy/get_init_state', { policy_name }, token);
     },
     init_assignment: async function (policy_name, variable_name, expression, is_constant = false, token) {
-        return await call_remote('/policy/init_assignment', { 
-            policy_name, 
-            variable_name, 
-            expression, 
-            is_constant 
+        return await call_remote('/policy/init_assignment', {
+            policy_name,
+            variable_name,
+            expression,
+            is_constant
         }, token);
     },
     undo_init_assignment: async function (policy_name, token) {
         return await call_remote('/policy/undo_init_assignment', { policy_name }, token);
     },
     runtime_assignment: async function (policy_name, variable_name, expression, is_constant = false, token) {
-        return await call_remote('/policy/runtime_assignment', { 
-            policy_name, 
-            variable_name, 
-            expression, 
-            is_constant 
+        return await call_remote('/policy/runtime_assignment', {
+            policy_name,
+            variable_name,
+            expression,
+            is_constant
         }, token);
     },
     get_policy_runtime:async function(policy_name, token) {
@@ -177,4 +177,10 @@ export default {
     list_watering_groups:async function(pageNo, token) {
         return await call_remote('/policy/list_watering_groups', { pageNo }, token);
     },
+    match_policy_farm:async function(policy_name, farm_name, token) {
+        return await call_remote('/policy/match_policy_farm', { policy_name, farm_name }, token);
+    },
+    get_matched_farm:async function(policy_name, token) {
+        return await call_remote('/policy/get_matched_farm', { policy_name }, token);
+    }
 }

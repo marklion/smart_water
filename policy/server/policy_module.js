@@ -13,6 +13,7 @@ import {
 import warning_lib from '../../warning/lib/warning_lib.js';
 import evaluator from '../lib/ast_expression_evaluator.js';
 import deviceModule, { get_driver } from '../../device/server/device_management_module.js';
+import resource_lib from '../../resource/lib/resource_lib.js';
 
 const policy_array = []
 
@@ -218,11 +219,13 @@ export default {
             is_write: false,
             is_get_api: true,
             params: {
+                farm_name: { type: String, mean: '关联农场名称', example: '农场1', have_to: false },
             },
             result: {
                 policies: {
                     type: Array, mean: '策略列表', explain: {
                         name: { type: String, mean: '策略名称', example: '策略1' },
+                        farm_name: { type: String, mean: '关联农场名称', example: '农场1' },
                         init_variables: {
                             type: Array, mean: '初始化变量列表', explain: {
                                 variable_name: { type: String, mean: '变量名', example: 'temp' },
@@ -234,7 +237,13 @@ export default {
                 }
             },
             func: async function (body, token) {
-                let result = getPaginatedResult(policy_array, body.pageNo);
+                let filtered_policies = policy_array.filter(policy => {
+                    if (body.farm_name)
+                        return policy.farm_name === body.farm_name;
+                    else
+                        return true;
+                });
+                let result = getPaginatedResult(filtered_policies, body.pageNo);
                 return {
                     policies: result.items,
                     total: result.total,
@@ -1067,28 +1076,28 @@ export default {
             func: async function (body, token) {
                 try {
                     let policy = validatePolicyExists(body.policy_name);
-                    
+
                     // 确保策略有初始化变量存储
                     if (!policy.init_variables) {
                         policy.init_variables = [];
                     }
-                    
+
                     // 检查是否已存在相同变量名的初始化赋值
                     const existingAssignment = policy.init_variables.find(
                         a => a.variable_name === body.variable_name
                     );
-                    
+
                     if (existingAssignment) {
                         throw { err_msg: `变量 ${body.variable_name} 的初始化赋值已存在` };
                     }
-                    
+
                     // 添加初始化变量赋值
                     policy.init_variables.push({
                         variable_name: body.variable_name,
                         expression: body.expression,
                         is_constant: body.is_constant || false
                     });
-                    
+
                     return { result: true };
                 } catch (error) {
                     throw {
@@ -1115,10 +1124,10 @@ export default {
                     if (!policy) {
                         return { result: true };
                     }
-                    
+
                     // 清空初始化变量数组
                     policy.init_variables = [];
-                    
+
                     return { result: true };
                 } catch (error) {
                     throw {
@@ -1145,7 +1154,7 @@ export default {
                 try {
                     // 验证策略是否存在
                     validatePolicyExists(body.policy_name);
-                    
+
                     // 获取或创建策略的运行时状态
                     let runtimeState = policy_runtime_states.get(body.policy_name);
                     if (!runtimeState) {
@@ -1160,7 +1169,7 @@ export default {
                         };
                         policy_runtime_states.set(body.policy_name, runtimeState);
                     }
-                    
+
                     // 计算表达式的值
                     let value;
                     if (body.is_constant) {
@@ -1204,11 +1213,11 @@ export default {
                             }
                         }
                     }
-                    
+
                     // 设置变量值
                     runtimeState.variables.set(body.variable_name, value);
                     console.log(`策略 ${body.policy_name} 运行时变量赋值: ${body.variable_name} = ${value}`);
-                    
+
                     return { result: true };
                 } catch (error) {
                     throw {
@@ -1285,7 +1294,7 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 policy.watering_group_matrix = body.matrix;
-                return { result: true};
+                return { result: true };
             },
         },
         get_watering_group_matrix: {
@@ -1326,11 +1335,10 @@ export default {
                     }
                 }
             },
-            func:async function(body, token) {
+            func: async function (body, token) {
                 let groups = [];
                 for (let policy of policy_array) {
-                    if (policy.watering_group_matrix)
-                    {
+                    if (policy.watering_group_matrix) {
                         let policy_runtime = policy_runtime_states.get(policy.name);
                         groups.push({
                             name: policy.name,
@@ -1353,6 +1361,56 @@ export default {
                 return ret;
             },
         },
+        match_policy_farm: {
+            name: '匹配策略农场',
+            description: '匹配农场和策略',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: false },
+            },
+            result: {
+                result: { type: Boolean, mean: '匹配结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                if (policy) {
+                    let all_farms = (await resource_lib.get_all_farms()).map(farm => farm.name);
+                    if (body.farm_name) {
+                        if (all_farms.includes(body.farm_name)) {
+                            policy.farm_name = body.farm_name;
+                        } else {
+                            throw { err_msg: `农场 ${body.farm_name} 不存在` };
+                        }
+                    }
+                    else {
+                        policy.farm_name = null;
+                    }
+                }
+                else {
+                    throw { err_msg: `策略 ${body.policy_name} 不存在` };
+                }
+
+                return { result: true };
+            }
+        },
+        get_matched_farm: {
+            name: '获取匹配农场',
+            description: '获取策略匹配的农场',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+            },
+            result: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1' }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                return { farm_name: policy.farm_name || '' };
+            }
+        }
     }
 };
 
@@ -1449,7 +1507,7 @@ async function processPolicyExecution(policy) {
                 }
             }
         };
-        
+
         // 应用初始化变量赋值
         if (policy.init_variables && policy.init_variables.length > 0) {
             for (const initVar of policy.init_variables) {
@@ -1493,7 +1551,7 @@ async function processPolicyExecution(policy) {
                 }
             }
         }
-        
+
         policy_runtime_states.set(policy.name, runtimeState);
         console.log(`策略 ${policy.name} 初始化，进入状态: ${runtimeState.current_state}`);
         await executeStateActions(policy, initialState, 'enter', runtimeState);

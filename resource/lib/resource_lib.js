@@ -18,4 +18,17 @@ export default {
     list_block: async function (farm_name, pageNo, token) {
         return await call_remote('/resource/list_block', { farm_name, pageNo }, token);
     },
+    get_all_farms: async function () {
+        let farms = [];
+        let pageNo = 0;
+        while (true) {
+            let result = await this.list_farm(pageNo);
+            if (result.farms.length === 0) {
+                break;
+            }
+            farms = farms.concat(result.farms);
+            pageNo++;
+        }
+        return farms;
+    }
 }
