@@ -36,7 +36,7 @@ const props = defineProps({
   items: {
     type: Array,
     default: () => [
-      { key: 'irrigationGroups', label: '轮灌组数量', valueClass: '' },
+      { key: 'waterGroupCount', label: '轮灌组数量', valueClass: '' },
       { key: 'farmArea', label: '农场面积', valueClass: '' },
       { key: 'cropName', label: '作物名称', valueClass: '' },
       { key: 'totalDevices', label: '设备总数量', valueClass: '' },
