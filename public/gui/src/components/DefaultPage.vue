@@ -2,23 +2,6 @@
   <div class="default-page">
     <!-- 监控中心特殊布局 -->
     <div v-if="route.name === '监控中心'" class="monitoring-center">
-      <!-- 顶部农场选择器和城市切换 -->
-      <div class="farm-selector-header">
-        <div class="selector-container">
-          <span class="selector-label">选择农场：</span>
-          <el-select v-model="selectedFarm" class="farm-select-main" size="large" @change="onFarmChange">
-            <el-option v-for="farm in farmList" :key="farm.id" :label="farm.name" :value="farm.id" />
-          </el-select>
-
-          <span class="selector-label" style="margin-left: 32px;">切换城市：</span>
-          <el-input v-model="cityInput" placeholder="输入城市名，如：北京" class="city-input" size="large" clearable
-            @keyup.enter="handleCityChange" style="width: 200px;" />
-          <el-button type="primary" size="large" @click="handleCityChange" :loading="cityChanging">
-            切换
-          </el-button>
-          
-        </div>
-      </div>
 
       <!-- 内容包装器 -->
       <div class="content-wrapper">
@@ -27,39 +10,7 @@
           <!-- 左侧信息面板 -->
           <div class="left-panel">
             <!-- 基本信息卡片 -->
-            <el-card class="info-card" shadow="hover">
-              <template #header>
-                <div class="card-header">
-                  <span class="card-title">基本信息</span>
-                </div>
-              </template>
-              <div class="info-grid">
-                <div class="info-item">
-                  <div class="info-label">轮灌组数量</div>
-                  <div class="info-value">{{ basicInfo.irrigationGroups }}</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">农场面积</div>
-                  <div class="info-value">{{ basicInfo.farmArea }}</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">作物名称</div>
-                  <div class="info-value">{{ basicInfo.cropName }}</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">设备总数量</div>
-                  <div class="info-value">{{ basicInfo.totalDevices }}</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">在线设备</div>
-                  <div class="info-value online">{{ basicInfo.onlineDevices }}</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">离线设备</div>
-                  <div class="info-value offline">{{ basicInfo.offlineDevices }}</div>
-                </div>
-              </div>
-            </el-card>
+            <BasicInfoCard :data="basicInfo" :items="basicInfoItems" title="基本信息" />
 
             <!-- 气象信息卡片 -->
             <el-card class="weather-card" shadow="hover">
@@ -90,39 +41,32 @@
               </div>
             </el-card>
 
-            <!-- 轮灌组表格卡片 -->
+            <!-- 轮灌组详情和策略运行时状态卡片 -->
             <el-card class="irrigation-card" shadow="hover">
               <template #header>
                 <div class="card-header">
-                  <span class="card-title">轮灌组详情</span>
-                  <el-button type="primary" size="small" @click="loadWateringGroups" :icon="Refresh">
+                  <span class="card-title">策略详情</span>
+                  <el-button type="primary" size="small" @click="refreshIrrigationData" :icon="Refresh">
                     刷新
                   </el-button>
                 </div>
               </template>
 
-              <el-table :data="irrigationGroups" style="width: 100%" :row-class-name="tableRowClassName"
-                v-loading="irrigationGroupsLoading">
+              <el-tabs v-model="activeIrrigationTab" class="irrigation-tabs" @tab-change="handleIrrigationTabChange">
+                <!-- 轮灌组状态 Tab -->
+                <el-tab-pane label="轮灌组状态" name="watering">
+                  <div class="tab-content">
+                    <WateringGroupStatus ref="wateringGroupRef" :farm-name="selectedFarm" />
+                  </div>
+                </el-tab-pane>
 
-                <el-table-column prop="name" label="轮灌组" width="150" align="left" show-overflow-tooltip />
-                <el-table-column prop="area" label="面积/亩" width="100" align="center" />
-                <el-table-column prop="method" label="灌溉方式" width="100" align="center" />
-                <el-table-column prop="fert_rate" label="施肥率(L/亩)" width="120" align="center" />
-                <el-table-column prop="total_water" label="总用水量(L)" width="120" align="center" />
-                <el-table-column prop="total_fert" label="总施肥量(L)" width="120" align="center" />
-                <el-table-column prop="minute_left" label="剩余时间(分)" width="120" align="center" />
-
-                <el-table-column prop="cur_state" label="当前状态" width="120" align="center">
-                  <template #default="{ row }">
-                    <el-tag :type="getStatusTagType(row.cur_state)" size="default" effect="dark" round>
-                      {{ row.cur_state || '未知' }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-
-                <el-table-column prop="water_valve" label="水阀" width="120" align="left" show-overflow-tooltip />
-                <el-table-column prop="fert_valve" label="肥阀" width="120" align="left" show-overflow-tooltip />
-              </el-table>
+                <!-- 策略运行时状态 Tab -->
+                <el-tab-pane label="策略运行时状态" name="runtime">
+                  <div class="tab-content">
+                    <PolicyRuntimeStatus ref="policyRuntimeRef" :farm-name="selectedFarm" />
+                  </div>
+                </el-tab-pane>
+              </el-tabs>
             </el-card>
           </div>
 
@@ -212,17 +156,23 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, shallowRef } from 'vue'
+import { computed, reactive, ref, onMounted, shallowRef, watch, inject } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Warning, Refresh } from '@element-plus/icons-vue'
+import { Warning, Refresh, Monitor } from '@element-plus/icons-vue'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
+import WateringGroupStatus from '../../../../policy/gui/WateringGroupStatus.vue'
+import PolicyRuntimeStatus from '../../../../policy/gui/PolicyRuntimeStatus.vue'
+import BasicInfoCard from '../../../../monitoring/gui/BasicInfoCard.vue'
 import call_remote from '../../../lib/call_remote.js'
 import { fetchMapConfig, getCityLocation, saveMapCenterToStorage } from '../config/mapConfig.js'
 
 const route = useRoute()
 const systemName = ref('智能灌溉管理系统')
+
+// 注入城市变化数据
+const cityChangeData = inject('cityChangeData', ref({ city: '', location: null, timestamp: null }))
 
 // 获取系统名称
 const getSystemName = async () => {
@@ -261,15 +211,7 @@ const pageDescription = computed(() => {
 
 // 监控中心数据
 const selectedFarm = ref('')
-
-// 城市切换相关
-const cityInput = ref('')
-const cityChanging = ref(false)
-const currentCity = ref('')
 const weatherRef = ref(null) // 天气组件引用
-
-// 农场列表数据 - 使用shallowRef优化性能
-const farmList = shallowRef([])
 
 // 基本信息数据
 const basicInfo = reactive({
@@ -280,6 +222,16 @@ const basicInfo = reactive({
   onlineDevices: 0,
   offlineDevices: 0
 })
+
+// 基本信息卡片配置
+const basicInfoItems = [
+  { key: 'irrigationGroups', label: '轮灌组数量', valueClass: '' },
+  { key: 'farmArea', label: '农场面积', valueClass: '' },
+  { key: 'cropName', label: '作物名称', valueClass: '' },
+  { key: 'totalDevices', label: '设备总数量', valueClass: '' },
+  { key: 'onlineDevices', label: '在线设备', valueClass: 'online' },
+  { key: 'offlineDevices', label: '离线设备', valueClass: 'offline' }
+]
 
 // 实时数据
 const realtimeData = reactive({
@@ -303,150 +255,129 @@ const mapZoom = ref(15)
 // 地图标记点 - 使用shallowRef优化性能，从真实设备数据获取
 const mapMarkers = shallowRef([])
 
-// 轮灌组数据 - 从API加载
-const irrigationGroups = shallowRef([])
-const irrigationGroupsLoading = ref(false)
 
+// Tab切换相关
+const activeIrrigationTab = ref('watering')
 
-// 表格行样式类名
-const tableRowClassName = ({ row }) => {
-  const status = row.cur_state || row.status
-  if (status && (status.includes('执行中') || status.includes('灌溉中') || status.includes('running'))) {
-    return 'success-row'
-  } else if (status && (status.includes('暂停') || status.includes('warning'))) {
-    return 'warning-row'
-  }
-  return ''
-}
+// 组件引用
+const wateringGroupRef = ref(null)
+const policyRuntimeRef = ref(null)
 
-// Element Plus标签类型
-const getStatusTagType = (status) => {
-  switch (status) {
-    case '执行中':
-    case '灌溉中':
-      return 'success'  // 绿色
-    case '执行完成':
-      return 'primary'  // 蓝色
-    case '排队中':
-    case '待机状态':
-      return 'warning'  // 橙色
-    case '暂停':
-      return 'danger'   // 红色
-    default:
-      return 'info'     // 灰色
-  }
-}
 
 // API接口方法
-const loadFarmList = async () => {
-  try {
-    const response = await call_remote('/resource/list_farm', {})
 
-    // 检查响应结构，数据直接在 farms 中
-    if (response && response.farms && Array.isArray(response.farms) && response.farms.length > 0) {
-      // 适配真实数据结构，直接使用农场名称作为ID
-      farmList.value = response.farms.map((farm) => ({
-        id: farm.name, // 直接使用农场名称作为ID
-        name: farm.name,
-        info: farm.info,
-        location: farm.location,
-        longitude: farm.longitude,
-        latitude: farm.latitude
-      }))
-      selectedFarm.value = farmList.value[0].id
-      await loadFarmData(selectedFarm.value)
-    } else {
-      farmList.value = []
-    }
-  } catch (error) {
-    console.error('加载农场列表失败:', error)
-    farmList.value = []
-  }
-}
-
-// 加载轮灌组数据
-const loadWateringGroups = async () => {
-  irrigationGroupsLoading.value = true
-  try {
-    const response = await call_remote('/policy/list_watering_groups', { pageNo: 0 })
-    if (response && response.groups) {
-      irrigationGroups.value = response.groups.map(group => ({
-        name: group.name || '未命名',
-        area: group.area ?? '-',
-        method: group.method || '-',
-        fert_rate: group.fert_rate ?? '-',
-        total_water: group.total_water ?? '-',
-        total_fert: group.total_fert ?? '-',
-        minute_left: group.minute_left ?? '-',
-        cur_state: group.cur_state || '未知',
-        water_valve: group.water_valve || '-',
-        fert_valve: group.fert_valve || '-'
-      }))
-      // 更新基本信息中的轮灌组数量
-      basicInfo.irrigationGroups = irrigationGroups.value.length
-    } else {
-      irrigationGroups.value = []
-    }
-  } catch (error) {
-    console.error('加载轮灌组数据失败:', error)
-    ElMessage.error('加载轮灌组数据失败')
-    irrigationGroups.value = []
-  } finally {
-    irrigationGroupsLoading.value = false
-  }
-}
 
 const loadFarmData = async (farmId) => {
   try {
+    console.log('正在加载农场数据:', farmId)
+
     // 加载基本信息 - 使用监控中心模块
     const basicResponse = await call_remote('/monitoring/getBasicInfo', { farmName: farmId })
+    console.log('基本信息响应:', basicResponse)
+
     if (basicResponse) {
-      basicInfo.irrigationGroups = basicResponse.irrigationGroups || 0
+      // 轮灌组数量从 WateringGroupStatus 组件获取，不在这里设置
       basicInfo.farmArea = `${basicResponse.totalArea || 0}亩`
       basicInfo.cropName = basicResponse.cropName || '未知'
       basicInfo.totalDevices = basicResponse.totalDevices || 0
       basicInfo.onlineDevices = basicResponse.onlineDevices || 0
       basicInfo.offlineDevices = basicResponse.offlineDevices || 0
+    } else {
+      // 如果 API 没有返回数据，使用默认值
+      basicInfo.farmArea = '0亩'
+      basicInfo.cropName = '未知'
+      basicInfo.totalDevices = 0
+      basicInfo.onlineDevices = 0
+      basicInfo.offlineDevices = 0
     }
 
     // 加载真实设备数据
     await loadRealDeviceData(farmId)
 
-    // 加载轮灌组数据
-    await loadWateringGroups()
+    // 加载实时数据
+    await loadRealtimeData(farmId)
+
+    // 延迟更新轮灌组数量，等待 WateringGroupStatus 组件加载完成
+    setTimeout(() => {
+      updateIrrigationGroupsCount()
+    }, 500)
+
   } catch (error) {
     console.error('加载农场数据失败:', error)
-    // 使用模拟数据
-    basicInfo.irrigationGroups = 6
-    basicInfo.farmArea = '580亩'
-    basicInfo.cropName = '玉米'
-    basicInfo.totalDevices = 27
-    basicInfo.onlineDevices = 25
-    basicInfo.offlineDevices = 2
+    // 使用默认值而不是硬编码的模拟数据
+    basicInfo.irrigationGroups = 0
+    basicInfo.farmArea = '0亩'
+    basicInfo.cropName = '未知'
+    basicInfo.totalDevices = 0
+    basicInfo.onlineDevices = 0
+    basicInfo.offlineDevices = 0
 
-    realtimeData.totalFlow = '1680 m³'
-    realtimeData.mainPipeFlow = '250 m³/h'
-    realtimeData.mainPipePressure = '0.345 mpa'
-    realtimeData.fertilizerFlow = '50 L/h'
-    realtimeData.totalFertilizer = '1000 m³'
+    realtimeData.totalFlow = '0 m³'
+    realtimeData.mainPipeFlow = '0 m³/h'
+    realtimeData.mainPipePressure = '0 mpa'
+    realtimeData.fertilizerFlow = '0 L/h'
+    realtimeData.totalFertilizer = '0 m³'
   }
 }
 
-const onFarmChange = async (farmId) => {
-  // 更新地图中心点到选中农场的坐标
-  const selectedFarmData = farmList.value.find(farm => farm.id === farmId)
-  if (selectedFarmData && selectedFarmData.longitude && selectedFarmData.latitude) {
-    mapCenter.value = {
-      lng: selectedFarmData.longitude,
-      lat: selectedFarmData.latitude
-    }
-  } else {
-    // 如果没有坐标信息，从后端获取默认坐标
-    const config = await fetchMapConfig()
-    mapCenter.value = config.center
-  }
+// 加载实时数据
+const loadRealtimeData = async (farmId) => {
+  try {
+    console.log('正在加载实时数据:', farmId)
+    const realtimeResponse = await call_remote('/monitoring/getRealtimeData', { farmName: farmId })
+    console.log('实时数据响应:', realtimeResponse)
 
+    if (realtimeResponse) {
+      realtimeData.totalFlow = `${realtimeResponse.totalFlow || 0} m³`
+      realtimeData.mainPipeFlow = `${realtimeResponse.mainPipeFlow || 0} m³/h`
+      realtimeData.mainPipePressure = `${realtimeResponse.mainPipePressure || 0} mpa`
+      realtimeData.fertilizerFlow = `${realtimeResponse.fertilizerFlow || 0} L/h`
+      realtimeData.totalFertilizer = `${realtimeResponse.totalFertilizer || 0} m³`
+    } else {
+      realtimeData.totalFlow = '0 m³'
+      realtimeData.mainPipeFlow = '0 m³/h'
+      realtimeData.mainPipePressure = '0 mpa'
+      realtimeData.fertilizerFlow = '0 L/h'
+      realtimeData.totalFertilizer = '0 m³'
+    }
+  } catch (error) {
+    console.error('加载实时数据失败:', error)
+    realtimeData.totalFlow = '0 m³'
+    realtimeData.mainPipeFlow = '0 m³/h'
+    realtimeData.mainPipePressure = '0 mpa'
+    realtimeData.fertilizerFlow = '0 L/h'
+    realtimeData.totalFertilizer = '0 m³'
+  }
+}
+
+// 处理农场切换事件
+const handleFarmChange = async (farmId) => {
+  selectedFarm.value = farmId
   await loadFarmData(farmId)
+
+  // 更新轮灌组数量 - 从 WateringGroupStatus 组件获取
+  updateIrrigationGroupsCount()
+}
+
+// 更新轮灌组数量
+const updateIrrigationGroupsCount = () => {
+  if (wateringGroupRef.value && wateringGroupRef.value.irrigationGroups) {
+    basicInfo.irrigationGroups = wateringGroupRef.value.irrigationGroups.length
+  }
+}
+
+// 处理城市切换事件
+const handleCityChangeEvent = async (cityData) => {
+  const { city, location } = cityData
+
+  // 更新地图中心点
+  mapCenter.value = location
+  mapZoom.value = 13
+
+  // 直接调用天气组件的方法更新天气
+  if (weatherRef.value && weatherRef.value.updateCity) {
+    weatherRef.value.updateCity(city)
+  }
 }
 
 // 更新设备实际状态
@@ -779,57 +710,79 @@ const initMapConfig = async () => {
   }
 }
 
-// 处理城市切换
-const handleCityChange = async () => {
-  const city = (cityInput.value || '').trim()
-  if (!city) {
-    ElMessage.warning('请输入城市名称')
-    return
-  }
 
-  cityChanging.value = true
-  try {
-    // 1. 获取城市坐标
-    const cityLocation = await getCityLocation(city)
-
-    // 2. 更新地图中心点
-    mapCenter.value = cityLocation
-    mapZoom.value = 13
-
-    // 3. 保存到 localStorage
-    saveMapCenterToStorage(cityLocation)
-    localStorage.setItem('weather_selected_city', city)
-    currentCity.value = city
-
-    // 4. 直接调用天气组件的方法更新天气（更安全）
-    if (weatherRef.value && weatherRef.value.updateCity) {
-      weatherRef.value.updateCity(city)
-    }
-
-    // 5. 可选：保存到后端
-    try {
-      await call_remote('/config/set_weather_city', { city })
-    } catch (error) {
-      console.warn('后端保存城市失败:', error)
-    }
-
-    ElMessage.success(`已切换到 ${city}，地图已定位`)
-  } catch (error) {
-    console.error('城市切换失败:', error)
-    ElMessage.error('未能找到该城市，请检查城市名称')
-  } finally {
-    cityChanging.value = false
+// Tab切换处理
+const handleIrrigationTabChange = (tabName) => {
+  // Tab切换时刷新对应组件数据
+  if (tabName === 'watering' && wateringGroupRef.value) {
+    wateringGroupRef.value.refresh()
+  } else if (tabName === 'runtime' && policyRuntimeRef.value) {
+    policyRuntimeRef.value.refresh()
   }
 }
 
+// 刷新轮灌组数据
+const refreshIrrigationData = async () => {
+  if (wateringGroupRef.value) {
+    wateringGroupRef.value.refresh()
+  }
+  if (policyRuntimeRef.value) {
+    policyRuntimeRef.value.refresh()
+  }
+}
 
 // 组件挂载时加载数据
 onMounted(async () => {
   await initMapConfig()
-  loadFarmList()
   getSystemName()
   loadWarningData()
+
+  // 添加全局事件监听器
+  window.addEventListener('farmChanged', (event) => {
+    handleFarmChange(event.detail.farmId)
+  })
+
+
+  // 如果是监控中心页面，立即尝试加载数据
+  if (route.name === '监控中心') {
+    // 先尝试从 localStorage 获取上次选中的农场
+    const savedFarm = localStorage.getItem('selectedFarm')
+    if (savedFarm) {
+      console.log('从 localStorage 恢复农场:', savedFarm)
+      selectedFarm.value = savedFarm
+      await loadFarmData(savedFarm)
+    } else {
+      // 如果没有保存的农场，等待 MainLayout 触发事件
+      console.log('等待 MainLayout 触发初始农场数据加载')
+    }
+  }
 })
+
+// 监听路由变化，当切换到监控中心时重新加载数据
+watch(() => route.name, async (newRouteName, oldRouteName) => {
+  if (newRouteName === '监控中心' && oldRouteName !== '监控中心') {
+    console.log('切换到监控中心页面，重新加载数据')
+    
+    // 获取当前选中的农场
+    const currentFarm = localStorage.getItem('selectedFarm')
+    if (currentFarm) {
+      selectedFarm.value = currentFarm
+      await loadFarmData(currentFarm)
+    } else {
+      // 如果没有保存的农场，等待 MainLayout 触发事件
+      console.log('等待 MainLayout 触发农场数据加载')
+    }
+  }
+})
+
+// 监听城市变化数据
+watch(cityChangeData, (newCityData, oldCityData) => {
+  if (newCityData && newCityData.city && newCityData.location && 
+      (!oldCityData || newCityData.timestamp !== oldCityData.timestamp)) {
+    console.log('检测到城市变化:', newCityData)
+    handleCityChangeEvent(newCityData)
+  }
+}, { deep: true })
 
 </script>
 
@@ -890,35 +843,6 @@ html {
 }
 
 
-/* 顶部农场选择器 */
-.farm-selector-header {
-  margin-bottom: 20px;
-  padding: 16px 24px;
-  background: linear-gradient(145deg, #ffffff, #f8f9fa);
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-}
-
-.selector-container {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  flex-wrap: nowrap;
-  min-width: 0;
-}
-
-.selector-label {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2d3748;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.farm-select-main {
-  min-width: 200px;
-}
 
 
 /* 内容包装器 */
@@ -2052,14 +1976,6 @@ html {
     padding: 12px;
   }
 
-  .farm-selector-header {
-    padding: 12px 16px;
-    margin-bottom: 16px;
-  }
-
-  .selector-label {
-    font-size: 14px;
-  }
 
   .main-content {
     gap: 12px;
@@ -2236,6 +2152,15 @@ html {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
+}
+
+/* Tab样式 */
+.irrigation-tabs {
+  margin-top: 0;
+}
+
+.tab-content {
+  padding: 20px 0;
 }
 
 /* 告警卡片样式 */

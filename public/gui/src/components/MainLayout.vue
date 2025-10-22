@@ -15,6 +15,16 @@
                     <div class="time-display">{{ currentTime }}</div>
                 </div>
 
+                <!-- 城市切换器 -->
+                <div class="city-switcher-container" v-if="showCitySwitcher">
+                    <span class="selector-label">切换城市：</span>
+                    <el-input v-model="cityInput" placeholder="输入城市名，如：北京" class="city-input" size="default" clearable
+                        @keyup.enter="handleCityChange" style="width: 150px;" />
+                    <el-button type="primary" size="default" @click="handleCityChange" :loading="cityChanging">
+                        切换
+                    </el-button>
+                </div>
+
                 <!-- 用户信息 -->
                 <div v-if="username" class="user-info">
                     <el-dropdown @command="handleCommand">
@@ -45,6 +55,14 @@
             <el-header height="auto" class="menu-header">
                 <MenuBar mode="horizontal" :collapsed="false">
                     <template #right>
+                        <!-- 农场选择器 -->
+                        <div class="farm-selector-container" v-if="showFarmSelector">
+                            <span class="selector-label">选择农场：</span>
+                            <el-select v-model="selectedFarm" class="farm-select-main" size="default" @change="onFarmChange">
+                                <el-option v-for="farm in farmList" :key="farm.id" :label="farm.name" :value="farm.id" />
+                            </el-select>
+                        </div>
+
                         <div class="date-info">
                             <div class="date-display">{{ currentDate }} {{ currentSolarTerm }}</div>
                         </div>
@@ -76,8 +94,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, shallowRef, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import {
     UserFilled,
     User,
@@ -85,6 +104,8 @@ import {
     ArrowDown
 } from '@element-plus/icons-vue'
 import MenuBar from './MenuBar.vue'
+import call_remote from '../../../lib/call_remote.js'
+import { getCityLocation, saveMapCenterToStorage } from '../config/mapConfig.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -95,6 +116,27 @@ const currentTime = ref('')
 const currentDate = ref('')
 const currentSolarTerm = ref('')
 const systemName = ref('智能灌溉管理系统')
+
+// 农场选择相关
+const selectedFarm = ref('')
+const farmList = shallowRef([])
+const showFarmSelector = computed(() => route.name === '监控中心')
+
+// 城市切换相关
+const cityInput = ref('')
+const cityChanging = ref(false)
+const currentCity = ref('')
+const showCitySwitcher = computed(() => route.name === '监控中心')
+
+// 城市变化相关的响应式数据
+const cityChangeData = ref({
+  city: '',
+  location: null,
+  timestamp: null
+})
+
+// 提供城市变化数据给子组件
+provide('cityChangeData', cityChangeData)
 
 // 24节气数据
 const solarTerms = [
@@ -197,6 +239,96 @@ const updateDateInfo = () => {
     currentSolarTerm.value = getCurrentSolarTerm(now)
 }
 
+// 加载农场列表
+const loadFarmList = async () => {
+    try {
+        const response = await call_remote('/resource/list_farm', {})
+
+        if (response && response.farms && Array.isArray(response.farms) && response.farms.length > 0) {
+            farmList.value = response.farms.map((farm) => ({
+                id: farm.name,
+                name: farm.name,
+                info: farm.info,
+                location: farm.location,
+                longitude: farm.longitude,
+                latitude: farm.latitude
+            }))
+            selectedFarm.value = farmList.value[0].id
+            
+            // 暴露农场列表到全局，供 DefaultPage 使用
+            window.farmList = farmList.value
+            
+            // 保存到 localStorage
+            localStorage.setItem('selectedFarm', selectedFarm.value)
+            
+            // 只有在监控中心页面才触发初始农场数据加载事件
+            if (route.name === '监控中心') {
+                // 延迟触发，确保 DefaultPage 已经准备好
+                setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('farmChanged', { detail: { farmId: selectedFarm.value } }))
+                }, 100)
+            }
+        } else {
+            farmList.value = []
+            window.farmList = []
+        }
+    } catch (error) {
+        console.error('加载农场列表失败:', error)
+        farmList.value = []
+        window.farmList = []
+    }
+}
+
+// 农场切换处理
+const onFarmChange = async (farmId) => {
+    // 保存到 localStorage
+    localStorage.setItem('selectedFarm', farmId)
+    
+    // 触发全局事件，通知监控中心页面农场已切换
+    window.dispatchEvent(new CustomEvent('farmChanged', { detail: { farmId } }))
+}
+
+// 处理城市切换
+const handleCityChange = async () => {
+    const city = (cityInput.value || '').trim()
+    if (!city) {
+        ElMessage.warning('请输入城市名称')
+        return
+    }
+
+    cityChanging.value = true
+    try {
+        // 1. 获取城市坐标
+        const cityLocation = await getCityLocation(city)
+
+        // 2. 保存到 localStorage
+        saveMapCenterToStorage(cityLocation)
+        localStorage.setItem('weather_selected_city', city)
+        currentCity.value = city
+
+        // 3. 更新响应式数据，通知子组件城市已切换
+        cityChangeData.value = {
+            city,
+            location: cityLocation,
+            timestamp: Date.now()
+        }
+
+        // 4. 可选：保存到后端
+        try {
+            await call_remote('/config/set_weather_city', { city })
+        } catch (error) {
+            console.warn('后端保存城市失败:', error)
+        }
+
+        ElMessage.success(`已切换到 ${city}，地图已定位`)
+    } catch (error) {
+        console.error('城市切换失败:', error)
+        ElMessage.error('未能找到该城市，请检查城市名称')
+    } finally {
+        cityChanging.value = false
+    }
+}
+
 onMounted(() => {
     const storedUsername = localStorage.getItem('username')
     if (storedUsername) {
@@ -209,6 +341,15 @@ onMounted(() => {
     // 初始化时间和日期信息
     updateTime()
     updateDateInfo()
+    
+    // 加载农场列表
+    loadFarmList()
+    
+    // 加载保存的城市
+    const savedCity = localStorage.getItem('weather_selected_city')
+    if (savedCity) {
+        currentCity.value = savedCity
+    }
     
     // 每秒更新一次时间
     setInterval(updateTime, 1000)
@@ -317,6 +458,42 @@ const logout = () => {
     display: flex;
     align-items: center;
     gap: 16px;
+}
+
+/* Header 中的城市切换器样式 */
+.header-tools .city-switcher-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, 
+        rgba(64, 158, 255, 0.08) 0%, 
+        rgba(64, 158, 255, 0.12) 100%);
+    border-radius: 8px;
+    border: 1px solid rgba(64, 158, 255, 0.2);
+    box-shadow: 
+        0 2px 8px rgba(64, 158, 255, 0.1),
+        0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.header-tools .city-switcher-container:hover {
+    transform: translateY(-1px);
+    box-shadow: 
+        0 4px 12px rgba(64, 158, 255, 0.15),
+        0 2px 4px rgba(0, 0, 0, 0.08);
+    border-color: rgba(64, 158, 255, 0.3);
+}
+
+.header-tools .selector-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #409eff;
+    white-space: nowrap;
+}
+
+.header-tools .city-input {
+    min-width: 100px;
 }
 
 .time-display-container {
@@ -476,6 +653,21 @@ const logout = () => {
     .date-display {
         font-size: 14px;
     }
+
+    /* 移动端城市切换器样式 */
+    .header-tools .city-switcher-container {
+        padding: 4px 8px;
+        gap: 6px;
+    }
+
+    .header-tools .selector-label {
+        font-size: 12px;
+    }
+
+    .header-tools .city-input {
+        min-width: 80px;
+        width: 80px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -505,6 +697,49 @@ const logout = () => {
     .date-display {
         font-size: 12px;
     }
+}
+
+/* 农场选择器和城市切换器样式 */
+.farm-selector-container,
+.city-switcher-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 16px;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, 
+        rgba(64, 158, 255, 0.08) 0%, 
+        rgba(64, 158, 255, 0.12) 100%);
+    border-radius: 8px;
+    border: 1px solid rgba(64, 158, 255, 0.2);
+    box-shadow: 
+        0 2px 8px rgba(64, 158, 255, 0.1),
+        0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.farm-selector-container:hover,
+.city-switcher-container:hover {
+    transform: translateY(-1px);
+    box-shadow: 
+        0 4px 12px rgba(64, 158, 255, 0.15),
+        0 2px 4px rgba(0, 0, 0, 0.08);
+    border-color: rgba(64, 158, 255, 0.3);
+}
+
+.selector-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #409eff;
+    white-space: nowrap;
+}
+
+.farm-select-main {
+    min-width: 120px;
+}
+
+.city-input {
+    min-width: 100px;
 }
 
 /* 日期信息样式 */
