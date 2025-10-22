@@ -1695,13 +1695,15 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
     }
 }
 
-async function executeStatisticUpdate(target_state , transformer, runtimeState) {
-    let statistic_item = transformer.statistic_items.find(s => s.target_state === target_state);
-    if (statistic_item)
-    {
-        let value = await evaluateAssignmentExpression(statistic_item.expression, runtimeState);
-        await statistic_lib.update_item(statistic_item.item_name, String(value));
+async function executeStatisticUpdate(target_state, transformer, runtimeState) {
+    if (transformer.statistic_items) {
+        let statistic_item = transformer.statistic_items.find(s => s.target_state === target_state);
+        if (statistic_item) {
+            let value = await evaluateAssignmentExpression(statistic_item.expression, runtimeState);
+            await statistic_lib.update_item(statistic_item.item_name, String(value));
+        }
     }
+
 }
 
 async function checkStateTransitions(policy, currentState, runtimeState) {
