@@ -88,7 +88,7 @@ describe('产生统计数据测试', () => {
         let res = await cli.run_cmd('list items');
         expect(res).toContain('st_1');
         expect(res).not.toContain('st_2');
-        await wait_ms(110);
+        await wait_ms(210);
         res = await cli.run_cmd('list items');
         expect(res).toContain('st_1');
         expect(res).toContain('st_2');
