@@ -344,7 +344,7 @@ const searchParams = ref({
 const loadPolicyData = async (params, pageNo = 0) => {
     try {
         const token = localStorage.getItem('auth_token')
-        const result = await policy_lib.list_policy(pageNo, token)
+        const result = await policy_lib.list_policy(pageNo, null, token)
 
         // 如果有搜索参数，进行前端筛选
         let filteredPolicies = result.policies || []
