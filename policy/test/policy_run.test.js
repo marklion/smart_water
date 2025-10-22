@@ -31,7 +31,6 @@ resource
   return
 return
 policy
-  scan period '300'
   policy 'lgz1'
     source 'll' 'llj' 'readout'
     source 'yl' 'ylb' 'readout'
@@ -96,22 +95,25 @@ return
   }
   test('正常运行两圈', async () => {
     let turn = 2;
-    await wait_ms(200);
+    await cli.run_cmd('policy');
+    await cli.run_cmd(`scan period '80'`)
+    await cli.run_cmd('return');
+    await wait_ms(400);
     while (turn > 0) {
       await check_lgz1_state('kongxian');
-      await wait_ms(5500);
+      await wait_ms(5100);
       await check_lgz1_state('zhengzaikaifa');
       await cli.run_cmd('device');
       await cli.run_cmd('mock readout llj 5');
       await cli.run_cmd('return');
-      await wait_ms(1500);
+      await wait_ms(2100);
       await check_lgz1_state('gongzuo');
-      await wait_ms(6500);
+      await wait_ms(6100);
       await check_lgz1_state('zhengzaiguanfa');
       await cli.run_cmd('device');
       await cli.run_cmd('mock readout llj 3');
       await cli.run_cmd('return');
-      await wait_ms(1500);
+      await wait_ms(2100);
       turn -= 1;
     }
   }, 40000);
