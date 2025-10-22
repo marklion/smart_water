@@ -47,7 +47,6 @@ describe('产生统计数据测试', () => {
         return
         return
         policy
-        scan period '100'
         policy 'a'
             init assignment 'false' 'rec' '0'
             state 'a'
@@ -75,13 +74,16 @@ describe('产生统计数据测试', () => {
         for (const line of config.trim().split('\n')) {
             await cli.run_cmd(line.trim());
         }
-
-        await cli.run_cmd('statistic');
     });
     afterEach(async () => {
+        await cli.run_cmd('return');
         await cli.run_cmd('clear');
     });
     test('生成统计并查看', async () => {
+        await cli.run_cmd('policy');
+        await cli.run_cmd('scan period 100');
+        await cli.run_cmd('return');
+        await cli.run_cmd('statistic');
         await wait_ms(210);
         let res = await cli.run_cmd('list items');
         expect(res).toContain('st_1');
@@ -92,6 +94,10 @@ describe('产生统计数据测试', () => {
         expect(res).toContain('st_2');
     });
     test('查看统计历史', async () => {
+        await cli.run_cmd('policy');
+        await cli.run_cmd('scan period 100');
+        await cli.run_cmd('return');
+        await cli.run_cmd('statistic');
         await wait_ms(500);
         let res = await cli.run_cmd('list item history st_1');
         expect(res.split('\n').length).toBe(2);
