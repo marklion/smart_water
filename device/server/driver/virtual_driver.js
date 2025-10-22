@@ -163,6 +163,10 @@ export default async function (config) {
             await this.write_log('设备急停');
             this.m_is_opened = false;
         },
+        is_online:async function() {
+            const sec = moment().second();
+            return !(sec >= 20 && sec <= 40);
+        },
     }
     return ret;
 }

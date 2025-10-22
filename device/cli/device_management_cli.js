@@ -68,7 +68,7 @@ export default {
                     ret += ` 位置: (${device.longitude || ''}, ${device.latitude || ''})\n`;
                     ret += ` 所属农场: ${device.farm_name || ''}\n`;
                     ret += ` 所属区块: ${device.block_name || ''}\n`;
-                    ret += ` 运行时信息: \n`;
+                    ret += ` 运行时信息(${device.is_online ? '在线' : '离线'}): \n`;
                     for (let info of device.runtime_info || []) {
                         ret += `   - ${info.title}: ${info.text}\n`;
                     }

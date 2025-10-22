@@ -1,5 +1,6 @@
 import test_utils from "../../public/lib/test_utils.js";
 import { print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
+import moment from "moment";
 let cli;
 beforeAll(async () => {
     print_test_log('device CRUD test begin', true)
@@ -75,5 +76,14 @@ describe('设备操作', () => {
         res = await get_device_info('d2');
         expect(res).toContain('- 开关是否打开: true');
     });
-
+    test('设备在线状态查询', async () => {
+        let online_status = await get_device_info('d1');
+        const sec = moment().second();
+        if (sec >= 20 && sec <= 40) {
+            expect(online_status).toContain('(离线)');
+        }
+        else {
+            expect(online_status).toContain('(在线)');
+        }
+    });
 });
