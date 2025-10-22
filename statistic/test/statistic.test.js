@@ -25,6 +25,7 @@ describe('产生统计数据测试', () => {
             const entries = await fs.promises.readdir(dir, { withFileTypes: true });
             await Promise.all(entries.map(async (entry) => {
                 const fullPath = path.join(dir, entry.name);
+
                 if (/^st_.*\.txt$/i.test(entry.name)) {
                     try {
                         await fs.promises.unlink(fullPath);
@@ -46,21 +47,21 @@ describe('产生统计数据测试', () => {
         return
         return
         policy
-        scan period '1000'
+        scan period '100'
         policy 'a'
             init assignment 'false' 'rec' '0'
             state 'a'
                 enter assignment 'false' 'rec' 'prs.variables.get("rec") + 1'
                 enter assignment 'false' 'begin' 'Date.now()'
                 transformer 'tob'
-                    rule 'false' 'b' 'Date.now() - prs.variables.get("begin") > 900'
+                    rule 'false' 'b' 'Date.now() - prs.variables.get("begin") > 90'
                     statistic 'b' 'st_1' 'prs.variables.get("rec")'
                 return
             return
             state 'b'
                 enter assignment 'false' 'begin' 'Date.now()'
                 transformer 'toa'
-                    rule 'false' 'a' 'Date.now() - prs.variables.get("begin") > 900'
+                    rule 'false' 'a' 'Date.now() - prs.variables.get("begin") > 90'
                     statistic 'a' 'st_2' 'prs.variables.get("rec")'
                 return
             return
@@ -81,9 +82,18 @@ describe('产生统计数据测试', () => {
         await cli.run_cmd('clear');
     });
     test('生成统计并查看', async () => {
-        await wait_ms(1000);
+        await wait_ms(210);
         let res = await cli.run_cmd('list items');
         expect(res).toContain('st_1');
+        expect(res).not.toContain('st_2');
+        await wait_ms(110);
+        res = await cli.run_cmd('list items');
+        expect(res).toContain('st_1');
         expect(res).toContain('st_2');
+    });
+    test('查看统计历史', async () => {
+        await wait_ms(500);
+        let res = await cli.run_cmd('list item history st_1');
+        expect(res.split('\n').length).toBe(2);
     });
 });

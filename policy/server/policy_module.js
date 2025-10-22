@@ -1700,7 +1700,7 @@ async function executeStatisticUpdate(target_state , transformer, runtimeState) 
     if (statistic_item)
     {
         let value = await evaluateAssignmentExpression(statistic_item.expression, runtimeState);
-        await statistic_lib.update_item(statistic_item.item_name, value);
+        await statistic_lib.update_item(statistic_item.item_name, String(value));
     }
 }
 

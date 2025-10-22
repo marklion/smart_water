@@ -6,4 +6,7 @@ export default {
     list_items: async function (pageNo, token) {
         return await call_remote('/statistic/list_items', { pageNo }, token);
     },
+    list_item_history: async function (item_name, pageNo, token) {
+        return await call_remote('/statistic/list_item_history', { item_name, pageNo }, token);
+    },
 }

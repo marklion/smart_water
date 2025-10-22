@@ -11,9 +11,19 @@ export default {
         cli_utils.make_display_cmd(vorpal, 'list items', '列出当前的统计项', async (cmd_this, args, pageNo) => {
             let items = (await statistic_lib.list_items(pageNo, this.token)).items;
             if (items.length > 0) {
-                cmd_this.log(items.map(item => `${item.item_name} - ${item.last_value} - ${item.last_update}`).join('\n'));
+                cmd_this.log(items.map(item => `${item.last_update}-${item.item_name}-${item.last_value}`).join('\n'));
             } else {
                 cmd_this.log('暂无统计项');
+            }
+            return items.length;
+        });
+        cli_utils.make_display_cmd(vorpal, 'list item history <item_name>', '列出某个统计项的历史记录', async (cmd_this, args, pageNo) => {
+            let res = await statistic_lib.list_item_history(args.item_name, pageNo, this.token);
+            let items = res.records;
+            if (items.length > 0) {
+                cmd_this.log(items.map(item => `${item.timestamp}-${item.value}`).join('\n'));
+            } else {
+                cmd_this.log('暂无历史记录');
             }
             return items.length;
         });
