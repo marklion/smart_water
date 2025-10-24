@@ -598,12 +598,12 @@ watch(cityChangeData, (newCityData, oldCityData) => {
   max-width: 100%;
 }
 
-/* 隐藏滚动条但保留滚动功能 */
-.default-page ::-webkit-scrollbar {
+/* 隐藏滚动条但保留滚动功能 - 仅监控中心页面 */
+.monitoring-center ::-webkit-scrollbar {
   display: none;
 }
 
-.default-page {
+.monitoring-center {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }

@@ -597,7 +597,7 @@ const logout = () => {
 .content-main {
     background: var(--el-bg-color-page);
     padding: 0;
-    overflow: hidden;
+    overflow: auto;
 }
 
 /* 响应式设计 */
