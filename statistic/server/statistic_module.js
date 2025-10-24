@@ -5,21 +5,9 @@ import moment from 'moment';
 // 统计文件目录（可通过环境变量 STAT_FILE_DIR 覆盖），默认使用当前工作目录保持向后兼容
 const STAT_DIR = process.env.STAT_FILE_DIR || process.cwd();
 
-function sanitize_item_name(item) {
-    let name = String(item || '');
-    // 取 basename 防止目录穿越
-    name = path.basename(name);
-    // 仅保留字母数字、下划线和连接符，其他字符替换为下划线
-    name = name.replace(/[^a-zA-Z0-9_-]/g, '_');
-    // 限制长度以防滥用
-    if (name.length > 64) name = name.slice(0, 64);
-    if (!name) name = 'default';
-    return name;
-}
-
 // 返回用于存放统计的文件绝对路径，并确保目录存在
 async function get_file_by_item(item) {
-    const name = sanitize_item_name(item);
+    const name = item;
     const filePath = path.join(STAT_DIR, `st_${name}.txt`);
     await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
     return filePath;
