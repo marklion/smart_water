@@ -8,7 +8,7 @@
     </template>
 
     <div class="warning-list">
-      <el-scrollbar height="300px" v-if="warningData.warnings.length > 0">
+      <el-scrollbar height="200px" v-if="warningData.warnings.length > 0">
         <div class="warning-item" v-for="(warning, index) in warningData.warnings" :key="index">
           <div class="warning-icon">
             <el-icon :size="16" color="#f56c6c">
@@ -118,7 +118,6 @@ onMounted(() => {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   position: relative;
   overflow: hidden;
-  min-height: 350px;
 }
 
 .warning-card::before {

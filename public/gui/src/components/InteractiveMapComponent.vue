@@ -3,15 +3,88 @@
     <!-- 地图容器 -->
     <div id="amap-container" class="amap-container"></div>
 
-    <!-- 紧急停止按钮 -->
-    <div class="emergency-stop-control">
-      <el-button type="danger" size="large" @click="showEmergencyStopDialog" class="emergency-stop-btn"
-        :loading="emergencyStopLoading">
-        <el-icon>
-          <Warning />
-        </el-icon>
-        紧急停止
-      </el-button>
+    <!-- 统一控制面板 -->
+    <div class="unified-control-panel">
+      <!-- 紧急停止区域 -->
+      <div class="emergency-section">
+        <div class="section-header">
+          <el-icon class="section-icon">
+            <Warning />
+          </el-icon>
+          <span class="section-title">紧急控制</span>
+        </div>
+        <el-button type="danger" @click="showEmergencyStopDialog" class="emergency-stop-btn"
+          :loading="emergencyStopLoading">
+          <el-icon>
+            <Warning />
+          </el-icon>
+          设备紧急停止
+        </el-button>
+      </div>
+
+      <!-- 分隔线 -->
+      <div class="control-divider"></div>
+
+      <!-- 策略运行区域 -->
+      <div class="policy-section">
+        <div class="section-header">
+          <el-icon class="section-icon">
+            <Monitor />
+          </el-icon>
+          <span class="section-title">策略控制</span>
+        </div>
+        
+        <div class="policy-controls">
+          <div class="period-input-wrapper">
+            <span class="input-label">扫描周期</span>
+            <el-input-number 
+              v-model="scanPeriod" 
+              :min="100" 
+              :max="10000" 
+              :step="100"
+              size="small"
+              class="period-input"
+            />
+            <span class="input-unit">毫秒</span>
+          </div>
+          
+          <div class="control-buttons">
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="startScan"
+              :loading="scanLoading"
+              :disabled="isScanning"
+              :icon="VideoPlay"
+              round
+            >
+              运行策略
+            </el-button>
+            <el-button 
+              type="danger" 
+              size="small" 
+              @click="stopScan"
+              :loading="scanLoading"
+              :disabled="!isScanning"
+              :icon="VideoPause"
+              round
+            >
+              停止运行
+            </el-button>
+          </div>
+          
+          <div class="status-indicator">
+            <div v-if="isScanning" class="status-running">
+              <span class="status-dot running"></span>
+              <span class="status-text">运行中</span>
+            </div>
+            <div v-else class="status-stopped">
+              <span class="status-dot stopped"></span>
+              <span class="status-text">已停止</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 地图控件 -->
@@ -233,6 +306,11 @@ const emergencyStopDialogVisible = ref(false)
 const selectedBlocks = ref([])
 const availableBlocks = ref([])
 const emergencyStopLoading = ref(false)
+
+// 策略运行控制相关数据
+const scanPeriod = ref(200) // 默认200ms
+const scanLoading = ref(false)
+const isScanning = ref(false)
 
 let map = null
 // 图层管理
@@ -1006,6 +1084,59 @@ const executeEmergencyStop = async () => {
   }
 }
 
+// 策略运行控制方法
+const startScan = async () => {
+  try {
+    scanLoading.value = true
+    const result = await call_remote('/policy/set_scan_period', { 
+      period_ms: scanPeriod.value 
+    })
+    
+    if (result.result) {
+      ElMessage.success(`策略开始运行，扫描周期: ${scanPeriod.value}ms`)
+      isScanning.value = true
+    }
+  } catch (error) {
+    console.error('启动策略扫描失败:', error)
+    ElMessage.error('启动策略扫描失败')
+  } finally {
+    scanLoading.value = false
+  }
+}
+
+const stopScan = async () => {
+  try {
+    scanLoading.value = true
+    const result = await call_remote('/policy/set_scan_period', { 
+      period_ms: 0 
+    })
+    
+    if (result.result) {
+      ElMessage.success('策略已停止运行')
+      isScanning.value = false
+    }
+  } catch (error) {
+    console.error('停止策略扫描失败:', error)
+    ElMessage.error('停止策略扫描失败')
+  } finally {
+    scanLoading.value = false
+  }
+}
+
+const checkScanStatus = async () => {
+  try {
+    const result = await call_remote('/policy/get_scan_period', {})
+    if (result.period_ms && result.period_ms > 0) {
+      isScanning.value = true
+      scanPeriod.value = result.period_ms
+    } else {
+      isScanning.value = false
+    }
+  } catch (error) {
+    console.error('获取扫描状态失败:', error)
+  }
+}
+
 // 监听设备数据变化
 watch(() => props.devices, () => {
   if (map && !loading.value) {
@@ -1025,6 +1156,8 @@ onMounted(() => {
   nextTick(() => {
     initMap()
   })
+  // 检查策略扫描状态
+  checkScanStatus()
 })
 
 // 组件卸载
@@ -1055,7 +1188,7 @@ onUnmounted(() => {
 .interactive-map-container {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: 718px;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
@@ -1063,16 +1196,64 @@ onUnmounted(() => {
 
 .amap-container {
   width: 100%;
-  height: 100%;
-  min-height: 400px;
+  height: 718px;
 }
 
-/* 紧急停止按钮样式 */
-.emergency-stop-control {
+/* 统一控制面板样式 */
+.unified-control-panel {
   position: absolute;
   top: 20px;
   left: 20px;
   z-index: 1000;
+  display: flex;
+  background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  min-width: 800px;
+  max-width: 1000px;
+}
+
+.unified-control-panel:hover {
+  border-color: rgba(64, 158, 255, 0.3);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* 紧急停止区域 */
+.emergency-section {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 200px;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.section-icon {
+  font-size: 16px;
+  color: #f56c6c;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  letter-spacing: 0.5px;
 }
 
 .emergency-stop-btn {
@@ -1082,8 +1263,149 @@ onUnmounted(() => {
   transition: all 0.3s ease;
   font-weight: 600;
   letter-spacing: 0.5px;
-  padding: 12px 24px;
-  font-size: 16px;
+  padding: 0 24px;
+  font-size: 14px;
+  height: 44px;
+  border-radius: 8px;
+}
+
+.emergency-stop-btn:hover {
+  background: linear-gradient(135deg, #ff3742, #ff2f3a);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
+}
+
+/* 分隔线 */
+.control-divider {
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.1), transparent);
+  margin: 16px 0;
+}
+
+/* 策略运行区域 */
+.policy-section {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.policy-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.period-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  height: 44px;
+  backdrop-filter: blur(5px);
+}
+
+.input-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.period-input {
+  width: 90px;
+}
+
+.period-input :deep(.el-input__wrapper) {
+  height: 32px;
+  border-radius: 6px;
+}
+
+.input-unit {
+  font-size: 11px;
+  color: #909399;
+  font-weight: 500;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.control-buttons .el-button {
+  height: 44px;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.status-indicator {
+  margin-left: auto;
+}
+
+.status-running,
+.status-stopped {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  height: 44px;
+  backdrop-filter: blur(5px);
+}
+
+.status-running {
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.15), rgba(103, 194, 58, 0.08));
+  color: #67c23a;
+  border: 1px solid rgba(103, 194, 58, 0.3);
+}
+
+.status-stopped {
+  background: linear-gradient(135deg, rgba(144, 147, 153, 0.15), rgba(144, 147, 153, 0.08));
+  color: #909399;
+  border: 1px solid rgba(144, 147, 153, 0.3);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.status-dot.running {
+  background: #67c23a;
+  animation: pulse-running 2s infinite;
+  box-shadow: 0 0 6px rgba(103, 194, 58, 0.6);
+}
+
+.status-dot.stopped {
+  background: #909399;
+}
+
+@keyframes pulse-running {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+.status-text {
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 .emergency-stop-btn:hover {

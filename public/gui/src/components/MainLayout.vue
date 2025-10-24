@@ -72,9 +72,7 @@
 
             <!-- 主内容区域 -->
             <el-main class="content-main">
-                <el-scrollbar>
-                    <router-view />
-                </el-scrollbar>
+                <router-view />
             </el-main>
         </el-container>
 
@@ -600,15 +598,6 @@ const logout = () => {
     background: var(--el-bg-color-page);
     padding: 0;
     overflow: hidden;
-}
-
-.content-main .el-scrollbar {
-    height: 100%;
-}
-
-.content-main :deep(.el-scrollbar__view) {
-    padding: 24px;
-    min-height: 100%;
 }
 
 /* 响应式设计 */
