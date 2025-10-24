@@ -73,7 +73,6 @@ const loadWateringGroups = async () => {
                                 farmName: farmMatch.farm_name
                             }
                         } catch (error) {
-                            console.warn(`获取策略 ${group.name} 的农场信息失败:`, error)
                             return {
                                 group,
                                 farmName: null
@@ -167,7 +166,10 @@ onMounted(() => {
 
 <style scoped>
 .watering-group-status {
-    padding: 20px 0;
+    padding: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .section-title {
@@ -181,7 +183,13 @@ onMounted(() => {
 }
 
 .watering-groups-table {
-    margin-top: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.watering-groups-table :deep(.el-table) {
+    flex: 1;
 }
 
 /* 表格行样式 */

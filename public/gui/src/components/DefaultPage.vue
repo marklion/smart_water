@@ -27,43 +27,42 @@
 
           <!-- 中央地图区域 -->
           <div class="center-panel">
-            <!-- 农场地图卡片 -->
-            <el-card class="map-card" shadow="hover">
-              <template #header>
-                <div class="card-header">
-                  <span class="card-title">农场地图</span>
-                </div>
-              </template>
+            <!-- 地图和策略详情卡片 -->
+            <el-card class="map-irrigation-card" shadow="hover">
+              <el-tabs v-model="activeMainTab" class="main-tabs" @tab-change="handleMainTabChange">
+                <!-- 农场地图 Tab -->
+                <el-tab-pane label="农场地图" name="map">
+                  <div class="map-container">
+                    <InteractiveMapComponent :devices="mapMarkers" :center="mapCenter" :zoom="mapZoom"
+                      @device-click="onDeviceClick" @device-toggle="onDeviceToggle" />
+                  </div>
+                </el-tab-pane>
 
-              <div class="map-container">
-                <InteractiveMapComponent :devices="mapMarkers" :center="mapCenter" :zoom="mapZoom"
-                  @device-click="onDeviceClick" @device-toggle="onDeviceToggle" />
-              </div>
-            </el-card>
-
-            <!-- 轮灌组详情和策略运行时状态卡片 -->
-            <el-card class="irrigation-card" shadow="hover">
-              <template #header>
-                <div class="card-header">
-                  <span class="card-title">策略详情</span>
-                  <el-button type="primary" size="small" @click="refreshIrrigationData" :icon="Refresh">
-                    刷新
-                  </el-button>
-                </div>
-              </template>
-
-              <el-tabs v-model="activeIrrigationTab" class="irrigation-tabs" @tab-change="handleIrrigationTabChange">
                 <!-- 轮灌组状态 Tab -->
                 <el-tab-pane label="轮灌组状态" name="watering">
-                  <div class="tab-content">
-                    <WateringGroupStatus ref="wateringGroupRef" :farm-name="selectedFarm" />
+                  <div class="tab-content-with-actions">
+                    <div class="tab-actions">
+                      <el-button type="primary" size="small" @click="refreshWateringGroup" :icon="Refresh">
+                        刷新
+                      </el-button>
+                    </div>
+                    <div class="tab-content-scroll">
+                      <WateringGroupStatus ref="wateringGroupRef" :farm-name="selectedFarm" />
+                    </div>
                   </div>
                 </el-tab-pane>
 
                 <!-- 策略运行时状态 Tab -->
                 <el-tab-pane label="策略运行时状态" name="runtime">
-                  <div class="tab-content">
-                    <PolicyRuntimeStatus ref="policyRuntimeRef" :farm-name="selectedFarm" />
+                  <div class="tab-content-with-actions">
+                    <div class="tab-actions">
+                      <el-button type="primary" size="small" @click="refreshIrrigationData" :icon="Refresh">
+                        刷新
+                      </el-button>
+                    </div>
+                    <div class="tab-content-scroll">
+                      <PolicyRuntimeStatus ref="policyRuntimeRef" :farm-name="selectedFarm" />
+                    </div>
                   </div>
                 </el-tab-pane>
               </el-tabs>
@@ -104,7 +103,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, shallowRef, watch, inject } from 'vue'
+import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject } from 'vue'
 import { useRoute } from 'vue-router'
 import { Refresh } from '@element-plus/icons-vue'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
@@ -174,9 +173,12 @@ const mapMarkers = shallowRef([])
 
 
 // Tab切换相关
+const activeMainTab = ref('map') // 主tab切换（地图、轮灌组状态、策略运行时状态）
 const activeIrrigationTab = ref('watering')
 
+
 // 组件引用
+const wateringGroupRef = ref(null)
 const policyRuntimeRef = ref(null)
 const realtimeDataRef = ref(null)
 const warningCardRef = ref(null)
@@ -503,6 +505,16 @@ const initMapConfig = async () => {
 
 
 // Tab切换处理
+// 主tab切换处理
+const handleMainTabChange = (tabName) => {
+  // Tab切换时刷新对应组件数据
+  if (tabName === 'runtime' && policyRuntimeRef.value) {
+    policyRuntimeRef.value.refresh()
+  } else if (tabName === 'watering' && wateringGroupRef.value) {
+    wateringGroupRef.value.refresh?.()
+  }
+}
+
 const handleIrrigationTabChange = (tabName) => {
   // Tab切换时刷新对应组件数据
   if (tabName === 'runtime' && policyRuntimeRef.value) {
@@ -511,11 +523,18 @@ const handleIrrigationTabChange = (tabName) => {
 }
 
 // 刷新轮灌组数据
+const refreshWateringGroup = async () => {
+  if (wateringGroupRef.value && wateringGroupRef.value.refresh) {
+    wateringGroupRef.value.refresh()
+  }
+}
+
 const refreshIrrigationData = async () => {
   if (policyRuntimeRef.value) {
     policyRuntimeRef.value.refresh()
   }
 }
+
 
 // 组件挂载时加载数据
 onMounted(async () => {
@@ -525,7 +544,7 @@ onMounted(async () => {
   window.addEventListener('farmChanged', (event) => {
     handleFarmChange(event.detail.farmId)
   })
-
+  
 
   // 如果是监控中心页面，立即尝试加载数据
   if (route.name === '监控中心') {
@@ -539,6 +558,12 @@ onMounted(async () => {
     }
   }
 })
+
+// 组件卸载时清理事件监听器
+onUnmounted(() => {
+  window.removeEventListener('farmChanged', handleFarmChange)
+})
+
 
 // 监听路由变化，当切换到监控中心时重新加载数据
 watch(() => route.name, async (newRouteName, oldRouteName) => {
@@ -573,11 +598,21 @@ watch(cityChangeData, (newCityData, oldCityData) => {
   max-width: 100%;
 }
 
+/* 隐藏滚动条但保留滚动功能 - 仅监控中心页面 */
+.monitoring-center ::-webkit-scrollbar {
+  display: none;
+}
+
+.monitoring-center {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: 8px 24px;
   background: linear-gradient(135deg, #f8f9fa, #ffffff);
   color: #2d3748;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
@@ -598,11 +633,11 @@ watch(cityChangeData, (newCityData, oldCityData) => {
 
 /* 监控中心响应式样式 */
 .monitoring-center {
-  min-height: 100vh;
+  height: 100%;
   background: #f5f5f5;
   color: #1a202c;
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  padding: 16px;
+  padding: 0;
   position: relative;
   width: 100%;
   box-sizing: border-box;
@@ -641,7 +676,7 @@ html {
   max-width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
-  min-height: calc(100vh - 120px);
+  padding: 16px;
 }
 
 /* 超大屏幕布局 (≥1600px) */
@@ -720,6 +755,7 @@ html {
   }
 }
 
+
 /* 卡片通用样式 */
 
 .card-header::after {
@@ -783,8 +819,6 @@ html {
 /* 卡片样式优化 */
 .info-card,
 .weather-card,
-.map-card,
-.irrigation-card,
 .realtime-card {
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
   border-radius: 16px;
@@ -798,10 +832,25 @@ html {
   overflow: hidden;
 }
 
-.info-card::before,
+.map-irrigation-card {
+  background: linear-gradient(145deg, #ffffff, #f8f9fa);
+  border-radius: 16px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;  
+  position: relative;
+  overflow: hidden;
+  /* 整个卡片的高度自适应 */
+  height: auto;
+  min-height: 550px;
+}
+
+.info-card::before, 
 .weather-card::before,
-.map-card::before,
-.irrigation-card::before,
+.map-irrigation-card::before,
 .realtime-card::before {
   content: '';
   position: absolute;
@@ -815,8 +864,7 @@ html {
 
 .info-card:hover,
 .weather-card:hover,
-.map-card:hover,
-.irrigation-card:hover,
+.map-irrigation-card:hover,
 .realtime-card:hover {
   transform: translateY(-4px);
   box-shadow:
@@ -831,7 +879,7 @@ html {
 .center-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -1017,44 +1065,55 @@ html {
 
 .map-container {
   width: 100%;
-  height: 700px;
+  height: 100%;
+  flex: 1;
   position: relative;
-  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  min-height: 500px;
-  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 确保 el-card 的 body 填满剩余空间 */
+.map-irrigation-card :deep(.el-card__body) {
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 地图容器高度 */
+.map-container {
+  height: 100%;
+  min-height: 300px;
 }
 
 /* 响应式地图容器高度 */
 @media (min-width: 1600px) {
   .map-container {
-    height: 800px;
-    min-height: 700px;
+    height: 100%;
+    min-height: 300px;
   }
 }
 
 @media (min-width: 1200px) and (max-width: 1599px) {
   .map-container {
-    height: 700px;
-    min-height: 600px;
+    height: 300px;
+    min-height: 280px;
   }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
   .map-container {
-    height: 600px;
-    min-height: 500px;
+    height: 280px;
+    min-height: 260px;
   }
 }
 
 @media (max-width: 767px) {
   .map-container {
-    height: 500px;
-    min-height: 400px;
+    height: 240px;
+    min-height: 220px;
   }
 }
 
@@ -1749,11 +1808,11 @@ html {
 /* 移动端优化 */
 @media (max-width: 767px) {
   .monitoring-center {
-    padding: 12px;
+    padding: 0;
   }
 
-
   .main-content {
+    padding: 12px;
     gap: 12px;
     display: flex;
     flex-direction: column;
@@ -1791,7 +1850,7 @@ html {
   }
 
   .card-header {
-    padding: 12px 16px;
+    padding: 8px 12px;
   }
 
   .card-title {
@@ -1807,7 +1866,7 @@ html {
   }
 
   .map-container {
-    height: 400px;
+    height: 300px;
   }
 
   .el-table {
@@ -1822,10 +1881,11 @@ html {
 /* 平板端优化 */
 @media (min-width: 768px) and (max-width: 1023px) {
   .monitoring-center {
-    padding: 14px;
+    padding: 0;
   }
 
   .main-content {
+    padding: 14px;
     gap: 14px;
   }
 
@@ -1843,7 +1903,7 @@ html {
   }
 
   .map-container {
-    height: 450px;
+    height: 260px;
   }
 }
 
@@ -1851,17 +1911,18 @@ html {
 /* 超小屏幕优化 */
 @media (max-width: 480px) {
   .monitoring-center {
+    padding: 0;
+  }
+
+  .main-content {
     padding: 8px;
+    gap: 8px;
+    display: flex;
+    flex-direction: column;
   }
 
   .farm-selector-header {
     padding: 8px 12px;
-  }
-
-  .main-content {
-    gap: 8px;
-    display: flex;
-    flex-direction: column;
   }
 
   /* 确保所有面板都显示 */
@@ -1896,7 +1957,7 @@ html {
   }
 
   .map-container {
-    height: 350px;
+    height: 220px;
   }
 
   .el-table {
@@ -1911,15 +1972,15 @@ html {
 /* 横屏优化 */
 @media (orientation: landscape) and (max-height: 600px) {
   .monitoring-center {
-    padding: 12px;
+    padding: 0;
   }
 
   .main-content {
-    min-height: calc(100vh - 80px);
+    padding: 12px;
   }
 
   .map-container {
-    height: 300px;
+    height: 180px;
   }
 }
 
@@ -1931,12 +1992,82 @@ html {
 }
 
 /* Tab样式 */
+/* 主tabs样式 */
+.main-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-tabs :deep(.el-tabs__header) {
+  margin: 0 0 0 0;
+  flex-shrink: 0;
+  height: 40px; /* 降低tab栏高度 */
+}
+
+.main-tabs :deep(.el-tabs__nav-wrap) {
+  height: 40px; /* 降低tab栏高度 */
+}
+
+.main-tabs :deep(.el-tabs__nav) {
+  height: 40px; /* 降低tab栏高度 */
+}
+
+.main-tabs :deep(.el-tabs__item) {
+  height: 40px; /* 降低tab栏高度 */
+  line-height: 40px; /* 调整行高匹配高度 */
+  padding: 0 20px; /* 调整内边距 */
+  font-size: 14px; /* 稍微减小字体 */
+}
+
+.main-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+}
+
+.main-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
 .irrigation-tabs {
   margin-top: 0;
 }
 
 .tab-content {
-  padding: 20px 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.tab-content::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-content-with-actions {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-actions {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tab-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-content-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 

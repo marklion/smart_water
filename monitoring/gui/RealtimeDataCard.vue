@@ -338,14 +338,18 @@ defineExpose({
 .realtime-data {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 16px;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
   margin-bottom: 16px;
 }
 
 .data-item {
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 8px;
+  padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   text-align: center;
   box-shadow:
@@ -377,12 +381,12 @@ defineExpose({
 .data-label {
   font-size: 12px;
   color: #666;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   font-weight: 500;
 }
 
 .data-value {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   margin-bottom: 4px;
   word-wrap: break-word;
@@ -434,18 +438,7 @@ defineExpose({
 @media (min-width: 1600px) {
   .realtime-data {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 20px;
-  }
-  
-  .data-value {
-    font-size: 22px;
-  }
-}
-
-@media (min-width: 1200px) and (max-width: 1599px) {
-  .realtime-data {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 16px;
+    gap: 10px;
   }
   
   .data-value {
@@ -453,10 +446,10 @@ defineExpose({
   }
 }
 
-@media (min-width: 768px) and (max-width: 1199px) {
+@media (min-width: 1200px) and (max-width: 1599px) {
   .realtime-data {
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
   }
   
   .data-value {
@@ -464,14 +457,25 @@ defineExpose({
   }
 }
 
-@media (max-width: 767px) {
+@media (min-width: 768px) and (max-width: 1199px) {
   .realtime-data {
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 6px;
   }
   
   .data-value {
     font-size: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .realtime-data {
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 6px;
+  }
+  
+  .data-value {
+    font-size: 14px;
   }
   
   .header-actions {
@@ -480,14 +484,20 @@ defineExpose({
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .realtime-data {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 6px;
   }
-  
+
   .data-item {
-    padding: 12px;
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .data-item {
+    padding: 6px 8px;
   }
 }
 </style>

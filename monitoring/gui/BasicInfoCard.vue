@@ -117,7 +117,7 @@ defineExpose({
 .info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
+  gap: 8px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -128,35 +128,35 @@ defineExpose({
 @media (min-width: 1600px) {
   .info-grid {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 16px;
+    gap: 10px;
   }
 }
 
 @media (min-width: 1200px) and (max-width: 1599px) {
   .info-grid {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 12px;
+    gap: 8px;
   }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
   .info-grid {
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 10px;
+    gap: 6px;
   }
 }
 
 @media (max-width: 767px) {
   .info-grid {
     grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 8px;
+    gap: 6px;
   }
 }
 
 .info-item {
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   text-align: center;
   box-shadow:
@@ -193,7 +193,7 @@ defineExpose({
 .info-label {
   font-size: 12px;
   color: #666;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   font-weight: 500;
 }
 
@@ -242,15 +242,15 @@ defineExpose({
 @media (max-width: 768px) {
   .info-grid {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 6px;
   }
 
   .info-item {
-    padding: 10px 12px;
+    padding: 6px 10px;
   }
 
   .card-header {
-    padding: 12px 16px;
+    padding: 8px 12px;
   }
 
   .card-title {
@@ -262,7 +262,7 @@ defineExpose({
 
   .info-item,
   .data-item {
-    padding: 8px 10px;
+    padding: 6px 8px;
   }
 }
 </style>
