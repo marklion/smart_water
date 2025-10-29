@@ -31,14 +31,27 @@
 
     <!-- 选中策略的运行时状态 -->
     <div v-if="selectedPolicy && selectedPolicyRuntime" class="runtime-details">
-      <h4 class="subsection-title">策略运行时状态 - {{ selectedPolicy.name }}</h4>
+      <div class="subsection-header">
+        <h4 class="subsection-title">策略运行时状态 - {{ selectedPolicy.name }}</h4>
+        <div class="refresh-controls">
+          <el-button size="small" @click="handleManualRefresh" :loading="isAutoRefreshing">
+            手动刷新
+          </el-button>
+          <div class="refresh-status">
+            <el-icon v-if="isAutoRefreshing" class="is-loading">
+              <Loading />
+            </el-icon>
+            <span class="refresh-text">{{ isAutoRefreshing ? '刷新中...' : '自动刷新' }}</span>
+          </div>
+        </div>
+      </div>
 
       <div class="runtime-info">
         <!-- 当前状态 -->
         <el-descriptions :column="2" border class="runtime-descriptions">
           <el-descriptions-item label="当前状态">
             <el-tag :type="getStateStatusType(selectedPolicyRuntime?.current_state)" size="large">
-              {{ selectedPolicyRuntime?.current_state || '未运行' }}
+              {{ getStateDisplayText(selectedPolicyRuntime?.current_state) }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="运行时间">
@@ -84,9 +97,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Monitor } from '@element-plus/icons-vue'
+import { Monitor, Loading } from '@element-plus/icons-vue'
 import call_remote from '../../public/lib/call_remote.js'
 
 // 接收父组件传递的农场参数
@@ -108,6 +121,10 @@ const editingVariable = ref(null)
 const editingValue = ref('')
 const assignmentLoading = ref(false)
 const editInput = ref(null)
+
+// 自动刷新相关
+const autoRefreshTimer = ref(null)
+const isAutoRefreshing = ref(false)
 
 // 获取轮灌组中的策略名称列表
 const loadWateringGroupPolicies = async () => {
@@ -181,8 +198,14 @@ const loadPolicies = async () => {
 
 // 选择策略查看运行时状态
 const selectPolicyForRuntime = async (policy) => {
+  // 停止之前的自动刷新
+  stopAutoRefresh()
+  
   selectedPolicy.value = policy
   await loadPolicyRuntime(policy.name)
+  
+  // 开始新的自动刷新
+  startAutoRefresh()
 }
 
 // 获取策略运行时状态
@@ -216,16 +239,32 @@ const getPolicyStatusType = (policy) => {
   return 'success'
 }
 
-// 获取策略状态文本
+// 获取策略状态文本 - 使用实际状态数据
 const getPolicyStatusText = (policy) => {
-  return '运行中'
+  // 如果有选中的策略运行时状态，使用其状态
+  if (selectedPolicyRuntime.value && selectedPolicyRuntime.value.current_state) {
+    return selectedPolicyRuntime.value.current_state
+  }
+  // 否则返回默认状态
+  return '未运行'
 }
 
-// 获取状态标签类型
+// 获取状态显示文本 - 直接显示原始状态，不做映射
+const getStateDisplayText = (state) => {
+  if (!state) return '未运行'
+  return state
+}
+
+// 获取状态标签类型 - 简化逻辑
 const getStateStatusType = (state) => {
   if (!state) return 'info'
-  if (state === 'empty') return 'warning'
-  if (state === 'work') return 'success'
+  
+  // 只有明确的运行状态才显示为成功（绿色）
+  if (state === 'work' || state === 'running' || state === 'active') {
+    return 'success'
+  }
+  
+  // 其他所有状态都显示为信息（灰色）
   return 'info'
 }
 
@@ -294,6 +333,34 @@ const saveVariable = async (variableName) => {
   }
 }
 
+// 自动刷新策略运行时状态
+const startAutoRefresh = () => {
+  if (autoRefreshTimer.value) {
+    clearInterval(autoRefreshTimer.value)
+  }
+  
+  autoRefreshTimer.value = setInterval(async () => {
+    if (selectedPolicy.value && !isAutoRefreshing.value) {
+      isAutoRefreshing.value = true
+      try {
+        await loadPolicyRuntime(selectedPolicy.value.name)
+      } catch (error) {
+        console.warn('自动刷新策略运行时状态失败:', error)
+      } finally {
+        isAutoRefreshing.value = false
+      }
+    }
+  }, 5000) // 每5秒刷新一次
+}
+
+// 停止自动刷新
+const stopAutoRefresh = () => {
+  if (autoRefreshTimer.value) {
+    clearInterval(autoRefreshTimer.value)
+    autoRefreshTimer.value = null
+  }
+}
+
 // 刷新数据
 const refresh = async () => {
   await loadPolicies()
@@ -321,11 +388,26 @@ defineExpose({
 onMounted(() => {
   loadPolicies()
 })
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  stopAutoRefresh()
+})
+
+// 处理手动刷新
+const handleManualRefresh = () => {
+  if (selectedPolicy.value && !isAutoRefreshing.value) {
+    loadPolicyRuntime(selectedPolicy.value.name)
+  }
+}
 </script>
 
 <style scoped>
 .policy-runtime-status {
-  padding: 20px 0;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .section-title {
@@ -336,13 +418,54 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
+  flex-shrink: 0;
+}
+
+.subsection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0 12px 0;
+  flex-shrink: 0;
+}
+
+.refresh-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .subsection-title {
-  margin: 20px 0 12px 0;
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
   color: #606266;
+}
+
+.refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.refresh-status .is-loading {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.refresh-text {
+  font-size: 12px;
+  color: #909399;
 }
 
 .policies-grid {
@@ -350,6 +473,7 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+  flex-shrink: 0;
 }
 
 .policy-card {
