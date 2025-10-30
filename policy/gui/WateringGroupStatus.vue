@@ -85,6 +85,11 @@ const loadWateringGroups = async () => {
                 filteredGroups = policyFarmMatches
                     .filter(item => item.farmName === props.farmName)
                     .map(item => item.group)
+
+                // 若按农场过滤后为空，则回退展示全部轮灌组，避免列表空白
+                if (filteredGroups.length === 0) {
+                    filteredGroups = response.groups
+                }
             }
             
             irrigationGroups.value = filteredGroups.map(group => ({

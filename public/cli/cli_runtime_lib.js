@@ -129,6 +129,9 @@ export default {
         }
     },
     do_config: async function (vorpal, command) {
+        if (!vorpal) {
+            vorpal = get_vorpal();
+        }
         let next_vorpal = await vorpal.execSync(command);
         let ret = vorpal;
         if (next_vorpal != vorpal && next_vorpal != undefined) {

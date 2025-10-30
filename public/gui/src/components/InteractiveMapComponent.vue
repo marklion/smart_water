@@ -1412,12 +1412,21 @@ const finishWizard = () => {
   })
 
   console.log('策略配置完成:', finalConfig)
-  ElMessage.success('策略配置已生成')
-
-  // 这里可以将配置发送到后端保存
-  // await savePolicyConfig(finalConfig)
-
-  policyConfigWizardVisible.value = false
+  // 下发到后端：创建/替换轮灌组策略
+  ;(async () => {
+    try {
+      const farm_name = localStorage.getItem('selectedFarm') || ''
+      const resp = await call_remote('/policy/apply_wizard_groups', { groups: finalConfig, farm_name })
+      if (resp && resp.result) {
+        ElMessage.success('轮灌组策略已下发并生效')
+        policyConfigWizardVisible.value = false
+      } else {
+        ElMessage.error(resp?.err_msg || '下发失败')
+      }
+    } catch (e) {
+      ElMessage.error(e?.err_msg || '下发失败')
+    }
+  })()
 }
 
 // 监听设备数据变化
