@@ -6,6 +6,7 @@ const g_key_event = {
 export default {
     create_vorpal: function () {
         const vorpal = Vorpal();
+        vorpal.isCommandArgKeyPairNormalized = false;
         // vorpal.ui.on('vorpal_ui_keypress', function (data) {
         //     vorpal.emit('keypress', data);
         //     if (vorpal.ui.parent == vorpal) {
