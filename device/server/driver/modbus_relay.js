@@ -1,39 +1,42 @@
 import ModbusRTU from "modbus-serial";
-
 export default async function (config_string) {
     let config = JSON.parse(config_string);
-    let get_flow = async function () {
-        let ret = {
-            online: true,
-            flow: 0,
-        }
+    let set_relay = async function (is_on) {
+        let ret = true;
         const client = new ModbusRTU();
         await client.connectTCP(config.ip, { port: config.port });
         try {
             client.setID(config.device_id);
-            let resp = await client.readHoldingRegisters(9, 3);
-            ret.flow = resp.data[0] * 65536 + resp.data[1] + resp.data[2] / 100;
+            await client.writeCoil(config.relay_address, is_on);
         } catch (error) {
-            console.log(`get flow via modbus error =:${JSON.stringify(error)}`);
-            ret.online = false;
+            console.log(`set coil error =:${JSON.stringify(error)}`);
+            ret = false;
         }
         client.close();
         return ret;
     };
     let ret = {
-        m_info: {},
-        readout: async function () {
-            return this.m_info.flow;
+        m_is_opened: false,
+        m_is_online: true,
+        open: async function () {
+            this.m_is_opened = true;
+        },
+        close: async function () {
+            this.m_is_opened = false;
+        },
+        is_opened: async function () {
+            return this.m_is_opened;
         },
         status_map: function () {
             let ret = [];
-            ret.push({ text: '当前流量值', func: 'readout' });
+            ret.push({ text: '阀门是否打开', func: 'is_opened' });
             return ret;
         },
         shutdown: async function () {
+            await this.close();
         },
         is_online: async function () {
-            return this.m_info.online;
+            return this.m_is_online;
         },
         destroy: async function () {
             clearInterval(this.m_timer);
@@ -41,9 +44,9 @@ export default async function (config_string) {
     }
     ret.m_timer = setInterval(async () => {
         try {
-            ret.m_info = await get_flow();
+            ret.m_is_online = await set_relay(ret.m_is_opened);
         } catch (error) {
-            console.error('Error fetching device info:', error);
+            console.error('Error set relay:', error);
         }
     }, config.poll_interval || 2000);
     return ret;
