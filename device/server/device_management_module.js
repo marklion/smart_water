@@ -1,5 +1,6 @@
 import virtual_driver from './driver/virtual_driver.js';
 import DZ005 from './driver/DZ005.js';
+import dijiang from './driver/dijiang.js';
 const driver_array = [
     {
         name: 'virtualDevice',
@@ -8,13 +9,19 @@ const driver_array = [
             'open', 'close', 'readout', 'mock_readout',
             'is_opened', 'status_map', 'shutdown'],
         driver: virtual_driver,
-    },{
-        name:'WaterGroupValve',
-        config_method:'{device_sn:<设备序列号>, is_left:<是否左阀>, poll_interval:<轮询间隔(ms)>, token:<鉴权token>}',
-        capability:[
+    }, {
+        name: 'WaterGroupValve',
+        config_method: '{device_sn:<设备序列号>, is_left:<是否左阀>, poll_interval:<轮询间隔(ms)>, token:<鉴权token>}',
+        capability: [
             'open', 'close', 'readout',
             'is_opened', 'status_map', 'shutdown'],
         driver: DZ005,
+    }, {
+        name: 'FertFlowMeter',
+        config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
+        capability: [
+            'readout', 'status_map', 'shutdown'],
+        driver: dijiang,
     }
 ];
 export async function get_driver(device_name, capability) {
@@ -141,6 +148,7 @@ export default {
                 if (body.block_name) {
                     exist_device.block_name = body.block_name;
                 }
+                await get_driver(body.device_name);
                 return { result: true };
             }
         },
