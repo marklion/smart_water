@@ -33,46 +33,29 @@
           </el-icon>
           <span class="section-title">策略控制</span>
         </div>
-        
+
         <div class="policy-controls">
           <div class="period-input-wrapper">
             <span class="input-label">扫描周期</span>
-            <el-input-number 
-              v-model="scanPeriod" 
-              :min="100" 
-              :max="10000" 
-              :step="100"
-              size="small"
-              class="period-input"
-            />
+            <el-input-number v-model="scanPeriod" :min="100" :max="10000" :step="100" size="small"
+              class="period-input" />
             <span class="input-unit">毫秒</span>
           </div>
-          
+
           <div class="control-buttons">
-            <el-button 
-              type="primary" 
-              size="small" 
-              @click="startScan"
-              :loading="scanLoading"
-              :disabled="isScanning"
-              :icon="VideoPlay"
-              round
-            >
+            <el-button type="primary" size="small" @click="startScan" :loading="scanLoading" :disabled="isScanning"
+              :icon="VideoPlay" round>
               运行策略
             </el-button>
-            <el-button 
-              type="danger" 
-              size="small" 
-              @click="stopScan"
-              :loading="scanLoading"
-              :disabled="!isScanning"
-              :icon="VideoPause"
-              round
-            >
+            <el-button type="danger" size="small" @click="stopScan" :loading="scanLoading" :disabled="!isScanning"
+              :icon="VideoPause" round>
               停止运行
             </el-button>
+            <el-button type="success" size="small" @click="showPolicyConfigWizard" :icon="Setting" round>
+              策略程序设定
+            </el-button>
           </div>
-          
+
           <div class="status-indicator">
             <div v-if="isScanning" class="status-running">
               <span class="status-dot running"></span>
@@ -180,8 +163,9 @@
         </div>
 
         <!-- 运行时信息区域 -->
-        <div v-if="(selectedDevice.runtime_info && selectedDevice.runtime_info.length > 0) || selectedDevice.is_online !== undefined" class="runtime-info-section"
-          :class="{ loading: refreshingRuntimeInfo }">
+        <div
+          v-if="(selectedDevice.runtime_info && selectedDevice.runtime_info.length > 0) || selectedDevice.is_online !== undefined"
+          class="runtime-info-section" :class="{ loading: refreshingRuntimeInfo }">
           <div class="section-title">
             <el-icon>
               <Monitor />
@@ -194,13 +178,15 @@
             <!-- 设备在线状态 -->
             <div v-if="selectedDevice.is_online !== undefined" class="runtime-info-item online-status-item">
               <div class="info-label">
-                <el-icon class="status-icon" :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
+                <el-icon class="status-icon"
+                  :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
                   <CircleCheck v-if="selectedDevice.is_online" />
                   <CircleClose v-else />
                 </el-icon>
                 设备在线状态：
               </div>
-              <div class="info-value" :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
+              <div class="info-value"
+                :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
                 {{ selectedDevice.is_online ? '在线' : '离线' }}
               </div>
             </div>
@@ -265,13 +251,148 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- 策略配置向导对话框 -->
+    <el-dialog v-model="policyConfigWizardVisible" title="策略程序设定向导" width="800px" :close-on-click-modal="false"
+      :close-on-press-escape="false" :modal="true" :append-to-body="true" :lock-scroll="true"
+      class="policy-config-dialog">
+      <div class="policy-config-wizard">
+        <!-- 步骤指示器 -->
+        <el-steps :active="wizardStep - 1" finish-status="success" align-center>
+          <el-step title="创建轮灌组" description="设置轮灌组名称和面积" />
+          <el-step title="分配设备" description="为轮灌组分配阀门设备" />
+          <el-step title="施肥配置" description="设置施肥方式和参数" />
+        </el-steps>
+
+        <!-- 步骤1：创建轮灌组 -->
+        <div v-if="wizardStep === 1" class="wizard-step-content">
+          <div class="step-header">
+            <h3>步骤1：创建轮灌组</h3>
+            <p>请创建轮灌组并设置每个组的面积</p>
+          </div>
+
+          <div class="watering-groups-config">
+            <div class="groups-header">
+              <span>轮灌组列表</span>
+              <el-button type="primary" size="small" @click="addWateringGroup" :icon="Plus">
+                添加轮灌组
+              </el-button>
+            </div>
+
+            <div v-for="(group, index) in wateringGroups" :key="index" class="group-item">
+              <div class="group-info">
+                <el-input v-model="group.name" placeholder="轮灌组名称" style="width: 200px;" />
+                <el-input-number v-model="group.area" :min="0" :precision="2" placeholder="面积"
+                  style="width: 150px; margin-left: 10px;" />
+                <span class="unit">亩</span>
+              </div>
+              <el-button type="danger" size="small" @click="removeWateringGroup(index)" :icon="Delete">
+                删除
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤2：分配设备 -->
+        <div v-if="wizardStep === 2" class="wizard-step-content">
+            <div class="step-header">
+              <h3>步骤2：分配阀门设备</h3>
+              <div v-if="availableValveDevices.length === 0" class="no-devices-warning">
+                <el-alert title="未找到WaterGroupValve设备" type="warning" description="当前农场没有找到WaterGroupValve类型的设备，请先配置相关设备" :closable="false"
+                  show-icon />
+              </div>
+            </div>
+
+          <div class="device-allocation">
+            <div v-for="group in wateringGroups" :key="group.name" class="group-device-config">
+              <h4>{{ group.name }}</h4>
+              <el-select v-model="selectedValveDevices[group.name]" multiple placeholder="选择阀门设备" style="width: 100%;"
+                :disabled="availableValveDevices.length === 0">
+                <el-option v-for="device in availableValveDevices" :key="device.device_name"
+                  :label="`${device.device_name} (${device.driver_name})`" :value="device.device_name" />
+              </el-select>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤3：施肥配置 -->
+        <div v-if="wizardStep === 3" class="wizard-step-content">
+          <div class="step-header">
+            <h3>步骤3：施肥配置</h3>
+            <p>为每个轮灌组设置施肥方式和参数</p>
+          </div>
+
+          <div class="fert-config">
+            <div v-for="group in wateringGroups" :key="group.name" class="group-fert-config">
+              <h4>{{ group.name }}</h4>
+
+              <div class="fert-method">
+                <label>施肥方式：</label>
+                <el-radio-group v-model="fertConfigs[group.name].method">
+                  <el-radio value="AreaBased">亩定量</el-radio>
+                  <el-radio value="Total">总定量</el-radio>
+                  <el-radio value="Time">定时</el-radio>
+                </el-radio-group>
+              </div>
+
+              <div class="fert-params">
+                <div v-if="fertConfigs[group.name].method === 'AreaBased'" class="param-item">
+                  <label>施肥参数：</label>
+                  <el-input-number v-model="fertConfigs[group.name].AB_fert" :min="0" :precision="2"
+                    placeholder="施肥量" />
+                  <span class="unit">L/亩</span>
+                </div>
+
+                <div v-if="fertConfigs[group.name].method === 'Total'" class="param-item">
+                  <label>施肥参数：</label>
+                  <el-input-number v-model="fertConfigs[group.name].total_fert" :min="0" :precision="2"
+                    placeholder="总量" />
+                  <span class="unit">L</span>
+                </div>
+
+                <div v-if="fertConfigs[group.name].method === 'Time'" class="param-item">
+                  <label>施肥参数：</label>
+                  <el-input-number v-model="fertConfigs[group.name].fert_time" :min="0" :precision="1"
+                    placeholder="时间" />
+                  <span class="unit">小时</span>
+                </div>
+              </div>
+
+              <div class="time-params">
+                <div class="param-item">
+                  <label>肥前时间：</label>
+                  <el-input-number v-model="fertConfigs[group.name].pre_fert_time" :min="0" :precision="1"
+                    placeholder="肥前时间" />
+                  <span class="unit">小时</span>
+                </div>
+
+                <div class="param-item">
+                  <label>肥后时间：</label>
+                  <el-input-number v-model="fertConfigs[group.name].post_fert_time" :min="0" :precision="1"
+                    placeholder="肥后时间" />
+                  <span class="unit">小时</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="wizard-actions">
+          <el-button v-if="wizardStep > 1" @click="prevStep">上一步</el-button>
+          <el-button v-if="wizardStep < 3" type="primary" @click="nextStep">下一步</el-button>
+          <el-button v-if="wizardStep === 3" type="success" @click="finishWizard">完成配置</el-button>
+          <el-button @click="policyConfigWizardVisible = false">取消</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, watch, getCurrentInstance } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning, CircleCheck, CircleClose, Setting, Plus, Delete } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
 
@@ -311,6 +432,14 @@ const emergencyStopLoading = ref(false)
 const scanPeriod = ref(200) // 默认200ms
 const scanLoading = ref(false)
 const isScanning = ref(false)
+
+// 策略配置向导相关数据
+const policyConfigWizardVisible = ref(false)
+const wizardStep = ref(1)
+const wateringGroups = ref([])
+const availableValveDevices = ref([])
+const selectedValveDevices = ref({}) // 每个轮灌组选择的阀门设备
+const fertConfigs = ref({}) // 每个轮灌组的施肥配置
 
 let map = null
 // 图层管理
@@ -646,7 +775,7 @@ const createMarkerContent = (device) => {
   const deviceType = getDeviceType(device)
   const iconName = getDeviceIcon(deviceType)
   const deviceName = device.label || device.device_name || device.deviceName
-  
+
   // 根据在线状态设置颜色
   let statusClass = 'offline' // 默认离线状态
   if (device.is_online === true) {
@@ -1088,10 +1217,10 @@ const executeEmergencyStop = async () => {
 const startScan = async () => {
   try {
     scanLoading.value = true
-    const result = await call_remote('/policy/set_scan_period', { 
-      period_ms: scanPeriod.value 
+    const result = await call_remote('/policy/set_scan_period', {
+      period_ms: scanPeriod.value
     })
-    
+
     if (result.result) {
       ElMessage.success(`策略开始运行，扫描周期: ${scanPeriod.value}ms`)
       isScanning.value = true
@@ -1107,10 +1236,10 @@ const startScan = async () => {
 const stopScan = async () => {
   try {
     scanLoading.value = true
-    const result = await call_remote('/policy/set_scan_period', { 
-      period_ms: 0 
+    const result = await call_remote('/policy/set_scan_period', {
+      period_ms: 0
     })
-    
+
     if (result.result) {
       ElMessage.success('策略已停止运行')
       isScanning.value = false
@@ -1135,6 +1264,160 @@ const checkScanStatus = async () => {
   } catch (error) {
     console.error('获取扫描状态失败:', error)
   }
+}
+
+// 策略配置向导相关方法
+const showPolicyConfigWizard = async () => {
+  try {
+    // 获取当前农场的WaterGroupValve类型设备
+    const currentFarm = props.devices.length > 0 ? (props.devices[0].farmName || props.devices[0].farm_name) : '默认农场'
+
+    console.log('当前农场:', currentFarm)
+
+    const deviceResponse = await call_remote('/device_management/list_device', {
+      farm_name: currentFarm,
+      pageNo: 0
+    })
+
+    console.log('设备响应:', deviceResponse)
+
+    if (deviceResponse && deviceResponse.devices) {
+      console.log('所有设备:', deviceResponse.devices)
+      
+      // 只筛选WaterGroupValve类型的设备
+      const valveDevices = deviceResponse.devices.filter(device => 
+        device.driver_name && device.driver_name.includes('WaterGroupValve')
+      )
+      
+      console.log('WaterGroupValve设备:', valveDevices)
+      availableValveDevices.value = valveDevices
+    } else {
+      availableValveDevices.value = []
+    }
+
+    // 重置向导状态
+    wizardStep.value = 1
+    wateringGroups.value = []
+    selectedValveDevices.value = {}
+    fertConfigs.value = {}
+
+    policyConfigWizardVisible.value = true
+  } catch (error) {
+    console.error('获取设备列表失败:', error)
+    ElMessage.error('获取设备列表失败')
+  }
+}
+
+const addWateringGroup = () => {
+  const groupName = `轮灌组${wateringGroups.value.length + 1}`
+  wateringGroups.value.push({
+    name: groupName,
+    area: 0
+  })
+  selectedValveDevices.value[groupName] = []
+  fertConfigs.value[groupName] = {
+    method: 'AreaBased',
+    AB_fert: 0,
+    total_fert: 0,
+    fert_time: 0,
+    pre_fert_time: 0,
+    post_fert_time: 0
+  }
+}
+
+const removeWateringGroup = (index) => {
+  const groupName = wateringGroups.value[index].name
+  wateringGroups.value.splice(index, 1)
+  delete selectedValveDevices.value[groupName]
+  delete fertConfigs.value[groupName]
+}
+
+const nextStep = () => {
+  if (wizardStep.value === 1) {
+    // 验证轮灌组配置
+    if (wateringGroups.value.length === 0) {
+      ElMessage.warning('请至少创建一个轮灌组')
+      return
+    }
+    for (const group of wateringGroups.value) {
+      if (group.area <= 0) {
+        ElMessage.warning(`请为${group.name}设置有效的面积`)
+        return
+      }
+    }
+  } else if (wizardStep.value === 2) {
+    // 验证设备分配
+    for (const group of wateringGroups.value) {
+      if (!selectedValveDevices.value[group.name] || selectedValveDevices.value[group.name].length === 0) {
+        ElMessage.warning(`请为${group.name}分配至少一个阀门设备`)
+        return
+      }
+    }
+
+    // 进入步骤3前，确保每个轮灌组都有施肥配置
+    for (const group of wateringGroups.value) {
+      if (!fertConfigs.value[group.name]) {
+        fertConfigs.value[group.name] = {
+          method: 'AreaBased',
+          AB_fert: 0,
+          total_fert: 0,
+          fert_time: 0,
+          pre_fert_time: 0,
+          post_fert_time: 0
+        }
+      }
+    }
+  }
+  wizardStep.value++
+}
+
+const prevStep = () => {
+  if (wizardStep.value > 1) {
+    wizardStep.value--
+  }
+}
+
+const finishWizard = () => {
+  // 验证施肥配置
+  for (const group of wateringGroups.value) {
+    const config = fertConfigs.value[group.name]
+    if (config.method === 'AreaBased' && config.AB_fert <= 0) {
+      ElMessage.warning(`请为${group.name}设置有效的亩定量施肥参数`)
+      return
+    }
+    if (config.method === 'Total' && config.total_fert <= 0) {
+      ElMessage.warning(`请为${group.name}设置有效的总定量施肥参数`)
+      return
+    }
+    if (config.method === 'Time' && config.fert_time <= 0) {
+      ElMessage.warning(`请为${group.name}设置有效的定时施肥参数`)
+      return
+    }
+  }
+
+  // 生成最终配置JSON
+  const finalConfig = wateringGroups.value.map(group => {
+    const config = fertConfigs.value[group.name]
+    return {
+      name: group.name,
+      area: group.area,
+      valves: selectedValveDevices.value[group.name] || [],
+      method: config.method,
+      AB_fert: config.method === 'AreaBased' ? config.AB_fert : 0,
+      total_fert: config.method === 'Total' ? config.total_fert : 0,
+      fert_time: config.method === 'Time' ? config.fert_time : 0,
+      pre_fert_time: config.pre_fert_time || 0,
+      post_fert_time: config.post_fert_time || 0
+    }
+  })
+
+  console.log('策略配置完成:', finalConfig)
+  ElMessage.success('策略配置已生成')
+
+  // 这里可以将配置发送到后端保存
+  // await savePolicyConfig(finalConfig)
+
+  policyConfigWizardVisible.value = false
 }
 
 // 监听设备数据变化
@@ -1209,7 +1492,7 @@ onUnmounted(() => {
   background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
   border-radius: 16px;
   border: 2px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.12),
     0 2px 8px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -1221,7 +1504,7 @@ onUnmounted(() => {
 
 .unified-control-panel:hover {
   border-color: rgba(64, 158, 255, 0.3);
-  box-shadow: 
+  box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.15),
     0 4px 12px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -1393,10 +1676,13 @@ onUnmounted(() => {
 }
 
 @keyframes pulse-running {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.1);
@@ -1937,6 +2223,218 @@ onUnmounted(() => {
   gap: 12px;
   padding-top: 16px;
   border-top: 1px solid #e4e7ed;
+}
+
+/* 策略配置向导样式 */
+.policy-config-dialog {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+}
+
+.policy-config-dialog .el-dialog {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+}
+
+.policy-config-dialog .el-dialog__wrapper {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 2000 !important;
+}
+
+.policy-config-wizard {
+  padding: 20px 0;
+}
+
+.wizard-step-content {
+  margin: 30px 0;
+  min-height: 400px;
+}
+
+.step-header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.step-header h3 {
+  margin: 0 0 8px 0;
+  color: #303133;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.step-header p {
+  margin: 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.no-devices-warning {
+  margin-top: 16px;
+}
+
+/* 轮灌组配置样式 */
+.watering-groups-config {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.groups-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.2s ease;
+}
+
+.group-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.group-item:last-child {
+  margin-bottom: 0;
+}
+
+.group-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-info .unit {
+  color: #909399;
+  font-size: 14px;
+}
+
+/* 设备分配样式 */
+.device-allocation {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.group-device-config {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.group-device-config:last-child {
+  margin-bottom: 0;
+}
+
+.group-device-config h4 {
+  margin: 0 0 12px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* 施肥配置样式 */
+.fert-config {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.group-fert-config {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.group-fert-config:last-child {
+  margin-bottom: 0;
+}
+
+.group-fert-config h4 {
+  margin: 0 0 16px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.fert-method {
+  margin-bottom: 16px;
+}
+
+.fert-method label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.fert-params {
+  margin-bottom: 16px;
+}
+
+.time-params {
+  display: flex;
+  gap: 20px;
+}
+
+.param-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.param-item label {
+  font-weight: 600;
+  color: #303133;
+  min-width: 80px;
+}
+
+.param-item .unit {
+  color: #909399;
+  font-size: 14px;
+}
+
+/* 向导操作按钮样式 */
+.wizard-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid #e4e7ed;
+  margin-top: 30px;
+}
+
+.wizard-actions .el-button {
+  min-width: 100px;
 }
 
 /* 响应式设计 */
