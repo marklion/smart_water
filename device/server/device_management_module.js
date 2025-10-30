@@ -1,4 +1,5 @@
 import virtual_driver from './driver/virtual_driver.js';
+import DZ005 from './driver/DZ005.js';
 const driver_array = [
     {
         name: 'virtualDevice',
@@ -7,6 +8,13 @@ const driver_array = [
             'open', 'close', 'readout', 'mock_readout',
             'is_opened', 'status_map', 'shutdown'],
         driver: virtual_driver,
+    },{
+        name:'WaterGroupValve',
+        config_method:'{device_sn:<设备序列号>, is_left:<是否左阀>, poll_interval:<轮询间隔(ms)>, token:<鉴权token>}',
+        capability:[
+            'open', 'close', 'readout',
+            'is_opened', 'status_map', 'shutdown'],
+        driver: DZ005,
     }
 ];
 export async function get_driver(device_name, capability) {
@@ -18,7 +26,7 @@ export async function get_driver(device_name, capability) {
     if (!driver_config) {
         throw { err_msg: '驱动不存在' };
     }
-    if (driver_config.capability.indexOf(capability) === -1) {
+    if (capability && driver_config.capability.indexOf(capability) === -1) {
         throw { err_msg: '驱动不支持该能力' };
     }
 
@@ -31,7 +39,11 @@ export async function get_driver(device_name, capability) {
             device_type: device.device_type || 'valve', // 默认阀门类型
             device_name: device_name
         };
-        const driver_instance = await driver_config.driver(driver_config_obj);
+        let driver_arg = device.config_key;
+        if (driver_config.name == 'virtualDevice') {
+            driver_arg = driver_config_obj;
+        }
+        const driver_instance = await driver_config.driver(driver_arg);
         driver_instances.set(cache_key, driver_instance);
     }
 
@@ -144,6 +156,10 @@ export default {
                 result: { type: Boolean, mean: '删除结果', example: true }
             },
             func: async function (body, token) {
+                let driver = await get_driver(body.device_name);
+                if (driver.destroy) {
+                    await driver.destroy();
+                }
                 let index = device_array.findIndex(device => device.device_name === body.device_name);
                 if (index === -1) {
                     throw { err_msg: `设备 ${body.device_name} 不存在` };
@@ -325,10 +341,10 @@ export default {
             is_get_api: false,
             params: {
                 farm_name: { type: String, have_to: true, mean: '农场名称', example: '温室1号' },
-                block_names: { 
-                    type: Array, 
-                    have_to: true, 
-                    mean: '地块名称列表', 
+                block_names: {
+                    type: Array,
+                    have_to: true,
+                    mean: '地块名称列表',
                     explain: {
                         name: { type: String, mean: '地块名称', example: '主灌溉管道' }
                     }
@@ -336,16 +352,16 @@ export default {
             },
             result: {
                 result: { type: Boolean, mean: '急停结果', example: true },
-                stopped_devices: { 
-                    type: Array, 
-                    mean: '已急停的设备列表', 
+                stopped_devices: {
+                    type: Array,
+                    mean: '已急停的设备列表',
                     explain: {
                         device_name: { type: String, mean: '设备名称', example: '设备1' }
                     }
                 },
-                failed_devices: { 
-                    type: Array, 
-                    mean: '急停失败的设备列表', 
+                failed_devices: {
+                    type: Array,
+                    mean: '急停失败的设备列表',
                     explain: {
                         device_name: { type: String, mean: '设备名称', example: '设备3' },
                         reason: { type: String, mean: '失败原因', example: '急停失败' }
@@ -356,24 +372,24 @@ export default {
                 try {
                     let stoppedDevices = [];
                     let failedDevices = [];
-                    
+
                     // 获取指定农场和地块下的所有设备
-                    let targetDevices = device_array.filter(device => 
-                        device.farm_name === body.farm_name && 
+                    let targetDevices = device_array.filter(device =>
+                        device.farm_name === body.farm_name &&
                         body.block_names.includes(device.block_name)
                     );
-                    
+
                     console.log(`找到 ${targetDevices.length} 个设备需要急停`);
-                    
+
                     // 遍历每个设备，调用shutdown_device接口
                     for (let device of targetDevices) {
                         try {
                             console.log(`正在急停设备: ${device.device_name}`);
-                            
+
                             // 直接调用shutdown逻辑
                             let driver = await get_driver(device.device_name, 'shutdown');
                             await driver.shutdown();
-                            
+
                             stoppedDevices.push(device.device_name);
                             console.log(`设备 ${device.device_name} 急停成功`);
                         } catch (error) {
@@ -384,18 +400,18 @@ export default {
                             });
                         }
                     }
-                    
+
                     console.log(`急停完成: 成功 ${stoppedDevices.length} 个，失败 ${failedDevices.length} 个`);
-                    
-                    return { 
-                        result: true, 
+
+                    return {
+                        result: true,
                         stopped_devices: stoppedDevices,
                         failed_devices: failedDevices
                     };
                 } catch (error) {
                     console.error('批量急停失败:', error);
-                    return { 
-                        result: false, 
+                    return {
+                        result: false,
                         stopped_devices: [],
                         failed_devices: [],
                         error: error.message || '批量急停失败'
