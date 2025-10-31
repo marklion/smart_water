@@ -1,6 +1,8 @@
 import virtual_driver from './driver/virtual_driver.js';
 import DZ005 from './driver/DZ005.js';
 import dijiang from './driver/dijiang.js';
+import kfd9000 from './driver/kfd9000.js';
+import modbus_relay from './driver/modbus_relay.js';
 const driver_array = [
     {
         name: 'virtualDevice',
@@ -22,6 +24,18 @@ const driver_array = [
         capability: [
             'readout', 'status_map', 'shutdown'],
         driver: dijiang,
+    },{
+        name:'WaterFlowMeter',
+        config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
+        capability: [
+            'readout', 'total_readout', 'status_map', 'shutdown'],
+        driver: kfd9000,
+    }, {
+        name:'ModbusRelay',
+        config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, relay_address:<继电器地址>, poll_interval:<轮询间隔(ms)>}',
+        capability: [
+            'open', 'close','is_opened', 'status_map', 'shutdown'],
+        driver: modbus_relay,
     }
 ];
 export async function get_driver(device_name, capability) {

@@ -2,19 +2,22 @@ import ModbusRTU from "modbus-serial";
 
 export default async function (config_string) {
     let config = JSON.parse(config_string);
-    let get_flow = async function () {
+    let get_flow_info = async function () {
         let ret = {
             online: true,
             flow: 0,
+            total_flow: 0,
         }
         const client = new ModbusRTU();
         await client.connectTCP(config.ip, { port: config.port });
         try {
             client.setID(config.device_id);
-            let resp = await client.readHoldingRegisters(9, 3);
-            ret.flow = resp.data[0] * 65536 + resp.data[1] + resp.data[2] / 100;
+            let resp = await client.readHoldingRegisters(0, 2);
+            ret.flow = resp.buffer.readFloatBE();
+            resp = await client.readHoldingRegisters(0x13, 2);
+            ret.total_flow = resp.buffer.readUint32BE() / 100;
         } catch (error) {
-            console.log(`get flow via modbus error =:${JSON.stringify(error)}`);
+            console.log(`get flow_info via modbus error =:${JSON.stringify(error)}`);
             ret.online = false;
         }
         client.close();
@@ -25,9 +28,13 @@ export default async function (config_string) {
         readout: async function () {
             return this.m_info.flow;
         },
+        total_readout: async function () {
+            return this.m_info.total_flow;
+        },
         status_map: function () {
             let ret = [];
             ret.push({ text: '当前流量值', func: 'readout' });
+            ret.push({ text: '累计流量值', func: 'total_readout' });
             return ret;
         },
         shutdown: async function () {
@@ -41,7 +48,7 @@ export default async function (config_string) {
     }
     ret.m_timer = setInterval(async () => {
         try {
-            ret.m_info = await get_flow();
+            ret.m_info = await get_flow_info();
         } catch (error) {
             console.error('Error fetching device info:', error);
         }
