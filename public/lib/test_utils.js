@@ -122,13 +122,17 @@ export default async function create_cli(processName) {
             }, wait_gap);
         });
     }
-    ret.run_cmd = async function (cmd, prompt = '> ') {
+    ret.run_cmd = async function (cmd, prompt = null) {
         ret.output = '';
         ret.process.write(cmd + '\n');
         let wait_gap = 10;
         if (cmd === 'clear' || cmd.startsWith('restore'))
         {
             wait_gap = 200;
+        }
+        // 如果没有指定 prompt，使用上次检测到的 prompt 或默认值
+        if (prompt === null) {
+            prompt = ret.current_prompt || '> ';
         }
         let resp = await waitForPrompt(prompt, wait_gap);
         print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
