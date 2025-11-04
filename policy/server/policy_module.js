@@ -202,6 +202,259 @@ function getWaterGroupVariable(matrix, key_name, runtime_state) {
     return ret;
 }
 
+/**
+ * 获取阀门值，如果不存在 valves 键，则从 water_valve 和 fert_valve 合并
+ */
+function getValvesValue(matrix, policy_runtime) {
+    let valves_value = getWaterGroupVariable(matrix, 'valves', policy_runtime);
+    
+    // 如果已经有 valves 值且不为空，直接返回
+    if (valves_value && valves_value !== '-') {
+        return valves_value;
+    }
+    
+    // 尝试从 water_valve 和 fert_valve 合并
+    const water_valve = getWaterGroupVariable(matrix, 'water_valve', policy_runtime);
+    const fert_valve = getWaterGroupVariable(matrix, 'fert_valve', policy_runtime);
+    
+    if (!water_valve && !fert_valve) {
+        return valves_value || '-';
+    }
+    
+    // 去除引号并合并
+    const waterStr = water_valve ? String(water_valve).replaceAll('"', '') : '';
+    const fertStr = fert_valve ? String(fert_valve).replaceAll('"', '') : '';
+    
+    if (waterStr && fertStr) {
+        return `${waterStr}|${fertStr}`;
+    }
+    if (waterStr) {
+        return waterStr;
+    }
+    if (fertStr) {
+        return fertStr;
+    }
+    
+    return '-';
+}
+
+/**
+ * 构建轮灌组对象
+ */
+function buildWateringGroup(policy, policy_runtime) {
+    return {
+        name: policy.name,
+        area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
+        method: getWaterGroupVariable(policy.watering_group_matrix, 'method', policy_runtime),
+        fert_rate: getWaterGroupVariable(policy.watering_group_matrix, 'fert_rate', policy_runtime),
+        total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
+        total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
+        minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
+        valves: getValvesValue(policy.watering_group_matrix, policy_runtime),
+        cur_state: policy_runtime ? policy_runtime.current_state : '未知',
+    };
+}
+
+/**
+ * 删除所有现有的轮灌组策略
+ */
+async function deleteExistingWateringGroupPolicies(token) {
+    const toDelete = policy_array
+        .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
+        .map(p => p.name);
+    
+    for (const name of toDelete) {
+        try {
+            await policy_lib.del_policy(name, token);
+        } catch (e) {
+            // 兜底处理，避免残留
+            const removed = findAndRemoveByName(policy_array, name);
+            if (removed) {
+                policy_runtime_states.delete(name);
+            }
+        }
+    }
+}
+
+/**
+ * 计算施肥率
+ */
+function calculateFertRate(group) {
+    if (group.method === 'AreaBased') {
+        return Number(group.AB_fert || 0);
+    }
+    if (group.method === 'Total') {
+        return group.area > 0 ? Number((Number(group.total_fert || 0) / Number(group.area)).toFixed(2)) : 0;
+    }
+    if (group.method === 'Time') {
+        return group.fert_time > 0 ? Number((Number(group.area) / Number(group.fert_time)).toFixed(1)) : 0;
+    }
+    return 0;
+}
+
+/**
+ * 初始化轮灌组策略的变量
+ */
+async function initializeWateringGroupVariables(group, fert_rate, token) {
+    const methodMap = {
+        AreaBased: '亩定量',
+        Total: '总定量',
+        Time: '定时'
+    };
+    
+    const valvesExpr = (group.valves || []).map(v => `"${v}"`).join(' ');
+    const preMs = Math.max(0, Number(group.pre_fert_time || 0)) * 3600000;
+    const fertMs = Math.max(0, Number(group.fert_time || 0)) * 3600000;
+    const postMs = Math.max(0, Number(group.post_fert_time || 0)) * 3600000;
+    
+    await policy_lib.init_assignment(group.name, 'area', String(group.area), true, token);
+    await policy_lib.init_assignment(group.name, 'method', `"${methodMap[group.method] || group.method}"`, false, token);
+    await policy_lib.init_assignment(group.name, 'fert_rate', String(fert_rate), true, token);
+    await policy_lib.init_assignment(group.name, 'fert_time', String(group.fert_time), true, token);
+    await policy_lib.init_assignment(group.name, 'total_water', '0', true, token);
+    await policy_lib.init_assignment(group.name, 'total_fert', '0', true, token);
+    await policy_lib.init_assignment(group.name, 'minute_left', '0', true, token);
+    await policy_lib.init_assignment(group.name, 'valves', valvesExpr || '""', true, token);
+    await policy_lib.init_assignment(group.name, 'pre_ms', String(preMs), true, token);
+    await policy_lib.init_assignment(group.name, 'fert_ms', String(fertMs), true, token);
+    await policy_lib.init_assignment(group.name, 'post_ms', String(postMs), true, token);
+    
+    return { preMs, fertMs, postMs };
+}
+
+/**
+ * 设置轮灌组矩阵
+ */
+async function setWateringGroupMatrix(policy, token) {
+    const matrix = [
+        { key_name: 'area', value_name: 'area' },
+        { key_name: 'method', value_name: 'method' },
+        { key_name: 'fert_rate', value_name: 'fert_rate' },
+        { key_name: 'total_water', value_name: 'total_water' },
+        { key_name: 'total_fert', value_name: 'total_fert' },
+        { key_name: 'minute_left', value_name: 'minute_left' },
+        { key_name: 'valves', value_name: 'valves' },
+    ];
+    try {
+        await policy_lib.set_watering_group_matrix(policy.name, matrix, token);
+    } catch (e) {
+        policy.watering_group_matrix = matrix;
+    }
+}
+
+/**
+ * 绑定策略到农场
+ */
+async function bindPolicyToFarm(policy, farm_name, token) {
+    if (!farm_name) return;
+    
+    try {
+        await policy_lib.match_policy_farm(policy.name, farm_name, token);
+    } catch (e) {
+        policy.farm_name = farm_name;
+    }
+}
+
+/**
+ * 生成轮灌组策略模板
+ */
+function generateWateringGroupTemplate(group, preMs, fertMs, postMs, farm_name) {
+    const farmLine = farm_name ? `\n                        match farm '${farm_name}'` : '';
+    const closeActions = (group.valves || []).map(v => `\n                        enter action '${v}' 'close'`).join('');
+    const openActions = (group.valves || []).map(v => `\n                        enter action '${v}' 'open'`).join('');
+    
+    return `policy
+                        policy '${group.name}'
+                        init assignment 'false' 'pre_ms' '${preMs}'
+                        init assignment 'false' 'post_ms' '${postMs}'
+                        init assignment 'false' '启动开关' 'false'
+                        init assignment 'false' '需要跳过' 'false'
+                        source 'flow_cumulative' '主管道流量计' 'total_readout'
+                        state '空闲'${closeActions}
+                        exit assignment 'false' '主管道流量累计值' 'await prs.getSource("flow_cumulative")'
+                        transformer 'next'
+                            rule 'false' '肥前' 'prs.variables.get("启动开关") == true'
+                        return
+                        return
+                        state '肥前'${openActions}
+                        enter crossAssignment 'false' '主策略' '${group.name}已启动' 'true'
+                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
+                        enter assignment 'false' 'enter_time' 'Date.now()'
+                        transformer 'timeup'
+                            rule 'false' '施肥' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("pre_ms")'
+                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
+                        return
+                        return
+                        state '施肥'
+                        enter crossAssignment 'false' '施肥策略' '启动开关' 'true'
+                        enter assignment 'false' 'enter_time' 'Date.now()'
+                        exit crossAssignment 'false' '施肥策略' '启动开关' 'false'
+                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
+                        do assignment 'false' 'tf' 'prs.variables.get("fr")*((Date.now() - prs.variables.get("enter_time"))/1000)'
+                        transformer 'timeup'
+                            rule 'false' '肥后' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("fert_ms")'
+                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
+                            statistic '肥后' '${group.name}累计施肥量' 'prs.variables.get("tf")'
+                            statistic '收尾' '${group.name}累计施肥量' 'prs.variables.get("tf")'
+                        return
+                        return
+                        state '肥后'
+                        exit action '主管道流量计' 'readout'
+                        enter assignment 'false' 'enter_time' 'Date.now()'
+                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
+                        transformer 'timeup'
+                            rule 'false' '收尾' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("post_ms")'
+                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
+                            statistic '收尾' '${group.name}累计供水量' 'tw'
+                        return
+                        return
+                        state '收尾'
+                        enter crossAssignment 'false' '主策略' '${group.name}已启动' 'false'
+                        transformer 'next'
+                            rule 'false' '空闲' 'prs.variables.get("启动开关") == false'
+                        return
+                        return
+                        init state '空闲'${farmLine}
+                    return`;
+}
+
+/**
+ * 创建并初始化单个轮灌组策略
+ */
+async function createWateringGroupPolicy(group, farm_name, token) {
+    // 创建策略
+    await policy_lib.add_policy(group.name, token);
+    const policy = validatePolicyExists(group.name);
+    
+    // 计算施肥率
+    const fert_rate = calculateFertRate(group);
+    
+    // 初始化变量
+    const { preMs, fertMs, postMs } = await initializeWateringGroupVariables(group, fert_rate, token);
+    
+    // 设置轮灌组矩阵
+    await setWateringGroupMatrix(policy, token);
+    
+    // 绑定农场
+    await bindPolicyToFarm(policy, farm_name, token);
+    
+    // 生成并应用模板
+    const templateSm = generateWateringGroupTemplate(group, preMs, fertMs, postMs, farm_name);
+    policy.template_sm = templateSm;
+    try {
+        await applyTemplateSm(templateSm);
+    } catch (e) {
+        // 忽略模板应用错误，继续执行
+    }
+    
+    // 初始化运行时状态
+    try {
+        await processPolicyExecution(policy);
+    } catch (e) {
+        console.error(`初始化策略 ${group.name} 运行时状态失败:`, e);
+    }
+}
+
 export default {
     name: 'policy',
     description: '策略管理',
@@ -1419,50 +1672,21 @@ export default {
                 }
             },
             func: async function (body, token) {
-                let groups = [];
-                for (let policy of policy_array) {
-                    if (policy.watering_group_matrix) {
-                        let policy_runtime = policy_runtime_states.get(policy.name);
-                        let valves_value = getWaterGroupVariable(policy.watering_group_matrix, 'valves', policy_runtime);
-                        
-                        // 如果没有 valves 键，尝试使用 water_valve 和 fert_valve 合并
-                        if (!valves_value || valves_value === '-') {
-                            const water_valve = getWaterGroupVariable(policy.watering_group_matrix, 'water_valve', policy_runtime);
-                            const fert_valve = getWaterGroupVariable(policy.watering_group_matrix, 'fert_valve', policy_runtime);
-                            
-                            if (water_valve || fert_valve) {
-                                // 去除引号并合并，格式：water_valve|fert_valve
-                                const waterStr = water_valve ? String(water_valve).replace(/^"|"$/g, '') : '';
-                                const fertStr = fert_valve ? String(fert_valve).replace(/^"|"$/g, '') : '';
-                                
-                                if (waterStr && fertStr) {
-                                    valves_value = `${waterStr}|${fertStr}`;
-                                } else if (waterStr) {
-                                    valves_value = waterStr;
-                                } else if (fertStr) {
-                                    valves_value = fertStr;
-                                }
-                            }
-                        }
-                        
-                        groups.push({
-                            name: policy.name,
-                            area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
-                            method: getWaterGroupVariable(policy.watering_group_matrix, 'method', policy_runtime),
-                            fert_rate: getWaterGroupVariable(policy.watering_group_matrix, 'fert_rate', policy_runtime),
-                            total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
-                            total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
-                            minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
-                            valves: valves_value || '-',
-                            cur_state: policy_runtime ? policy_runtime.current_state : '未知',
-                        });
-                    }
-                }
-                let ret = {
-                    groups: groups.slice(body.pageNo * 20, (body.pageNo + 1) * 20),
+                const groups = policy_array
+                    .filter(policy => policy.watering_group_matrix)
+                    .map(policy => {
+                        const policy_runtime = policy_runtime_states.get(policy.name);
+                        return buildWateringGroup(policy, policy_runtime);
+                    });
+                
+                const pageSize = 20;
+                const startIndex = body.pageNo * pageSize;
+                const endIndex = startIndex + pageSize;
+                
+                return {
+                    groups: groups.slice(startIndex, endIndex),
                     total: groups.length,
-                }
-                return ret;
+                };
             },
         },
         apply_wizard_groups: {
@@ -1492,154 +1716,15 @@ export default {
                 result: { type: Boolean, mean: '是否成功', example: true }
             },
             func: async function (body, token) {
-                // 1) 删除既有的“轮灌组策略”（约定：含有 watering_group_matrix 定义的策略）
-                const toDelete = [];
-                for (const p of policy_array) {
-                    if (p.watering_group_matrix && p.watering_group_matrix.length > 0) {
-                        toDelete.push(p.name);
-                    }
+                // 删除既有的轮灌组策略
+                await deleteExistingWateringGroupPolicies(token);
+                
+                // 创建并初始化新的轮灌组策略
+                const groups = body.groups || [];
+                for (const group of groups) {
+                    await createWateringGroupPolicy(group, body.farm_name, token);
                 }
-                for (const name of toDelete) {
-                    try {
-                        await policy_lib.del_policy(name, token);
-                    } catch (e) {
-                        // 兜底处理，避免残留
-                        const removed = findAndRemoveByName(policy_array, name);
-                        if (removed) {
-                            policy_runtime_states.delete(name);
-                        }
-                    }
-                }
-
-                // 2) 创建并初始化新的策略
-                const methodMap = {
-                    AreaBased: '亩定量',
-                    Total: '总定量',
-                    Time: '定时'
-                };
-
-                for (const g of (body.groups || [])) {
-                    // 通过 lib 创建策略
-                    await policy_lib.add_policy(g.name, token);
-                    const policy = validatePolicyExists(g.name);
-
-                    
-
-                    // 计算施肥率 fert_rate
-                    let fert_rate = 0;
-                    if (g.method === 'AreaBased') {
-                        fert_rate = Number(g.AB_fert || 0);
-                    } else if (g.method === 'Total') {
-                        if (g.area > 0) fert_rate = Number((Number(g.total_fert || 0) / Number(g.area)).toFixed(2));
-                    } else if (g.method === 'Time') {
-                        if (g.fert_time > 0) fert_rate = Number((Number(g.area) / Number(g.fert_time)).toFixed(1));
-                    }
-
-                    // 拼接阀门名（以空格分隔的字符串数组字面量）: "v1" "v2"
-                    const valvesExpr = (g.valves || []).map(v => `"${v}"`).join(' ');
-
-					// 初始化变量（通过 lib 设置）
-					await policy_lib.init_assignment(g.name, 'area', String(g.area), true, token);
-					await policy_lib.init_assignment(g.name, 'method', `"${methodMap[g.method] || g.method}"`, false, token);
-                    await policy_lib.init_assignment(g.name, 'fert_rate', String(fert_rate), true, token);
-                    await policy_lib.init_assignment(g.name, 'fert_time', String(g.fert_time), true, token);
-					await policy_lib.init_assignment(g.name, 'total_water', '0', true, token);
-					await policy_lib.init_assignment(g.name, 'total_fert', '0', true, token);
-					await policy_lib.init_assignment(g.name, 'minute_left', '0', true, token);
-					await policy_lib.init_assignment(g.name, 'valves', valvesExpr || '""', true, token);
-                    const preMs = Math.max(0, Number(g.pre_fert_time || 0)) * 3600000;
-                    const fertMs = Math.max(0, Number(g.fert_time || 0)) * 3600000;
-                    const postMs = Math.max(0, Number(g.post_fert_time || 0)) * 3600000;
-					await policy_lib.init_assignment(g.name, 'pre_ms', String(preMs), true, token);
-					await policy_lib.init_assignment(g.name, 'fert_ms', String(fertMs), true, token);
-					await policy_lib.init_assignment(g.name, 'post_ms', String(postMs), true, token);
-
-                    // 定义轮灌组矩阵：运行时变量与展示字段的映射（通过 lib 设置）
-                    const matrix = [
-                        { key_name: 'area', value_name: 'area' },
-                        { key_name: 'method', value_name: 'method' },
-                        { key_name: 'fert_rate', value_name: 'fert_rate' },
-                        { key_name: 'total_water', value_name: 'total_water' },
-                        { key_name: 'total_fert', value_name: 'total_fert' },
-                        { key_name: 'minute_left', value_name: 'minute_left' },
-                        { key_name: 'valves', value_name: 'valves' },
-                    ];  
-                    try { await policy_lib.set_watering_group_matrix(g.name, matrix, token); } catch (e) { policy.watering_group_matrix = matrix; }
-
-                    // 绑定默认农场（如果传入）
-                    if (body.farm_name) {
-                        try { await policy_lib.match_policy_farm(g.name, body.farm_name, token); } catch (e) { policy.farm_name = body.farm_name; }
-                    }
-                    const farmLine = body.farm_name ? `\n                        match farm '${body.farm_name}'` : '';
-                    const closeActions = (g.valves || []).map(v => `\n                        enter action '${v}' 'close'`).join('');
-                    const openActions = (g.valves || []).map(v => `\n                        enter action '${v}' 'open'`).join('');
- 					const templateSm = `policy
-                        policy '${g.name}'
-                        init assignment 'false' 'pre_ms' '${preMs}'
-                        init assignment 'false' 'post_ms' '${postMs}'
-                        init assignment 'false' '启动开关' 'false'
-                        init assignment 'false' '需要跳过' 'false'
-                        source 'flow_cumulative' '主管道流量计' 'total_readout'
-                        state '空闲'${closeActions}
-                        exit assignment 'false' '主管道流量累计值' 'await prs.getSource("flow_cumulative")'
-                        transformer 'next'
-                            rule 'false' '肥前' 'prs.variables.get("启动开关") == true'
-                        return
-                        return
-                        state '肥前'${openActions}
-                        enter crossAssignment 'false' '主策略' '${g.name}已启动' 'true'
-                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
-                        enter assignment 'false' 'enter_time' 'Date.now()'
-                        transformer 'timeup'
-                            rule 'false' '施肥' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("pre_ms")'
-                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
-                        return
-                        return
-                        state '施肥'
-                        enter crossAssignment 'false' '施肥策略' '启动开关' 'true'
-                        enter assignment 'false' 'enter_time' 'Date.now()'
-                        exit crossAssignment 'false' '施肥策略' '启动开关' 'false'
-                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
-                        do assignment 'false' 'tf' 'prs.variables.get("fr")*((Date.now() - prs.variables.get("enter_time"))/1000)'
-                        transformer 'timeup'
-                            rule 'false' '肥后' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("fert_ms")'
-                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
-                            statistic '肥后' '${g.name}累计施肥量' 'prs.variables.get("tf")'
-                            statistic '收尾' '${g.name}累计施肥量' 'prs.variables.get("tf")'
-                        return
-                        return
-                        state '肥后'
-                        exit action '主管道流量计' 'readout'
-                        enter assignment 'false' 'enter_time' 'Date.now()'
-                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
-                        transformer 'timeup'
-                            rule 'false' '收尾' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("post_ms")'
-                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
-                            statistic '收尾' '${g.name}累计供水量' 'tw'
-                        return
-                        return
-                        state '收尾'
-                        enter crossAssignment 'false' '主策略' '${g.name}已启动' 'false'
-                        transformer 'next'
-                            rule 'false' '空闲' 'prs.variables.get("启动开关") == false'
-                        return
-                        return
-                        init state '空闲'${farmLine}
-                    return`;
-					// 将模板保存到策略对象，供后续下发/解析
-					policy.template_sm = templateSm;
-					// 逐行执行模板命令以落地配置
-					try { await applyTemplateSm(templateSm); } catch (e) {}
-                    
-                    // 手动触发一次策略执行以初始化运行时状态
-                    try {
-                        await processPolicyExecution(policy);
-                    } catch (e) {
-                        console.error(`初始化策略 ${g.name} 运行时状态失败:`, e);
-                    }
-                }
-
-                // 3) 
+                
                 return { result: true };
             }
         },
