@@ -1414,8 +1414,7 @@ export default {
                         total_fert: { type: Number, mean: '轮灌组总施肥量(L)', example: 50 },
                         minute_left: { type: Number, mean: '轮灌组剩余分钟数', example: 30 },
                         cur_state: { type: String, mean: '轮灌组当前状态', example: '灌溉中' },
-                        water_valve: { type: String, mean: '水阀设备名称', example: '水阀1' },
-                        fert_valve: { type: String, mean: '肥阀设备名称', example: '肥阀1' },
+                        valves: { type: String, mean: '阀门设备名称（多个阀门用空格分隔的引号字符串）', example: '"阀门1" "阀门2"' },
                     }
                 }
             },
@@ -1424,6 +1423,7 @@ export default {
                 for (let policy of policy_array) {
                     if (policy.watering_group_matrix) {
                         let policy_runtime = policy_runtime_states.get(policy.name);
+                        const valves_value = getWaterGroupVariable(policy.watering_group_matrix, 'valves', policy_runtime);
                         groups.push({
                             name: policy.name,
                             area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
@@ -1432,8 +1432,7 @@ export default {
                             total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
                             total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
                             minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
-                            water_valve: getWaterGroupVariable(policy.watering_group_matrix, 'water_valve', policy_runtime),
-                            fert_valve: getWaterGroupVariable(policy.watering_group_matrix, 'fert_valve', policy_runtime),
+                            valves: valves_value,
                             cur_state: policy_runtime ? policy_runtime.current_state : '未知',
                         });
                     }
@@ -1515,8 +1514,8 @@ export default {
                         if (g.fert_time > 0) fert_rate = Number((Number(g.area) / Number(g.fert_time)).toFixed(1));
                     }
 
-                    // 拼接水阀名（以空格分隔的字符串数组字面量）: "v1" "v2"
-                    const wvExpr = (g.valves || []).map(v => `"${v}"`).join(' ');
+                    // 拼接阀门名（以空格分隔的字符串数组字面量）: "v1" "v2"
+                    const valvesExpr = (g.valves || []).map(v => `"${v}"`).join(' ');
 
 					// 初始化变量（通过 lib 设置）
 					await policy_lib.init_assignment(g.name, 'area', String(g.area), true, token);
@@ -1526,10 +1525,7 @@ export default {
 					await policy_lib.init_assignment(g.name, 'total_water', '0', true, token);
 					await policy_lib.init_assignment(g.name, 'total_fert', '0', true, token);
 					await policy_lib.init_assignment(g.name, 'minute_left', '0', true, token);
-					await policy_lib.init_assignment(g.name, 'water_valve', wvExpr || '""', false, token);
-					await policy_lib.init_assignment(g.name, 'fert_valve', '""', false, token);
-
-                    // 时长配置（小时->毫秒），用于模板状态机（通过 lib 设置）
+					await policy_lib.init_assignment(g.name, 'valves', valvesExpr || '""', true, token);
                     const preMs = Math.max(0, Number(g.pre_fert_time || 0)) * 3600000;
                     const fertMs = Math.max(0, Number(g.fert_time || 0)) * 3600000;
                     const postMs = Math.max(0, Number(g.post_fert_time || 0)) * 3600000;
@@ -1545,8 +1541,7 @@ export default {
                         { key_name: 'total_water', value_name: 'total_water' },
                         { key_name: 'total_fert', value_name: 'total_fert' },
                         { key_name: 'minute_left', value_name: 'minute_left' },
-                        { key_name: 'water_valve', value_name: 'water_valve' },
-                        { key_name: 'fert_valve', value_name: 'fert_valve' },
+                        { key_name: 'valves', value_name: 'valves' },
                     ];  
                     try { await policy_lib.set_watering_group_matrix(g.name, matrix, token); } catch (e) { policy.watering_group_matrix = matrix; }
 
@@ -1778,8 +1773,18 @@ async function processPolicyExecution(policy) {
                         if (!isNaN(numericValue)) {
                             value = numericValue;
                         } else {
-                            // 如果不是数字，尝试作为字符串处理
-                            value = initVar.expression;
+                            // 如果不是数字，检查是否是多个引号字符串（如 "v1" "v2"）
+                            // 如果是多个引号字符串，保留原始格式（用于 valves 等）
+                            if (initVar.expression.includes('"') && initVar.expression.split('"').length > 3) {
+                                // 多个引号字符串，保留原始格式
+                                value = initVar.expression;
+                            } else if (initVar.expression.startsWith('"') && initVar.expression.endsWith('"')) {
+                                // 单个引号字符串，移除引号
+                                value = initVar.expression.slice(1, -1);
+                            } else {
+                                // 普通字符串，直接使用
+                                value = initVar.expression;
+                            }
                         }
                     } else {
                         // 如果是动态表达式，使用表达式求值器

@@ -59,7 +59,8 @@ export default {
             let result = await policy_lib.list_watering_groups(pageNo);
             let lines = result.groups;
             for (let line of lines) {
-                cmd_this.log(`${line.name}|${line.area}|${line.method}|${line.fert_rate}|${line.total_water}|${line.total_fert}|${line.minute_left}|${line.water_valve}|${line.fert_valve}|${line.cur_state}`);
+                const valvesStr = (line.valves && line.valves !== '-') ? line.valves : '-';
+                cmd_this.log(`${line.name}|${line.area}|${line.method}|${line.fert_rate}|${line.total_water}|${line.total_fert}|${line.minute_left}|${valvesStr}|${line.cur_state}`);
             }
             return lines.length;
         });
