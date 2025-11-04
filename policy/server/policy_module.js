@@ -1423,7 +1423,28 @@ export default {
                 for (let policy of policy_array) {
                     if (policy.watering_group_matrix) {
                         let policy_runtime = policy_runtime_states.get(policy.name);
-                        const valves_value = getWaterGroupVariable(policy.watering_group_matrix, 'valves', policy_runtime);
+                        let valves_value = getWaterGroupVariable(policy.watering_group_matrix, 'valves', policy_runtime);
+                        
+                        // 如果没有 valves 键，尝试使用 water_valve 和 fert_valve 合并
+                        if (!valves_value || valves_value === '-') {
+                            const water_valve = getWaterGroupVariable(policy.watering_group_matrix, 'water_valve', policy_runtime);
+                            const fert_valve = getWaterGroupVariable(policy.watering_group_matrix, 'fert_valve', policy_runtime);
+                            
+                            if (water_valve || fert_valve) {
+                                // 去除引号并合并，格式：water_valve|fert_valve
+                                const waterStr = water_valve ? String(water_valve).replace(/^"|"$/g, '') : '';
+                                const fertStr = fert_valve ? String(fert_valve).replace(/^"|"$/g, '') : '';
+                                
+                                if (waterStr && fertStr) {
+                                    valves_value = `${waterStr}|${fertStr}`;
+                                } else if (waterStr) {
+                                    valves_value = waterStr;
+                                } else if (fertStr) {
+                                    valves_value = fertStr;
+                                }
+                            }
+                        }
+                        
                         groups.push({
                             name: policy.name,
                             area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
@@ -1432,7 +1453,7 @@ export default {
                             total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
                             total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
                             minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
-                            valves: valves_value,
+                            valves: valves_value || '-',
                             cur_state: policy_runtime ? policy_runtime.current_state : '未知',
                         });
                     }
