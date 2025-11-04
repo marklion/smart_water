@@ -1610,6 +1610,12 @@ export default {
 					// 逐行执行模板命令以落地配置
 					try { await applyTemplateSm(templateSm); } catch (e) {}
                     
+                    // 手动触发一次策略执行以初始化运行时状态
+                    try {
+                        await processPolicyExecution(policy);
+                    } catch (e) {
+                        console.error(`初始化策略 ${g.name} 运行时状态失败:`, e);
+                    }
                 }
 
                 // 3) 
@@ -1775,7 +1781,10 @@ async function processPolicyExecution(policy) {
                         } else {
                             // 如果不是数字，检查是否是多个引号字符串（如 "v1" "v2"）
                             // 如果是多个引号字符串，保留原始格式（用于 valves 等）
-                            if (initVar.expression.includes('"') && initVar.expression.split('"').length > 3) {
+                            if (initVar.variable_name === 'valves') {
+                                // valves 变量始终保留原始格式（带引号）
+                                value = initVar.expression;
+                            } else if (initVar.expression.includes('"') && initVar.expression.split('"').length > 3) {
                                 // 多个引号字符串，保留原始格式
                                 value = initVar.expression;
                             } else if (initVar.expression.startsWith('"') && initVar.expression.endsWith('"')) {
