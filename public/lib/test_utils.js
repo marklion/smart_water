@@ -128,7 +128,7 @@ export default async function create_cli(processName) {
         let wait_gap = 10;
         if (cmd === 'clear' || cmd.startsWith('restore'))
         {
-            wait_gap = 2000;
+            wait_gap = 500;
         }
         let resp = await waitForPrompt(prompt, wait_gap);
         print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
