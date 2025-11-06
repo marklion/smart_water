@@ -59,7 +59,23 @@ export default {
             let result = await policy_lib.list_watering_groups(pageNo);
             let lines = result.groups;
             for (let line of lines) {
-                cmd_this.log(`${line.name}|${line.area}|${line.method}|${line.fert_rate}|${line.total_water}|${line.total_fert}|${line.minute_left}|${line.water_valve}|${line.fert_valve}|${line.cur_state}`);
+                let valvesStr = '-';
+                if (line.valves && line.valves !== '-') {
+                    // 如果已经是 | 分隔的格式（来自 water_valve|fert_valve），直接使用
+                    if (line.valves.includes('|')) {
+                        valvesStr = line.valves;
+                    } else {
+                        // 如果是 "阀门1" "阀门2" 格式，转换为 阀门1|阀门2
+                        // 匹配所有引号内的字符串
+                        const matches = line.valves.match(/"([^"]+)"/g);
+                        if (matches) {
+                            valvesStr = matches.map(m => m.replace(/"/g, '')).join('|');
+                        } else {
+                            valvesStr = line.valves;
+                        }
+                    }
+                }
+                cmd_this.log(`${line.name}|${line.area}|${line.method}|${line.fert_rate}|${line.total_water}|${line.total_fert}|${line.minute_left}|${valvesStr}|${line.cur_state}`);
             }
             return lines.length;
         });

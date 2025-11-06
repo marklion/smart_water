@@ -26,8 +26,21 @@
                     </template>
                 </el-table-column>
 
-                <el-table-column prop="water_valve" label="水阀" width="120" align="left" show-overflow-tooltip />
-                <el-table-column prop="fert_valve" label="肥阀" width="120" align="left" show-overflow-tooltip />
+                <el-table-column prop="valves" label="阀门" width="240" align="left">
+                    <template #default="{ row }">
+                        <template v-if="row.valves && row.valves !== '-'">
+                            <el-tag
+                                v-for="(valve, idx) in parseValves(row.valves)"
+                                :key="idx"
+                                size="small"
+                                style="margin-right:4px; margin-bottom:2px;"
+                            >
+                                {{ valve }}
+                            </el-tag>
+                        </template>
+                        <span v-else>-</span>
+                    </template>
+                </el-table-column>
             </el-table>
         </div>
     </div>
@@ -85,6 +98,11 @@ const loadWateringGroups = async () => {
                 filteredGroups = policyFarmMatches
                     .filter(item => item.farmName === props.farmName)
                     .map(item => item.group)
+
+                // 若按农场过滤后为空，则回退展示全部轮灌组，避免列表空白
+                if (filteredGroups.length === 0) {
+                    filteredGroups = response.groups
+                }
             }
             
             irrigationGroups.value = filteredGroups.map(group => ({
@@ -96,8 +114,7 @@ const loadWateringGroups = async () => {
                 total_fert: group.total_fert ?? '-',
                 minute_left: group.minute_left ?? '-',
                 cur_state: group.cur_state || '未知',
-                water_valve: group.water_valve || '-',
-                fert_valve: group.fert_valve || '-'
+                valves: group.valves || '-'
             }))
         } else {
             irrigationGroups.value = []
@@ -138,6 +155,20 @@ const getStatusTagType = (status) => {
         default:
             return 'info'     // 灰色
     }
+}
+
+// 解析阀门字符串：将 "阀门1" "阀门2" 格式转换为数组
+const parseValves = (valveStr) => {
+    if (!valveStr || valveStr === '-' || typeof valveStr !== 'string') {
+        return []
+    }
+    // 匹配所有引号内的字符串
+    const matches = valveStr.match(/"([^"]+)"/g)
+    if (matches) {
+        return matches.map(m => m.slice(1, -1)) // 移除引号
+    }
+    // 如果没有引号，尝试按空格分割（兼容旧格式）
+    return valveStr.split(/\s+/).filter(v => v && v.trim())
 }
 
 // 监听农场参数变化

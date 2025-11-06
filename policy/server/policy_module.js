@@ -12,10 +12,12 @@ import {
 } from '../../public/server/common_utils.js';
 import warning_lib from '../../warning/lib/warning_lib.js';
 import evaluator from '../lib/ast_expression_evaluator.js';
+import policy_lib from '../lib/policy_lib.js';
 import deviceModule, { get_driver } from '../../device/server/device_management_module.js';
 import resource_lib from '../../resource/lib/resource_lib.js';
 import statistic_lib from '../../statistic/lib/statistic_lib.js';
-
+import cli_runtime from '../../public/cli/cli_runtime_lib.js';
+let default_config_file = 'sw_cli_config.txt';
 const policy_array = []
 
 // 辅助函数：获取传感器数据
@@ -77,10 +79,25 @@ function validateTransformerExists(state, transformer_name) {
     return validateNestedItemExists(state, 'transformers', transformer_name, '转换器');
 }
 
-
-// 设备操作接口 - 直接使用已导入的模块
-async function getDriverFunction() {
-    return get_driver;
+// 解析并按顺序执行策略模板（templateSm）中的命令
+async function applyTemplateSm(templateSm) {
+    if (!templateSm || typeof templateSm !== 'string') return;
+    const lines = templateSm.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    let vp = null;
+    for (const line of lines) {
+        try {
+            console.log(line);
+            vp = await cli_runtime.do_config(vp, line);
+        } catch (e) {
+            console.log(e);
+        }
+    }
+    try {
+        await cli_runtime.save_config(default_config_file);
+    } catch (e) {
+        console.log('save_config failed:', e);
+    }
+    return vp;
 }
 
 // 验证设备存在性和动作能力
@@ -183,6 +200,259 @@ function getWaterGroupVariable(matrix, key_name, runtime_state) {
     }
 
     return ret;
+}
+
+/**
+ * 获取阀门值，如果不存在 valves 键，则从 water_valve 和 fert_valve 合并
+ */
+function getValvesValue(matrix, policy_runtime) {
+    let valves_value = getWaterGroupVariable(matrix, 'valves', policy_runtime);
+    
+    // 如果已经有 valves 值且不为空，直接返回
+    if (valves_value && valves_value !== '-') {
+        return valves_value;
+    }
+    
+    // 尝试从 water_valve 和 fert_valve 合并
+    const water_valve = getWaterGroupVariable(matrix, 'water_valve', policy_runtime);
+    const fert_valve = getWaterGroupVariable(matrix, 'fert_valve', policy_runtime);
+    
+    if (!water_valve && !fert_valve) {
+        return valves_value || '-';
+    }
+    
+    // 去除引号并合并
+    const waterStr = water_valve ? String(water_valve).replaceAll('"', '') : '';
+    const fertStr = fert_valve ? String(fert_valve).replaceAll('"', '') : '';
+    
+    if (waterStr && fertStr) {
+        return `${waterStr}|${fertStr}`;
+    }
+    if (waterStr) {
+        return waterStr;
+    }
+    if (fertStr) {
+        return fertStr;
+    }
+    
+    return '-';
+}
+
+/**
+ * 构建轮灌组对象
+ */
+function buildWateringGroup(policy, policy_runtime) {
+    return {
+        name: policy.name,
+        area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
+        method: getWaterGroupVariable(policy.watering_group_matrix, 'method', policy_runtime),
+        fert_rate: getWaterGroupVariable(policy.watering_group_matrix, 'fert_rate', policy_runtime),
+        total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
+        total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
+        minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
+        valves: getValvesValue(policy.watering_group_matrix, policy_runtime),
+        cur_state: policy_runtime ? policy_runtime.current_state : '未知',
+    };
+}
+
+/**
+ * 删除所有现有的轮灌组策略
+ */
+async function deleteExistingWateringGroupPolicies(token) {
+    const toDelete = policy_array
+        .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
+        .map(p => p.name);
+    
+    for (const name of toDelete) {
+        try {
+            await policy_lib.del_policy(name, token);
+        } catch (e) {
+            // 兜底处理，避免残留
+            const removed = findAndRemoveByName(policy_array, name);
+            if (removed) {
+                policy_runtime_states.delete(name);
+            }
+        }
+    }
+}
+
+/**
+ * 计算施肥率
+ */
+function calculateFertRate(group) {
+    if (group.method === 'AreaBased') {
+        return Number(group.AB_fert || 0);
+    }
+    if (group.method === 'Total') {
+        return group.area > 0 ? Number((Number(group.total_fert || 0) / Number(group.area)).toFixed(2)) : 0;
+    }
+    if (group.method === 'Time') {
+        return group.fert_time > 0 ? Number((Number(group.area) / Number(group.fert_time)).toFixed(1)) : 0;
+    }
+    return 0;
+}
+
+/**
+ * 初始化轮灌组策略的变量
+ */
+async function initializeWateringGroupVariables(group, fert_rate, token) {
+    const methodMap = {
+        AreaBased: '亩定量',
+        Total: '总定量',
+        Time: '定时'
+    };
+    
+    const valvesExpr = (group.valves || []).map(v => `"${v}"`).join(' ');
+    const preMs = Math.max(0, Number(group.pre_fert_time || 0)) * 3600000;
+    const fertMs = Math.max(0, Number(group.fert_time || 0)) * 3600000;
+    const postMs = Math.max(0, Number(group.post_fert_time || 0)) * 3600000;
+    
+    await policy_lib.init_assignment(group.name, 'area', String(group.area), true, token);
+    await policy_lib.init_assignment(group.name, 'method', `"${methodMap[group.method] || group.method}"`, false, token);
+    await policy_lib.init_assignment(group.name, 'fert_rate', String(fert_rate), true, token);
+    await policy_lib.init_assignment(group.name, 'fert_time', String(group.fert_time), true, token);
+    await policy_lib.init_assignment(group.name, 'total_water', '0', true, token);
+    await policy_lib.init_assignment(group.name, 'total_fert', '0', true, token);
+    await policy_lib.init_assignment(group.name, 'minute_left', '0', true, token);
+    await policy_lib.init_assignment(group.name, 'valves', valvesExpr || '""', true, token);
+    await policy_lib.init_assignment(group.name, 'pre_ms', String(preMs), true, token);
+    await policy_lib.init_assignment(group.name, 'fert_ms', String(fertMs), true, token);
+    await policy_lib.init_assignment(group.name, 'post_ms', String(postMs), true, token);
+    
+    return { preMs, fertMs, postMs };
+}
+
+/**
+ * 设置轮灌组矩阵
+ */
+async function setWateringGroupMatrix(policy, token) {
+    const matrix = [
+        { key_name: 'area', value_name: 'area' },
+        { key_name: 'method', value_name: 'method' },
+        { key_name: 'fert_rate', value_name: 'fert_rate' },
+        { key_name: 'total_water', value_name: 'total_water' },
+        { key_name: 'total_fert', value_name: 'total_fert' },
+        { key_name: 'minute_left', value_name: 'minute_left' },
+        { key_name: 'valves', value_name: 'valves' },
+    ];
+    try {
+        await policy_lib.set_watering_group_matrix(policy.name, matrix, token);
+    } catch (e) {
+        policy.watering_group_matrix = matrix;
+    }
+}
+
+/**
+ * 绑定策略到农场
+ */
+async function bindPolicyToFarm(policy, farm_name, token) {
+    if (!farm_name) return;
+    
+    try {
+        await policy_lib.match_policy_farm(policy.name, farm_name, token);
+    } catch (e) {
+        policy.farm_name = farm_name;
+    }
+}
+
+/**
+ * 生成轮灌组策略模板
+ */
+function generateWateringGroupTemplate(group, preMs, fertMs, postMs, farm_name) {
+    const farmLine = farm_name ? `\n                        match farm '${farm_name}'` : '';
+    const closeActions = (group.valves || []).map(v => `\n                        enter action '${v}' 'close'`).join('');
+    const openActions = (group.valves || []).map(v => `\n                        enter action '${v}' 'open'`).join('');
+    
+    return `policy
+                        policy '${group.name}'
+                        init assignment 'false' 'pre_ms' '${preMs}'
+                        init assignment 'false' 'post_ms' '${postMs}'
+                        init assignment 'false' '启动开关' 'false'
+                        init assignment 'false' '需要跳过' 'false'
+                        source 'flow_cumulative' '主管道流量计' 'total_readout'
+                        state '空闲'${closeActions}
+                        exit assignment 'false' '主管道流量累计值' 'await prs.getSource("flow_cumulative")'
+                        transformer 'next'
+                            rule 'false' '肥前' 'prs.variables.get("启动开关") == true'
+                        return
+                        return
+                        state '肥前'${openActions}
+                        enter crossAssignment 'false' '主策略' '${group.name}已启动' 'true'
+                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
+                        enter assignment 'false' 'enter_time' 'Date.now()'
+                        transformer 'timeup'
+                            rule 'false' '施肥' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("pre_ms")'
+                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
+                        return
+                        return
+                        state '施肥'
+                        enter crossAssignment 'false' '施肥策略' '启动开关' 'true'
+                        enter assignment 'false' 'enter_time' 'Date.now()'
+                        exit crossAssignment 'false' '施肥策略' '启动开关' 'false'
+                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
+                        do assignment 'false' 'tf' 'prs.variables.get("fr")*((Date.now() - prs.variables.get("enter_time"))/1000)'
+                        transformer 'timeup'
+                            rule 'false' '肥后' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("fert_ms")'
+                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
+                            statistic '肥后' '${group.name}累计施肥量' 'prs.variables.get("tf")'
+                            statistic '收尾' '${group.name}累计施肥量' 'prs.variables.get("tf")'
+                        return
+                        return
+                        state '肥后'
+                        exit action '主管道流量计' 'readout'
+                        enter assignment 'false' 'enter_time' 'Date.now()'
+                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
+                        transformer 'timeup'
+                            rule 'false' '收尾' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("post_ms")'
+                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
+                            statistic '收尾' '${group.name}累计供水量' 'tw'
+                        return
+                        return
+                        state '收尾'
+                        enter crossAssignment 'false' '主策略' '${group.name}已启动' 'false'
+                        transformer 'next'
+                            rule 'false' '空闲' 'prs.variables.get("启动开关") == false'
+                        return
+                        return
+                        init state '空闲'${farmLine}
+                    return`;
+}
+
+/**
+ * 创建并初始化单个轮灌组策略
+ */
+async function createWateringGroupPolicy(group, farm_name, token) {
+    // 创建策略
+    await policy_lib.add_policy(group.name, token);
+    const policy = validatePolicyExists(group.name);
+    
+    // 计算施肥率
+    const fert_rate = calculateFertRate(group);
+    
+    // 初始化变量
+    const { preMs, fertMs, postMs } = await initializeWateringGroupVariables(group, fert_rate, token);
+    
+    // 设置轮灌组矩阵
+    await setWateringGroupMatrix(policy, token);
+    
+    // 绑定农场
+    await bindPolicyToFarm(policy, farm_name, token);
+    
+    // 生成并应用模板
+    const templateSm = generateWateringGroupTemplate(group, preMs, fertMs, postMs, farm_name);
+    policy.template_sm = templateSm;
+    try {
+        await applyTemplateSm(templateSm);
+    } catch (e) {
+        // 忽略模板应用错误，继续执行
+    }
+    
+    // 初始化运行时状态
+    try {
+        await processPolicyExecution(policy);
+    } catch (e) {
+        console.error(`初始化策略 ${group.name} 运行时状态失败:`, e);
+    }
 }
 
 export default {
@@ -1397,36 +1667,66 @@ export default {
                         total_fert: { type: Number, mean: '轮灌组总施肥量(L)', example: 50 },
                         minute_left: { type: Number, mean: '轮灌组剩余分钟数', example: 30 },
                         cur_state: { type: String, mean: '轮灌组当前状态', example: '灌溉中' },
-                        water_valve: { type: String, mean: '水阀设备名称', example: '水阀1' },
-                        fert_valve: { type: String, mean: '肥阀设备名称', example: '肥阀1' },
+                        valves: { type: String, mean: '阀门设备名称（多个阀门用空格分隔的引号字符串）', example: '"阀门1" "阀门2"' },
                     }
                 }
             },
             func: async function (body, token) {
-                let groups = [];
-                for (let policy of policy_array) {
-                    if (policy.watering_group_matrix) {
-                        let policy_runtime = policy_runtime_states.get(policy.name);
-                        groups.push({
-                            name: policy.name,
-                            area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
-                            method: getWaterGroupVariable(policy.watering_group_matrix, 'method', policy_runtime),
-                            fert_rate: getWaterGroupVariable(policy.watering_group_matrix, 'fert_rate', policy_runtime),
-                            total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
-                            total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
-                            minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
-                            water_valve: getWaterGroupVariable(policy.watering_group_matrix, 'water_valve', policy_runtime),
-                            fert_valve: getWaterGroupVariable(policy.watering_group_matrix, 'fert_valve', policy_runtime),
-                            cur_state: policy_runtime ? policy_runtime.current_state : '未知',
-                        });
-                    }
-                }
-                let ret = {
-                    groups: groups.slice(body.pageNo * 20, (body.pageNo + 1) * 20),
+                const groups = policy_array
+                    .filter(policy => policy.watering_group_matrix)
+                    .map(policy => {
+                        const policy_runtime = policy_runtime_states.get(policy.name);
+                        return buildWateringGroup(policy, policy_runtime);
+                    });
+                
+                const pageSize = 20;
+                const startIndex = body.pageNo * pageSize;
+                const endIndex = startIndex + pageSize;
+                
+                return {
+                    groups: groups.slice(startIndex, endIndex),
                     total: groups.length,
-                }
-                return ret;
+                };
             },
+        },
+        apply_wizard_groups: {
+            name: '应用向导生成的轮灌组',
+            description: '删除既有轮灌组策略，按向导JSON创建并初始化策略',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                groups: {
+                    type: Array, mean: '轮灌组配置数组', have_to: true, explain: {
+                        name: { type: String, mean: '组名', example: 'l1', have_to: true },
+                        area: { type: Number, mean: '面积(亩)', example: 23, have_to: true },
+                        valves: { type: Array, mean: '阀门名称列表', example: ['v1','v2'], have_to: true, explain: {
+                            item: { type: String, mean: '阀门名称', example: 'v1' }
+                        } },
+                        method: { type: String, mean: '施肥方式 AreaBased/Total/Time', example: 'AreaBased', have_to: true },
+                        AB_fert: { type: Number, mean: '亩定量(L/亩)', example: 10, have_to: false },
+                        total_fert: { type: Number, mean: '总定量(L)', example: 500, have_to: false },
+                        fert_time: { type: Number, mean: '定时(小时)', example: 0.6, have_to: false },
+                        pre_fert_time: { type: Number, mean: '肥前时间(小时)', example: 0, have_to: false },
+                        post_fert_time: { type: Number, mean: '肥后时间(小时)', example: 0, have_to: false },
+                    }
+                },
+                farm_name: { type: String, mean: '默认绑定的农场名称', example: '科技农场', have_to: false }
+            },
+            result: {
+                result: { type: Boolean, mean: '是否成功', example: true }
+            },
+            func: async function (body, token) {
+                // 删除既有的轮灌组策略
+                await deleteExistingWateringGroupPolicies(token);
+                
+                // 创建并初始化新的轮灌组策略
+                const groups = body.groups || [];
+                for (const group of groups) {
+                    await createWateringGroupPolicy(group, body.farm_name, token);
+                }
+                
+                return { result: true };
+            }
         },
         match_policy_farm: {
             name: '匹配策略农场',
@@ -1553,8 +1853,7 @@ async function processPolicyExecution(policy) {
                     }
 
                     // 获取设备读数
-                    const getDriver = await getDriverFunction();
-                    const driver = await getDriver(source.device, 'readout');
+                    const driver = await get_driver(source.device, 'readout');
                     const readout = await driver.readout();
                     const deviceData = { readout };
 
@@ -1586,8 +1885,21 @@ async function processPolicyExecution(policy) {
                         if (!isNaN(numericValue)) {
                             value = numericValue;
                         } else {
-                            // 如果不是数字，尝试作为字符串处理
-                            value = initVar.expression;
+                            // 如果不是数字，检查是否是多个引号字符串（如 "v1" "v2"）
+                            // 如果是多个引号字符串，保留原始格式（用于 valves 等）
+                            if (initVar.variable_name === 'valves') {
+                                // valves 变量始终保留原始格式（带引号）
+                                value = initVar.expression;
+                            } else if (initVar.expression.includes('"') && initVar.expression.split('"').length > 3) {
+                                // 多个引号字符串，保留原始格式
+                                value = initVar.expression;
+                            } else if (initVar.expression.startsWith('"') && initVar.expression.endsWith('"')) {
+                                // 单个引号字符串，移除引号
+                                value = initVar.expression.slice(1, -1);
+                            } else {
+                                // 普通字符串，直接使用
+                                value = initVar.expression;
+                            }
                         }
                     } else {
                         // 如果是动态表达式，使用表达式求值器
@@ -1746,21 +2058,20 @@ async function performStateTransition(policy, fromState, toStateName, runtimeSta
 
 async function executeDeviceAction(device, action) {
     try {
-        const getDriver = await getDriverFunction();
         let result;
 
         if (action === 'open') {
-            const driver = await getDriver(device, 'open');
+            const driver = await get_driver(device, 'open');
             result = await driver.open();
         } else if (action === 'close') {
-            const driver = await getDriver(device, 'close');
+            const driver = await get_driver(device, 'close');
             result = await driver.close();
         } else if (action === 'readout') {
-            const driver = await getDriver(device, 'readout');
+            const driver = await get_driver(device, 'readout');
             const readout = await driver.readout();
             result = { readout };
         } else if (action === 'mock_readout') {
-            const driver = await getDriver(device, 'mock_readout');
+            const driver = await get_driver(device, 'mock_readout');
             result = await driver.mock_readout(1);
         } else {
             throw new Error(`未知的动作: ${action}`);
