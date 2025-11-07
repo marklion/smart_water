@@ -27,6 +27,7 @@ dist-ssr
 *.sw?
 sw_cli_config.txt
 tmp_config_for_restore.txt
+tmp_config.txt
 test_reports/
 public/server/web
 /*.log
