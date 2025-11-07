@@ -1,6 +1,5 @@
 import test_utils, { wait_ms } from "../../public/lib/test_utils.js";
 import { print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
-import moment from "moment";
 let cli;
 beforeAll(async () => {
     print_test_log('water group valve quick config test begin', true)
@@ -77,6 +76,14 @@ async function confirm_valve_status(wgv_name, expected_status) {
     await cli.run_cmd('return');
 }
 
+async function confirm_warning(expected_warning) {
+    await cli.run_cmd('warning');
+    let warnings_lines = (await cli.run_cmd('list warnings')).split('\n');
+    let focus_line = warnings_lines[0];
+    expect(focus_line).toContain(expected_warning);
+    await cli.run_cmd('return');
+}
+
 async function confirm_policy_status(wgv_name, expected_status) {
     await cli.run_cmd('policy');
     let policies_lines = (await cli.run_cmd(`list policy ${wgv_name}`)).split('\n');
@@ -109,6 +116,7 @@ describe('轮灌阀门快速配置和验证', () => {
         await confirm_policy_status('轮灌阀门1', '关阀')
         await wait_ms(1000);
         await confirm_policy_status('轮灌阀门1', '异常')
+        await confirm_warning('轮灌阀门1压力异常')
     });
     test('开阀状态下压力太小,手动恢复', async () => {
         await trigger_valve_open('轮灌阀门2');
