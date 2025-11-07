@@ -1,5 +1,11 @@
 import call_remote from '../../public/lib/call_remote.js';
+import { find_by_list } from '../../public/lib/call_remote.js';
 export default {
+    find_policy:async function(policy_name, token) {
+        return await find_by_list(async (pageNo, token)=>{
+            return (await this.list_policy(pageNo, null, token)).policies;
+        }, item=>item.name === policy_name, token);
+    },
     add_policy: async function (name, token) {
         return await call_remote('/policy/add_policy', { name }, token);
     },

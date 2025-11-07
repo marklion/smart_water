@@ -1,4 +1,7 @@
 import fetch from 'node-fetch';
+import device_management_lib from '../../device/lib/device_management_lib.js';
+import policy_lib from '../../policy/lib/policy_lib.js';
+import cli_runtime_lib from '../../public/cli/cli_runtime_lib.js';
 
 // 高德地图API配置
 const AMAP_CONFIG = {
@@ -28,16 +31,16 @@ async function getCityLocation(cityName) {
     try {
         const url = `${AMAP_CONFIG.geocodeUrl}?key=${AMAP_CONFIG.key}&address=${encodeURIComponent(cityName)}`;
         console.log(`正在查询城市坐标: ${cityName}`);
-        
+
         const response = await fetch(url);
         const data = await response.json();
-        
+
         if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
             const location = data.geocodes[0].location;
             const [lng, lat] = location.split(',').map(parseFloat);
-            
+
             console.log(`城市 ${cityName} 的坐标: 经度${lng}, 纬度${lat}`);
-            
+
             return {
                 lng,
                 lat,
@@ -95,20 +98,20 @@ export default {
             func: async function (body, token) {
                 try {
                     const { lng, lat } = body;
-                    
+
                     // 验证经纬度范围
                     if (typeof lng !== 'number' || typeof lat !== 'number') {
                         throw new Error('经纬度必须是数字类型');
                     }
-                    
+
                     if (lng < -180 || lng > 180) {
                         throw new Error('经度范围必须在-180到180之间');
                     }
-                    
+
                     if (lat < -90 || lat > 90) {
                         throw new Error('纬度范围必须在-90到90之间');
                     }
-                    
+
                     SYSTEM_CONFIG.map.defaultCenter = { lng, lat };
                     console.log(`地图默认中心点已设置为: 经度${lng}, 纬度${lat}`);
                     return { result: true };
@@ -148,11 +151,11 @@ export default {
             func: async function (body, token) {
                 try {
                     const { zoom } = body;
-                    
+
                     if (typeof zoom !== 'number' || zoom < 3 || zoom > 18) {
                         throw new Error('缩放级别必须是3-18之间的数字');
                     }
-                    
+
                     SYSTEM_CONFIG.map.defaultZoom = zoom;
                     console.log(`地图默认缩放级别已设置为: ${zoom}`);
                     return { result: true };
@@ -195,13 +198,13 @@ export default {
                 try {
                     const city = body.city;
                     const skipValidation = body.skip_validation || false;
-                    
+
                     if (!city || typeof city !== 'string' || city.trim() === '') {
                         throw new Error('城市名称不能为空');
                     }
-                    
+
                     let warning = '';
-                    
+
                     // 如果不跳过验证，尝试验证城市名是否可用
                     if (!skipValidation) {
                         try {
@@ -215,11 +218,11 @@ export default {
                             console.warn(warning);
                         }
                     }
-                    
+
                     SYSTEM_CONFIG.weather.defaultCity = city.trim();
                     console.log(`天气预报默认城市已设置为: ${SYSTEM_CONFIG.weather.defaultCity}`);
-                    
-                    return { 
+
+                    return {
                         result: true,
                         warning: warning
                     };
@@ -254,19 +257,19 @@ export default {
                     if (!city || typeof city !== 'string' || city.trim() === '') {
                         throw new Error('城市名称不能为空');
                     }
-                    
+
                     // 通过城市名获取经纬度
                     const location = await getCityLocation(city.trim());
-                    
+
                     // 设置地图中心点
                     SYSTEM_CONFIG.map.defaultCenter = {
                         lng: location.lng,
                         lat: location.lat
                     };
                     SYSTEM_CONFIG.map.defaultCityName = city.trim();
-                    
+
                     console.log(`地图默认中心点已设置为: ${city} (经度${location.lng}, 纬度${location.lat})`);
-                    
+
                     return {
                         result: true,
                         center: SYSTEM_CONFIG.map.defaultCenter,
@@ -293,7 +296,81 @@ export default {
                     throw { err_msg: error.message };
                 }
             }
-        }
+        },
+        add_water_group_valve: {
+            name: '快速配置添加轮灌阀门组',
+            description: '快速配置添加轮灌阀门组，包括阀门和相关策略',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                block_name: { type: String, mean: '地块名称', example: '地块1', have_to: true },
+                valve_name: { type: String, mean: '阀门名称', example: '轮灌阀门1', have_to: true },
+                driver_name: { type: String, mean: '阀门驱动名称', example: 'virtualDevice', have_to: true },
+                valve_config_key: { type: String, mean: '阀门配置关键字', example: 'all_device_log.log', have_to: true },
+                latitude: { type: Number, mean: '阀门纬度', example: 40.818311, have_to: true },
+                longitude: { type: Number, mean: '阀门经度', example: 111.670801, have_to: true },
+                open_pressure_low_limit: { type: Number, mean: '开启压力下限', example: 0.2, have_to: true },
+                close_pressure_high_limit: { type: Number, mean: '关闭压力上限', example: 0.5, have_to: true },
+                pressure_check_interval: { type: Number, mean: '压力检查间隔(秒)', example: 10, have_to: true },
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let found_device = await device_management_lib.find_device(body.valve_name, token);
+                if (found_device) {
+                    await device_management_lib.del_device(body.valve_name, token);
+                }
+                let found_policy = await policy_lib.find_policy(body.valve_name, token);
+                if (found_policy) {
+                    await policy_lib.del_policy(body.valve_name, token);
+                }
+                let config_string = `
+                    device
+                      add device '${body.valve_name}' '${body.driver_name}' '${body.valve_config_key}' '${body.longitude}' '${body.latitude}' '${body.farm_name}' '${body.block_name}'
+                    return
+                    policy
+                      policy '${body.valve_name}'
+                        init assignment 'false' '需要启动' 'false'
+                        init assignment 'false' '需要重置' 'false'
+                        init assignment 'false' '开阀压力下限' '${body.open_pressure_low_limit}'
+                        init assignment 'false' '关阀压力上限' '${body.close_pressure_high_limit}'
+                        init assignment 'false' '压力检查周期' '${body.pressure_check_interval * 1000}'
+                        source '瞬时压力' '${body.valve_name}' 'readout'
+                        state '关阀'
+                        enter action '${body.valve_name}' 'close'
+                        enter assignment 'false' '进入时间' 'Date.now()'
+                        transformer 'next'
+                            rule 'false' '异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("压力检查周期")) &&  await prs.getSource("瞬时压力") > prs.variables.get("关阀压力上限")'
+                            rule 'false' '开阀' 'prs.variables.get("需要启动") == true'
+                        return
+                        return
+                        state '开阀'
+                        enter action '${body.valve_name}' 'open'
+                        enter assignment 'false' '进入时间' 'Date.now()'
+                        transformer 'next'
+                            rule 'false' '异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("压力检查周期")) &&  await prs.getSource("瞬时压力") < prs.variables.get("开阀压力下限")'
+                            rule 'false' '开阀' 'prs.variables.get("需要启动") == false'
+                        return
+                        return
+                        state '异常'
+                        enter crossAssignment 'false' '"总策略"' '${body.valve_name}策略异常' 'true'
+                        exit assignment 'false' '需要启动' 'false'
+                        warning '\`${body.valve_name}压力异常:\${prs.getSource("瞬时压力")}, 当前设定为\${prs.variables.get("需要启动")?"开":"关"}\`'
+                        transformer 'next'
+                            rule 'false' '关阀' 'prs.variables.get("需要重置") == true'
+                        return
+                        return
+                        init state '关阀'
+                        match farm '${body.farm_name}'
+                    return
+                    return
+                `;
+                await cli_runtime_lib.do_config_batch(config_string);
+                return { result: true };
+            }
+        },
     }
 };
 

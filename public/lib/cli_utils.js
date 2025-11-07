@@ -39,12 +39,29 @@ export default {
         });
         return vorpal;
     },
-    do_config: async function (vorpal, command) {
-        let next_vorpal = await vorpal.execSync(command);
+    do_config: async function (vorpal, command, care_error = false) {
         let ret = vorpal;
-        if (next_vorpal != vorpal && next_vorpal != undefined) {
-            ret = next_vorpal;
+        vorpal.pipe(log => {
+            if (log.indexOf('Error:') != -1 && care_error) {
+                throw { err_msg: log };
+            }
+            return log;
+        });
+        try {
+            let next_vorpal = await vorpal.execSync(command, {
+                fatal: care_error
+            });
+            if (next_vorpal != vorpal && next_vorpal != undefined) {
+                ret = next_vorpal;
+            }
         }
+        catch (err) {
+            throw err;
+        }
+        finally {
+            vorpal.pipe(null);
+        }
+
         return ret;
     },
     add_sub_cli: function (cli, sub_cli_definition, parent_prompt) {
@@ -159,11 +176,11 @@ export default {
             for (let sub_cli of sub_clies) {
                 let view_name_array = await this.get_view_name_array(sub_cli);
                 for (let view_name of view_name_array) {
-                    await vorpal.execSync(`${sub_cli.command} '${view_name}'`);
+                    await this.do_config(vorpal, `${sub_cli.command} '${view_name}'`);
                     await this.clear_config(sub_cli._vorpalInstance);
-                    await sub_cli._vorpalInstance.execSync('return');
+                    await this.do_config(sub_cli._vorpalInstance, 'return');
                     if (view_name != '') {
-                        await vorpal.execSync(`undo ${sub_cli.command} '${view_name}'`);
+                        await this.do_config(vorpal, `undo ${sub_cli.command} '${view_name}'`);
                     }
                 }
             }
@@ -171,7 +188,7 @@ export default {
         let undo_cmd_array = vorpal.undo_cmd_array;
         if (undo_cmd_array != undefined) {
             for (let undo_cmd of undo_cmd_array) {
-                await vorpal.execSync(undo_cmd);
+                await this.do_config(vorpal, undo_cmd);
             }
         }
     },
