@@ -351,13 +351,13 @@ export default {
                         enter assignment 'false' '进入时间' 'Date.now()'
                         transformer 'next'
                             rule 'false' '异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("压力检查周期")) &&  await prs.getSource("瞬时压力") < prs.variables.get("开阀压力下限")'
-                            rule 'false' '开阀' 'prs.variables.get("需要启动") == false'
+                            rule 'false' '关阀' 'prs.variables.get("需要启动") == false'
                         return
                         return
                         state '异常'
                         enter crossAssignment 'false' '"总策略"' '${body.valve_name}策略异常' 'true'
                         exit assignment 'false' '需要启动' 'false'
-                        warning '\`${body.valve_name}压力异常:\${prs.getSource("瞬时压力")}, 当前设定为\${prs.variables.get("需要启动")?"开":"关"}\`'
+                        warning '\`${body.valve_name}压力异常:\${await prs.getSource("瞬时压力")}, 当前设定为\${prs.variables.get("需要启动")?"开":"关"}\`'
                         transformer 'next'
                             rule 'false' '关阀' 'prs.variables.get("需要重置") == true'
                         return
@@ -370,6 +370,114 @@ export default {
                 await cli_runtime_lib.do_config_batch(config_string);
                 return { result: true };
             }
+        },
+        init_water_policy:{
+            name: '初始化供水策略',
+            description: '初始化供水策略，创建默认的供水策略模板',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                flow_warning_low_limit: { type: Number, mean: '流量预警下限', example: 10, have_to: true },
+                flow_warning_high_limit: { type: Number, mean: '流量预警上限', example: 100, have_to: true },
+                pressure_warning_low_limit: { type: Number, mean: '压力预警下限', example: 5, have_to: true },
+                pressure_warning_high_limit: { type: Number, mean: '压力预警上限', example: 50, have_to: true },
+                pressure_shutdown_low_limit: { type: Number, mean: '压力停机下限', example: 60, have_to: true },
+                pressure_shutdown_high_limit: { type: Number, mean: '压力停机上限', example: 80, have_to: true },
+                flow_check_interval: { type: Number, mean: '流量检查间隔(秒)', example: 10, have_to: true },
+                pressure_warning_check_interval: { type: Number, mean: '压力预警检查间隔(秒)', example: 10, have_to: true },
+                pressure_shutdown_check_interval: { type: Number, mean: '压力停机检查间隔(秒)', example: 10, have_to: true },
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func:async function(body, token) {
+                let found_policy = await policy_lib.find_policy('供水', token);
+                if (found_policy)
+                {
+                    await policy_lib.del_policy('供水', token);
+                }
+                let need_device_names = ['主管道压力计', '主管道流量计', '主泵'];
+                for (let device_name of need_device_names)
+                {
+                    let found_device = await device_management_lib.find_device(device_name, token);
+                    if (!found_device)
+                    {
+                        throw {
+                            err_msg:'初始化供水策略失败，缺少必要设备：' + device_name
+                        }
+                    }
+                }
+                let config_string = `
+policy
+  policy '供水'
+    init assignment 'false' '流量告警下限' '${body.flow_warning_low_limit}'
+    init assignment 'false' '流量告警上限' '${body.flow_warning_high_limit}'
+    init assignment 'false' '压力告警下限' '${body.pressure_warning_low_limit}'
+    init assignment 'false' '压力告警上限' '${body.pressure_warning_high_limit}'
+    init assignment 'false' '压力停机下限' '${body.pressure_shutdown_low_limit}'
+    init assignment 'false' '压力停机上限' '${body.pressure_shutdown_high_limit}'
+    init assignment 'false' '流量检查周期' '${body.flow_check_interval * 1000}'
+    init assignment 'false' '压力告警检查周期' '${body.pressure_warning_check_interval * 1000}'
+    init assignment 'false' '压力停机检查周期' '${body.pressure_shutdown_check_interval * 1000}'
+    init assignment 'false' '需要启动' 'false'
+    init assignment 'false' '需要重置' 'false'
+    init assignment 'false' '主管道累计流量' '0'
+    init assignment 'false' '主管道累计流量增量' '0'
+    source '主管道压力读数' '主管道压力计' 'readout'
+    source '主管道流量读数' '主管道流量计' 'readout'
+    source '主管道流量累计读数' '主管道流量计' 'total_readout'
+    state '空闲'
+      enter action '主泵' 'close'
+      enter assignment 'false' '需要重置' 'false'
+      exit assignment 'false' '主管道累计流量' 'await prs.getSource("主管道流量累计读数")'
+      transformer 'next'
+        rule 'false' '主泵工作' 'prs.variables.get("需要启动") == true'
+      return
+    return
+    state '主泵工作'
+      enter action '主泵' 'open'
+      enter assignment 'false' '进入时间' 'Date.now()'
+      do assignment 'false' '主管道累计流量增量' 'await prs.getSource("主管道流量累计读数") - prs.variables.get("主管道累计流量")'
+      transformer 'next'
+        rule 'false' '异常停机' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("压力停机检查周期")) &&  await prs.getSource("主管道压力读数") < prs.variables.get("压力停机下限")'
+        rule 'false' '异常停机' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("压力停机检查周期")) && await prs.getSource("主管道压力读数") > prs.variables.get("压力停机上限")'
+        rule 'false' '压力异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("压力告警检查周期")) && await prs.getSource("主管道压力读数") < prs.variables.get("压力告警下限")'
+        rule 'false' '压力异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("压力告警检查周期")) && await prs.getSource("主管道压力读数") > prs.variables.get("压力告警上限")'
+        rule 'false' '流量异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("流量检查周期")) && await prs.getSource("主管道流量读数") < prs.variables.get("流量告警下限")'
+        rule 'false' '流量异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("流量检查周期")) && await prs.getSource("主管道流量读数") > prs.variables.get("流量告警上限")'
+        rule 'false' '空闲' 'prs.variables.get("需要启动") == false'
+        statistic '空闲' '总水流量' 'prs.variables.get("主管道累计流量增量")' 'true'
+      return
+    return
+    state '压力异常'
+      warning '\`压力异常:\${await prs.getSource("主管道压力读数")}\`'
+      transformer 'next'
+        rule 'false' '主泵工作' 'true'
+      return
+    return
+    state '流量异常'
+      warning '\`流量异常:\${await prs.getSource("主管道流量读数")}\`'
+      transformer 'next'
+        rule 'false' '主泵工作' 'true'
+      return
+    return
+    state '异常停机'
+      do action '主泵' 'close'
+      enter crossAssignment 'false' '"总策略"' '供水策略异常' 'true'
+      exit assignment 'false' '需要启动' 'false'
+      transformer 'next'
+        rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
+      return
+    return
+    init state '空闲'
+    match farm '${body.farm_name}'
+  return
+return
+                `;
+                await cli_runtime_lib.do_config_batch(config_string);
+                return { result: true };
+            },
         },
     }
 };

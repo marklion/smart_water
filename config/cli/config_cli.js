@@ -27,6 +27,27 @@ export default {
                 return `${args.valve_name} 添加失败`;
             }
         });
+        cli_utils.make_common_cmd(vorpal, 'init water policy <farm_name> <flow_warning_low_limit> <flow_warning_high_limit> <pressure_warning_low_limit> <pressure_warning_high_limit> <pressure_shutdown_low_limit> <pressure_shutdown_high_limit> <flow_check_interval> <pressure_warning_check_interval> <pressure_shutdown_check_interval>',
+            '初始化供水策略',
+            async (cmd_this, args) => {
+            let result = await config_lib.init_water_policy({
+                farm_name: args.farm_name,
+                flow_warning_low_limit: args.flow_warning_low_limit,
+                flow_warning_high_limit: args.flow_warning_high_limit,
+                pressure_warning_low_limit: args.pressure_warning_low_limit,
+                pressure_warning_high_limit: args.pressure_warning_high_limit,
+                pressure_shutdown_low_limit: args.pressure_shutdown_low_limit,
+                pressure_shutdown_high_limit: args.pressure_shutdown_high_limit,
+                flow_check_interval: args.flow_check_interval,
+                pressure_warning_check_interval: args.pressure_warning_check_interval,
+                pressure_shutdown_check_interval: args.pressure_shutdown_check_interval
+            });
+            if (result.result) {
+                return `供水策略初始化成功`;
+            } else {
+                return `供水策略初始化失败`;
+            }
+        });
         vorpal.delimiter(prompt)
         return vorpal;
     },

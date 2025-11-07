@@ -15,4 +15,19 @@ export default {
         };
         return await call_remote('/config/add_water_group_valve', req, token);
     },
+    init_water_policy: async function (water_config, token) {
+        let req = {
+            farm_name: water_config.farm_name,
+            flow_warning_low_limit: parseFloat(water_config.flow_warning_low_limit),
+            flow_warning_high_limit: parseFloat(water_config.flow_warning_high_limit),
+            pressure_warning_low_limit: parseFloat(water_config.pressure_warning_low_limit),
+            pressure_warning_high_limit: parseFloat(water_config.pressure_warning_high_limit),
+            pressure_shutdown_low_limit: parseFloat(water_config.pressure_shutdown_low_limit),
+            pressure_shutdown_high_limit: parseFloat(water_config.pressure_shutdown_high_limit),
+            flow_check_interval: parseInt(water_config.flow_check_interval),
+            pressure_warning_check_interval: parseInt(water_config.pressure_warning_check_interval),
+            pressure_shutdown_check_interval: parseInt(water_config.pressure_shutdown_check_interval),
+        };
+        return await call_remote('/config/init_water_policy', req, token);
+    },
 };
