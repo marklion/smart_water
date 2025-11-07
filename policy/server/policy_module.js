@@ -1856,8 +1856,7 @@ async function processPolicyExecution(policy) {
                     }
 
                     // 获取设备读数
-                    const getDriver = await getDriverFunction();
-                    const driver = await getDriver(source.device, source.data_type);
+                    const driver = await get_driver(source.device, source.data_type);
                     const readout = await driver[source.data_type]();
                     const deviceData = { readout };
 
