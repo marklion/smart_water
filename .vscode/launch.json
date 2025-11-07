@@ -3,6 +3,23 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Dev Gui",
+            "type":"node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev_gui"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "postDebugTask": "kill-dev-terminals"
+        },
+        {
             "name": "Dev Server",
             "type": "node",
             "request": "launch",
@@ -42,7 +59,8 @@
             "name": "Whole",
             "configurations": [
                 "Dev Server",
-                "Dev CLI"
+                "Dev CLI",
+                "Dev Gui"
             ]
         }
     ]

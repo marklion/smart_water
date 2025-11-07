@@ -1,4 +1,5 @@
 import Vorpal from 'vorpal';
+import clipboardy from 'clipboardy';
 const g_key_event = {
     key: undefined,
     value: undefined
@@ -28,9 +29,24 @@ export default {
                 data.value = g_key_event.value;
             }
         });
+        this.make_common_cmd(vorpal, 'paste', '粘贴之前复制的命令', async (cmd_this, args) => {
+            let clip_text = await clipboardy.read();
+            let cmd_array = clip_text.split('\n').map(item => item.trim()).filter(item => item.length > 0);
+            let tmp_vorpal = vorpal;
+            for (let cmd of cmd_array) {
+                tmp_vorpal = await this.do_config(tmp_vorpal, cmd);
+            }
+        });
         return vorpal;
     },
-
+    do_config: async function (vorpal, command) {
+        let next_vorpal = await vorpal.execSync(command);
+        let ret = vorpal;
+        if (next_vorpal != vorpal && next_vorpal != undefined) {
+            ret = next_vorpal;
+        }
+        return ret;
+    },
     add_sub_cli: function (cli, sub_cli_definition, parent_prompt) {
         let ins = this;
         let sub_cli = sub_cli_definition.install(parent_prompt);

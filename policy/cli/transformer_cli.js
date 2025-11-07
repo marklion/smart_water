@@ -47,7 +47,7 @@ export default {
                 }
                 return `已删除 ${deletedCount} 个转移规则`;
             });
-        cli_utils.make_undo_cmd(vorpal, 'statistic <target_state> <item_name> <expresstion>', '指定统计项赋值条件','删除所有统计项',
+        cli_utils.make_undo_cmd(vorpal, 'statistic <target_state> <item_name> <expresstion> [is_increment]', '指定统计项赋值条件','删除所有统计项',
             async (cmd_this, args) => {
                 await policy_lib.add_transformer_statistic_item(
                     ins.state_view.policy_view.cur_view_name,
@@ -55,7 +55,8 @@ export default {
                     ins.cur_view_name,
                     args.target_state,
                     args.item_name,
-                    args.expresstion
+                    args.expresstion,
+                    args.is_increment === 'true'
                 );
                 return `已设置统计项: ${args.item_name} 在状态 ${args.target_state} 下的赋值条件为 ${args.expresstion}`;
             }, async (cmd_this, args) => {
@@ -118,7 +119,7 @@ export default {
         }
         if (resp.transformer && resp.transformer.statistic_items) {
             for (const item of resp.transformer.statistic_items) {
-                ret.push(`statistic '${item.target_state}' '${item.item_name}' '${item.expression}'`);
+                ret.push(`statistic '${item.target_state}' '${item.item_name}' '${item.expression}' '${item.is_increment}'`);
             }
         }
         return ret;

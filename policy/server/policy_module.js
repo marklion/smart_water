@@ -207,24 +207,24 @@ function getWaterGroupVariable(matrix, key_name, runtime_state) {
  */
 function getValvesValue(matrix, policy_runtime) {
     let valves_value = getWaterGroupVariable(matrix, 'valves', policy_runtime);
-    
+
     // 如果已经有 valves 值且不为空，直接返回
     if (valves_value && valves_value !== '-') {
         return valves_value;
     }
-    
+
     // 尝试从 water_valve 和 fert_valve 合并
     const water_valve = getWaterGroupVariable(matrix, 'water_valve', policy_runtime);
     const fert_valve = getWaterGroupVariable(matrix, 'fert_valve', policy_runtime);
-    
+
     if (!water_valve && !fert_valve) {
         return valves_value || '-';
     }
-    
+
     // 去除引号并合并
     const waterStr = water_valve ? String(water_valve).replaceAll('"', '') : '';
     const fertStr = fert_valve ? String(fert_valve).replaceAll('"', '') : '';
-    
+
     if (waterStr && fertStr) {
         return `${waterStr}|${fertStr}`;
     }
@@ -234,7 +234,7 @@ function getValvesValue(matrix, policy_runtime) {
     if (fertStr) {
         return fertStr;
     }
-    
+
     return '-';
 }
 
@@ -262,7 +262,7 @@ async function deleteExistingWateringGroupPolicies(token) {
     const toDelete = policy_array
         .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
         .map(p => p.name);
-    
+
     for (const name of toDelete) {
         try {
             await policy_lib.del_policy(name, token);
@@ -301,12 +301,12 @@ async function initializeWateringGroupVariables(group, fert_rate, token) {
         Total: '总定量',
         Time: '定时'
     };
-    
+
     const valvesExpr = (group.valves || []).map(v => `"${v}"`).join(' ');
     const preMs = Math.max(0, Number(group.pre_fert_time || 0)) * 3600000;
     const fertMs = Math.max(0, Number(group.fert_time || 0)) * 3600000;
     const postMs = Math.max(0, Number(group.post_fert_time || 0)) * 3600000;
-    
+
     await policy_lib.init_assignment(group.name, 'area', String(group.area), true, token);
     await policy_lib.init_assignment(group.name, 'method', `"${methodMap[group.method] || group.method}"`, false, token);
     await policy_lib.init_assignment(group.name, 'fert_rate', String(fert_rate), true, token);
@@ -318,7 +318,7 @@ async function initializeWateringGroupVariables(group, fert_rate, token) {
     await policy_lib.init_assignment(group.name, 'pre_ms', String(preMs), true, token);
     await policy_lib.init_assignment(group.name, 'fert_ms', String(fertMs), true, token);
     await policy_lib.init_assignment(group.name, 'post_ms', String(postMs), true, token);
-    
+
     return { preMs, fertMs, postMs };
 }
 
@@ -347,7 +347,7 @@ async function setWateringGroupMatrix(policy, token) {
  */
 async function bindPolicyToFarm(policy, farm_name, token) {
     if (!farm_name) return;
-    
+
     try {
         await policy_lib.match_policy_farm(policy.name, farm_name, token);
     } catch (e) {
@@ -362,7 +362,7 @@ function generateWateringGroupTemplate(group, preMs, fertMs, postMs, farm_name) 
     const farmLine = farm_name ? `\n                        match farm '${farm_name}'` : '';
     const closeActions = (group.valves || []).map(v => `\n                        enter action '${v}' 'close'`).join('');
     const openActions = (group.valves || []).map(v => `\n                        enter action '${v}' 'open'`).join('');
-    
+
     return `policy
                         policy '${group.name}'
                         init assignment 'false' 'pre_ms' '${preMs}'
@@ -425,19 +425,19 @@ async function createWateringGroupPolicy(group, farm_name, token) {
     // 创建策略
     await policy_lib.add_policy(group.name, token);
     const policy = validatePolicyExists(group.name);
-    
+
     // 计算施肥率
     const fert_rate = calculateFertRate(group);
-    
+
     // 初始化变量
     const { preMs, fertMs, postMs } = await initializeWateringGroupVariables(group, fert_rate, token);
-    
+
     // 设置轮灌组矩阵
     await setWateringGroupMatrix(policy, token);
-    
+
     // 绑定农场
     await bindPolicyToFarm(policy, farm_name, token);
-    
+
     // 生成并应用模板
     const templateSm = generateWateringGroupTemplate(group, preMs, fertMs, postMs, farm_name);
     policy.template_sm = templateSm;
@@ -446,7 +446,7 @@ async function createWateringGroupPolicy(group, farm_name, token) {
     } catch (e) {
         // 忽略模板应用错误，继续执行
     }
-    
+
     // 初始化运行时状态
     try {
         await processPolicyExecution(policy);
@@ -919,7 +919,8 @@ export default {
                             explain: {
                                 item_name: { type: String, mean: '统计项名称', example: 'total_watered_volume' },
                                 expression: { type: String, mean: '统计项表达式', example: 's.watered_volume + 100' },
-                                target_state: { type: String, mean: '目标状态', example: 's2' }
+                                target_state: { type: String, mean: '目标状态', example: 's2' },
+                                is_increment: { type: Boolean, mean: '是否为增量统计', example: false },
                             }
                         },
                     }
@@ -1000,7 +1001,7 @@ export default {
                 return { result: true };
             }
         },
-        add_transformer_statistic_item:{
+        add_transformer_statistic_item: {
             name: '添加转换器统计项',
             description: '向转换器添加一个统计项',
             is_write: true,
@@ -1011,7 +1012,8 @@ export default {
                 transformer_name: { type: String, mean: '转换器名称', example: 't1', have_to: true },
                 target_state: { type: String, mean: '目标状态', example: 's2', have_to: true },
                 item_name: { type: String, mean: '统计项名称', example: 'total_watered_volume', have_to: true },
-                expression: { type: String, mean: '统计项表达式', example: 's.watered_volume + 100', have_to: true }
+                expression: { type: String, mean: '统计项表达式', example: 's.watered_volume + 100', have_to: true },
+                is_increment: { type: Boolean, mean: '是否为增量统计', example: false, have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -1025,11 +1027,12 @@ export default {
                     item_name: body.item_name,
                     expression: body.expression,
                     target_state: body.target_state,
+                    is_increment: body.is_increment
                 }, item => item.item_name === body.item_name && item.target_state === body.target_state);
                 return { result: true };
             }
         },
-        del_transformer_statistic_item:{
+        del_transformer_statistic_item: {
             name: '删除转换器统计项',
             description: '从转换器中删除一个统计项',
             is_write: true,
@@ -1678,11 +1681,11 @@ export default {
                         const policy_runtime = policy_runtime_states.get(policy.name);
                         return buildWateringGroup(policy, policy_runtime);
                     });
-                
+
                 const pageSize = 20;
                 const startIndex = body.pageNo * pageSize;
                 const endIndex = startIndex + pageSize;
-                
+
                 return {
                     groups: groups.slice(startIndex, endIndex),
                     total: groups.length,
@@ -1718,13 +1721,13 @@ export default {
             func: async function (body, token) {
                 // 删除既有的轮灌组策略
                 await deleteExistingWateringGroupPolicies(token);
-                
+
                 // 创建并初始化新的轮灌组策略
                 const groups = body.groups || [];
                 for (const group of groups) {
                     await createWateringGroupPolicy(group, body.farm_name, token);
                 }
-                
+
                 return { result: true };
             }
         },
@@ -1853,8 +1856,9 @@ async function processPolicyExecution(policy) {
                     }
 
                     // 获取设备读数
-                    const driver = await get_driver(source.device, 'readout');
-                    const readout = await driver.readout();
+                    const getDriver = await getDriverFunction();
+                    const driver = await getDriver(source.device, source.data_type);
+                    const readout = await driver[source.data_type]();
                     const deviceData = { readout };
 
                     if (deviceData && deviceData.readout !== undefined) {
@@ -1966,9 +1970,13 @@ async function executeStateActions(policy, state, trigger, runtimeState) {
                     let rs = runtimeState;
                     if (assignment.target_policy_name) {
                         // 跨策略赋值
-                        let targetRuntimeState = policy_runtime_states.get(assignment.target_policy_name);
+                        let target_policy_name = await evaluateAssignmentExpression(assignment.target_policy_name, runtimeState);
+                        let targetRuntimeState = policy_runtime_states.get(target_policy_name);
                         if (targetRuntimeState) {
                             rs = targetRuntimeState;
+                        }
+                        else {
+                            rs = undefined;
                         }
                     }
                     if (rs) {
@@ -2012,7 +2020,7 @@ async function executeStatisticUpdate(target_state, transformer, runtimeState) {
         let statistic_item = transformer.statistic_items.find(s => s.target_state === target_state);
         if (statistic_item) {
             let value = await evaluateAssignmentExpression(statistic_item.expression, runtimeState);
-            await statistic_lib.update_item(statistic_item.item_name, String(value));
+            await statistic_lib.update_item(statistic_item.item_name, String(value), statistic_item.is_increment);
         }
     }
 

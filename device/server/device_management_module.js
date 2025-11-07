@@ -9,7 +9,7 @@ const driver_array = [
         config_method: '[log_file]',
         capability: [
             'open', 'close', 'readout', 'mock_readout',
-            'is_opened', 'status_map', 'shutdown'],
+            'is_opened', 'status_map', 'shutdown', 'total_readout', 'mock_total_readout'],
         driver: virtual_driver,
     }, {
         name: 'WaterGroupValve',
@@ -319,6 +319,24 @@ export default {
             func: async function (body, token) {
                 let driver = await get_driver(body.device_name, 'mock_readout');
                 await driver.mock_readout(body.value);
+                return { result: true };
+            }
+        },
+        mock_total_readout: {
+            name: '模拟累计读数',
+            description: '模拟设备累计读数',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' },
+                value: { type: Number, have_to: true, mean: '模拟累计读数值', example: 1000 }
+            },
+            result: {
+                result: { type: Boolean, mean: '模拟累计读数结果', example: true }
+            },
+            func: async function (body, token) {
+                let driver = await get_driver(body.device_name, 'mock_total_readout');
+                await driver.mock_total_readout(body.value);
                 return { result: true };
             }
         },

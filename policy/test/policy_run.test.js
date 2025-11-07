@@ -267,7 +267,7 @@ return
 policy
   policy 'p2'
     state 'manual'
-      do crossAssignment 'false' 'p1' 'should_move' 'true'
+      do crossAssignment 'false' '"p1"' 'should_move' 'true'
     return
     init state 'manual'
   return

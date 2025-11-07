@@ -85,14 +85,15 @@ export default {
             target_state
         }, token);
     },
-    add_transformer_statistic_item: async function (policy_name, state_name, transformer_name,target_state, item_name, expression, token) {
+    add_transformer_statistic_item: async function (policy_name, state_name, transformer_name,target_state, item_name, expression,is_increment, token) {
         return await call_remote('/policy/add_transformer_statistic_item', {
             policy_name,
             state_name,
             transformer_name,
             item_name,
             expression,
-            target_state
+            target_state,
+            is_increment
         }, token);
     },
     del_transformer_statistic_item: async function (policy_name, state_name, transformer_name, target_state,item_name, token) {

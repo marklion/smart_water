@@ -132,12 +132,7 @@ export default {
         if (!vorpal) {
             vorpal = get_vorpal();
         }
-        let next_vorpal = await vorpal.execSync(command);
-        let ret = vorpal;
-        if (next_vorpal != vorpal && next_vorpal != undefined) {
-            ret = next_vorpal;
-        }
-        return ret;
+        return await cli_utils.do_config(vorpal, command);
     },
     restore_config: async function (filename) {
         if (!filename) {
