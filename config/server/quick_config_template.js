@@ -111,4 +111,70 @@ policy
 return`;
         return config_string;
     },
+    init_fert_policy_config:function(params) {
+        let config_string = `
+policy
+  policy '施肥'
+    init assignment 'false' '需要启动' 'false'
+    init assignment 'false' '需要重置' 'false'
+    init assignment 'false' '液位告警' '${params.level_warning_limit}'
+    init assignment 'false' '液位停机' '${params.level_shutdown_limit}'
+    init assignment 'false' '期望施肥流量' '${params.flow_expected_value}'
+    init assignment 'false' '流量告警偏移' '${params.flow_warning_max_offset}'
+    init assignment 'false' '流量检查周期' '${params.flow_check_interval * 1000}'
+    init assignment 'false' '液位告警检查周期' '${params.level_check_interval * 1000}'
+    init assignment 'false' '液位停机检查周期' '${params.level_check_interval * 1000}'
+    init assignment 'false' '本次施肥量' '0'
+    source '施肥流量读数' '施肥流量计' 'readout'
+    source '施肥液位读数' '施肥液位计' 'readout'
+    state '空闲'
+      enter action '施肥泵' 'close'
+      enter assignment 'false' '本次施肥量' '0'
+      enter assignment 'false' '需要重置' 'false'
+      transformer 'next'
+        rule 'false' '施肥工作' 'prs.variables.get("需要启动") == true'
+      return
+    return
+    state '施肥工作'
+      enter action '施肥泵' 'open'
+      enter assignment 'false' '进入时间' 'Date.now()'
+      enter assignment 'false' '上次采样' 'Date.now()'
+      do assignment 'false' '采样时长' '(Date.now() - prs.variables.get("上次采样"))/1000'
+      do assignment 'false' '本次施肥量' 'await prs.getSource("施肥流量读数") / 60 * prs.variables.get("采样时长") + prs.variables.get("本次施肥量")'
+      do assignment 'false' '上次采样' 'Date.now()'
+      transformer 'next'
+        rule 'false' '异常停机' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("液位停机检查周期")) && await prs.getSource("施肥液位读数") < prs.variables.get("液位停机")'
+        rule 'false' '液位异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("液位告警检查周期")) && await prs.getSource("施肥液位读数") < prs.variables.get("液位告警")'
+        rule 'false' '流量异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("流量检查周期")) && (await prs.getSource("施肥流量读数") < prs.variables.get("期望施肥流量") - prs.variables.get("流量告警偏移") || await prs.getSource("施肥流量读数") > prs.variables.get("期望施肥流量") + prs.variables.get("流量告警偏移"))'
+        rule 'false' '空闲' 'prs.variables.get("需要启动") == false'
+        statistic '空闲' '总施肥量' 'prs.variables.get("本次施肥量")' 'true'
+      return
+    return
+    state '液位异常'
+      warning '\`施肥液位异常:\${await prs.getSource("施肥液位读数")}\`'
+      transformer 'next'
+        rule 'false' '施肥工作' 'true'
+      return
+    return
+    state '流量异常'
+      warning '\`施肥流量异常:\${await prs.getSource("施肥流量读数")}\`'
+      transformer 'next'
+        rule 'false' '施肥工作' 'true'
+      return
+    return
+    state '异常停机'
+      do action '施肥泵' 'close'
+      enter crossAssignment 'false' '"总策略"' '施肥策略异常' 'true'
+      exit assignment 'false' '需要启动' 'false'
+      transformer 'next'
+        rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
+      return
+    return
+    init state '空闲'
+    match farm '${params.farm_name}'
+  return
+return
+        `;
+        return config_string;
+    },
 };

@@ -31,7 +31,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let value_to_store = body.value;
+                let value_to_store = parseFloat(body.value);
                 if (body.is_increment) {
                     let last_value = 0;
                     let resp = await statistic_lib.list_all_items(token);
@@ -42,7 +42,7 @@ export default {
                     value_to_store = parseFloat(body.value) + last_value;
                 }
 
-                let content = `${moment().format('YYYY-MM-DD HH:mm:ss')}==${value_to_store}==\n`;
+                let content = `${moment().format('YYYY-MM-DD HH:mm:ss')}==${value_to_store.toFixed(2)}==\n`;
                 const filePath = await get_file_by_item(body.item_name);
                 // 使用 appendFile，底层会创建文件（我们已确保目录存在）并进行追加，避免手动 open/close
                 await fs.promises.appendFile(filePath, content, 'utf8');

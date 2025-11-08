@@ -29,4 +29,16 @@ export default {
         };
         return await call_remote('/config/init_water_policy', req, token);
     },
+    init_fert_policy: async function (fert_config, token) {
+        let req = {
+            farm_name: fert_config.farm_name,
+            flow_expected_value: parseFloat(fert_config.flow_expected_value),
+            flow_warning_max_offset: parseFloat(fert_config.flow_warning_max_offset),
+            flow_check_interval: parseInt(fert_config.flow_check_interval),
+            level_warning_limit: parseFloat(fert_config.level_warning_limit),
+            level_shutdown_limit: parseFloat(fert_config.level_shutdown_limit),
+            level_check_interval: parseInt(fert_config.level_check_interval),
+        };
+        return await call_remote('/config/init_fert_policy', req, token);
+    }
 };

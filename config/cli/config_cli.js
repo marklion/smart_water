@@ -30,23 +30,41 @@ export default {
         cli_utils.make_common_cmd(vorpal, 'init water policy <farm_name> <flow_warning_low_limit> <flow_warning_high_limit> <pressure_warning_low_limit> <pressure_warning_high_limit> <pressure_shutdown_low_limit> <pressure_shutdown_high_limit> <flow_check_interval> <pressure_shutdown_check_interval>',
             '初始化供水策略',
             async (cmd_this, args) => {
-            let result = await config_lib.init_water_policy({
-                farm_name: args.farm_name,
-                flow_warning_low_limit: args.flow_warning_low_limit,
-                flow_warning_high_limit: args.flow_warning_high_limit,
-                pressure_warning_low_limit: args.pressure_warning_low_limit,
-                pressure_warning_high_limit: args.pressure_warning_high_limit,
-                pressure_shutdown_low_limit: args.pressure_shutdown_low_limit,
-                pressure_shutdown_high_limit: args.pressure_shutdown_high_limit,
-                flow_check_interval: args.flow_check_interval,
-                pressure_shutdown_check_interval: args.pressure_shutdown_check_interval
+                let result = await config_lib.init_water_policy({
+                    farm_name: args.farm_name,
+                    flow_warning_low_limit: args.flow_warning_low_limit,
+                    flow_warning_high_limit: args.flow_warning_high_limit,
+                    pressure_warning_low_limit: args.pressure_warning_low_limit,
+                    pressure_warning_high_limit: args.pressure_warning_high_limit,
+                    pressure_shutdown_low_limit: args.pressure_shutdown_low_limit,
+                    pressure_shutdown_high_limit: args.pressure_shutdown_high_limit,
+                    flow_check_interval: args.flow_check_interval,
+                    pressure_shutdown_check_interval: args.pressure_shutdown_check_interval
+                });
+                if (result.result) {
+                    return `供水策略初始化成功`;
+                } else {
+                    return `供水策略初始化失败`;
+                }
             });
-            if (result.result) {
-                return `供水策略初始化成功`;
-            } else {
-                return `供水策略初始化失败`;
-            }
-        });
+        cli_utils.make_common_cmd(vorpal, 'init fert policy <farm_name> <flow_expected_value> <flow_warning_max_offset> <flow_check_interval> <level_warning_limit> <level_shutdown_limit> <level_check_interval>',
+            '初始化施肥策略',
+            async (cmd_this, args) => {
+                let result = await config_lib.init_fert_policy({
+                    farm_name: args.farm_name,
+                    flow_expected_value: args.flow_expected_value,
+                    flow_warning_max_offset: args.flow_warning_max_offset,
+                    flow_check_interval: args.flow_check_interval,
+                    level_warning_limit: args.level_warning_limit,
+                    level_shutdown_limit: args.level_shutdown_limit,
+                    level_check_interval: args.level_check_interval
+                });
+                if (result.result) {
+                    return `施肥策略初始化成功`;
+                } else {
+                    return `施肥策略初始化失败`;
+                }
+            });
         vorpal.delimiter(prompt)
         return vorpal;
     },

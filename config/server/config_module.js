@@ -371,18 +371,44 @@ export default {
                 return { result: true };
             },
         },
-        // init_fert_policy:{
-        //     name:'初始化施肥策略',
-        //     description:'初始化施肥策略，创建默认的施肥策略模板',
-        //     is_write: true,
-        //     is_get_api: false,
-        //     params: {
-        //         farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
-        //         level_warning_limit: { type: Number, mean: '液位预警下限', example: 20, have_to: true },
-        //         level_shutdown_limit: { type: Number, mean: '液位停机下限', example: 10, have_to: true },
-        //         flow_warning_max_offset: { type: Number, mean: '流量预警最大偏差', example: 5, have_to: true },
-        //     },
-        // },
+        init_fert_policy:{
+            name:'初始化施肥策略',
+            description:'初始化施肥策略，创建默认的施肥策略模板',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                level_warning_limit: { type: Number, mean: '液位预警下限', example: 20, have_to: true },
+                level_shutdown_limit: { type: Number, mean: '液位停机下限', example: 10, have_to: true },
+                flow_warning_max_offset: { type: Number, mean: '流量预警最大偏差', example: 5, have_to: true },
+                level_check_interval: { type: Number, mean: '液位检查间隔(秒)', example: 10, have_to: true },
+                flow_check_interval: { type: Number, mean: '流量检查间隔(秒)', example: 10, have_to: true },
+                flow_expected_value: { type: Number, mean: '预期流量值', example: 50, have_to: true },
+            },
+            result:{
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func:async function(body, token){
+                let found_policy = await policy_lib.find_policy('施肥', token);
+                if (found_policy)
+                {
+                    await policy_lib.del_policy('施肥', token);
+                }
+                let need_device_names = ['施肥液位计', '施肥流量计', '施肥泵'];
+                for (let device_name of need_device_names)
+                {
+                    let found_device = await device_management_lib.find_device(device_name, token);
+                    if (!found_device)
+                    {
+                        throw {
+                            err_msg:'初始化施肥策略失败，缺少必要设备：' + device_name
+                        }
+                    }
+                }
+                await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_policy_config(body));
+                return { result: true };
+            },
+        },
     }
 };
 

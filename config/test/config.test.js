@@ -165,6 +165,7 @@ describe('轮灌阀门快速配置和验证', () => {
 async function reset_statistics() {
     await cli.run_cmd('statistic');
     await cli.run_cmd('update item 总水流量 0');
+    await cli.run_cmd('update item 总施肥量 0');
     await cli.run_cmd('return');
 }
 
@@ -199,11 +200,15 @@ async function reset_water_policy() {
     await cli.run_cmd('return');
 }
 async function get_statistics(item_name) {
+    let ret = [];
     await cli.run_cmd('statistic');
     let resp = await cli.run_cmd('list item history ' + item_name);
     let lines = resp.split('\n').filter(l => l.trim().length > 0);
     await cli.run_cmd('return');
-    return lines;
+    for (let line of lines) {
+        ret.push(parseFloat(line.split('-').pop()));
+    }
+    return ret;
 }
 
 describe('供水策略快速配置和验证', () => {
@@ -237,10 +242,10 @@ describe('供水策略快速配置和验证', () => {
         await mock_readout('主管道流量计', 1);
         await mock_readout('主管道压力计', 1);
         await confirm_valve_status('主泵', false);
-        let statistics_lines = await get_statistics('总水流量');
-        expect(statistics_lines.length).toBeGreaterThanOrEqual(1);
-        expect(statistics_lines[0]).toContain('-30');
-        expect(statistics_lines[1]).toContain('-10');
+        let statistics = await get_statistics('总水流量');
+        expect(statistics.length).toBeGreaterThanOrEqual(1);
+        expect(statistics[0]).toEqual(30);
+        expect(statistics[1]).toEqual(10);
     });
     test('工作时压力和流量异常告警', async () => {
         await trigger_water_policy(true);
@@ -276,5 +281,102 @@ describe('供水策略快速配置和验证', () => {
         await mock_readout('主管道压力计', 112);
         await wait_ms(1000);
         await confirm_policy_status('供水', '异常停机');
+    });
+});
+async function prepare_fert_policy_config() {
+    let prepare = `
+  device
+    add device '施肥泵' 'virtualDevice' 'all_device_log.log' '1' '2' '农场1'
+    add device '施肥流量计' 'virtualDevice' 'all_device_log.log' '1' '2' '农场1'
+    add device '施肥液位计' 'virtualDevice' 'all_device_log.log' '1' '2' '农场1'
+  return
+    `;
+    await prepare_resource_config();
+    for (let line of prepare.trim().split('\n').filter(l => l.trim().length > 0)) {
+        await cli.run_cmd(line.trim());
+    }
+    await cli.run_cmd('config');
+    await cli.run_cmd(`init fert policy '农场1' 20 5 1 30 10 1`);
+    await cli.run_cmd('return');
+    await reset_statistics();
+}
+async function trigger_fert_policy(is_open) {
+    await cli.run_cmd('policy');
+    await cli.run_cmd(`runtime assignment 施肥 false '需要启动' '${is_open ? 'true' : 'false'}'`);
+    await wait_ms(30);
+    await cli.run_cmd('return');
+}
+async function reset_fert_policy() {
+    await cli.run_cmd('policy');
+    await cli.run_cmd(`runtime assignment 施肥 false '需要重置' 'true'`);
+    await wait_ms(30);
+    await cli.run_cmd('return');
+}
+describe('施肥策略快速配置和验证', () => {
+    beforeEach(async () => {
+        await cli.run_cmd('clear');
+        await prepare_fert_policy_config();
+        await begin_policy_run();
+    });
+    afterEach(async () => {
+        await cli.run_cmd('clear');
+    });
+    test('施肥策略正常转两轮', async () => {
+        await trigger_fert_policy(true);
+        await mock_readout('施肥流量计', 24);
+        await mock_readout('施肥液位计', 50);
+        await wait_ms(1010);
+        await confirm_valve_status('施肥泵', true);
+        await trigger_fert_policy(false);
+        await confirm_valve_status('施肥泵', false);
+        await mock_readout('施肥流量计', 1);
+        await wait_ms(1010);
+        await trigger_fert_policy(true);
+        await mock_readout('施肥流量计', 18);
+        await confirm_valve_status('施肥泵', true);
+        await wait_ms(1010);
+        await trigger_fert_policy(false);
+        await confirm_valve_status('施肥泵', false);
+        let statistics = await get_statistics('总施肥量');
+        expect(statistics.length).toBeGreaterThanOrEqual(2);
+        expect(statistics[0]).toBeCloseTo(0.77,1);
+        expect(statistics[1]).toBeCloseTo(0.44, 1);
+    });
+    test('施肥时液位和流量告警', async () => {
+        await trigger_fert_policy(true);
+        await mock_readout('施肥流量计', 20);
+        await mock_readout('施肥液位计', 20);
+        await wait_ms(1010);
+        await confirm_valve_status('施肥泵', true);
+        await confirm_warning('施肥液位异常:20');
+        await mock_readout('施肥液位计', 40);
+        await wait_ms(100);
+        await mock_readout('施肥流量计', 26);
+        await wait_ms(1010);
+        await confirm_valve_status('施肥泵', true);
+        await confirm_warning('施肥流量异常:26');
+        await mock_readout('施肥流量计', 20);
+        await wait_ms(100);
+        await mock_readout('施肥流量计', 14);
+        await wait_ms(1010);
+        await confirm_valve_status('施肥泵', true);
+        await confirm_warning('施肥流量异常:14');
+    });
+    test('施肥时液位变化过大', async () => {
+        await trigger_fert_policy(true);
+        await mock_readout('施肥流量计', 20);
+        await mock_readout('施肥液位计', 9);
+        await wait_ms(500);
+        await confirm_valve_status('施肥泵', true);
+        await wait_ms(500);
+        await confirm_valve_status('施肥泵', false);
+        await confirm_policy_status('施肥', '异常停机');
+        await reset_fert_policy();
+        await confirm_policy_status('施肥', '空闲');
+        await confirm_valve_status('施肥泵', false);
+        await trigger_fert_policy(true);
+        await mock_readout('施肥液位计', 31);
+        await wait_ms(1000);
+        await confirm_valve_status('施肥泵', true);
     });
 });
