@@ -25,7 +25,6 @@ export default {
             pressure_shutdown_low_limit: parseFloat(water_config.pressure_shutdown_low_limit),
             pressure_shutdown_high_limit: parseFloat(water_config.pressure_shutdown_high_limit),
             flow_check_interval: parseInt(water_config.flow_check_interval),
-            pressure_warning_check_interval: parseInt(water_config.pressure_warning_check_interval),
             pressure_shutdown_check_interval: parseInt(water_config.pressure_shutdown_check_interval),
         };
         return await call_remote('/config/init_water_policy', req, token);

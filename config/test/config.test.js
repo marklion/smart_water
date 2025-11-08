@@ -181,7 +181,7 @@ async function prepare_water_policy_config() {
         await cli.run_cmd(line.trim());
     }
     await cli.run_cmd('config');
-    await cli.run_cmd(`init water policy '农场1' 10 100 5 50 2 100 2 2 1`);
+    await cli.run_cmd(`init water policy '农场1' 10 100 5 50 2 100 2 1`);
     await cli.run_cmd('return');
     await reset_statistics();
 }
