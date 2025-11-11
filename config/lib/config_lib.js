@@ -40,5 +40,20 @@ export default {
             level_check_interval: parseInt(fert_config.level_check_interval),
         };
         return await call_remote('/config/init_fert_policy', req, token);
-    }
+    },
+    add_group_policy: async function (group_policy_config, token) {
+        let req = {
+            policy_name: group_policy_config.policy_name,
+            farm_name: group_policy_config.farm_name,
+            wgv_array: group_policy_config.wgv_array,
+            pre_fert_time: parseFloat(group_policy_config.pre_fert_time),
+            post_fert_time: parseFloat(group_policy_config.post_fert_time),
+            method: group_policy_config.method,
+            fert_time: parseFloat(group_policy_config.fert_time),
+            area_based_amount: parseFloat(group_policy_config.area_based_amount),
+            area: parseFloat(group_policy_config.area),
+            fert_rate: parseFloat(group_policy_config.fert_rate),
+        };
+        return await call_remote('/config/add_group_policy', req, token);
+    },
 };

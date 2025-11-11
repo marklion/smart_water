@@ -65,6 +65,29 @@ export default {
                     return `施肥策略初始化失败`;
                 }
             });
+        cli_utils.make_common_cmd(vorpal, 'add group policy <policy_name> <farm_name> <pre_fert_time> <post_fert_time> <method> <fert_time> <area_based_amount> <area> <fert_rate> [wgv_array...]',
+            '添加轮灌组施肥策略',
+            async (cmd_this, args) => {
+                let wgv_array = args.wgv_array.map((val) => { return {name:val}; });
+                let result = await config_lib.add_group_policy({
+                    policy_name: args.policy_name,
+                    farm_name: args.farm_name,
+                    wgv_array: wgv_array,
+                    pre_fert_time: args.pre_fert_time,
+                    post_fert_time: args.post_fert_time,
+                    method: args.method,
+                    fert_time: args.fert_time,
+                    area_based_amount: args.area_based_amount,
+                    area: args.area,
+                    fert_rate: args.fert_rate
+                });
+                if (result.result) {
+                    return `轮灌组施肥策略 ${args.policy_name} 添加成功`;
+                } else {
+                    return `轮灌组施肥策略 ${args.policy_name} 添加失败`;
+                }
+            }
+        );
         vorpal.delimiter(prompt)
         return vorpal;
     },

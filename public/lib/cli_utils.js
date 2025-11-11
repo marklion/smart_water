@@ -198,7 +198,11 @@ export default {
                 try {
                     let cleaned_args = { ...args };
                     for (let key in cleaned_args) {
-                        cleaned_args[key] = String(cleaned_args[key]);
+                        if (Array.isArray(cleaned_args[key])) {
+                            cleaned_args[key] = cleaned_args[key].map(item => String(item));
+                        } else {
+                            cleaned_args[key] = String(cleaned_args[key]);
+                        }
                     }
                     let result = await func(this, cleaned_args);
                     if (result) {

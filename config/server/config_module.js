@@ -331,7 +331,7 @@ export default {
                 return { result: true };
             }
         },
-        init_water_policy:{
+        init_water_policy: {
             name: '初始化供水策略',
             description: '初始化供水策略，创建默认的供水策略模板',
             is_write: true,
@@ -350,30 +350,28 @@ export default {
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
-            func:async function(body, token) {
-                let found_policy = await policy_lib.find_policy('供水', token);
-                if (found_policy)
-                {
-                    await policy_lib.del_policy('供水', token);
-                }
+            func: async function (body, token) {
+
                 let need_device_names = ['主管道压力计', '主管道流量计', '主泵'];
-                for (let device_name of need_device_names)
-                {
+                for (let device_name of need_device_names) {
                     let found_device = await device_management_lib.find_device(device_name, token);
-                    if (!found_device)
-                    {
+                    if (!found_device) {
                         throw {
-                            err_msg:'初始化供水策略失败，缺少必要设备：' + device_name
+                            err_msg: '初始化供水策略失败，缺少必要设备：' + device_name
                         }
                     }
+                }
+                let found_policy = await policy_lib.find_policy('供水', token);
+                if (found_policy) {
+                    await policy_lib.del_policy('供水', token);
                 }
                 await cli_runtime_lib.do_config_batch(quick_config_template.init_water_policy_config(body));
                 return { result: true };
             },
         },
-        init_fert_policy:{
-            name:'初始化施肥策略',
-            description:'初始化施肥策略，创建默认的施肥策略模板',
+        init_fert_policy: {
+            name: '初始化施肥策略',
+            description: '初始化施肥策略，创建默认的施肥策略模板',
             is_write: true,
             is_get_api: false,
             params: {
@@ -385,27 +383,74 @@ export default {
                 flow_check_interval: { type: Number, mean: '流量检查间隔(秒)', example: 10, have_to: true },
                 flow_expected_value: { type: Number, mean: '预期流量值', example: 50, have_to: true },
             },
-            result:{
+            result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
-            func:async function(body, token){
-                let found_policy = await policy_lib.find_policy('施肥', token);
-                if (found_policy)
-                {
-                    await policy_lib.del_policy('施肥', token);
-                }
+            func: async function (body, token) {
                 let need_device_names = ['施肥液位计', '施肥流量计', '施肥泵'];
-                for (let device_name of need_device_names)
-                {
+                for (let device_name of need_device_names) {
                     let found_device = await device_management_lib.find_device(device_name, token);
-                    if (!found_device)
-                    {
+                    if (!found_device) {
                         throw {
-                            err_msg:'初始化施肥策略失败，缺少必要设备：' + device_name
+                            err_msg: '初始化施肥策略失败，缺少必要设备：' + device_name
                         }
                     }
                 }
+                let found_policy = await policy_lib.find_policy('施肥', token);
+                if (found_policy) {
+                    await policy_lib.del_policy('施肥', token);
+                }
                 await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_policy_config(body));
+                return { result: true };
+            },
+        },
+        add_group_policy: {
+            name: '快速配置添加轮灌组策略',
+            description: '快速配置添加轮灌组策略',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '轮灌组1', have_to: true },
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                wgv_array: {
+                    type: Array, mean: '轮灌阀门组数组', have_to: true, explain: {
+                        name: { type: String, mean: '阀门名称', example: '轮灌阀门1', have_to: true },
+                    }
+                },
+                pre_fert_time: { type: Number, mean: '肥前时间（分钟）', example: 30, have_to: true },
+                post_fert_time: { type: Number, mean: '肥后时间（分钟）', example: 30, have_to: true },
+                method: { type: String, mean: '施肥方式', example: '定时', have_to: true },
+                fert_time: { type: Number, mean: '施肥时间(分钟)', example: 30, have_to: true },
+                area_based_amount: { type: Number, mean: '基于面积施肥量(升/亩)', example: 5, have_to: true },
+                area: { type: Number, mean: '轮灌面积(亩)', example: 10, have_to: true },
+                fert_rate: { type: Number, mean: '施肥速率(升/分钟)', example: 2, have_to: true },
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let sub_policies = ['供水', '施肥'];
+                sub_policies = sub_policies.concat(body.wgv_array.map(item => item.name));
+                for (let policy_name of sub_policies) {
+                    let sub_policy = await policy_lib.find_policy(policy_name, token);
+                    if (!sub_policy) {
+                        throw {
+                            err_msg: '添加轮灌组策略失败，缺少必要子策略：' + policy_name
+                        }
+                    }
+                    if (policy_name == '施肥') {
+                        try {
+                            await policy_lib.del_assignment(policy_name, '施肥工作', 'do', '当前施肥量', body.policy_name, token);
+                        } catch (error) {
+                            // 忽略错误
+                        }
+                    }
+                }
+                let found_policy = await policy_lib.find_policy(body.policy_name, token);
+                if (found_policy) {
+                    await policy_lib.del_policy(body.policy_name, token);
+                }
+                await cli_runtime_lib.do_config_batch(quick_config_template.add_group_policy(body));
                 return { result: true };
             },
         },
