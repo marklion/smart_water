@@ -17,6 +17,7 @@ import deviceModule, { get_driver } from '../../device/server/device_management_
 import resource_lib from '../../resource/lib/resource_lib.js';
 import statistic_lib from '../../statistic/lib/statistic_lib.js';
 import cli_runtime from '../../public/cli/cli_runtime_lib.js';
+import config_lib from '../../config/lib/config_lib.js';
 let default_config_file = 'sw_cli_config.txt';
 const policy_array = []
 
@@ -1428,16 +1429,17 @@ export default {
                     );
 
                     if (existingAssignment) {
-                        throw { err_msg: `变量 ${body.variable_name} 的初始化赋值已存在` };
+                        existingAssignment.expression = body.expression;
+                        existingAssignment.is_constant = body.is_constant || false;
+                        existingAssignment.variable_name = body.variable_name;
                     }
-
-                    // 添加初始化变量赋值
-                    policy.init_variables.push({
-                        variable_name: body.variable_name,
-                        expression: body.expression,
-                        is_constant: body.is_constant || false
-                    });
-
+                    else {
+                        policy.init_variables.push({
+                            variable_name: body.variable_name,
+                            expression: body.expression,
+                            is_constant: body.is_constant || false
+                        });
+                    }
                     return { result: true };
                 } catch (error) {
                     throw {
@@ -1702,15 +1704,18 @@ export default {
                     type: Array, mean: '轮灌组配置数组', have_to: true, explain: {
                         name: { type: String, mean: '组名', example: 'l1', have_to: true },
                         area: { type: Number, mean: '面积(亩)', example: 23, have_to: true },
-                        valves: { type: Array, mean: '阀门名称列表', example: ['v1','v2'], have_to: true, explain: {
-                            item: { type: String, mean: '阀门名称', example: 'v1' }
-                        } },
+                        valves: {
+                            type: Array, mean: '阀门名称列表', example: ['v1', 'v2'], have_to: true, explain: {
+                                item: { type: String, mean: '阀门名称', example: 'v1' }
+                            }
+                        },
                         method: { type: String, mean: '施肥方式 AreaBased/Total/Time', example: 'AreaBased', have_to: true },
                         AB_fert: { type: Number, mean: '亩定量(L/亩)', example: 10, have_to: false },
                         total_fert: { type: Number, mean: '总定量(L)', example: 500, have_to: false },
                         fert_time: { type: Number, mean: '定时(小时)', example: 0.6, have_to: false },
                         pre_fert_time: { type: Number, mean: '肥前时间(小时)', example: 0, have_to: false },
                         post_fert_time: { type: Number, mean: '肥后时间(小时)', example: 0, have_to: false },
+                        fert_rate: { type: Number, mean: '期望施肥速度(L/min)', example: 1.5, have_to: false},
                     }
                 },
                 farm_name: { type: String, mean: '默认绑定的农场名称', example: '科技农场', have_to: false }
@@ -1721,13 +1726,20 @@ export default {
             func: async function (body, token) {
                 // 删除既有的轮灌组策略
                 await deleteExistingWateringGroupPolicies(token);
-
-                // 创建并初始化新的轮灌组策略
-                const groups = body.groups || [];
-                for (const group of groups) {
-                    await createWateringGroupPolicy(group, body.farm_name, token);
+                for (const groupConfig of body.groups) {
+                    await config_lib.add_group_policy({
+                        policy_name: groupConfig.name,
+                        farm_name:body.farm_name,
+                        wgv_array: groupConfig.valves.map(v => ({ name: v })),
+                        pre_fert_time:groupConfig.pre_fert_time,
+                        post_fert_time:groupConfig.post_fert_time,
+                        method: groupConfig.method == 'Time'?'定时':'定量',
+                        fert_time: groupConfig.fert_time,
+                        area_based_amount: groupConfig.AB_fert,
+                        area: groupConfig.area,
+                        fert_rate: groupConfig.fert_rate,
+                    }, token);
                 }
-
                 return { result: true };
             }
         },

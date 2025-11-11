@@ -84,12 +84,12 @@ export default async function (config) {
             });
         },
         open: async function () {
-            await this.write_log('打开阀门');
+            await this.write_log(`${device_name}打开阀门`);
             this.m_is_opened = true;
             return { status: 'opened', message: '阀门已成功打开' };
         },
         close: async function () {
-            await this.write_log('关闭阀门');
+            await this.write_log(`${device_name}关闭阀门`);
             this.m_is_opened = false;
             return { status: 'closed', message: '阀门已成功关闭' };
         },

@@ -351,8 +351,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-
-                let need_device_names = ['主管道压力计', '主管道流量计', '主泵'];
+                let need_device_names = ['主管道压力计', '主管道流量计', '主泵'].map(item => `${body.farm_name}-${item}`);
                 for (let device_name of need_device_names) {
                     let found_device = await device_management_lib.find_device(device_name, token);
                     if (!found_device) {
@@ -361,10 +360,12 @@ export default {
                         }
                     }
                 }
-                let found_policy = await policy_lib.find_policy('供水', token);
+                let policy_name = `${body.farm_name}-供水`;
+                let found_policy = await policy_lib.find_policy(policy_name, token);
                 if (found_policy) {
-                    await policy_lib.del_policy('供水', token);
+                    await policy_lib.del_policy(policy_name, token);
                 }
+                body.policy_name = policy_name;
                 await cli_runtime_lib.do_config_batch(quick_config_template.init_water_policy_config(body));
                 return { result: true };
             },
@@ -387,7 +388,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let need_device_names = ['施肥液位计', '施肥流量计', '施肥泵'];
+                let need_device_names = ['施肥液位计', '施肥流量计', '施肥泵'].map(item => `${body.farm_name}-${item}`);
                 for (let device_name of need_device_names) {
                     let found_device = await device_management_lib.find_device(device_name, token);
                     if (!found_device) {
@@ -396,10 +397,12 @@ export default {
                         }
                     }
                 }
-                let found_policy = await policy_lib.find_policy('施肥', token);
+                let policy_name = `${body.farm_name}-施肥`
+                let found_policy = await policy_lib.find_policy(policy_name, token);
                 if (found_policy) {
-                    await policy_lib.del_policy('施肥', token);
+                    await policy_lib.del_policy(policy_name, token);
                 }
+                body.policy_name = policy_name;
                 await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_policy_config(body));
                 return { result: true };
             },
@@ -429,7 +432,7 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let sub_policies = ['供水', '施肥'];
+                let sub_policies = ['供水', '施肥', '总策略'].map(item => `${body.farm_name}-${item}`);
                 sub_policies = sub_policies.concat(body.wgv_array.map(item => item.name));
                 for (let policy_name of sub_policies) {
                     let sub_policy = await policy_lib.find_policy(policy_name, token);
@@ -438,11 +441,36 @@ export default {
                             err_msg: '添加轮灌组策略失败，缺少必要子策略：' + policy_name
                         }
                     }
-                    if (policy_name == '施肥') {
+                    if (policy_name == `${body.farm_name}-施肥`) {
                         try {
                             await policy_lib.del_assignment(policy_name, '施肥工作', 'do', '当前施肥量', body.policy_name, token);
                         } catch (error) {
                             // 忽略错误
+                        }
+                    }
+                    else if (policy_name == `${body.farm_name}-总策略`) {
+                        try {
+                            let assignment_config = sub_policy.init_variables.find(item => item.variable_name === '所有轮灌组');
+                            let original_array = [];
+                            if (assignment_config.expression.length > 2) {
+                                original_array = assignment_config.expression.substr(1, assignment_config.expression.length - 2).split(',').map(item => item.trim().replace(/"/g, ''));
+                                original_array = original_array.filter(item => item != body.policy_name);
+                            }
+                            let new_expression = '[]';
+                            if (original_array.length != 0) {
+                                new_expression = '["' + original_array.join('","') + '"]';
+                            }
+                            await policy_lib.init_assignment(policy_name, '所有轮灌组', new_expression, false, token);
+                        } catch (error) {
+
+                        }
+                    }
+                    else if (body.wgv_array.find(item => item.name === policy_name)) {
+                        try {
+                            await policy_lib.del_assignment(policy_name, '异常', 'enter', '需要跳过', body.policy_name);
+                        }
+                        catch (error) {
+
                         }
                     }
                 }
@@ -451,6 +479,36 @@ export default {
                     await policy_lib.del_policy(body.policy_name, token);
                 }
                 await cli_runtime_lib.do_config_batch(quick_config_template.add_group_policy(body));
+                let assignment_config = (await policy_lib.find_policy(`${body.farm_name}-总策略`, token)).init_variables.find(item => item.variable_name === '所有轮灌组');
+                let original_array = [];
+                if (assignment_config.expression.length > 2) {
+                    original_array = assignment_config.expression.substr(1, assignment_config.expression.length - 2).split(',').map(item => item.trim().replace(/"/g, ''));
+                }
+                original_array.push(body.policy_name);
+                let new_expression = '["' + original_array.join('","') + '"]';
+                await policy_lib.init_assignment(`${body.farm_name}-总策略`, '所有轮灌组', new_expression, false, token);
+                return { result: true };
+            },
+        },
+        init_global_policy: {
+            name: '初始化总策略',
+            description: '初始化总策略，创建默认的总策略模板',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                start_hour: { type: Number, mean: '开始小时', example: 6, have_to: true },
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true },
+            },
+            func: async function (body, token) {
+                let policy_name = `${body.farm_name}-总策略`;
+                let found_policy = await policy_lib.find_policy(policy_name, token);
+                if (found_policy) {
+                    await policy_lib.del_policy(policy_name, token);
+                }
+                await cli_runtime_lib.do_config_batch(quick_config_template.init_global_policy(body));
                 return { result: true };
             },
         },

@@ -56,4 +56,11 @@ export default {
         };
         return await call_remote('/config/add_group_policy', req, token);
     },
+    init_global_policy: async function (global_policy_config, token) {
+        let req = {
+            farm_name: global_policy_config.farm_name,
+            start_hour: parseInt(global_policy_config.start_hour),
+        };
+        return await call_remote('/config/init_global_policy', req, token);
+    }
 };

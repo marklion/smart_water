@@ -44,7 +44,7 @@ return`;
   init_water_policy_config: function (params) {
     let config_string = `
 policy
-  policy '供水'
+  policy '${params.policy_name}'
     init assignment 'false' '流量告警下限' '${params.flow_warning_low_limit}'
     init assignment 'false' '流量告警上限' '${params.flow_warning_high_limit}'
     init assignment 'false' '压力告警下限' '${params.pressure_warning_low_limit}'
@@ -58,11 +58,11 @@ policy
     init assignment 'false' '需要重置' 'false'
     init assignment 'false' '主管道累计流量' '0'
     init assignment 'false' '主管道累计流量增量' '0'
-    source '主管道压力读数' '主管道压力计' 'readout'
-    source '主管道流量读数' '主管道流量计' 'readout'
-    source '主管道流量累计读数' '主管道流量计' 'total_readout'
+    source '主管道压力读数' '${params.farm_name}-主管道压力计' 'readout'
+    source '主管道流量读数' '${params.farm_name}-主管道流量计' 'readout'
+    source '主管道流量累计读数' '${params.farm_name}-主管道流量计' 'total_readout'
     state '空闲'
-      enter action '主泵' 'close'
+      enter action '${params.farm_name}-主泵' 'close'
       enter assignment 'false' '需要重置' 'false'
       exit assignment 'false' '主管道累计流量' 'await prs.getSource("主管道流量累计读数")'
       transformer 'next'
@@ -70,7 +70,7 @@ policy
       return
     return
     state '主泵工作'
-      enter action '主泵' 'open'
+      enter action '${params.farm_name}-主泵' 'open'
       enter assignment 'false' '进入时间' 'Date.now()'
       do assignment 'false' '主管道累计流量增量' 'await prs.getSource("主管道流量累计读数") - prs.variables.get("主管道累计流量")'
       transformer 'next'
@@ -97,8 +97,8 @@ policy
       return
     return
     state '异常停机'
-      do action '主泵' 'close'
-      enter crossAssignment 'false' '"总策略"' '供水策略异常' 'true'
+      do action '${params.farm_name}-主泵' 'close'
+      enter crossAssignment 'false' '"${params.farm_name}-总策略"' '供水策略异常' 'true'
       exit assignment 'false' '需要启动' 'false'
       transformer 'next'
         rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
@@ -113,7 +113,7 @@ return`;
   init_fert_policy_config: function (params) {
     let config_string = `
 policy
-  policy '施肥'
+  policy '${params.policy_name}'
     init assignment 'false' '需要启动' 'false'
     init assignment 'false' '需要重置' 'false'
     init assignment 'false' '液位告警' '${params.level_warning_limit}'
@@ -124,10 +124,10 @@ policy
     init assignment 'false' '液位告警检查周期' '${params.level_check_interval * 1000}'
     init assignment 'false' '液位停机检查周期' '${params.level_check_interval * 1000}'
     init assignment 'false' '本次施肥量' '0'
-    source '施肥流量读数' '施肥流量计' 'readout'
-    source '施肥液位读数' '施肥液位计' 'readout'
+    source '施肥流量读数' '${params.farm_name}-施肥流量计' 'readout'
+    source '施肥液位读数' '${params.farm_name}-施肥液位计' 'readout'
     state '空闲'
-      enter action '施肥泵' 'close'
+      enter action '${params.farm_name}-施肥泵' 'close'
       enter assignment 'false' '本次施肥量' '0'
       enter assignment 'false' '需要重置' 'false'
       transformer 'next'
@@ -135,7 +135,7 @@ policy
       return
     return
     state '施肥工作'
-      enter action '施肥泵' 'open'
+      enter action '${params.farm_name}-施肥泵' 'open'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '上次采样' 'Date.now()'
       do assignment 'false' '采样时长' '(Date.now() - prs.variables.get("上次采样"))/1000'
@@ -162,8 +162,8 @@ policy
       return
     return
     state '异常停机'
-      do action '施肥泵' 'close'
-      enter crossAssignment 'false' '"总策略"' '施肥策略异常' 'true'
+      do action '${params.farm_name}-施肥泵' 'close'
+      enter crossAssignment 'false' '"${params.farm_name}-总策略"' '施肥策略异常' 'true'
       exit assignment 'false' '需要启动' 'false'
       transformer 'next'
         rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
@@ -198,12 +198,13 @@ return
     let config_string = `
 policy
   ${exeption_push_config}
-  policy '施肥'
+  policy '${params.farm_name}-施肥'
     state '施肥工作'
       do crossAssignment 'false' '"${params.policy_name}"' '当前施肥量' 'prs.variables.get("本次施肥量")'
     return
   return
   policy '${params.policy_name}'
+    init assignment 'false' '组内阀门' '"${params.wgv_array.map((item) => item.name).join(",")}"'
     init assignment 'false' '肥前时间' '${params.pre_fert_time * 1000 * 60}'
     init assignment 'false' '施肥时间' '${params.fert_time * 1000 * 60}'
     init assignment 'false' '肥后时间' '${params.post_fert_time * 1000 * 60}'
@@ -223,7 +224,8 @@ policy
     watering group matrix 'total_water' '当前浇水量'
     watering group matrix 'total_fert' '当前施肥量'
     watering group matrix 'minute_left' '阶段剩余时间'
-    source '供水流量累计读数' '主管道流量计' 'total_readout'
+    watering group matrix 'valves' '组内阀门'
+    source '供水流量累计读数' '${params.farm_name}-主管道流量计' 'total_readout'
     state '空闲'
       enter assignment 'false' '当前施肥量' '0'
       enter assignment 'false' '当前浇水量' '0'
@@ -237,7 +239,7 @@ policy
     return
     state '肥前'
       ${valve_open_config}
-      enter crossAssignment 'false' '"总策略"' '${params.policy_name}已启动' 'true'
+      enter crossAssignment 'false' '"${params.farm_name}-总策略"' '当前轮灌组已启动' 'true'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '阶段剩余时间' '0'
       do assignment 'false' '阶段剩余时间' 'prs.variables.get("肥前时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60'
@@ -248,12 +250,12 @@ policy
       return
     return
     state '施肥'
-      enter crossAssignment 'false' '"施肥"' '需要启动' 'true'
+      enter crossAssignment 'false' '"${params.farm_name}-施肥"' '需要启动' 'true'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '阶段剩余时间' '0'
       do assignment 'false' '阶段剩余时间' 'prs.variables.get("施肥策略") == "定时"?(prs.variables.get("施肥时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60):( (prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率")) * 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60 )'
       do assignment 'false' '当前浇水量' 'await prs.getSource("供水流量累计读数") - prs.variables.get("主管道流量累计值")'
-      exit crossAssignment 'false' '"施肥"' '需要启动' 'false'
+      exit crossAssignment 'false' '"${params.farm_name}-施肥"' '需要启动' 'false'
       transformer 'timeup'
         rule 'false' '肥后' '"定时" != prs.variables.get("施肥策略") && prs.variables.get("当前施肥量") >= prs.variables.get("期望施肥总量")'
         rule 'false' '肥后' '"定时" == prs.variables.get("施肥策略") && (prs.variables.get("施肥时间") > 0) && prs.variables.get("阶段剩余时间") < 0'
@@ -274,7 +276,7 @@ policy
       return
     return
     state '收尾'
-      enter crossAssignment 'false' '"总策略"' '${params.policy_name}已启动' 'false'
+      enter crossAssignment 'false' '"${params.farm_name}-总策略"' '当前轮灌组已启动' 'false'
       transformer 'next'
         rule 'false' '空闲' 'prs.variables.get("需要启动") == false'
       return
@@ -283,6 +285,78 @@ policy
     match farm '${params.farm_name}'
   return
 return`;
+    return config_string;
+  },
+  init_global_policy: function (params) {
+    let config_string = `
+policy
+policy '${params.farm_name}-总策略'
+    init assignment 'false' '需要启动' 'false'
+    init assignment 'false' '需要重置' 'false'
+    init assignment 'false' '启动时间' '${params.start_hour}'
+    init assignment 'false' '今天日期' '0'
+    init assignment 'false' '今天已经自动启动过了' 'false'
+    init assignment 'false' '当前轮灌组索引' '0'
+    init assignment 'false' '当前轮灌组名称' '""'
+    init assignment 'false' '上一个轮灌组名称' '""'
+    init assignment 'false' '当前轮灌组已启动' 'false'
+    init assignment 'false' '供水策略异常' 'false'
+    init assignment 'false' '施肥策略异常' 'false'
+    init assignment 'false' '所有轮灌组' '[]'
+    state '空闲'
+      enter assignment 'false' '供水策略异常' 'false'
+      enter assignment 'false' '施肥策略异常' 'false'
+      enter crossAssignment 'false' '"${params.farm_name}-供水"' '需要启动' 'false'
+      enter assignment 'false' '需要重置' 'false'
+      enter assignment 'false' '当前轮灌组索引' '0-1'
+      do assignment 'false' '今天已经自动启动过了' '(new Date().getDate() != prs.variables.get("今天日期"))?false:(prs.variables.get("今天已经自动启动过了"))'
+      do assignment 'false' '今天日期' 'new Date().getDate()'
+      transformer 'next'
+        rule 'false' '准备' 'prs.variables.get("需要启动") == true'
+        rule 'false' '准备' 'prs.variables.get("启动时间") == new Date().getHours() && prs.variables.get("今天已经自动启动过了") == false'
+      return
+    return
+    state '准备'
+      enter assignment 'false' '需要启动' 'false'
+      enter assignment 'false' '今天已经自动启动过了' 'true'
+      enter assignment 'false' '上一个轮灌组名称' 'prs.variables.get("当前轮灌组索引")>=prs.variables.get("所有轮灌组").length?"":(prs.variables.get("所有轮灌组")[prs.variables.get("当前轮灌组索引")])'
+      enter assignment 'false' '当前轮灌组索引' 'prs.variables.get("当前轮灌组索引") + 1'
+      enter assignment 'false' '当前轮灌组名称' 'prs.variables.get("当前轮灌组索引")>=prs.variables.get("所有轮灌组").length?"":(prs.variables.get("所有轮灌组")[prs.variables.get("当前轮灌组索引")])'
+      do crossAssignment 'false' 'prs.variables.get("当前轮灌组名称")' '需要启动' 'true'
+      exit crossAssignment 'false' '"${params.farm_name}-供水"' '需要启动' 'true'
+      exit crossAssignment 'false' 'prs.variables.get("上一个轮灌组名称")' '需要启动' 'false'
+      transformer 'next'
+        rule 'false' '空闲' 'prs.variables.get("当前轮灌组名称") == ""'
+        rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
+        rule 'false' '工作' 'prs.variables.get("当前轮灌组已启动") == true'
+      return
+      transformer 'exp'
+        rule 'false' '异常' 'prs.variables.get("供水策略异常") == true'
+        rule 'false' '异常' 'prs.variables.get("施肥策略异常") == true'
+      return
+    return
+    state '工作'
+      transformer 'next'
+        rule 'false' '准备' 'prs.variables.get("当前轮灌组已启动") == false'
+        rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
+      return
+      transformer 'exp'
+        rule 'false' '异常' 'prs.variables.get("供水策略异常") == true'
+        rule 'false' '异常' 'prs.variables.get("施肥策略异常") == true'
+      return
+    return
+    state '异常'
+      warning '\`${params.farm_name}总策略异常,因为\${prs.variables.get("供水策略异常") == true?"供水策略异常":""}\${prs.variables.get("施肥策略异常") == true?"施肥策略异常":""}\`'
+      transformer 'next'
+        rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
+      return
+    return
+    init state '空闲'
+    match farm '农场1'
+  return
+
+return
+    `;
     return config_string;
   },
 };
