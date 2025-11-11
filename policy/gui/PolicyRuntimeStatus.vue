@@ -115,6 +115,7 @@ const policies = ref([])
 const selectedPolicy = ref(null)
 const selectedPolicyRuntime = ref(null)
 const wateringGroupPolicies = ref([]) // 轮灌组中的策略名称列表
+const policyRuntimeMap = ref({}) // 存储每个策略的运行时状态
 
 // 内联编辑相关数据
 const editingVariable = ref(null)
@@ -190,10 +191,51 @@ const loadPolicies = async () => {
     policies.value = allPolicies.filter(policy => 
       !wateringGroupPolicies.value.includes(policy.name)
     )
+    
+    // 为每个策略加载运行时状态
+    await loadAllPoliciesRuntime()
   } catch (error) {
     console.error('加载策略列表失败:', error)
     ElMessage.error('加载策略列表失败')
   }
+}
+
+// 加载所有策略的运行时状态
+const loadAllPoliciesRuntime = async () => {
+  // 并行加载所有策略的运行时状态
+  const runtimePromises = policies.value.map(async (policy) => {
+    try {
+      const result = await call_remote('/policy/get_policy_runtime', { policy_name: policy.name })
+      // 解析变量数据
+      let variables = {}
+      if (result.variables) {
+        try {
+          variables = JSON.parse(result.variables)
+        } catch (e) {
+          console.warn(`解析策略 ${policy.name} 变量数据失败:`, e)
+        }
+      }
+      return {
+        policyName: policy.name,
+        runtime: {
+          ...result,
+          variables
+        }
+      }
+    } catch (error) {
+      console.warn(`获取策略 ${policy.name} 运行时状态失败:`, error)
+      return {
+        policyName: policy.name,
+        runtime: null
+      }
+    }
+  })
+  
+  const results = await Promise.all(runtimePromises)
+  // 将结果存储到 map 中
+  results.forEach(({ policyName, runtime }) => {
+    policyRuntimeMap.value[policyName] = runtime
+  })
 }
 
 // 选择策略查看运行时状态
@@ -223,14 +265,19 @@ const loadPolicyRuntime = async (policyName) => {
       }
     }
 
-    selectedPolicyRuntime.value = {
+    const runtimeData = {
       ...result,
       variables
     }
+    
+    selectedPolicyRuntime.value = runtimeData
+    // 同时更新策略运行时状态映射，以便卡片显示正确的状态
+    policyRuntimeMap.value[policyName] = runtimeData
   } catch (error) {
     console.error('获取策略运行时状态失败:', error)
     ElMessage.error('获取策略运行时状态失败')
     selectedPolicyRuntime.value = null
+    policyRuntimeMap.value[policyName] = null
   }
 }
 
@@ -241,9 +288,10 @@ const getPolicyStatusType = (policy) => {
 
 // 获取策略状态文本 - 使用实际状态数据
 const getPolicyStatusText = (policy) => {
-  // 如果有选中的策略运行时状态，使用其状态
-  if (selectedPolicyRuntime.value && selectedPolicyRuntime.value.current_state) {
-    return selectedPolicyRuntime.value.current_state
+  // 从策略运行时状态映射中获取该策略的状态
+  const runtime = policyRuntimeMap.value[policy.name]
+  if (runtime && runtime.current_state) {
+    return runtime.current_state
   }
   // 否则返回默认状态
   return '未运行'
@@ -340,10 +388,15 @@ const startAutoRefresh = () => {
   }
   
   autoRefreshTimer.value = setInterval(async () => {
-    if (selectedPolicy.value && !isAutoRefreshing.value) {
+    if (!isAutoRefreshing.value) {
       isAutoRefreshing.value = true
       try {
-        await loadPolicyRuntime(selectedPolicy.value.name)
+        // 刷新所有策略的运行时状态
+        await loadAllPoliciesRuntime()
+        // 如果当前有选中的策略，也刷新其详细运行时状态
+        if (selectedPolicy.value) {
+          await loadPolicyRuntime(selectedPolicy.value.name)
+        }
       } catch (error) {
         console.warn('自动刷新策略运行时状态失败:', error)
       } finally {
@@ -365,7 +418,7 @@ const stopAutoRefresh = () => {
 const refresh = async () => {
   await loadPolicies()
   if (selectedPolicy.value) {
-    loadPolicyRuntime(selectedPolicy.value.name)
+    await loadPolicyRuntime(selectedPolicy.value.name)
   }
 }
 

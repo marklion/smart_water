@@ -10,6 +10,7 @@ class SafeExpressionEvaluator {
             'ConditionalExpression', // 三元表达式 (condition ? trueValue : falseValue)
             'MemberExpression',  // 成员表达式 (object.property)
             'CallExpression',    // 函数调用
+            'NewExpression',     // new 表达式 (new Date())
             'LogicalExpression',  // 逻辑表达式 (&&, ||),
             'AwaitExpression',    // Await 表达式
             'TemplateLiteral',  // 模板字符串
@@ -94,6 +95,9 @@ class SafeExpressionEvaluator {
             case 'MemberExpression':
                 this.validateMemberExpression(node);
                 break;
+            case 'NewExpression':
+                this.validateNewExpression(node);
+                break;
             case 'Identifier':
                 // 标识符验证在求值时进行，这里只检查基本格式
                 if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(node.name)) {
@@ -154,6 +158,14 @@ class SafeExpressionEvaluator {
             // 允许访问 Math 和 Date 对象的属性
             return;
         }
+
+        // 允许访问 new Date() 等 NewExpression 的结果
+        if (node.object.type === 'NewExpression') {
+            // 验证 new 表达式本身
+            this.validateNewExpression(node.object);
+            return;
+        }
+
         // 允许访问对象的属性，如 sensors.temperature
         // 也允许对函数调用或 new 表达式的返回值进行成员访问，例如 new Date().getHours()
         if (node.object.type === 'Identifier' ||
@@ -164,6 +176,17 @@ class SafeExpressionEvaluator {
         }
 
         throw new Error(`不允许的成员访问: ${this.getMemberExpressionName(node)}`);
+    }
+
+    validateNewExpression(node) {
+        // 只允许 new Date() 和 new 其他允许的全局对象
+        if (node.callee.type === 'Identifier') {
+            if (this.allowedGlobals.has(node.callee.name)) {
+                return; // 允许 new Date()
+            }
+            throw new Error(`不允许的 new 表达式: new ${node.callee.name}`);
+        }
+        throw new Error('不允许的 new 表达式类型');
     }
 
     getMemberExpressionName(node) {
@@ -255,6 +278,8 @@ class SafeExpressionEvaluator {
                 }
                 return result;
             }
+            case 'NewExpression':
+                return await this.evaluateNewExpression(node, context);
             case 'LogicalExpression':
                 return await this.evaluateLogicalExpression(node, context);
             case 'TemplateLiteral': {
@@ -360,6 +385,21 @@ class SafeExpressionEvaluator {
         }
 
         throw new Error('不支持的函数调用类型');
+    }
+
+    async evaluateNewExpression(node, context) {
+        const argsPromises = node.arguments.map(arg => this.evaluateNode(arg, context));
+        const args = await Promise.all(argsPromises);
+
+        if (node.callee.type === 'Identifier') {
+            const Constructor = context[node.callee.name];
+            if (typeof Constructor !== 'function') {
+                throw new Error(`不是构造函数: ${node.callee.name}`);
+            }
+            return new Constructor(...args);
+        }
+
+        throw new Error('不支持的 new 表达式类型');
     }
     async evaluateLogicalExpression(node, context) {
         const left = await this.evaluateNode(node.left, context);
