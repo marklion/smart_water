@@ -278,8 +278,6 @@ class SafeExpressionEvaluator {
                 }
                 return result;
             }
-            case 'NewExpression':
-                return await this.evaluateNewExpression(node, context);
             case 'LogicalExpression':
                 return await this.evaluateLogicalExpression(node, context);
             case 'TemplateLiteral': {
@@ -387,20 +385,6 @@ class SafeExpressionEvaluator {
         throw new Error('不支持的函数调用类型');
     }
 
-    async evaluateNewExpression(node, context) {
-        const argsPromises = node.arguments.map(arg => this.evaluateNode(arg, context));
-        const args = await Promise.all(argsPromises);
-
-        if (node.callee.type === 'Identifier') {
-            const Constructor = context[node.callee.name];
-            if (typeof Constructor !== 'function') {
-                throw new Error(`不是构造函数: ${node.callee.name}`);
-            }
-            return new Constructor(...args);
-        }
-
-        throw new Error('不支持的 new 表达式类型');
-    }
     async evaluateLogicalExpression(node, context) {
         const left = await this.evaluateNode(node.left, context);
 
