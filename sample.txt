@@ -1,15 +1,15 @@
 set_sys_name 'no_name'
 device
-  add device '农场1-施肥泵' 'virtualDevice' 'vd.log' '1' '2' '农场1' 
-  add device '农场1-施肥流量计' 'virtualDevice' 'vd.log' '1' '2' '农场1' 
-  add device '农场1-施肥液位计' 'virtualDevice' 'vd.log' '1' '2' '农场1' 
-  add device '轮灌阀门1' 'virtualDevice' 'vd.log' '3' '2' '农场1' '地块1'
-  add device '轮灌阀门2' 'virtualDevice' 'vd.log' '3' '2' '农场1' '地块1'
-  add device '轮灌阀门3' 'virtualDevice' 'vd.log' '3' '2' '农场1' '地块2'
-  add device '轮灌阀门4' 'virtualDevice' 'vd.log' '3' '2' '农场2' '地块1'
-  add device '农场1-主泵' 'virtualDevice' 'vd.log' '1' '2' '农场1' 
-  add device '农场1-主管道流量计' 'virtualDevice' 'vd.log' '1' '2' '农场1' 
-  add device '农场1-主管道压力计' 'virtualDevice' 'vd.log' '1' '2' '农场1' 
+  add device '农场1-施肥泵' 'virtualDevice' 'vd.log' '1' '2' '农场1'
+  add device '农场1-施肥流量计' 'virtualDevice' 'vd.log' '1' '2' '农场1'
+  add device '农场1-施肥液位计' 'virtualDevice' 'vd.log' '1' '2' '农场1'
+  add device '轮灌阀门1' 'WaterGroupValve' '{"deviceSN":"a"}' '3' '2' '农场1' '地块1'
+  add device '轮灌阀门2' 'WaterGroupValve' '{"deviceSN":"a"}' '3' '2' '农场1' '地块1'
+  add device '轮灌阀门3' 'WaterGroupValve' '{"deviceSN":"a"}' '3' '2' '农场1' '地块2'
+  add device '轮灌阀门4' 'WaterGroupValve' '{"deviceSN":"a"}' '3' '2' '农场2' '地块1'
+  add device '农场1-主泵' 'virtualDevice' 'vd.log' '1' '2' '农场1'
+  add device '农场1-主管道流量计' 'virtualDevice' 'vd.log' '1' '2' '农场1'
+  add device '农场1-主管道压力计' 'virtualDevice' 'vd.log' '1' '2' '农场1'
 return
 resource
   farm
