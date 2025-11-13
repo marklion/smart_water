@@ -434,6 +434,7 @@ async function group_run_once(begin_total, end_total) {
     await mock_readout('轮灌阀门1', 5);
     await mock_readout('轮灌阀门2', 5);
     await mock_readout('轮灌阀门3', 2);
+    await wait_spend_ms(start_point, 60);
     await confirm_policy_status('轮灌组1', '肥前');
     await confirm_valve_status('轮灌阀门1', true);
     await confirm_valve_status('轮灌阀门2', true);
