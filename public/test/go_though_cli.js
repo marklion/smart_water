@@ -260,12 +260,12 @@ function convert_param(cmd, param) {
             values: ['true', 'false']
         },
         {
-            cmd:'list policy',
-            param:'policy_name',
-            values:['a']
+            cmd: 'list policy',
+            param: 'policy_name',
+            values: ['a']
         },
         {
-            cmd:'runtime assignment',
+            cmd: 'runtime assignment',
             param: 'policy_name',
             values: ['a', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
@@ -283,18 +283,22 @@ function convert_param(cmd, param) {
             cmd: 'runtime assignment',
             param: 'expression',
             values: ['"abcd"', '12345', '1 + 1', '"test_string"']
+        }, {
+            cmd: 'del watering group matrix',
+            param: 'key_name',
+            values: ['abcd', 'defg']
+        }, {
+            cmd: 'shutdown device',
+            param: 'device_name',
+            values: ['abcd', 'ffff']
+        }, {
+            cmd: 'match farm',
+            param: 'farm_name',
+            values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },{
-            cmd:'del watering group matrix',
-            param:'key_name',
-            values:['abcd','defg']
-        },{
-            cmd:'shutdown device',
-            param:'device_name',
-            values:['abcd','ffff']
-        },{
-            cmd:'match farm',
-            param:'farm_name',
-            values:['abcd','LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
+            cmd:'statistic',
+            param:'is_increment',
+            values:['true','false']
         }
     ];
     for (let item of exceptions) {
@@ -665,13 +669,24 @@ export default {
                 prompt: 'device',
                 cmd: 'mock readout'
             },
+            {
+                prompt: 'device',
+                cmd: 'mock total readout'
+            },
+            {
+                cmd:'paste',
+            },
+            {
+                cmd:'config',
+            },
         ];
         for (let item of whitelist) {
-            if (prompt.includes(item.prompt) && cmd == item.cmd) {
+            if ((!item.prompt || prompt.includes(item.prompt)) && cmd == item.cmd) {
                 ret = true;
                 break;
             }
         }
+
         return ret;
     },
     collect_cmds: async function (cli, cur_level = 'sw_cli') {

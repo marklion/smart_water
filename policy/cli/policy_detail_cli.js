@@ -167,16 +167,6 @@ export default {
     make_bdr: async function (view_name) {
         let ret = [];
         try {
-            // 显示初始状态配置
-            try {
-                let initStateResp = await policy_lib.get_init_state(view_name);
-                if (initStateResp.init_state) {
-                    ret.push(`init state '${initStateResp.init_state}'`);
-                }
-            } catch (err) {
-                // 忽略获取初始状态时的错误
-            }
-
             // 显示初始化变量赋值配置
             try {
                 let policyResp = await policy_lib.list_policy(0);

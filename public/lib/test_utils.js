@@ -53,6 +53,16 @@ async function wait_ms(ms) {
         }, ms);
     });
 }
+async function wait_spend_ms(start_point,ms) {
+    return new Promise(resolve=>{
+        let int = setInterval(()=>{
+            if (Date.now() - start_point >= ms) {
+                clearInterval(int);
+                resolve();
+            }
+        }, 10);
+    });
+}
 async function call_api(path, params) {
     let real_path = `http://localhost:47147/api/v1${path}`;
     let ret = '';
@@ -159,4 +169,4 @@ export default async function create_cli(processName) {
 
     return ret;
 }
-export { start_server, close_server, print_test_log, wait_ms, call_api };
+export { start_server, close_server, print_test_log, wait_ms, call_api, wait_spend_ms };

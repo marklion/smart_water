@@ -5,6 +5,7 @@ import policy_cli from '../../policy/cli/policy_cli.js';
 import web_cli from '../../web/cli/web_cli.js';
 import warning_cli from '../../warning/cli/warning_cli.js';
 import statistic_cli from '../../statistic/cli/statistic_cli.js';
+import config_cli from '../../config/cli/config_cli.js';
 import call_remote from '../lib/call_remote.js';
 import events from 'events';
 let g_vorpal = undefined;
@@ -13,7 +14,7 @@ async function make_bdr() {
     let ret = [];
     let sys_name = (await call_remote('/get_sys_name', {})).sys_name;
     ret.push(`set_sys_name '${sys_name}'`);
-    ret = ret.concat(await cli_utils.make_sub_bdr(g_vorpal));
+    ret = ret.concat(await cli_utils.make_sub_bdr(get_vorpal()));
     return ret;
 }
 function get_vorpal() {
@@ -44,6 +45,7 @@ function get_vorpal() {
         cli_utils.add_sub_cli(vorpal, web_cli, prompt);
         cli_utils.add_sub_cli(vorpal, warning_cli, prompt);
         cli_utils.add_sub_cli(vorpal, statistic_cli, prompt);
+        cli_utils.add_sub_cli(vorpal, config_cli, prompt);
         vorpal.delimiter(prompt);
         g_vorpal = vorpal;
     }
@@ -128,16 +130,26 @@ export default {
             fs.appendFileSync(filename, single_config + '\n');
         }
     },
-    do_config: async function (vorpal, command) {
+    do_config: async function (vorpal, command, care_error) {
         if (!vorpal) {
             vorpal = get_vorpal();
         }
-        let next_vorpal = await vorpal.execSync(command);
-        let ret = vorpal;
-        if (next_vorpal != vorpal && next_vorpal != undefined) {
-            ret = next_vorpal;
+        return await cli_utils.do_config(vorpal, command, care_error);
+    },
+    do_config_batch: async function (commands, care_error = false) {
+        await this.save_config('tmp_config_for_restore.txt');
+        let vorpal = get_vorpal();
+        try {
+            let lines = commands.split('\n').filter(line => line.trim() !== '');
+            for (let line of lines) {
+                vorpal = await this.do_config(vorpal, line, care_error);
+            }
         }
-        return ret;
+        catch (err) {
+            await cli_utils.clear_config(get_vorpal());
+            await this.restore_config('tmp_config_for_restore.txt');
+            throw err;
+        }
     },
     restore_config: async function (filename) {
         if (!filename) {
@@ -148,22 +160,19 @@ export default {
             throw new Error(`配置文件 ${filename} 不存在`);
         }
         let content = fs.readFileSync(filename, 'utf-8');
-        let commands = content.split('\n').filter(line => line.trim() !== '');
-        let vorpal = get_vorpal();
-        for (let command of commands) {
-            vorpal = await this.do_config(vorpal, command);
-        }
+        await this.do_config_batch(content);
     },
     destroy: function () {
-        let sub_clies = g_vorpal.sub_clies;
+        let vp = get_vorpal();
+        let sub_clies = vp.sub_clies;
         for (let sub_cli of sub_clies) {
             if (sub_cli._vorpalInstance) {
                 sub_cli._vorpalInstance.hide();
                 delete sub_cli._vorpalInstance;
             }
         }
-        g_vorpal.sub_clies = [];
-        g_vorpal.hide();
+        vp.sub_clies = [];
+        vp.hide();
         g_vorpal = undefined;
     }
 }

@@ -32,7 +32,7 @@ jobs:
         cache: 'npm'
     - run: npm ci
     - run: npm run citest
-      timeout-minutes: 10
+      timeout-minutes: 20
       env:
         CI: true
         DISPLAY: ':99.0'

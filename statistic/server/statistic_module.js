@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import moment from 'moment';
+import statistic_lib from '../lib/statistic_lib.js';
 
 // 统计文件目录（可通过环境变量 STAT_FILE_DIR 覆盖），默认使用当前工作目录保持向后兼容
 const STAT_DIR = process.env.STAT_FILE_DIR || process.cwd();
@@ -23,13 +24,25 @@ export default {
             is_get_api: false,
             params: {
                 item_name: { type: String, mean: '统计项名称', example: 'total_water_usage', have_to: true },
-                value: { type: String, mean: '统计值', example: 'abc', have_to: true }
+                value: { type: String, mean: '统计值', example: 'abc', have_to: true },
+                is_increment: { type: Boolean, mean: '是否为增量更新', example: false, have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let content = `${moment().format('YYYY-MM-DD HH:mm:ss')}==${body.value}==\n`;
+                let value_to_store = parseFloat(body.value);
+                if (body.is_increment) {
+                    let last_value = 0;
+                    let resp = await statistic_lib.list_all_items(token);
+                    let existing_item = resp.find(i => i.item_name === body.item_name);
+                    if (existing_item) {
+                        last_value = parseFloat(existing_item.last_value) || 0;
+                    }
+                    value_to_store = parseFloat(body.value) + last_value;
+                }
+
+                let content = `${moment().format('YYYY-MM-DD HH:mm:ss')}==${value_to_store.toFixed(2)}==\n`;
                 const filePath = await get_file_by_item(body.item_name);
                 // 使用 appendFile，底层会创建文件（我们已确保目录存在）并进行追加，避免手动 open/close
                 await fs.promises.appendFile(filePath, content, 'utf8');
@@ -83,7 +96,7 @@ export default {
                 return { items: items, total: files.length };
             }
         },
-        list_item_history:{
+        list_item_history: {
             name: '列出统计项历史记录',
             description: '列出某个统计项的历史记录',
             is_write: false,

@@ -21,3 +21,23 @@ export default async function (url, body, token = '') {
 export function inject_err_handler(fn) {
     err_handler = fn;
 }
+export async function find_by_list(list_fn, cmp_func, token) {
+    let ret = undefined;
+    let pageNo = 0;
+    while (true) {
+        let result_items = await list_fn(pageNo, token);
+        if (result_items && result_items.length > 0) {
+            ret = result_items.find(cmp_func);
+            if (ret !== undefined) {
+                break;
+            }
+            pageNo++;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return ret;
+}

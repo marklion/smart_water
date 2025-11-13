@@ -14,8 +14,10 @@ class SafeExpressionEvaluator {
             'LogicalExpression',  // 逻辑表达式 (&&, ||),
             'AwaitExpression',    // Await 表达式
             'TemplateLiteral',  // 模板字符串
-            'TemplateElement' // 模板字符串元素
+            'TemplateElement', // 模板字符串元素
+            'NewExpression'
         ]);
+
 
         // 允许的二元运算符
         this.allowedBinaryOperators = new Set([
@@ -40,6 +42,10 @@ class SafeExpressionEvaluator {
         this.allowedGlobals = new Set([
             'Math', 'Date', 'prs.variables', 'prs', 'variables'
         ]);
+
+        // 允许的其它节点（数组字面量和展开元素）
+        this.allowedNodeTypes.add('ArrayExpression');
+        this.allowedNodeTypes.add('SpreadElement');
 
         // 危险函数名列表
         this.dangerousFunctions = new Set([
@@ -161,7 +167,11 @@ class SafeExpressionEvaluator {
         }
 
         // 允许访问对象的属性，如 sensors.temperature
-        if (node.object.type === 'Identifier' || node.object.type === 'MemberExpression') {
+        // 也允许对函数调用或 new 表达式的返回值进行成员访问，例如 new Date().getHours()
+        if (node.object.type === 'Identifier' ||
+            node.object.type === 'MemberExpression' ||
+            node.object.type === 'CallExpression' ||
+            node.object.type === 'NewExpression') {
             return;
         }
 
@@ -188,7 +198,43 @@ class SafeExpressionEvaluator {
             const property = node.computed ? `[${node.property.value}]` : `.${node.property.name}`;
             return object + property;
         }
+        if (node.type === 'CallExpression') {
+            // 尝试解析 callee 名称并加上 ()
+            const calleeName = this.getMemberExpressionName(node.callee || node.callee?.object || node.callee?.name) || 'unknown';
+            return calleeName + '()';
+        }
+        if (node.type === 'NewExpression') {
+            const calleeName = this.getMemberExpressionName(node.callee) || 'unknown';
+            return 'new ' + calleeName + '()';
+        }
         return 'unknown';
+    }
+    async evaluateNewExpression(node, context) {
+        // 评估构造函数和参数，然后用 new 创建实例
+        let ctor;
+        if (node.callee.type === 'Identifier') {
+            const name = node.callee.name;
+            if (name in context) {
+                ctor = context[name];
+            } else if (this.allowedGlobals.has(name) && typeof globalThis[name] !== 'undefined') {
+                ctor = globalThis[name];
+            } else {
+                throw new Error(`未定义的构造函数: ${name}`);
+            }
+        } else if (node.callee.type === 'MemberExpression') {
+            // 支持诸如 SomeNamespace.Clazz 的构造
+            ctor = await this.evaluateNode(node.callee, context);
+        } else {
+            throw new Error('不支持的 NewExpression callee 类型');
+        }
+
+        if (typeof ctor !== 'function') {
+            throw new Error('不是构造函数');
+        }
+
+        const args = await Promise.all((node.arguments || []).map(arg => this.evaluateNode(arg, context)));
+        // 使用 Reflect.construct 比直接 new 更通用
+        return Reflect.construct(ctor, args);
     }
     async evaluateNode(node, context) {
         switch (node.type) {
@@ -213,8 +259,25 @@ class SafeExpressionEvaluator {
                 return await this.evaluateMemberExpression(node, context);
             case 'CallExpression':
                 return await this.evaluateCallExpression(node, context);
-            case 'NewExpression':
-                return await this.evaluateNewExpression(node, context);
+            case 'ArrayExpression': {
+                // 处理数组字面量，支持稀疏元素和展开元素
+                const result = [];
+                for (const el of (node.elements || [])) {
+                    if (el === null) {
+                        // 稀疏数组的空位，保持为 undefined
+                        result.push(undefined);
+                    } else if (el.type === 'SpreadElement') {
+                        const spreadVal = await this.evaluateNode(el.argument, context);
+                        if (spreadVal == null || typeof spreadVal[Symbol.iterator] !== 'function') {
+                            throw new Error('Spread 元素不是可迭代对象');
+                        }
+                        for (const item of spreadVal) result.push(item);
+                    } else {
+                        result.push(await this.evaluateNode(el, context));
+                    }
+                }
+                return result;
+            }
             case 'LogicalExpression':
                 return await this.evaluateLogicalExpression(node, context);
             case 'TemplateLiteral': {
@@ -234,6 +297,9 @@ class SafeExpressionEvaluator {
                 // Evaluate the inner expression and await if it's a promise
                 const result = await this.evaluateNode(node.argument, context);
                 return result;
+            }
+            case 'NewExpression': {
+                return await this.evaluateNewExpression(node, context);
             }
             default:
                 throw new Error(`不支持的节点类型: ${node.type}`);
@@ -297,9 +363,13 @@ class SafeExpressionEvaluator {
         const args = await Promise.all(argsPromises);
 
         if (node.callee.type === 'Identifier') {
-            const func = context[node.callee.name];
+            const name = node.callee.name;
+            let func = undefined;
+            if (name in context) func = context[name];
+            else if (this.allowedGlobals.has(name) && typeof globalThis[name] !== 'undefined') func = globalThis[name];
+
             if (typeof func !== 'function') {
-                throw new Error(`不是函数: ${node.callee.name}`);
+                throw new Error(`不是函数: ${name}`);
             }
             return func(...args);
         } else if (node.callee.type === 'MemberExpression') {
@@ -315,20 +385,6 @@ class SafeExpressionEvaluator {
         throw new Error('不支持的函数调用类型');
     }
 
-    async evaluateNewExpression(node, context) {
-        const argsPromises = node.arguments.map(arg => this.evaluateNode(arg, context));
-        const args = await Promise.all(argsPromises);
-
-        if (node.callee.type === 'Identifier') {
-            const Constructor = context[node.callee.name];
-            if (typeof Constructor !== 'function') {
-                throw new Error(`不是构造函数: ${node.callee.name}`);
-            }
-            return new Constructor(...args);
-        }
-
-        throw new Error('不支持的 new 表达式类型');
-    }
     async evaluateLogicalExpression(node, context) {
         const left = await this.evaluateNode(node.left, context);
 

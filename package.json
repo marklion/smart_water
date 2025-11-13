@@ -51,6 +51,7 @@
     "dependencies": {
         "acorn": "^8.15.0",
         "axios": "^1.11.0",
+        "clipboardy": "^5.0.0",
         "cls-hooked": "^4.2.2",
         "connect-history-api-fallback": "^2.0.0",
         "crc": "^4.3.2",

@@ -101,6 +101,10 @@ export default {
             await device_management_lib.mock_readout(args.device_name, Number.parseFloat(args.value), this.token);
             return `设备 ${args.device_name} 模拟读数为: ${args.value}`;
         });
+        cli_utils.make_common_cmd(vorpal, 'mock total readout <device_name> <value>', '模拟设备累计读数', async (cmd_this, args) => {
+            await device_management_lib.mock_total_readout(args.device_name, Number.parseFloat(args.value), this.token);
+            return `设备 ${args.device_name} 模拟累计读数为: ${args.value}`;
+        });
         cli_utils.make_common_cmd(vorpal, 'shutdown device <device_name>', '设备急停', async (cmd_this, args) => {
             await device_management_lib.shutdown_device(args.device_name, this.token);
             return `设备 ${args.device_name} 已急停`;

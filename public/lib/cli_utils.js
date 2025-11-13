@@ -1,4 +1,5 @@
 import Vorpal from 'vorpal';
+import clipboardy from 'clipboardy';
 const g_key_event = {
     key: undefined,
     value: undefined
@@ -28,9 +29,41 @@ export default {
                 data.value = g_key_event.value;
             }
         });
+        this.make_common_cmd(vorpal, 'paste', '粘贴之前复制的命令', async (cmd_this, args) => {
+            let clip_text = await clipboardy.read();
+            let cmd_array = clip_text.split('\n').map(item => item.trim()).filter(item => item.length > 0);
+            let tmp_vorpal = vorpal;
+            for (let cmd of cmd_array) {
+                tmp_vorpal = await this.do_config(tmp_vorpal, cmd);
+            }
+        });
         return vorpal;
     },
+    do_config: async function (vorpal, command, care_error = false) {
+        let ret = vorpal;
+        vorpal.pipe(log => {
+            if (log.indexOf('Error:') != -1 && care_error) {
+                throw { err_msg: log };
+            }
+            return log;
+        });
+        try {
+            let next_vorpal = await vorpal.execSync(command, {
+                fatal: care_error
+            });
+            if (next_vorpal != vorpal && next_vorpal != undefined) {
+                ret = next_vorpal;
+            }
+        }
+        catch (err) {
+            throw err;
+        }
+        finally {
+            vorpal.pipe(null);
+        }
 
+        return ret;
+    },
     add_sub_cli: function (cli, sub_cli_definition, parent_prompt) {
         let ins = this;
         let sub_cli = sub_cli_definition.install(parent_prompt);
@@ -143,11 +176,11 @@ export default {
             for (let sub_cli of sub_clies) {
                 let view_name_array = await this.get_view_name_array(sub_cli);
                 for (let view_name of view_name_array) {
-                    await vorpal.execSync(`${sub_cli.command} '${view_name}'`);
+                    await this.do_config(vorpal, `${sub_cli.command} '${view_name}'`);
                     await this.clear_config(sub_cli._vorpalInstance);
-                    await sub_cli._vorpalInstance.execSync('return');
+                    await this.do_config(sub_cli._vorpalInstance, 'return');
                     if (view_name != '') {
-                        await vorpal.execSync(`undo ${sub_cli.command} '${view_name}'`);
+                        await this.do_config(vorpal, `undo ${sub_cli.command} '${view_name}'`);
                     }
                 }
             }
@@ -155,7 +188,7 @@ export default {
         let undo_cmd_array = vorpal.undo_cmd_array;
         if (undo_cmd_array != undefined) {
             for (let undo_cmd of undo_cmd_array) {
-                await vorpal.execSync(undo_cmd);
+                await this.do_config(vorpal, undo_cmd);
             }
         }
     },
@@ -165,7 +198,11 @@ export default {
                 try {
                     let cleaned_args = { ...args };
                     for (let key in cleaned_args) {
-                        cleaned_args[key] = String(cleaned_args[key]);
+                        if (Array.isArray(cleaned_args[key])) {
+                            cleaned_args[key] = cleaned_args[key].map(item => String(item));
+                        } else {
+                            cleaned_args[key] = String(cleaned_args[key]);
+                        }
                     }
                     let result = await func(this, cleaned_args);
                     if (result) {

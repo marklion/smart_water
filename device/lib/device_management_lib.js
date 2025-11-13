@@ -1,7 +1,13 @@
 import call_remote from '../../public/lib/call_remote.js';
+import { find_by_list } from '../../public/lib/call_remote.js';
 export default{
     get_driver_list: async function (token, pageNo = 0) {
         return await call_remote('/device_management/list_driver', { pageNo }, token);
+    },
+    find_device:async function(device_name, token) {
+        return await find_by_list(async (pageNo, token)=>{
+            return (await this.list_device(pageNo, null, null, token)).devices;
+        }, item=>item.device_name === device_name, token);
     },
     add_device: async function (deviceConfig, token) {
         const {
@@ -41,6 +47,9 @@ export default{
     },
     mock_readout: async function (device_name, value, token) {
         return await call_remote('/device_management/mock_readout', { device_name, value }, token);
+    },
+    mock_total_readout: async function (device_name, value, token) {
+        return await call_remote('/device_management/mock_total_readout', { device_name, value }, token);
     },
     shutdown_device: async function (device_name, token) {
         return await call_remote('/device_management/shutdown_device', { device_name }, token);

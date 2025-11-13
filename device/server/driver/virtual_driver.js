@@ -5,7 +5,7 @@ import moment from 'moment';
 export default async function (config) {
     // 支持传入配置对象或直接传入日志文件路径（向后兼容）
     let log_file_path, device_type, device_name;
-    
+
     if (typeof config === 'string') {
         // 向后兼容：直接传入日志文件路径
         log_file_path = config;
@@ -17,7 +17,7 @@ export default async function (config) {
         device_type = config.device_type || 'valve';
         device_name = config.device_name || 'unknown';
     }
-    
+
     // 如果传入的是相对路径或简单文件名，则使用统一的日志目录
     let actual_log_path = log_file_path;
     if (!path.isAbsolute(log_file_path) && !log_file_path.includes('/')) {
@@ -33,6 +33,7 @@ export default async function (config) {
         log_file: actual_log_path,
         m_is_opened:false,
         mock_value: null, // 存储模拟值
+        mock_total_value:null,
         read_last_line:async function() {
             return new Promise((resolve, reject) => {
                 fs.readFile(actual_log_path, 'utf8', (err, data) => {
@@ -83,12 +84,12 @@ export default async function (config) {
             });
         },
         open: async function () {
-            await this.write_log('打开阀门');
+            await this.write_log(`${device_name}打开阀门`);
             this.m_is_opened = true;
             return { status: 'opened', message: '阀门已成功打开' };
         },
         close: async function () {
-            await this.write_log('关闭阀门');
+            await this.write_log(`${device_name}关闭阀门`);
             this.m_is_opened = false;
             return { status: 'closed', message: '阀门已成功关闭' };
         },
@@ -113,6 +114,9 @@ export default async function (config) {
 
             return value;
         },
+        total_readout: async function() {
+            return this.mock_total_value !== null ? this.mock_total_value : 0;
+        },
         mock_readout: async function (value) {
             this.mock_value = value; // 存储模拟值
             const deviceType = this.getDeviceType();
@@ -120,6 +124,11 @@ export default async function (config) {
             const details = `模拟${deviceType}: ${value}${unit}`;
             await this.write_log(`[模拟] ${details}`);
             return { status: 'mocked', value: value, message: `已设置模拟值为 ${value}${unit}` };
+        },
+        mock_total_readout: async function(value) {
+            this.mock_total_value = value;
+            await this.write_log(`[模拟] 模拟总读数: ${value}`);
+            return { status: 'mocked', value: value, message: `已设置模拟总读数为 ${value}` };
         },
         getDeviceType: function() {
             // 虚拟驱动程序统一返回"虚拟设备"
@@ -157,6 +166,7 @@ export default async function (config) {
             let ret = [];
             ret.push({text:'开关是否打开', func:'is_opened'});
             ret.push({text:'当前仪表读数', func:'readout'});
+            ret.push({text:'当前仪表累计读数', func:'total_readout'});
             return ret;
         },
         shutdown:async function() {
