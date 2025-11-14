@@ -407,6 +407,49 @@ export default {
                 return { result: true };
             },
         },
+        init_fert_mixing_policy: {
+            name: '快速配置施肥搅拌策略',
+            description: '快速配置施肥搅拌策略，创建包含搅拌功能的施肥策略模板',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                level_warning_limit: { type: Number, mean: '液位预警下限', example: 20, have_to: true },
+                level_shutdown_limit: { type: Number, mean: '液位停机下限', example: 10, have_to: true },
+                flow_warning_max_offset: { type: Number, mean: '流量预警最大偏差', example: 5, have_to: true },
+                level_check_interval: { type: Number, mean: '液位检查间隔(秒)', example: 10, have_to: true },
+                flow_check_interval: { type: Number, mean: '流量检查间隔(秒)', example: 10, have_to: true },
+                flow_expected_value: { type: Number, mean: '预期流量值', example: 50, have_to: true },
+                mixing_pump_name: { type: String, mean: '搅拌泵设备名称', example: '农场1-搅拌泵', have_to: false },
+                mixing_before_time: { type: Number, mean: '施肥前搅拌时间(分钟)', example: 5, have_to: false },
+                mixing_after_time: { type: Number, mean: '施肥后搅拌时间(分钟)', example: 3, have_to: false },
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let need_device_names = ['施肥液位计', '施肥流量计', '施肥泵'].map(item => `${body.farm_name}-${item}`);
+                let mixing_pump_name = body.mixing_pump_name || `${body.farm_name}-搅拌泵`;
+                need_device_names.push(mixing_pump_name);
+                
+                for (let device_name of need_device_names) {
+                    let found_device = await device_management_lib.find_device(device_name, token);
+                    if (!found_device) {
+                        throw {
+                            err_msg: '初始化施肥搅拌策略失败，缺少必要设备：' + device_name
+                        }
+                    }
+                }
+                let policy_name = `${body.farm_name}-施肥`
+                let found_policy = await policy_lib.find_policy(policy_name, token);
+                if (found_policy) {
+                    await policy_lib.del_policy(policy_name, token);
+                }
+                body.policy_name = policy_name;
+                await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_mixing_policy_config(body));
+                return { result: true };
+            },
+        },
         add_group_policy: {
             name: '快速配置添加轮灌组策略',
             description: '快速配置添加轮灌组策略',
