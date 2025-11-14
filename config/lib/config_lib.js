@@ -41,6 +41,27 @@ export default {
         };
         return await call_remote('/config/init_fert_policy', req, token);
     },
+    init_fert_mixing_policy: async function (fert_mixing_config, token) {
+        let req = {
+            farm_name: fert_mixing_config.farm_name,
+            flow_expected_value: parseFloat(fert_mixing_config.flow_expected_value),
+            flow_warning_max_offset: parseFloat(fert_mixing_config.flow_warning_max_offset),
+            flow_check_interval: parseInt(fert_mixing_config.flow_check_interval),
+            level_warning_limit: parseFloat(fert_mixing_config.level_warning_limit),
+            level_shutdown_limit: parseFloat(fert_mixing_config.level_shutdown_limit),
+            level_check_interval: parseInt(fert_mixing_config.level_check_interval),
+        };
+        if (fert_mixing_config.mixing_pump_name) {
+            req.mixing_pump_name = fert_mixing_config.mixing_pump_name;
+        }
+        if (fert_mixing_config.mixing_before_time !== undefined) {
+            req.mixing_before_time = parseFloat(fert_mixing_config.mixing_before_time);
+        }
+        if (fert_mixing_config.mixing_after_time !== undefined) {
+            req.mixing_after_time = parseFloat(fert_mixing_config.mixing_after_time);
+        }
+        return await call_remote('/config/init_fert_mixing_policy', req, token);
+    },
     add_group_policy: async function (group_policy_config, token) {
         let req = {
             policy_name: group_policy_config.policy_name,

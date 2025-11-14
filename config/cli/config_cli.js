@@ -65,6 +65,34 @@ export default {
                     return `施肥策略初始化失败`;
                 }
             });
+        cli_utils.make_common_cmd(vorpal, 'init fert mixing policy <farm_name> <flow_expected_value> <flow_warning_max_offset> <flow_check_interval> <level_warning_limit> <level_shutdown_limit> <level_check_interval> [mixing_pump_name] [mixing_before_time] [mixing_after_time]',
+            '快速配置施肥搅拌策略',
+            async (cmd_this, args) => {
+                let config = {
+                    farm_name: args.farm_name,
+                    flow_expected_value: args.flow_expected_value,
+                    flow_warning_max_offset: args.flow_warning_max_offset,
+                    flow_check_interval: args.flow_check_interval,
+                    level_warning_limit: args.level_warning_limit,
+                    level_shutdown_limit: args.level_shutdown_limit,
+                    level_check_interval: args.level_check_interval
+                };
+                if (args.mixing_pump_name) {
+                    config.mixing_pump_name = args.mixing_pump_name;
+                }
+                if (args.mixing_before_time) {
+                    config.mixing_before_time = args.mixing_before_time;
+                }
+                if (args.mixing_after_time) {
+                    config.mixing_after_time = args.mixing_after_time;
+                }
+                let result = await config_lib.init_fert_mixing_policy(config);
+                if (result.result) {
+                    return `施肥搅拌策略初始化成功`;
+                } else {
+                    return `施肥搅拌策略初始化失败`;
+                }
+            });
         cli_utils.make_common_cmd(vorpal, 'add group policy <policy_name> <farm_name> <pre_fert_time> <post_fert_time> <method> <fert_time> <area_based_amount> <area> <fert_rate> [wgv_array...]',
             '添加轮灌组施肥策略',
             async (cmd_this, args) => {
