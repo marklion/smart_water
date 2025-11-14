@@ -176,6 +176,104 @@ return
         `;
     return config_string;
   },
+  init_fert_mixing_policy_config: function (params) {
+    let mixing_pump_name = params.mixing_pump_name || `${params.farm_name}-搅拌泵`;
+    let mixing_before_time = params.mixing_before_time || 0; // 施肥前搅拌时间（分钟）
+    let mixing_after_time = params.mixing_after_time || 0; // 施肥后搅拌时间（分钟）
+    let mixing_before_ms = mixing_before_time * 1000 * 60;
+    let mixing_after_ms = mixing_after_time * 1000 * 60;
+    
+    let config_string = `
+policy
+  policy '${params.policy_name}'
+    init assignment 'false' '需要启动' 'false'
+    init assignment 'false' '需要重置' 'false'
+    init assignment 'false' '液位告警' '${params.level_warning_limit}'
+    init assignment 'false' '液位停机' '${params.level_shutdown_limit}'
+    init assignment 'false' '期望施肥流量' '${params.flow_expected_value}'
+    init assignment 'false' '流量告警偏移' '${params.flow_warning_max_offset}'
+    init assignment 'false' '流量检查周期' '${params.flow_check_interval * 1000}'
+    init assignment 'false' '液位告警检查周期' '${params.level_check_interval * 1000}'
+    init assignment 'false' '液位停机检查周期' '${params.level_check_interval * 1000}'
+    init assignment 'false' '本次施肥量' '0'
+    init assignment 'false' '搅拌前时间' '${mixing_before_ms}'
+    init assignment 'false' '搅拌后时间' '${mixing_after_ms}'
+    source '施肥流量读数' '${params.farm_name}-施肥流量计' 'readout'
+    source '施肥液位读数' '${params.farm_name}-施肥液位计' 'readout'
+    state '空闲'
+      enter action '${params.farm_name}-施肥泵' 'close'
+      enter action '${mixing_pump_name}' 'close'
+      enter assignment 'false' '本次施肥量' '0'
+      enter assignment 'false' '需要重置' 'false'
+      transformer 'next'
+        rule 'false' '${mixing_before_ms > 0 ? '搅拌前' : '施肥工作'}' 'prs.variables.get("需要启动") == true'
+      return
+    return
+    ${mixing_before_ms > 0 ? `
+    state '搅拌前'
+      enter action '${mixing_pump_name}' 'open'
+      enter assignment 'false' '进入时间' 'Date.now()'
+      transformer 'timeup'
+        rule 'false' '施肥工作' 'Date.now() - prs.variables.get("进入时间") >= prs.variables.get("搅拌前时间")'
+        rule 'false' '空闲' 'prs.variables.get("需要启动") == false'
+      return
+    return
+    ` : ''}
+    state '施肥工作'
+      enter action '${mixing_pump_name}' 'open'
+      enter action '${params.farm_name}-施肥泵' 'open'
+      enter assignment 'false' '进入时间' 'Date.now()'
+      enter assignment 'false' '上次采样' 'Date.now()'
+      do assignment 'false' '采样时长' '(Date.now() - prs.variables.get("上次采样"))/1000'
+      do assignment 'false' '本次施肥量' 'await prs.getSource("施肥流量读数") / 60 * prs.variables.get("采样时长") + prs.variables.get("本次施肥量")'
+      do assignment 'false' '上次采样' 'Date.now()'
+      transformer 'next'
+        rule 'false' '异常停机' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("液位停机检查周期")) && await prs.getSource("施肥液位读数") < prs.variables.get("液位停机")'
+        rule 'false' '液位异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("液位告警检查周期")) && await prs.getSource("施肥液位读数") < prs.variables.get("液位告警")'
+        rule 'false' '流量异常' '(Date.now() - prs.variables.get("进入时间") > prs.variables.get("流量检查周期")) && (await prs.getSource("施肥流量读数") < prs.variables.get("期望施肥流量") - prs.variables.get("流量告警偏移") || await prs.getSource("施肥流量读数") > prs.variables.get("期望施肥流量") + prs.variables.get("流量告警偏移"))'
+        rule 'false' '${mixing_after_ms > 0 ? '搅拌后' : '空闲'}' 'prs.variables.get("需要启动") == false'
+        statistic '${mixing_after_ms > 0 ? '搅拌后' : '空闲'}' '${params.farm_name}总施肥量' 'prs.variables.get("本次施肥量")' 'true'
+      return
+    return
+    ${mixing_after_ms > 0 ? `
+    state '搅拌后'
+      enter action '${params.farm_name}-施肥泵' 'close'
+      enter assignment 'false' '进入时间' 'Date.now()'
+      exit action '${mixing_pump_name}' 'close'
+      transformer 'timeup'
+        rule 'false' '空闲' 'Date.now() - prs.variables.get("进入时间") >= prs.variables.get("搅拌后时间")'
+        rule 'false' '空闲' 'prs.variables.get("需要启动") == false'
+      return
+    return
+    ` : ''}
+    state '液位异常'
+      warning '\`${params.farm_name}施肥液位异常:\${await prs.getSource("施肥液位读数")}\`'
+      transformer 'next'
+        rule 'false' '施肥工作' 'true'
+      return
+    return
+    state '流量异常'
+      warning '\`${params.farm_name}施肥流量异常:\${await prs.getSource("施肥流量读数")}\`'
+      transformer 'next'
+        rule 'false' '施肥工作' 'true'
+      return
+    return
+    state '异常停机'
+      do action '${params.farm_name}-施肥泵' 'close'
+      do action '${mixing_pump_name}' 'close'
+      enter crossAssignment 'false' '"${params.farm_name}-总策略"' '施肥策略异常' 'true'
+      exit assignment 'false' '需要启动' 'false'
+      transformer 'next'
+        rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
+      return
+    return
+    init state '空闲'
+    match farm '${params.farm_name}'
+  return
+return
+        `;
+    return config_string;
+  },
   add_group_policy: function (params) {
     let valve_open_config = '';
     for (let single_sub_policy of params.wgv_array) {
