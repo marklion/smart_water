@@ -10,39 +10,21 @@ function parseCommandLine(line) {
     const cmdPart = match[1].trim();
     const description = match[2].trim();
 
-    // 先处理 [--option <value>] 格式，将其替换为占位符，避免被分割
-    let processedCmdPart = cmdPart;
-    const optionPlaceholders = [];
-    let placeholderIndex = 0;
-    
-    // 匹配 [--xxx <value>] 格式并替换
-    processedCmdPart = processedCmdPart.replace(/\[--[^\]]+\s+<[^>]+>\]/g, (match) => {
-        const placeholder = `__OPTION_PLACEHOLDER_${placeholderIndex}__`;
-        optionPlaceholders.push(match);
-        placeholderIndex++;
-        return placeholder;
-    });
-
     // 拆分命令部分的 token
-    const tokens = processedCmdPart.split(/\s+/);
+    const tokens = cmdPart.split(/\s+/);
 
     // 找出命令名（连续的非 < > [ ] token）
     let cmdTokens = [];
     let params = [];
     for (let token of tokens) {
-        // 如果是占位符，跳过（这些是可选的长选项参数，不在测试中处理）
-        if (token.startsWith('__OPTION_PLACEHOLDER_')) {
-            continue;
-        }
         if (token.startsWith('<') && token.endsWith('>')) {
             params.push({
                 text: token.slice(1, -1),
                 optional: false
             });
         } else if (token.startsWith('[') && token.endsWith(']')) {
-            let paramText = token.slice(1, -1);
             params.push({
-                text: paramText,
+                text: token.slice(1, -1),
                 optional: true
             });
         } else {
@@ -647,14 +629,6 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'undo add device',
             ],
-        }, {
-            cmd: 'get area params',
-            depends: farm_related_prepare,
-            teardown: farm_related_teardown,
-        }, {
-            cmd: 'set area params',
-            depends: farm_related_prepare,
-            teardown: farm_related_teardown,
         }
     ];
     let ret = { depends: [], teardown: [] };
@@ -704,6 +678,12 @@ export default {
             },
             {
                 cmd:'config',
+            },
+            {
+                cmd:'get area params',
+            },
+            {
+                cmd:'set area params',
             },
         ];
         for (let item of whitelist) {
