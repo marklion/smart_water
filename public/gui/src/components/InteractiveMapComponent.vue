@@ -281,6 +281,7 @@
             <div v-if="wizardStep === 2" class="wizard-step-content">
                 <div class="step-header">
                     <h3>步骤2：分配阀门设备</h3>
+                    <p class="step-description">为每个轮灌组在地图上选择阀门设备，点击地图上的设备标记进行选择，选中的设备会显示为蓝色</p>
                     <div v-if="availableValveDevices.length === 0" class="no-devices-warning">
                         <el-alert title="未找到WaterGroupValve设备" type="warning" description="当前农场没有找到WaterGroupValve类型的设备，请先配置相关设备" :closable="false" show-icon />
                     </div>
@@ -289,9 +290,15 @@
                 <div class="device-allocation">
                     <div v-for="group in wateringGroups" :key="group.name" class="group-device-config">
                         <h4>{{ group.name }}</h4>
-                        <el-select v-model="selectedValveDevices[group.name]" multiple placeholder="选择阀门设备" style="width: 100%;" :disabled="availableValveDevices.length === 0">
-                            <el-option v-for="device in availableValveDevices" :key="device.device_name" :label="`${device.device_name} (${device.driver_name})`" :value="device.device_name" />
-                        </el-select>
+                        <div class="valve-selection-map-container">
+                            <div :id="`valve-selection-map-${group.name}`" class="valve-selection-map" :data-group-name="group.name"></div>
+                            <div class="selected-valves-info">
+                                <span class="info-text">已选择 {{ selectedValveDevices[group.name]?.length || 0 }} 个阀门</span>
+                                <el-button v-if="selectedValveDevices[group.name]?.length > 0" type="danger" size="small" @click="clearSelectedValves(group.name)" :icon="Delete">
+                                    清空选择
+                                </el-button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -421,6 +428,8 @@ const wateringGroups = ref([])
 const availableValveDevices = ref([])
 const selectedValveDevices = ref({}) // 每个轮灌组选择的阀门设备
 const fertConfigs = ref({}) // 每个轮灌组的施肥配置
+const valveSelectionMaps = ref({}) // 每个轮灌组的地图实例
+const valveSelectionMarkers = ref({}) // 每个轮灌组的地图标记
 
 let map = null
 // 图层管理
@@ -1305,9 +1314,199 @@ const removeWateringGroup = (index) => {
     wateringGroups.value.splice(index, 1)
     delete selectedValveDevices.value[groupName]
     delete fertConfigs.value[groupName]
+    
+    // 清理地图实例
+    if (valveSelectionMaps.value[groupName]) {
+        valveSelectionMaps.value[groupName].destroy()
+        delete valveSelectionMaps.value[groupName]
+    }
+    delete valveSelectionMarkers.value[groupName]
 }
 
-const nextStep = () => {
+// 初始化阀门选择地图
+const initValveSelectionMap = async (groupName) => {
+    await nextTick()
+    
+    const mapContainerId = `valve-selection-map-${groupName}`
+    const container = document.getElementById(mapContainerId)
+    if (!container) {
+        console.error('找不到地图容器:', mapContainerId)
+        return
+    }
+    
+    // 如果地图已存在，先销毁
+    if (valveSelectionMaps.value[groupName]) {
+        valveSelectionMaps.value[groupName].destroy()
+    }
+    
+    try {
+        // 确保高德地图API已加载
+        if (!globalThis.AMap) {
+            await loadAMapScript()
+        }
+        
+        if (!globalThis.AMap) {
+            throw new Error('高德地图API加载失败')
+        }
+        
+        // 计算地图中心点（所有阀门的中心）
+        let centerLng = props.center.lng
+        let centerLat = props.center.lat
+        
+        if (availableValveDevices.value.length > 0) {
+            const lngs = availableValveDevices.value.map(d => d.longitude).filter(Boolean)
+            const lats = availableValveDevices.value.map(d => d.latitude).filter(Boolean)
+            
+            if (lngs.length > 0 && lats.length > 0) {
+                centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length
+                centerLat = lats.reduce((a, b) => a + b, 0) / lats.length
+            }
+        }
+        
+        // 创建地图实例
+        const selectionMap = new AMap.Map(mapContainerId, {
+            zoom: 15,
+            center: [centerLng, centerLat],
+            mapStyle: 'amap://styles/normal',
+            viewMode: '2D'
+        })
+        
+        // 添加卫星图层
+        const satelliteLayer = new AMap.TileLayer.Satellite({
+            zIndex: 1,
+            opacity: 1
+        })
+        selectionMap.add(satelliteLayer)
+        
+        valveSelectionMaps.value[groupName] = selectionMap
+        
+        // 创建标记
+        const markers = []
+        for (const device of availableValveDevices.value) {
+            if (!device.longitude || !device.latitude) continue
+            
+            const isSelected = selectedValveDevices.value[groupName]?.includes(device.device_name) || false
+            
+            const marker = createValveSelectionMarker(device, isSelected, groupName)
+            if (marker) {
+                selectionMap.add(marker)
+                markers.push(marker)
+            }
+        }
+        
+        valveSelectionMarkers.value[groupName] = markers
+        
+    } catch (error) {
+        console.error('初始化阀门选择地图失败:', error)
+        ElMessage.error('地图加载失败')
+    }
+}
+
+// 创建阀门选择标记
+const createValveSelectionMarker = (device, isSelected, groupName) => {
+    if (!globalThis.AMap) return null
+    
+    try {
+        const deviceName = device.device_name
+        // 使用 getDeviceIcon 函数获取正确的图标
+        const deviceType = 'valve' // WaterGroupValve 使用阀门类型
+        const iconName = getDeviceIcon(deviceType)
+        
+        // 使用与主地图相同的样式，选中时添加 selected 类
+        const statusClass = isSelected ? 'selected' : ''
+        const selectionClass = isSelected ? 'valve-selected' : ''
+        
+        const markerContent = `
+            <div class="device-marker valve ${statusClass} ${selectionClass}">
+                <div class="marker-icon">
+                    <img src="/deviceIcon/${iconName}.png" alt="${deviceName}" />
+                </div>
+                <div class="marker-info">
+                    <div class="device-name">${deviceName}</div>
+                </div>
+            </div>
+        `
+        
+        const marker = new AMap.Marker({
+            position: [device.longitude, device.latitude],
+            content: markerContent,
+            anchor: 'center',
+            offset: new AMap.Pixel(0, 0)
+        })
+        
+        // 添加点击事件
+        marker.on('click', () => {
+            toggleValveSelection(device.device_name, groupName)
+        })
+        
+        return marker
+    } catch (error) {
+        console.error('创建阀门选择标记失败:', error)
+        return null
+    }
+}
+
+// 切换阀门选择状态
+const toggleValveSelection = (deviceName, groupName) => {
+    if (!selectedValveDevices.value[groupName]) {
+        selectedValveDevices.value[groupName] = []
+    }
+    
+    const index = selectedValveDevices.value[groupName].indexOf(deviceName)
+    if (index > -1) {
+        // 取消选择
+        selectedValveDevices.value[groupName].splice(index, 1)
+    } else {
+        // 选择
+        selectedValveDevices.value[groupName].push(deviceName)
+    }
+    
+    // 更新标记显示
+    updateValveSelectionMarkers(groupName)
+}
+
+// 更新阀门选择标记
+const updateValveSelectionMarkers = (groupName) => {
+    const markers = valveSelectionMarkers.value[groupName]
+    if (!markers) return
+    
+    markers.forEach((marker, index) => {
+        const device = availableValveDevices.value[index]
+        if (!device) return
+        
+        const isSelected = selectedValveDevices.value[groupName]?.includes(device.device_name) || false
+        
+        // 重新创建标记内容，使用与主地图相同的样式
+        const deviceName = device.device_name
+        const deviceType = 'valve'
+        const iconName = getDeviceIcon(deviceType)
+        const statusClass = isSelected ? 'selected' : ''
+        const selectionClass = isSelected ? 'valve-selected' : ''
+        
+        const markerContent = `
+            <div class="device-marker valve ${statusClass} ${selectionClass}">
+                <div class="marker-icon">
+                    <img src="/deviceIcon/${iconName}.png" alt="${deviceName}" />
+                </div>
+                <div class="marker-info">
+                    <div class="device-name">${deviceName}</div>
+                </div>
+            </div>
+        `
+        
+        marker.setContent(markerContent)
+    })
+}
+
+// 清空选择的阀门
+const clearSelectedValves = (groupName) => {
+    if (selectedValveDevices.value[groupName]) {
+        selectedValveDevices.value[groupName] = []
+        updateValveSelectionMarkers(groupName)
+    }
+}
+
+const nextStep = async () => {
     if (wizardStep.value === 1) {
         // 验证轮灌组配置
         if (wateringGroups.value.length === 0) {
@@ -1320,6 +1519,13 @@ const nextStep = () => {
                 return
             }
         }
+        // 进入步骤2
+        wizardStep.value = 2
+        // 等待DOM更新后初始化地图
+        await nextTick()
+        wateringGroups.value.forEach(group => {
+            initValveSelectionMap(group.name)
+        })
     } else if (wizardStep.value === 2) {
         // 验证设备分配
         for (const group of wateringGroups.value) {
@@ -1343,8 +1549,9 @@ const nextStep = () => {
                 }
             }
         }
+        // 进入步骤3
+        wizardStep.value = 3
     }
-    wizardStep.value++
 }
 
 const prevStep = () => {
@@ -1398,17 +1605,176 @@ const finishWizard = () => {
     (async () => {
         try {
             const farm_name = localStorage.getItem('selectedFarm') || ''
+            
+            if (!farm_name) {
+                ElMessage.error('请先选择农场')
+                return
+            }
+            
+            console.log('开始下发轮灌组策略，农场:', farm_name)
+            console.log('配置数据:', finalConfig)
+            
+            // 先检查并创建必要的策略
+            try {
+                await ensureRequiredPolicies(farm_name)
+                console.log('必要策略检查完成')
+            } catch (e) {
+                console.error('确保必要策略失败:', e)
+                ElMessage.error(e?.err_msg || e?.message || '检查必要策略失败: ' + String(e))
+                return
+            }
+            
             const resp = await call_remote('/policy/apply_wizard_groups', { groups: finalConfig, farm_name })
+            console.log('下发响应:', resp)
+            
             if (resp && resp.result) {
                 ElMessage.success('轮灌组策略已下发并生效')
                 policyConfigWizardVisible.value = false
             } else {
-                ElMessage.error(resp?.err_msg || '下发失败')
+                const errorMsg = resp?.err_msg || resp?.message || '下发失败，未知错误'
+                console.error('下发失败:', errorMsg, resp)
+                ElMessage.error(errorMsg)
             }
         } catch (e) {
-            ElMessage.error(e?.err_msg || '下发失败')
+            console.error('下发异常:', e)
+            const errorMsg = e?.err_msg || e?.message || e?.toString() || '下发失败，未知错误'
+            ElMessage.error(errorMsg)
         }
     })()
+}
+
+// 确保必要的策略存在
+const ensureRequiredPolicies = async (farm_name) => {
+    if (!farm_name) {
+        throw new Error('请先选择农场')
+    }
+    
+    try {
+        // 先检查策略是否已存在
+        const requiredPolicies = [
+            { name: `${farm_name}-供水`, type: '供水策略' },
+            { name: `${farm_name}-总策略`, type: '总策略' }
+        ]
+        
+        // 检查所有策略是否存在
+        const policyList = await call_remote('/policy/list_policy', { pageNo: 0, farm_name: farm_name })
+        const existingPolicies = policyList?.policies || []
+        const existingPolicyNames = existingPolicies.map(p => p.name)
+        console.log('当前农场策略列表:', existingPolicyNames)
+        
+        // 检查并创建供水策略
+        const waterPolicyName = `${farm_name}-供水`
+        if (!existingPolicyNames.includes(waterPolicyName)) {
+            // 先检查必要设备是否存在
+            const requiredDevices = [
+                `${farm_name}-主泵`,
+                `${farm_name}-主管道压力计`,
+                `${farm_name}-主管道流量计`
+            ]
+            
+            try {
+                const deviceList = await call_remote('/device_management/list_device', {
+                    farm_name: farm_name,
+                    pageNo: 0
+                })
+                const existingDevices = deviceList?.devices || []
+                const existingDeviceNames = existingDevices.map(d => d.device_name)
+                console.log('当前农场设备列表:', existingDeviceNames)
+                
+                const missingDevices = requiredDevices.filter(name => !existingDeviceNames.includes(name))
+                if (missingDevices.length > 0) {
+                    throw new Error(`缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`)
+                }
+                
+                await call_remote('/config/init_water_policy', {
+                    farm_name: farm_name,
+                    flow_warning_low_limit: 1,
+                    flow_warning_high_limit: 6,
+                    pressure_warning_low_limit: 0.1,
+                    pressure_warning_high_limit: 0.25,
+                    pressure_shutdown_low_limit: 0.05,
+                    pressure_shutdown_high_limit: 0.3,
+                    flow_check_interval: 60,
+                    pressure_shutdown_check_interval: 3
+                })
+                console.log('供水策略已初始化')
+            } catch (e) {
+                // 如果是因为缺少设备而失败，给出明确提示
+                if (e?.err_msg && e.err_msg.includes('缺少必要设备')) {
+                    throw new Error(e.err_msg + `。请先配置以下设备（设备名称格式必须为"${farm_name}-设备名"）：\n1. ${farm_name}-主泵\n2. ${farm_name}-主管道压力计\n3. ${farm_name}-主管道流量计`)
+                }
+                throw e
+            }
+        } else {
+            console.log('供水策略已存在，跳过创建')
+        }
+        
+        // 检查并创建总策略
+        const globalPolicyName = `${farm_name}-总策略`
+        if (!existingPolicyNames.includes(globalPolicyName)) {
+            try {
+                await call_remote('/config/init_global_policy', {
+                    farm_name: farm_name,
+                    start_hour: 8  // 默认8点启动
+                })
+                console.log('总策略已初始化')
+            } catch (e) {
+                throw e
+            }
+        } else {
+            console.log('总策略已存在，跳过创建')
+        }
+        
+        // 检查并创建施肥策略
+        const fertPolicyName = `${farm_name}-施肥`
+        if (!existingPolicyNames.includes(fertPolicyName)) {
+            // 先检查必要设备是否存在
+            const requiredFertDevices = [
+                `${farm_name}-施肥泵`,
+                `${farm_name}-施肥流量计`,
+                `${farm_name}-施肥液位计`
+            ]
+            
+            try {
+                const deviceList = await call_remote('/device_management/list_device', {
+                    farm_name: farm_name,
+                    pageNo: 0
+                })
+                const existingDevices = deviceList?.devices || []
+                const existingDeviceNames = existingDevices.map(d => d.device_name)
+                
+                const missingDevices = requiredFertDevices.filter(name => !existingDeviceNames.includes(name))
+                if (missingDevices.length > 0) {
+                    throw new Error(`缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`)
+                }
+                
+                await call_remote('/config/init_fert_policy', {
+                    farm_name: farm_name,
+                    flow_expected_value: 2.0,  // 期望流量值
+                    flow_warning_max_offset: 0.5,  // 流量告警最大偏移
+                    flow_check_interval: 60,  // 流量检查间隔(秒)
+                    level_warning_limit: 0.8,  // 液位告警限制
+                    level_shutdown_limit: 0.5,  // 液位停机限制
+                    level_check_interval: 60  // 液位检查间隔(秒)
+                })
+                console.log('施肥策略已初始化')
+            } catch (e) {
+                // 如果是因为缺少设备而失败，给出明确提示
+                if (e?.err_msg && e.err_msg.includes('缺少必要设备')) {
+                    throw new Error(e.err_msg + `。请先配置以下设备（设备名称格式必须为"${farm_name}-设备名"）：\n1. ${farm_name}-施肥泵\n2. ${farm_name}-施肥流量计\n3. ${farm_name}-施肥液位计`)
+                }
+                throw e
+            }
+        } else {
+            console.log('施肥策略已存在，跳过创建')
+        }
+    } catch (e) {
+        // 如果是关键错误，重新抛出
+        if (e?.err_msg && e.err_msg.includes('缺少必要设备')) {
+            throw e
+        }
+        throw e
+    }
 }
 
 // 监听设备数据变化
@@ -1419,6 +1785,18 @@ watch(() => props.devices, () => {
 }, { deep: true })
 
 // 监听地图中心点变化
+// 监听步骤变化，初始化地图
+watch(() => wizardStep.value, (newStep) => {
+    if (newStep === 2) {
+        // 进入步骤2时初始化所有轮灌组的地图
+        nextTick(() => {
+            wateringGroups.value.forEach(group => {
+                initValveSelectionMap(group.name)
+            })
+        })
+    }
+})
+
 watch(() => props.center, (newCenter) => {
     if (map && newCenter) {
         map.setCenter([newCenter.lng, newCenter.lat])
@@ -2338,6 +2716,45 @@ onUnmounted(() => {
 
 .group-device-config:last-child {
     margin-bottom: 0;
+}
+
+.valve-selection-map-container {
+    margin-top: 12px;
+    border: 1px solid #e4e7ed;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.valve-selection-map {
+    width: 100%;
+    height: 400px;
+    min-height: 400px;
+}
+
+.selected-valves-info {
+    padding: 12px 16px;
+    background: #f5f7fa;
+    border-top: 1px solid #e4e7ed;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.selected-valves-info .info-text {
+    color: #606266;
+    font-size: 14px;
+}
+
+/* 阀门选择标记选中状态 - 使用蓝色高亮 */
+:deep(.device-marker.valve-selected) {
+    border-color: #409eff !important;
+    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5) !important;
+}
+
+:deep(.device-marker.valve-selected .marker-icon) {
+    border-color: #409eff !important;
+    background: rgba(64, 158, 255, 0.3) !important;
+    box-shadow: 0 2px 8px rgba(64, 158, 255, 0.4) !important;
 }
 
 .group-device-config h4 {
