@@ -30,5 +30,11 @@ export default {
             pageNo++;
         }
         return farms;
+    },
+    set_farm_area_params: async function (farm_name, params, token) {
+        return await call_remote('/resource/set_farm_area_params', { farm_name, ...params }, token);
+    },
+    get_farm_area_params: async function (farm_name, token) {
+        return await call_remote('/resource/get_farm_area_params', { farm_name }, token);
     }
 }
