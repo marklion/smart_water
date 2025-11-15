@@ -1,373 +1,455 @@
 <template>
-<div class="interactive-map-container">
-    <!-- 地图容器 -->
-    <div id="amap-container" class="amap-container"></div>
+    <div class="interactive-map-container">
+        <!-- 地图容器 -->
+        <div id="amap-container" class="amap-container"></div>
 
-    <!-- 统一控制面板 -->
-    <div class="unified-control-panel">
-        <!-- 紧急停止区域 -->
-        <div class="emergency-section">
-            <div class="section-header">
-                <el-icon class="section-icon">
-                    <Warning />
-                </el-icon>
-                <span class="section-title">紧急控制</span>
-            </div>
-            <el-button type="danger" @click="showEmergencyStopDialog" class="emergency-stop-btn" :loading="emergencyStopLoading">
-                <el-icon>
-                    <Warning />
-                </el-icon>
-                设备紧急停止
-            </el-button>
-        </div>
-
-        <!-- 分隔线 -->
-        <div class="control-divider"></div>
-
-        <!-- 策略运行区域 -->
-        <div class="policy-section">
-            <div class="section-header">
-                <el-icon class="section-icon">
-                    <Monitor />
-                </el-icon>
-                <span class="section-title">策略控制</span>
-            </div>
-
-            <div class="policy-controls">
-                <div class="period-input-wrapper">
-                    <span class="input-label">扫描周期</span>
-                    <el-input-number v-model="scanPeriod" :min="100" :max="10000" :step="100" size="small" class="period-input" />
-                    <span class="input-unit">毫秒</span>
-                </div>
-
-                <div class="control-buttons">
-                    <el-button type="primary" size="small" @click="startScan" :loading="scanLoading" :disabled="isScanning" :icon="VideoPlay" round>
-                        运行策略
-                    </el-button>
-                    <el-button type="danger" size="small" @click="stopScan" :loading="scanLoading" :disabled="!isScanning" :icon="VideoPause" round>
-                        停止运行
-                    </el-button>
-                    <el-button type="success" size="small" @click="showPolicyConfigWizard" :icon="Setting" round>
-                        策略程序设定
-                    </el-button>
-                </div>
-
-                <div class="status-indicator">
-                    <div v-if="isScanning" class="status-running">
-                        <span class="status-dot running"></span>
-                        <span class="status-text">运行中</span>
-                    </div>
-                    <div v-else class="status-stopped">
-                        <span class="status-dot stopped"></span>
-                        <span class="status-text">已停止</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 地图控件 -->
-    <div class="map-controls">
-        <el-dropdown trigger="click" @command="handleMapLayerCommand">
-            <el-tag type="success" size="small" class="map-type-tag" title="点击选择地图图层类型">
-                <el-icon>
-                    <Location />
-                </el-icon>
-                {{ currentLayerType }}
-                <el-icon>
-                    <ArrowDown />
-                </el-icon>
-            </el-tag>
-            <template #dropdown>
-                <el-dropdown-menu>
-                    <el-dropdown-item command="satellite">
-                        <el-icon>
-                            <Location />
-                        </el-icon>
-                        卫星地图（定期更新）
-                    </el-dropdown-item>
-                    <el-dropdown-item command="traffic">
-                        <el-icon>
-                            <Grid />
-                        </el-icon>
-                        实时交通地图
-                    </el-dropdown-item>
-                    <el-dropdown-item command="hybrid">
-                        <el-icon>
-                            <Grid />
-                        </el-icon>
-                        混合图层（卫星+交通）
-                    </el-dropdown-item>
-                </el-dropdown-menu>
-            </template>
-        </el-dropdown>
-
-        <el-button-group class="control-group">
-            <el-button size="small" @click="zoomIn">
-                <el-icon>
-                    <ZoomIn />
-                </el-icon>
-            </el-button>
-            <el-button size="small" @click="zoomOut">
-                <el-icon>
-                    <ZoomOut />
-                </el-icon>
-            </el-button>
-            <el-button size="small" @click="resetView">
-                <el-icon>
-                    <Refresh />
-                </el-icon>
-            </el-button>
-        </el-button-group>
-    </div>
-
-    <!-- 设备信息面板 -->
-    <div v-if="selectedDevice" class="device-info-panel">
-        <div class="panel-header">
-            <h3>{{ selectedDevice.deviceName }}</h3>
-            <el-button size="small" @click="closeDevicePanel">
-                <el-icon>
-                    <Close />
-                </el-icon>
-            </el-button>
-        </div>
-        <div class="panel-content">
-            <div class="device-details">
-                <div class="detail-item">
-                    <span class="label">设备类型：</span>
-                    <span class="value">{{ selectedDevice.deviceType }}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">所属农场：</span>
-                    <span class="value">{{ selectedDevice.farmName }}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">设备区块：</span>
-                    <span class="value">{{ selectedDevice.blockName }}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="label">坐标位置：</span>
-                    <span class="value">
-                        <span v-if="selectedDevice.longitude && selectedDevice.latitude">
-                            经度: {{ selectedDevice.longitude.toFixed(6) }}, 纬度: {{ selectedDevice.latitude.toFixed(6) }}
-                        </span>
-                        <span v-else>
-                            X: {{ selectedDevice.x }}, Y: {{ selectedDevice.y }}
-                        </span>
-                    </span>
-                </div>
-            </div>
-
-            <!-- 运行时信息区域 -->
-            <div v-if="(selectedDevice.runtime_info && selectedDevice.runtime_info.length > 0) || selectedDevice.is_online !== undefined" class="runtime-info-section" :class="{ loading: refreshingRuntimeInfo }">
-                <div class="section-title">
-                    <el-icon>
-                        <Monitor />
+        <!-- 统一控制面板 -->
+        <div class="unified-control-panel">
+            <!-- 紧急停止区域 -->
+            <div class="emergency-section">
+                <div class="section-header">
+                    <el-icon class="section-icon">
+                        <Warning />
                     </el-icon>
-                    <span>运行时信息</span>
-                    <el-button size="small" type="primary" :icon="Refresh" @click="refreshRuntimeInfo" :loading="refreshingRuntimeInfo" circle />
+                    <span class="section-title">紧急控制</span>
                 </div>
-                <div class="runtime-info-list">
-                    <!-- 设备在线状态 -->
-                    <div v-if="selectedDevice.is_online !== undefined" class="runtime-info-item online-status-item">
-                        <div class="info-label">
-                            <el-icon class="status-icon" :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
-                                <CircleCheck v-if="selectedDevice.is_online" />
-                                <CircleClose v-else />
-                            </el-icon>
-                            设备在线状态：
-                        </div>
-                        <div class="info-value" :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
-                            {{ selectedDevice.is_online ? '在线' : '离线' }}
-                        </div>
-                    </div>
-                    <!-- 其他运行时信息 -->
-                    <div v-for="(info, index) in selectedDevice.runtime_info" :key="index" class="runtime-info-item">
-                        <div class="info-label">{{ info.title }}：</div>
-                        <div class="info-value">{{ info.text }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDevice)">
-                <div class="device-controls-container">
-                    <!-- 动态生成的设备操作按钮 -->
-                    <div v-for="buttonGroup in getDeviceButtonGroups(selectedDevice)" :key="buttonGroup.key" :class="buttonGroup.containerClass">
-                        <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key" :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize" :class="buttonConfig.buttonClass" @click="handleDeviceAction(buttonConfig.action, selectedDevice.deviceName || selectedDevice.device_name)">
-                            <el-icon v-if="buttonConfig.icon" class="mr-1">
-                                <VideoPlay v-if="buttonConfig.icon === 'VideoPlay'" />
-                                <VideoPause v-else-if="buttonConfig.icon === 'VideoPause'" />
-                                <Monitor v-else-if="buttonConfig.icon === 'Monitor'" />
-                                <Close v-else-if="buttonConfig.icon === 'Close'" />
-                            </el-icon>
-                            {{ buttonConfig.buttonText }}
-                        </el-button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-overlay">
-        <div class="loading-spinner"></div>
-        <p>地图加载中...</p>
-    </div>
-
-    <!-- 紧急停止对话框 -->
-    <el-dialog v-model="emergencyStopDialogVisible" title="紧急停止" width="600px" :close-on-click-modal="false" :close-on-press-escape="false">
-        <div class="emergency-stop-content">
-            <div class="emergency-warning">
-                <el-icon size="24" color="#f56c6c">
-                    <Warning />
-                </el-icon>
-                <span>请选择需要执行急停的地块：</span>
-            </div>
-
-            <el-checkbox-group v-model="selectedBlocks" class="block-selection">
-                <el-checkbox v-for="block in availableBlocks" :key="block.id" :label="block.id" class="block-checkbox">
-                    {{ block.name }}
-                </el-checkbox>
-            </el-checkbox-group>
-
-            <div class="emergency-actions">
-                <el-button @click="cancelEmergencyStop">取消</el-button>
-                <el-button type="danger" @click="executeEmergencyStop" :loading="emergencyStopLoading">
-                    执行急停
+                <el-button type="danger" @click="showEmergencyStopDialog" class="emergency-stop-btn"
+                    :loading="emergencyStopLoading">
+                    <el-icon>
+                        <Warning />
+                    </el-icon>
+                    设备紧急停止
                 </el-button>
             </div>
-        </div>
-    </el-dialog>
 
-    <!-- 策略配置向导对话框 -->
-    <el-dialog v-model="policyConfigWizardVisible" title="策略程序设定向导" width="800px" :close-on-click-modal="false" :close-on-press-escape="false" :modal="true" :append-to-body="true" :lock-scroll="true" class="policy-config-dialog">
-        <div class="policy-config-wizard">
-            <!-- 步骤指示器 -->
-            <el-steps :active="wizardStep - 1" finish-status="success" align-center>
-                <el-step title="创建轮灌组" description="设置轮灌组名称和面积" />
-                <el-step title="分配设备" description="为轮灌组分配阀门设备" />
-                <el-step title="施肥配置" description="设置施肥方式和参数" />
-            </el-steps>
+            <!-- 分隔线 -->
+            <div class="control-divider"></div>
 
-            <!-- 步骤1：创建轮灌组 -->
-            <div v-if="wizardStep === 1" class="wizard-step-content">
-                <div class="step-header">
-                    <h3>步骤1：创建轮灌组</h3>
-                    <p>请创建轮灌组并设置每个组的面积</p>
+            <!-- 策略运行区域 -->
+            <div class="policy-section">
+                <div class="section-header">
+                    <el-icon class="section-icon">
+                        <Monitor />
+                    </el-icon>
+                    <span class="section-title">策略控制</span>
                 </div>
 
-                <div class="watering-groups-config">
-                    <div class="groups-header">
-                        <span>轮灌组列表</span>
-                        <el-button type="primary" size="small" @click="addWateringGroup" :icon="Plus">
-                            添加轮灌组
+                <div class="policy-controls">
+                    <div class="period-input-wrapper">
+                        <span class="input-label">扫描周期</span>
+                        <el-input-number v-model="scanPeriod" :min="100" :max="10000" :step="100" size="small"
+                            class="period-input" />
+                        <span class="input-unit">毫秒</span>
+                    </div>
+
+                    <div class="control-buttons">
+                        <el-button type="primary" size="small" @click="startScan" :loading="scanLoading"
+                            :disabled="isScanning" :icon="VideoPlay" round>
+                            运行策略
+                        </el-button>
+                        <el-button type="danger" size="small" @click="stopScan" :loading="scanLoading"
+                            :disabled="!isScanning" :icon="VideoPause" round>
+                            停止运行
+                        </el-button>
+                        <el-button type="success" size="small" @click="showPolicyConfigWizard" :icon="Setting" round>
+                            策略程序设定
                         </el-button>
                     </div>
 
-                    <div v-for="(group, index) in wateringGroups" :key="index" class="group-item">
-                        <div class="group-info">
-                            <el-input v-model="group.name" placeholder="轮灌组名称" style="width: 200px;" />
-                            <el-input-number v-model="group.area" :min="0" :precision="2" placeholder="面积" style="width: 150px; margin-left: 10px;" />
-                            <span class="unit">亩</span>
+                    <div class="status-indicator">
+                        <div v-if="isScanning" class="status-running">
+                            <span class="status-dot running"></span>
+                            <span class="status-text">运行中</span>
                         </div>
-                        <el-button type="danger" size="small" @click="removeWateringGroup(index)" :icon="Delete">
-                            删除
-                        </el-button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 步骤2：分配设备 -->
-            <div v-if="wizardStep === 2" class="wizard-step-content">
-                <div class="step-header">
-                    <h3>步骤2：分配阀门设备</h3>
-                    <div v-if="availableValveDevices.length === 0" class="no-devices-warning">
-                        <el-alert title="未找到WaterGroupValve设备" type="warning" description="当前农场没有找到WaterGroupValve类型的设备，请先配置相关设备" :closable="false" show-icon />
-                    </div>
-                </div>
-
-                <div class="device-allocation">
-                    <div v-for="group in wateringGroups" :key="group.name" class="group-device-config">
-                        <h4>{{ group.name }}</h4>
-                        <el-select v-model="selectedValveDevices[group.name]" multiple placeholder="选择阀门设备" style="width: 100%;" :disabled="availableValveDevices.length === 0">
-                            <el-option v-for="device in availableValveDevices" :key="device.device_name" :label="`${device.device_name} (${device.driver_name})`" :value="device.device_name" />
-                        </el-select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 步骤3：施肥配置 -->
-            <div v-if="wizardStep === 3" class="wizard-step-content">
-                <div class="step-header">
-                    <h3>步骤3：施肥配置</h3>
-                    <p>为每个轮灌组设置施肥方式和参数</p>
-                </div>
-
-                <div class="fert-config">
-                    <div v-for="group in wateringGroups" :key="group.name" class="group-fert-config">
-                        <h4>{{ group.name }}</h4>
-
-                        <div class="fert-method">
-                            <label>施肥方式：</label>
-                            <el-radio-group v-model="fertConfigs[group.name].method">
-                                <el-radio value="AreaBased">亩定量</el-radio>
-                                <el-radio value="Total">总定量</el-radio>
-                                <el-radio value="Time">定时</el-radio>
-                            </el-radio-group>
-                        </div>
-
-                        <div class="fert-params">
-                            <div v-if="fertConfigs[group.name].method === 'AreaBased'" class="param-item">
-                                <label>施肥参数：</label>
-                                <el-input-number v-model="fertConfigs[group.name].AB_fert" :min="0" :precision="2" placeholder="施肥量" />
-                                <span class="unit">L/亩</span>
-                            </div>
-
-                            <div v-if="fertConfigs[group.name].method === 'Total'" class="param-item">
-                                <label>施肥参数：</label>
-                                <el-input-number v-model="fertConfigs[group.name].total_fert" :min="0" :precision="2" placeholder="总量" />
-                                <span class="unit">L</span>
-                            </div>
-                            <div v-if="fertConfigs[group.name].method === 'Total'" class="param-item">
-                                <label>施肥参数：</label>
-                                <el-input-number v-model="fertConfigs[group.name].total_fert" :min="0" :precision="2" placeholder="总量" />
-                                <span class="unit">L</span>
-                            </div>
-
-                            <div class="param-item">
-                                <label>期望施肥速度：</label>
-                                <el-input-number v-model="fertConfigs[group.name].fert_rate" :min="0" :precision="1" placeholder="速度" />
-                                <span class="unit">L/分钟</span>
-                            </div>
-                        </div>
-
-                        <div class="time-params">
-                            <div class="param-item">
-                                <label>肥前时间：</label>
-                                <el-input-number v-model="fertConfigs[group.name].pre_fert_time" :min="0" :precision="1" placeholder="肥前时间" />
-                                <span class="unit">分钟</span>
-                            </div>
-
-                            <div class="param-item">
-                                <label>肥后时间：</label>
-                                <el-input-number v-model="fertConfigs[group.name].post_fert_time" :min="0" :precision="1" placeholder="肥后时间" />
-                                <span class="unit">分钟</span>
-                            </div>
+                        <div v-else class="status-stopped">
+                            <span class="status-dot stopped"></span>
+                            <span class="status-text">已停止</span>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- 操作按钮 -->
-            <div class="wizard-actions">
-                <el-button v-if="wizardStep > 1" @click="prevStep">上一步</el-button>
-                <el-button v-if="wizardStep < 3" type="primary" @click="nextStep">下一步</el-button>
-                <el-button v-if="wizardStep === 3" type="success" @click="finishWizard">完成配置</el-button>
-                <el-button @click="policyConfigWizardVisible = false">取消</el-button>
             </div>
         </div>
-    </el-dialog>
-</div>
+
+        <!-- 地图控件 -->
+        <div class="map-controls">
+            <el-dropdown trigger="click" @command="handleMapLayerCommand">
+                <el-tag type="success" size="small" class="map-type-tag" title="点击选择地图图层类型">
+                    <el-icon>
+                        <Location />
+                    </el-icon>
+                    {{ currentLayerType }}
+                    <el-icon>
+                        <ArrowDown />
+                    </el-icon>
+                </el-tag>
+                <template #dropdown>
+                    <el-dropdown-menu>
+                        <el-dropdown-item command="satellite">
+                            <el-icon>
+                                <Location />
+                            </el-icon>
+                            卫星地图（定期更新）
+                        </el-dropdown-item>
+                        <el-dropdown-item command="traffic">
+                            <el-icon>
+                                <Grid />
+                            </el-icon>
+                            实时交通地图
+                        </el-dropdown-item>
+                        <el-dropdown-item command="hybrid">
+                            <el-icon>
+                                <Grid />
+                            </el-icon>
+                            混合图层（卫星+交通）
+                        </el-dropdown-item>
+                    </el-dropdown-menu>
+                </template>
+            </el-dropdown>
+
+            <el-button-group class="control-group">
+                <el-button size="small" @click="zoomIn">
+                    <el-icon>
+                        <ZoomIn />
+                    </el-icon>
+                </el-button>
+                <el-button size="small" @click="zoomOut">
+                    <el-icon>
+                        <ZoomOut />
+                    </el-icon>
+                </el-button>
+                <el-button size="small" @click="resetView">
+                    <el-icon>
+                        <Refresh />
+                    </el-icon>
+                </el-button>
+            </el-button-group>
+        </div>
+
+        <!-- 设备信息面板 -->
+        <div v-if="selectedDevice" class="device-info-panel">
+            <div class="panel-header">
+                <h3>{{ selectedDevice.deviceName }}</h3>
+                <el-button size="small" @click="closeDevicePanel">
+                    <el-icon>
+                        <Close />
+                    </el-icon>
+                </el-button>
+            </div>
+            <div class="panel-content">
+                <div class="device-details">
+                    <div class="detail-item">
+                        <span class="label">设备类型：</span>
+                        <span class="value">{{ selectedDevice.deviceType }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">所属农场：</span>
+                        <span class="value">{{ selectedDevice.farmName }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">设备区块：</span>
+                        <span class="value">{{ selectedDevice.blockName }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">坐标位置：</span>
+                        <span class="value">
+                            <span v-if="selectedDevice.longitude && selectedDevice.latitude">
+                                经度: {{ selectedDevice.longitude.toFixed(6) }}, 纬度: {{ selectedDevice.latitude.toFixed(6)
+                                }}
+                            </span>
+                            <span v-else>
+                                X: {{ selectedDevice.x }}, Y: {{ selectedDevice.y }}
+                            </span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 运行时信息区域 -->
+                <div v-if="(selectedDevice.runtime_info && selectedDevice.runtime_info.length > 0) || selectedDevice.is_online !== undefined"
+                    class="runtime-info-section" :class="{ loading: refreshingRuntimeInfo }">
+                    <div class="section-title">
+                        <el-icon>
+                            <Monitor />
+                        </el-icon>
+                        <span>运行时信息</span>
+                        <el-button size="small" type="primary" :icon="Refresh" @click="refreshRuntimeInfo"
+                            :loading="refreshingRuntimeInfo" circle />
+                    </div>
+                    <div class="runtime-info-list">
+                        <!-- 设备在线状态 -->
+                        <div v-if="selectedDevice.is_online !== undefined" class="runtime-info-item online-status-item">
+                            <div class="info-label">
+                                <el-icon class="status-icon"
+                                    :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
+                                    <CircleCheck v-if="selectedDevice.is_online" />
+                                    <CircleClose v-else />
+                                </el-icon>
+                                设备在线状态：
+                            </div>
+                            <div class="info-value"
+                                :class="{ 'online': selectedDevice.is_online, 'offline': !selectedDevice.is_online }">
+                                {{ selectedDevice.is_online ? '在线' : '离线' }}
+                            </div>
+                        </div>
+                        <!-- 其他运行时信息 -->
+                        <div v-for="(info, index) in selectedDevice.runtime_info" :key="index"
+                            class="runtime-info-item">
+                            <div class="info-label">{{ info.title }}：</div>
+                            <div class="info-value">{{ info.text }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDevice)">
+                    <div class="device-controls-container">
+                        <!-- 动态生成的设备操作按钮 -->
+                        <div v-for="buttonGroup in getDeviceButtonGroups(selectedDevice)" :key="buttonGroup.key"
+                            :class="buttonGroup.containerClass">
+                            <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
+                                :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize"
+                                :class="buttonConfig.buttonClass"
+                                @click="handleDeviceAction(buttonConfig.action, selectedDevice.deviceName || selectedDevice.device_name)">
+                                <el-icon v-if="buttonConfig.icon" class="mr-1">
+                                    <VideoPlay v-if="buttonConfig.icon === 'VideoPlay'" />
+                                    <VideoPause v-else-if="buttonConfig.icon === 'VideoPause'" />
+                                    <Monitor v-else-if="buttonConfig.icon === 'Monitor'" />
+                                    <Close v-else-if="buttonConfig.icon === 'Close'" />
+                                </el-icon>
+                                {{ buttonConfig.buttonText }}
+                            </el-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 加载状态 -->
+        <div v-if="loading" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>地图加载中...</p>
+        </div>
+
+        <!-- 紧急停止对话框 -->
+        <el-dialog v-model="emergencyStopDialogVisible" title="紧急停止" width="600px" :close-on-click-modal="false"
+            :close-on-press-escape="false">
+            <div class="emergency-stop-content">
+                <div class="emergency-warning">
+                    <el-icon size="24" color="#f56c6c">
+                        <Warning />
+                    </el-icon>
+                    <span>请选择需要执行急停的地块：</span>
+                </div>
+
+                <el-checkbox-group v-model="selectedBlocks" class="block-selection">
+                    <el-checkbox v-for="block in availableBlocks" :key="block.id" :label="block.id"
+                        class="block-checkbox">
+                        {{ block.name }}
+                    </el-checkbox>
+                </el-checkbox-group>
+
+                <div class="emergency-actions">
+                    <el-button @click="cancelEmergencyStop">取消</el-button>
+                    <el-button type="danger" @click="executeEmergencyStop" :loading="emergencyStopLoading">
+                        执行急停
+                    </el-button>
+                </div>
+            </div>
+        </el-dialog>
+
+        <!-- 策略配置向导对话框 -->
+        <el-dialog v-model="policyConfigWizardVisible" title="策略程序设定向导" width="800px" :close-on-click-modal="false"
+            :close-on-press-escape="false" :modal="true" :append-to-body="true" :lock-scroll="true"
+            class="policy-config-dialog">
+            <div class="policy-config-wizard">
+                <!-- 步骤指示器 -->
+                <el-steps :active="wizardStep - 1" finish-status="success" align-center>
+                    <el-step title="创建轮灌组" description="设置轮灌组名称和面积" />
+                    <el-step title="分配设备" description="为轮灌组分配阀门设备" />
+                    <el-step title="施肥配置" description="设置施肥方式和参数" />
+                </el-steps>
+
+                <!-- 步骤1：创建轮灌组 -->
+                <div v-if="wizardStep === 1" class="wizard-step-content">
+                    <div class="step-header">
+                        <h3>步骤1：创建轮灌组</h3>
+                        <p>请创建轮灌组并设置每个组的面积</p>
+                    </div>
+
+                    <div class="watering-groups-config">
+                        <div class="groups-header">
+                            <span>轮灌组列表</span>
+                            <el-button type="primary" size="small" @click="addWateringGroup" :icon="Plus">
+                                添加轮灌组
+                            </el-button>
+                        </div>
+
+                        <div v-for="(group, index) in wateringGroups" :key="index" class="group-item">
+                            <div class="group-info">
+                                <el-input v-model="group.name" placeholder="轮灌组名称" style="width: 200px;" />
+                                <el-input-number v-model="group.area" :min="0" :precision="2" placeholder="面积"
+                                    style="width: 150px; margin-left: 10px;" />
+                                <span class="unit">亩</span>
+                                <el-popover v-model:visible="areaParamsPopoverVisible[index]" placement="top"
+                                    :width="400" trigger="hover" popper-class="area-params-popover">
+                                    <template #reference>
+                                        <span class="recommended-area"
+                                            :class="{ 'has-recommendation': getRecommendedArea(index) > 0 }">
+                                            建议{{ getRecommendedArea(index).toFixed(2) }}亩
+                                        </span>
+                                    </template>
+                                    <div class="area-params-content">
+                                        <div class="params-header">
+                                            <h4>建议亩数计算参数</h4>
+                                        </div>
+                                        <div class="params-formula">
+                                            <p>计算公式：</p>
+                                            <p class="formula-text">系统流量 × 1000 ÷ (667 ÷ 铺设间距 ÷ 滴头间距 × 滴头流量) × 系数</p>
+                                        </div>
+                                        <div class="params-list">
+                                            <div class="param-item">
+                                                <span class="param-label">系统流量：</span>
+                                                <el-input-number v-model="farmAreaParams.system_flow" :min="0"
+                                                    :precision="2" size="small" style="width: 120px;"
+                                                    @change="updateAreaParam('system_flow', $event)" />
+                                            </div>
+                                            <div class="param-item">
+                                                <span class="param-label">铺设间距：</span>
+                                                <el-input-number v-model="farmAreaParams.laying_spacing" :min="0"
+                                                    :precision="2" size="small" style="width: 120px;"
+                                                    @change="updateAreaParam('laying_spacing', $event)" />
+                                            </div>
+                                            <div class="param-item">
+                                                <span class="param-label">滴头间距：</span>
+                                                <el-input-number v-model="farmAreaParams.dripper_spacing" :min="0"
+                                                    :precision="2" size="small" style="width: 120px;"
+                                                    @change="updateAreaParam('dripper_spacing', $event)" />
+                                            </div>
+                                            <div class="param-item">
+                                                <span class="param-label">滴头流量：</span>
+                                                <el-input-number v-model="farmAreaParams.dripper_flow" :min="0"
+                                                    :precision="2" size="small" style="width: 120px;"
+                                                    @change="updateAreaParam('dripper_flow', $event)" />
+                                            </div>
+                                            <div class="param-item">
+                                                <span class="param-label">系数：</span>
+                                                <el-input-number v-model="farmAreaParams.coefficient" :min="0"
+                                                    :precision="2" size="small" style="width: 120px;"
+                                                    @change="updateAreaParam('coefficient', $event)" />
+                                            </div>
+                                        </div>
+                                        <div class="params-result">
+                                            <p>计算结果：<strong>{{ getRecommendedArea(index).toFixed(2) }}亩</strong></p>
+                                        </div>
+                                    </div>
+                                </el-popover>
+                            </div>
+                            <el-button type="danger" size="small" @click="removeWateringGroup(index)" :icon="Delete">
+                                删除
+                            </el-button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步骤2：分配设备 -->
+                <div v-if="wizardStep === 2" class="wizard-step-content">
+                    <div class="step-header">
+                        <h3>步骤2：分配阀门设备</h3>
+                        <div v-if="availableValveDevices.length === 0" class="no-devices-warning">
+                            <el-alert title="未找到WaterGroupValve设备" type="warning"
+                                description="当前农场没有找到WaterGroupValve类型的设备，请先配置相关设备" :closable="false" show-icon />
+                        </div>
+                    </div>
+
+                    <div class="device-allocation">
+                        <div v-for="group in wateringGroups" :key="group.name" class="group-device-config">
+                            <h4>{{ group.name }}</h4>
+                            <el-select v-model="selectedValveDevices[group.name]" multiple placeholder="选择阀门设备"
+                                style="width: 100%;" :disabled="availableValveDevices.length === 0">
+                                <el-option v-for="device in availableValveDevices" :key="device.device_name"
+                                    :label="`${device.device_name} (${device.driver_name})`"
+                                    :value="device.device_name" />
+                            </el-select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步骤3：施肥配置 -->
+                <div v-if="wizardStep === 3" class="wizard-step-content">
+                    <div class="step-header">
+                        <h3>步骤3：施肥配置</h3>
+                        <p>为每个轮灌组设置施肥方式和参数</p>
+                    </div>
+
+                    <div class="fert-config">
+                        <div v-for="group in wateringGroups" :key="group.name" class="group-fert-config">
+                            <h4>{{ group.name }}</h4>
+
+                            <div class="fert-method">
+                                <label>施肥方式：</label>
+                                <el-radio-group v-model="fertConfigs[group.name].method">
+                                    <el-radio value="AreaBased">亩定量</el-radio>
+                                    <el-radio value="Total">总定量</el-radio>
+                                    <el-radio value="Time">定时</el-radio>
+                                </el-radio-group>
+                            </div>
+
+                            <div class="fert-params">
+                                <div v-if="fertConfigs[group.name].method === 'AreaBased'" class="param-item">
+                                    <label>施肥参数：</label>
+                                    <el-input-number v-model="fertConfigs[group.name].AB_fert" :min="0" :precision="2"
+                                        placeholder="施肥量" />
+                                    <span class="unit">L/亩</span>
+                                </div>
+
+                                <div v-if="fertConfigs[group.name].method === 'Total'" class="param-item">
+                                    <label>施肥参数：</label>
+                                    <el-input-number v-model="fertConfigs[group.name].total_fert" :min="0"
+                                        :precision="2" placeholder="总量" />
+                                    <span class="unit">L</span>
+                                </div>
+                                <div v-if="fertConfigs[group.name].method === 'Total'" class="param-item">
+                                    <label>施肥参数：</label>
+                                    <el-input-number v-model="fertConfigs[group.name].total_fert" :min="0"
+                                        :precision="2" placeholder="总量" />
+                                    <span class="unit">L</span>
+                                </div>
+
+                                <div class="param-item">
+                                    <label>期望施肥速度：</label>
+                                    <el-input-number v-model="fertConfigs[group.name].fert_rate" :min="0" :precision="1"
+                                        placeholder="速度" />
+                                    <span class="unit">L/分钟</span>
+                                </div>
+                            </div>
+
+                            <div class="time-params">
+                                <div class="param-item">
+                                    <label>肥前时间：</label>
+                                    <el-input-number v-model="fertConfigs[group.name].pre_fert_time" :min="0"
+                                        :precision="1" placeholder="肥前时间" />
+                                    <span class="unit">分钟</span>
+                                </div>
+
+                                <div class="param-item">
+                                    <label>肥后时间：</label>
+                                    <el-input-number v-model="fertConfigs[group.name].post_fert_time" :min="0"
+                                        :precision="1" placeholder="肥后时间" />
+                                    <span class="unit">分钟</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="wizard-actions">
+                    <el-button v-if="wizardStep > 1" @click="prevStep">上一步</el-button>
+                    <el-button v-if="wizardStep < 3" type="primary" @click="nextStep">下一步</el-button>
+                    <el-button v-if="wizardStep === 3" type="success" @click="finishWizard">完成配置</el-button>
+                    <el-button @click="policyConfigWizardVisible = false">取消</el-button>
+                </div>
+            </div>
+        </el-dialog>
+    </div>
 </template>
 
 <script setup>
@@ -421,6 +503,14 @@ const wateringGroups = ref([])
 const availableValveDevices = ref([])
 const selectedValveDevices = ref({}) // 每个轮灌组选择的阀门设备
 const fertConfigs = ref({}) // 每个轮灌组的施肥配置
+const farmAreaParams = ref({
+    system_flow: 0,
+    laying_spacing: 0,
+    dripper_spacing: 0,
+    dripper_flow: 0,
+    coefficient: 0.9
+}) // 农场建议亩数计算参数
+const areaParamsPopoverVisible = ref({}) // 控制每个轮灌组的参数提示框显示
 
 let map = null
 // 图层管理
@@ -1269,11 +1359,38 @@ const showPolicyConfigWizard = async () => {
             availableValveDevices.value = []
         }
 
+        // 加载农场建议亩数计算参数
+        try {
+            const paramsResponse = await call_remote('/resource/get_farm_area_params', {
+                farm_name: currentFarm
+            })
+            if (paramsResponse) {
+                farmAreaParams.value = {
+                    system_flow: paramsResponse.system_flow || 0,
+                    laying_spacing: paramsResponse.laying_spacing || 0,
+                    dripper_spacing: paramsResponse.dripper_spacing || 0,
+                    dripper_flow: paramsResponse.dripper_flow || 0,
+                    coefficient: paramsResponse.coefficient !== undefined ? paramsResponse.coefficient : 0.9
+                }
+            }
+        } catch (error) {
+            console.error('获取农场参数失败:', error)
+            // 使用默认值
+            farmAreaParams.value = {
+                system_flow: 0,
+                laying_spacing: 0,
+                dripper_spacing: 0,
+                dripper_flow: 0,
+                coefficient: 0.9
+            }
+        }
+
         // 重置向导状态
         wizardStep.value = 1
         wateringGroups.value = []
         selectedValveDevices.value = {}
         fertConfigs.value = {}
+        areaParamsPopoverVisible.value = {}
 
         policyConfigWizardVisible.value = true
     } catch (error) {
@@ -1284,6 +1401,7 @@ const showPolicyConfigWizard = async () => {
 
 const addWateringGroup = () => {
     const groupName = `轮灌组${wateringGroups.value.length + 1}`
+    const index = wateringGroups.value.length
     wateringGroups.value.push({
         name: groupName,
         area: 0
@@ -1298,6 +1416,7 @@ const addWateringGroup = () => {
         post_fert_time: 0,
         fert_rate: 0,
     }
+    areaParamsPopoverVisible.value[index] = false
 }
 
 const removeWateringGroup = (index) => {
@@ -1305,6 +1424,41 @@ const removeWateringGroup = (index) => {
     wateringGroups.value.splice(index, 1)
     delete selectedValveDevices.value[groupName]
     delete fertConfigs.value[groupName]
+    delete areaParamsPopoverVisible.value[index]
+}
+
+// 计算建议亩数
+const getRecommendedArea = (index) => {
+    const params = farmAreaParams.value
+    // 公式：系统流量*1000/（667/铺设间距/滴头间距*滴头流量）*系数
+    if (!params.system_flow || params.system_flow <= 0 ||
+        !params.laying_spacing || params.laying_spacing <= 0 ||
+        !params.dripper_spacing || params.dripper_spacing <= 0 ||
+        !params.dripper_flow || params.dripper_flow <= 0) {
+        return 0
+    }
+    const denominator = (667 / params.laying_spacing / params.dripper_spacing) * params.dripper_flow
+    if (denominator === 0) {
+        return 0
+    }
+    const result = (params.system_flow * 1000 / denominator) * (params.coefficient || 0.9)
+    return result > 0 ? result : 0
+}
+
+// 更新建议亩数计算参数
+const updateAreaParam = async (paramName, value) => {
+    const currentFarm = props.devices.length > 0 ? (props.devices[0].farmName || props.devices[0].farm_name) : '默认农场'
+    try {
+        const params = { [paramName]: value }
+        await call_remote('/resource/set_farm_area_params', {
+            farm_name: currentFarm,
+            ...params
+        })
+        // 参数已更新，响应式数据会自动更新计算结果
+    } catch (error) {
+        console.error('更新参数失败:', error)
+        ElMessage.error('更新参数失败')
+    }
 }
 
 const nextStep = () => {
@@ -1375,8 +1529,7 @@ const finishWizard = () => {
     const finalConfig = wateringGroups.value.map(group => {
         const config = fertConfigs.value[group.name]
         let AB_fert = config.AB_fert;
-        if (config.method == 'Total')
-        {
+        if (config.method == 'Total') {
             AB_fert = config.total_fert / group.area;
         }
         return {
@@ -1393,8 +1546,8 @@ const finishWizard = () => {
     })
 
     console.log('策略配置完成:', finalConfig)
-    // 下发到后端：创建/替换轮灌组策略
-    ;
+        // 下发到后端：创建/替换轮灌组策略
+        ;
     (async () => {
         try {
             const farm_name = localStorage.getItem('selectedFarm') || ''
@@ -2319,6 +2472,97 @@ onUnmounted(() => {
 .group-info .unit {
     color: #909399;
     font-size: 14px;
+}
+
+.recommended-area {
+    margin-left: 10px;
+    padding: 4px 8px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    color: #999;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.recommended-area.has-recommendation {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+    color: #856404;
+    font-weight: 500;
+}
+
+.recommended-area:hover {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #fff;
+}
+
+/* 参数提示框样式 */
+:deep(.area-params-popover) {
+    max-width: 400px;
+}
+
+.area-params-content {
+    padding: 10px;
+}
+
+.params-header h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.params-formula {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+}
+
+.params-formula p {
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+.formula-text {
+    font-family: 'Courier New', monospace;
+    color: #666;
+    font-size: 12px;
+}
+
+.params-list {
+    margin: 15px 0;
+}
+
+.param-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.param-label {
+    width: 100px;
+    font-size: 13px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.params-result {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.params-result p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.params-result strong {
+    color: #409eff;
+    font-size: 16px;
 }
 
 /* 设备分配样式 */
