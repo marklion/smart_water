@@ -16,7 +16,8 @@ function parseCommandLine(line) {
     // 找出命令名（连续的非 < > [ ] token）
     let cmdTokens = [];
     let params = [];
-    for (let token of tokens) {
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
         if (token.startsWith('<') && token.endsWith('>')) {
             params.push({
                 text: token.slice(1, -1),
@@ -27,6 +28,12 @@ function parseCommandLine(line) {
                 text: token.slice(1, -1),
                 optional: true
             });
+        } else if (token.startsWith('[') && !token.endsWith(']')) {
+            // 处理 [--option <value>] 这种跨多个 token 的情况
+            // 跳过整个可选参数块，直到找到对应的 ]
+            while (i < tokens.length && !tokens[i].endsWith(']')) {
+                i++;
+            }
         } else {
             cmdTokens.push(token);
         }
