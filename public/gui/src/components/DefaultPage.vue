@@ -30,15 +30,7 @@
             <!-- 地图和策略详情卡片 -->
             <el-card class="map-irrigation-card" shadow="hover">
               <el-tabs v-model="activeMainTab" class="main-tabs" @tab-change="handleMainTabChange">
-                <!-- 农场地图 Tab -->
-                <el-tab-pane label="农场地图" name="map">
-                  <div class="map-container">
-                    <InteractiveMapComponent :devices="mapMarkers" :center="mapCenter" :zoom="mapZoom"
-                      @device-click="onDeviceClick" @device-toggle="onDeviceToggle" />
-                  </div>
-                </el-tab-pane>
-
-                <!-- 轮灌组状态 Tab -->
+                  <!-- 轮灌组状态 Tab -->
                 <el-tab-pane label="轮灌组状态" name="watering">
                   <div class="tab-content-with-actions">
                     <div class="tab-actions">
@@ -49,6 +41,59 @@
                     <div class="tab-content-scroll">
                       <WateringGroupStatus ref="wateringGroupRef" :farm-name="selectedFarm" />
                     </div>
+                  </div>
+                </el-tab-pane>
+
+                <!-- 所有设备 Tab -->
+                <el-tab-pane label="所有设备" name="devices">
+                  <div class="tab-content-with-actions">
+                    <div class="tab-actions">
+                      <span class="farm-name-display" v-if="selectedFarm">
+                        <el-icon><House /></el-icon>
+                        当前农场：{{ selectedFarm }}
+                      </span>
+                      <el-button type="primary" size="small" @click="refreshDeviceList" :icon="Refresh">
+                        刷新
+                      </el-button>
+                    </div>
+                    <div class="tab-content-scroll">
+                      <el-table :data="deviceList" stripe border :loading="deviceListLoading" 
+                        :empty-text="selectedFarm ? '当前农场暂无设备数据' : '请先选择农场'"
+                        class="device-list-table">
+                        <el-table-column prop="deviceName" label="设备名称" width="180" align="left" show-overflow-tooltip />
+                        <el-table-column prop="deviceType" label="设备类型" width="150" align="center" />
+                        <el-table-column prop="blockName" label="所属区块" width="120" align="center" />
+                        <el-table-column prop="status" label="状态" width="100" align="center">
+                          <template #default="{ row }">
+                            <el-tag :type="row.status === 'open' || row.status === 'active' ? 'success' : 'info'" size="small">
+                              {{ row.status === 'open' ? '开启' : row.status === 'closed' ? '关闭' : row.status === 'active' ? '运行中' : '未激活' }}
+                            </el-tag>
+                          </template>
+                        </el-table-column>
+                        <el-table-column prop="is_online" label="在线状态" width="100" align="center">
+                          <template #default="{ row }">
+                            <el-tag :type="row.is_online ? 'success' : 'danger'" size="small">
+                              {{ row.is_online ? '在线' : '离线' }}
+                            </el-tag>
+                          </template>
+                        </el-table-column>
+                        <el-table-column prop="longitude" label="经度" width="120" align="center" />
+                        <el-table-column prop="latitude" label="纬度" width="120" align="center" />
+                        <el-table-column prop="capability" label="能力集" min-width="150" align="left" show-overflow-tooltip>
+                          <template #default="{ row }">
+                            {{ Array.isArray(row.capability) ? row.capability.join(', ') : row.capability }}
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                    </div>
+                  </div>
+                </el-tab-pane>
+
+                <!-- 农场地图 Tab -->
+                <el-tab-pane label="农场地图" name="map">
+                  <div class="map-container">
+                    <InteractiveMapComponent :devices="mapMarkers" :center="mapCenter" :zoom="mapZoom"
+                      @device-click="onDeviceClick" @device-toggle="onDeviceToggle" />
                   </div>
                 </el-tab-pane>
 
@@ -105,7 +150,7 @@
 <script setup>
 import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject } from 'vue'
 import { useRoute } from 'vue-router'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, House } from '@element-plus/icons-vue'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import WateringGroupStatus from '../../../../policy/gui/WateringGroupStatus.vue'
@@ -173,8 +218,12 @@ const mapMarkers = shallowRef([])
 
 
 // Tab切换相关
-const activeMainTab = ref('map') // 主tab切换（地图、轮灌组状态、策略运行时状态）
+const activeMainTab = ref('watering') // 主tab切换（轮灌组状态、所有设备、地图、策略运行时状态）
 const activeIrrigationTab = ref('watering')
+
+// 设备列表相关
+const deviceList = ref([])
+const deviceListLoading = ref(false)
 
 
 // 组件引用
@@ -435,17 +484,22 @@ const loadRealDeviceData = async (farmId) => {
       basicInfo.totalDevices = devices.length
       basicInfo.onlineDevices = devices.filter(d => d.is_online === true).length
       basicInfo.offlineDevices = devices.filter(d => d.is_online === false).length
+
+      // 更新设备列表
+      updateDeviceList()
       
 
     } else {
       // 如果没有获取到设备数据，使用空数组
       mapMarkers.value = []
+      deviceList.value = []
     }
 
   } catch (error) {
     console.error('加载真实设备数据失败:', error)
     // 出错时使用空数组
     mapMarkers.value = []
+    deviceList.value = []
   }
 }
 
@@ -512,6 +566,9 @@ const handleMainTabChange = (tabName) => {
     policyRuntimeRef.value.refresh()
   } else if (tabName === 'watering' && wateringGroupRef.value) {
     wateringGroupRef.value.refresh?.()
+  } else if (tabName === 'devices') {
+    // 切换到设备列表时，更新设备列表数据
+    updateDeviceList()
   }
 }
 
@@ -532,6 +589,42 @@ const refreshWateringGroup = async () => {
 const refreshIrrigationData = async () => {
   if (policyRuntimeRef.value) {
     policyRuntimeRef.value.refresh()
+  }
+}
+
+// 更新设备列表
+const updateDeviceList = () => {
+  // 从 mapMarkers 获取设备数据并转换为列表格式
+  // 确保只显示当前选中农场的设备（双重保险）
+  const currentFarmDevices = mapMarkers.value.filter(marker => 
+    !selectedFarm.value || marker.farmName === selectedFarm.value
+  )
+  
+  deviceList.value = currentFarmDevices.map(marker => ({
+    deviceName: marker.deviceName,
+    deviceType: marker.deviceType,
+    blockName: marker.blockName,
+    status: marker.status,
+    is_online: marker.is_online,
+    longitude: marker.longitude,
+    latitude: marker.latitude,
+    capability: marker.capability,
+    farmName: marker.farmName // 保留农场名称用于过滤
+  }))
+}
+
+// 刷新设备列表
+const refreshDeviceList = async () => {
+  if (selectedFarm.value) {
+    deviceListLoading.value = true
+    try {
+      await loadRealDeviceData(selectedFarm.value)
+      updateDeviceList()
+    } catch (error) {
+      console.error('刷新设备列表失败:', error)
+    } finally {
+      deviceListLoading.value = false
+    }
   }
 }
 
@@ -2053,9 +2146,23 @@ html {
   padding: 12px 16px;
   border-bottom: 1px solid #f0f0f0;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.farm-name-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #409eff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.farm-name-display .el-icon {
+  font-size: 16px;
 }
 
 .tab-content-scroll {
