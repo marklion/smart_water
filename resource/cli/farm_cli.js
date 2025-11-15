@@ -41,6 +41,32 @@ export default {
                 return `农场 ${name} 删除失败`;
             }
         });
+        cli_utils.make_common_cmd(vorpal, 'set area params <farm_name> [--system_flow <value>] [--laying_spacing <value>] [--dripper_spacing <value>] [--dripper_flow <value>] [--coefficient <value>]', '设置农场建议亩数计算参数', async (cmd_this, args) => {
+            let farm_name = args.farm_name;
+            let params = {};
+            if (args.system_flow !== undefined) params.system_flow = parseFloat(args.system_flow);
+            if (args.laying_spacing !== undefined) params.laying_spacing = parseFloat(args.laying_spacing);
+            if (args.dripper_spacing !== undefined) params.dripper_spacing = parseFloat(args.dripper_spacing);
+            if (args.dripper_flow !== undefined) params.dripper_flow = parseFloat(args.dripper_flow);
+            if (args.coefficient !== undefined) params.coefficient = parseFloat(args.coefficient);
+            let result = await resource_lib.set_farm_area_params(farm_name, params, ins.token);
+            if (result.result) {
+                return `农场 ${farm_name} 的建议亩数计算参数设置成功`;
+            } else {
+                return `农场 ${farm_name} 的建议亩数计算参数设置失败`;
+            }
+        });
+        cli_utils.make_common_cmd(vorpal, 'get area params <farm_name>', '获取农场建议亩数计算参数', async (cmd_this, args) => {
+            let farm_name = args.farm_name;
+            let result = await resource_lib.get_farm_area_params(farm_name, ins.token);
+            let output = `农场 ${farm_name} 的建议亩数计算参数：\n`;
+            output += `  系统流量: ${result.system_flow || 0}\n`;
+            output += `  铺设间距: ${result.laying_spacing || 0}\n`;
+            output += `  滴头间距: ${result.dripper_spacing || 0}\n`;
+            output += `  滴头流量: ${result.dripper_flow || 0}\n`;
+            output += `  系数: ${result.coefficient !== undefined ? result.coefficient : 0.9}`;
+            return output;
+        });
         vorpal.delimiter(prompt)
         return vorpal;
     },
