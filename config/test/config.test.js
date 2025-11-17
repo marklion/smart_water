@@ -108,7 +108,11 @@ async function confirm_policy_status(wgv_name, expected_status) {
     await cli.run_cmd('policy');
     let policies_lines = (await cli.run_cmd(`list policy ${wgv_name}`)).split('\n');
     let status_line_index = policies_lines.findIndex(line => line.startsWith('当前状态'));
-    expect(status_line_index).not.toBe(-1);
+    if (status_line_index === -1) {
+        // 如果找不到"当前状态"行，输出所有行以便调试
+        console.error(`策略 ${wgv_name} 的输出:`, policies_lines.join('\n'));
+        throw new Error(`策略 ${wgv_name} 未找到或未初始化`);
+    }
     let status_line = policies_lines[status_line_index].split(':')[1].trim();
     expect(status_line).toBe(expected_status);
     await cli.run_cmd('return');
@@ -569,6 +573,7 @@ describe('总策略快速配置和验证', () => {
         await wait_spend_ms(start_point, 1650);
         await mock_readout('轮灌阀门2', 2);
         await wait_spend_ms(start_point, 3750);
+        await wait_ms(500); // 等待策略扫描周期执行，确保轮灌组2已启动并进入"肥前"状态
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
@@ -684,24 +689,25 @@ describe('肥料搅拌策略快速配置和验证', () => {
         await cli.run_cmd('clear');
     }, 120000); // 120秒超时
     test('手动启动和停止搅拌', async () => {
+        await wait_ms(500); // 等待策略扫描周期执行，确保策略已初始化
         await confirm_mixing_state(false);
         await change_mixing_state_and_confirm(true);
         await change_mixing_state_and_confirm(false);
     });
     test('搅拌持续时间自动停止', async () => {
-        await setup_fert_mixing_test(2, 1); // 启动间隔2分钟，持续时间1分钟
+        await setup_fert_mixing_test(2, 1);
         const start_point = await change_mixing_state_and_confirm(true);
-        await wait_spend_ms(start_point, 65000); // 增加等待时间，确保策略有足够时间执行（1分钟=60000ms，加上扫描周期延迟）
+        await wait_spend_ms(start_point, 65000);
         await confirm_mixing_state(false);
-    }, 120000); // 120秒超时
+    }, 120000);
     test('定时自动启动搅拌', async () => {
         await setup_fert_mixing_test(1, 0.1);
+        await wait_ms(300);
         await confirm_mixing_state(false);
-        await wait_ms(200); // 等待策略扫描周期执行，确保"进入时间"已设置
         const start_point = Date.now();
-        await wait_spend_ms(start_point, 65000); // 增加等待时间，确保策略有足够时间执行（1分钟=60000ms，加上扫描周期延迟）
+        await wait_spend_ms(start_point, 65000);
         await confirm_mixing_state(true);
-        await wait_spend_ms(start_point, 70000); // 增加等待时间，确保策略有足够时间执行（0.1分钟=6000ms，加上扫描周期延迟）
+        await wait_spend_ms(start_point, 70000);
         await confirm_mixing_state(false);
     }, 120000);
     test('使用自定义搅拌泵名称', async () => {
