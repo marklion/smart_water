@@ -689,18 +689,19 @@ describe('肥料搅拌策略快速配置和验证', () => {
         await change_mixing_state_and_confirm(false);
     });
     test('搅拌持续时间自动停止', async () => {
-        await setup_fert_mixing_test(2, 1); // 启动间隔60分钟，持续时间1分钟
+        await setup_fert_mixing_test(2, 1); // 启动间隔2分钟，持续时间1分钟
         const start_point = await change_mixing_state_and_confirm(true);
-        await wait_spend_ms(start_point, 62000); // 增加等待时间，确保策略有足够时间执行
+        await wait_spend_ms(start_point, 65000); // 增加等待时间，确保策略有足够时间执行（1分钟=60000ms，加上扫描周期延迟）
         await confirm_mixing_state(false);
     }, 120000); // 120秒超时
     test('定时自动启动搅拌', async () => {
         await setup_fert_mixing_test(1, 0.1);
         await confirm_mixing_state(false);
+        await wait_ms(200); // 等待策略扫描周期执行，确保"进入时间"已设置
         const start_point = Date.now();
-        await wait_spend_ms(start_point, 62000);
+        await wait_spend_ms(start_point, 65000); // 增加等待时间，确保策略有足够时间执行（1分钟=60000ms，加上扫描周期延迟）
         await confirm_mixing_state(true);
-        await wait_spend_ms(start_point, 68000);
+        await wait_spend_ms(start_point, 70000); // 增加等待时间，确保策略有足够时间执行（0.1分钟=6000ms，加上扫描周期延迟）
         await confirm_mixing_state(false);
     }, 120000);
     test('使用自定义搅拌泵名称', async () => {
