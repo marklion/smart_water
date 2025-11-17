@@ -353,21 +353,24 @@
             <div v-if="wizardStep === 2" class="wizard-step-content">
                 <div class="step-header">
                     <h3>步骤2：分配阀门设备</h3>
+                    <p class="step-description">为每个轮灌组在地图上选择阀门设备，点击地图上的设备标记进行选择，选中的设备会显示为蓝色</p>
                     <div v-if="availableValveDevices.length === 0" class="no-devices-warning">
-                            <el-alert title="未找到WaterGroupValve设备" type="warning"
-                                description="当前农场没有找到WaterGroupValve类型的设备，请先配置相关设备" :closable="false" show-icon />
+                        <el-alert title="未找到WaterGroupValve设备" type="warning" description="当前农场没有找到WaterGroupValve类型的设备，请先配置相关设备" :closable="false" show-icon />
                     </div>
                 </div>
 
                 <div class="device-allocation">
                     <div v-for="group in wateringGroups" :key="group.name" class="group-device-config">
                         <h4>{{ group.name }}</h4>
-                            <el-select v-model="selectedValveDevices[group.name]" multiple placeholder="选择阀门设备"
-                                style="width: 100%;" :disabled="availableValveDevices.length === 0">
-                                <el-option v-for="device in availableValveDevices" :key="device.device_name"
-                                    :label="`${device.device_name} (${device.driver_name})`"
-                                    :value="device.device_name" />
-                        </el-select>
+                        <div class="valve-selection-map-container">
+                            <div :id="`valve-selection-map-${group.name}`" class="valve-selection-map" :data-group-name="group.name"></div>
+                            <div class="selected-valves-info">
+                                <span class="info-text">已选择 {{ selectedValveDevices[group.name]?.length || 0 }} 个阀门</span>
+                                <el-button v-if="selectedValveDevices[group.name]?.length > 0" type="danger" size="small" @click="clearSelectedValves(group.name)" :icon="Delete">
+                                    清空选择
+                                </el-button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
