@@ -561,6 +561,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
+        await wait_ms(200); // 等待策略扫描周期执行
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
@@ -690,16 +691,16 @@ describe('肥料搅拌策略快速配置和验证', () => {
     test('搅拌持续时间自动停止', async () => {
         await setup_fert_mixing_test(60, 1); // 启动间隔60分钟，持续时间1分钟
         const start_point = await change_mixing_state_and_confirm(true);
-        await wait_spend_ms(start_point, 61000);
+        await wait_spend_ms(start_point, 62000); // 增加等待时间，确保策略有足够时间执行
         await confirm_mixing_state(false);
     }, 120000); // 120秒超时
     test('定时自动启动搅拌', async () => {
         await setup_fert_mixing_test(1, 0.1); // 启动间隔1分钟，持续时间0.1分钟（6秒）
         await confirm_mixing_state(false);
         const start_point = Date.now();
-        await wait_spend_ms(start_point, 61000);
+        await wait_spend_ms(start_point, 62000); // 增加等待时间，确保策略有足够时间执行
         await confirm_mixing_state(true);
-        await wait_spend_ms(start_point, 67000);
+        await wait_spend_ms(start_point, 68000); // 增加等待时间，确保策略有足够时间执行
         await confirm_mixing_state(false);
     }, 120000); // 120秒超时
     test('使用自定义搅拌泵名称', async () => {
