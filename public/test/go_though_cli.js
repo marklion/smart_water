@@ -665,6 +665,7 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'undo add farm',
             ],
+        }
     ];
     let ret = { depends: [], teardown: [] };
     for (let item of depends) {
