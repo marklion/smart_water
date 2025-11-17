@@ -1718,9 +1718,33 @@ const prevStep = () => {
 }
 
 const finishWizard = () => {
+    // 确保 wateringGroups.value 是数组
+    if (!Array.isArray(wateringGroups.value)) {
+        console.error('wateringGroups.value 不是数组:', wateringGroups.value, typeof wateringGroups.value)
+        // 如果不是数组，重置为数组
+        wateringGroups.value = []
+        ElMessage.error('轮灌组数据异常，请重新配置')
+        return
+    }
+
+    // 验证是否有轮灌组
+    if (wateringGroups.value.length === 0) {
+        ElMessage.warning('请至少创建一个轮灌组')
+        return
+    }
+
     // 验证施肥配置
     for (const group of wateringGroups.value) {
+        if (!group || !group.name) {
+            console.error('轮灌组数据异常:', group)
+            ElMessage.error('轮灌组数据异常，请重新配置')
+            return
+        }
         const config = fertConfigs.value[group.name]
+        if (!config) {
+            ElMessage.warning(`请为${group.name}设置施肥配置`)
+            return
+        }
         if (config.method === 'AreaBased' && config.AB_fert <= 0) {
             ElMessage.warning(`请为${group.name}设置有效的亩定量施肥参数`)
             return
@@ -1736,8 +1760,24 @@ const finishWizard = () => {
     }
 
     // 生成最终配置JSON
+    // 再次确保是数组（双重检查）
+    if (!Array.isArray(wateringGroups.value)) {
+        console.error('wateringGroups.value 在生成配置时不是数组:', wateringGroups.value)
+        wateringGroups.value = []
+        ElMessage.error('轮灌组数据异常，请重新配置')
+        return
+    }
+
     const finalConfig = wateringGroups.value.map(group => {
+        if (!group || !group.name) {
+            console.error('轮灌组数据异常:', group)
+            return null
+        }
         const config = fertConfigs.value[group.name]
+        if (!config) {
+            console.error('施肥配置缺失:', group.name)
+            return null
+        }
         let AB_fert = config.AB_fert;
         if (config.method == 'Total') {
             AB_fert = config.total_fert / group.area;
@@ -1753,7 +1793,13 @@ const finishWizard = () => {
             post_fert_time: config.post_fert_time || 0,
             fert_rate: config.fert_rate || 0,
         }
-    })
+    }).filter(Boolean) // 过滤掉 null 值
+
+    // 检查是否有有效的配置
+    if (finalConfig.length === 0) {
+        ElMessage.error('没有有效的轮灌组配置')
+        return
+    }
 
     // 下发到后端：创建/替换轮灌组策略
     (async () => {
