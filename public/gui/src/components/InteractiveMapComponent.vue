@@ -409,12 +409,6 @@
                                         :precision="2" placeholder="总量" />
                                 <span class="unit">L</span>
                             </div>
-                            <div v-if="fertConfigs[group.name].method === 'Total'" class="param-item">
-                                <label>施肥参数：</label>
-                                    <el-input-number v-model="fertConfigs[group.name].total_fert" :min="0"
-                                        :precision="2" placeholder="总量" />
-                                <span class="unit">L</span>
-                            </div>
 
                             <div class="param-item">
                                 <label>期望施肥速度：</label>
