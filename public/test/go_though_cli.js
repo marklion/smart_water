@@ -299,6 +299,26 @@ function convert_param(cmd, param) {
             cmd:'statistic',
             param:'is_increment',
             values:['true','false']
+        }, {
+            cmd: 'set area params',
+            param: 'system_flow',
+            values: ['1', '10', '100']
+        }, {
+            cmd: 'set area params',
+            param: 'laying_spacing',
+            values: ['0.5', '1', '2']
+        }, {
+            cmd: 'set area params',
+            param: 'dripper_spacing',
+            values: ['0.3', '0.4', '0.5']
+        }, {
+            cmd: 'set area params',
+            param: 'dripper_flow',
+            values: ['2', '5', '10']
+        }, {
+            cmd: 'set area params',
+            param: 'coefficient',
+            values: ['0.8', '0.9', '1.0']
         }
     ];
     for (let item of exceptions) {
@@ -629,6 +649,12 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'undo add device',
             ],
+        }, {
+            cmd: 'set area params',
+            depends: farm_related_prepare,
+            teardown: [
+                'undo set area params'
+            ].concat(farm_related_teardown),
         }
     ];
     let ret = { depends: [], teardown: [] };
