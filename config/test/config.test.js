@@ -678,10 +678,10 @@ async function change_mixing_state_and_confirm(is_start, mixing_pump_name = '农
 describe('肥料搅拌策略快速配置和验证', () => {
     beforeEach(async () => {
         await setup_fert_mixing_test();
-    });
+    }, 120000); // 120秒超时
     afterEach(async () => {
         await cli.run_cmd('clear');
-    });
+    }, 120000); // 120秒超时
     test('手动启动和停止搅拌', async () => {
         await confirm_mixing_state(false);
         await change_mixing_state_and_confirm(true);
@@ -692,7 +692,7 @@ describe('肥料搅拌策略快速配置和验证', () => {
         const start_point = await change_mixing_state_and_confirm(true);
         await wait_spend_ms(start_point, 61000);
         await confirm_mixing_state(false);
-    });
+    }, 120000); // 120秒超时
     test('定时自动启动搅拌', async () => {
         await setup_fert_mixing_test(1, 0.1); // 启动间隔1分钟，持续时间0.1分钟（6秒）
         await confirm_mixing_state(false);
@@ -701,14 +701,14 @@ describe('肥料搅拌策略快速配置和验证', () => {
         await confirm_mixing_state(true);
         await wait_spend_ms(start_point, 67000);
         await confirm_mixing_state(false);
-    });
+    }, 120000); // 120秒超时
     test('使用自定义搅拌泵名称', async () => {
         const pump_name = '农场1-自定义搅拌泵';
         await setup_fert_mixing_test(60, 6, pump_name);
         await confirm_mixing_state(false, pump_name);
         await change_mixing_state_and_confirm(true, pump_name);
         await change_mixing_state_and_confirm(false, pump_name);
-    });
+    }, 120000); // 120秒超时
     test('搅拌过程中手动停止', async () => {
         await setup_fert_mixing_test(60, 10); // 启动间隔60分钟，持续时间10分钟
         const start_point = await change_mixing_state_and_confirm(true);
