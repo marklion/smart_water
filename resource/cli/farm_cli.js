@@ -91,7 +91,12 @@ export default {
                 let dripper_spacing = areaParams.dripper_spacing !== undefined ? areaParams.dripper_spacing : 0;
                 let dripper_flow = areaParams.dripper_flow !== undefined ? areaParams.dripper_flow : 0;
                 let coefficient = areaParams.coefficient !== undefined ? areaParams.coefficient : 0.9;
-                ret.push(`set area params '${farm.name}' '${system_flow}' '${laying_spacing}' '${dripper_spacing}' '${dripper_flow}' '${coefficient}'`);
+                let formatParam = (val) => {
+                    if (val === undefined || val === null) return val;
+                    return val.toString();
+                };
+                let coefficient_str = (coefficient === 1 || coefficient === 1.0) ? '1.0' : formatParam(coefficient);
+                ret.push(`set area params '${farm.name}' '${formatParam(system_flow)}' '${formatParam(laying_spacing)}' '${formatParam(dripper_spacing)}' '${formatParam(dripper_flow)}' '${coefficient_str}'`);
             }
         }
         if (this._vorpalInstance) {
