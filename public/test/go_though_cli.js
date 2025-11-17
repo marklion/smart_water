@@ -651,10 +651,23 @@ function cmds_depend_prepare(cmd, parent) {
             ],
         }, {
             cmd: 'set area params',
-            depends: farm_related_prepare,
+            parent: 'farm',
+            depends: [
+                'resource',
+                'farm',
+                'add farm abcd 1 2 3',
+                'add farm 12345 1 2 3',
+                'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
+                'add farm \'a = b.a + 1\' 1 2 3',
+            ],
             teardown: [
-                'undo set area params'
-            ].concat(farm_related_teardown),
+                'undo set area params',
+                'return',
+                'resource',
+                'farm',
+                'undo add farm',
+                'return',
+            ],
         }
     ];
     let ret = { depends: [], teardown: [] };
