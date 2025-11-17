@@ -661,6 +661,7 @@ function cmds_depend_prepare(cmd, parent) {
                 'add farm \'a = b.a + 1\' 1 2 3',
             ],
             teardown: [
+                'farm',
                 'undo set area params',
                 'return',
                 'resource',
