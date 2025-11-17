@@ -506,7 +506,7 @@ const fertConfigs = ref({}) // 每个轮灌组的施肥配置
 const valveSelectionMaps = ref({}) // 每个轮灌组的地图实例
 const valveSelectionMarkers = ref({}) // 每个轮灌组的地图标记
 const farmAreaParams = ref({
-    system_flow: 0,
+    system_flow: 1,
     laying_spacing: 0,
     dripper_spacing: 0,
     dripper_flow: 0,
@@ -1338,24 +1338,16 @@ const showPolicyConfigWizard = async () => {
         // 获取当前农场的WaterGroupValve类型设备
         const currentFarm = props.devices.length > 0 ? (props.devices[0].farmName || props.devices[0].farm_name) : '默认农场'
 
-        console.log('当前农场:', currentFarm)
-
         const deviceResponse = await call_remote('/device_management/list_device', {
             farm_name: currentFarm,
             pageNo: 0
         })
 
-        console.log('设备响应:', deviceResponse)
-
         if (deviceResponse && deviceResponse.devices) {
-            console.log('所有设备:', deviceResponse.devices)
-
             // 只筛选WaterGroupValve类型的设备
             const valveDevices = deviceResponse.devices.filter(device =>
                 device.driver_name && device.driver_name.includes('WaterGroupValve')
             )
-
-            console.log('WaterGroupValve设备:', valveDevices)
             availableValveDevices.value = valveDevices
         } else {
             availableValveDevices.value = []
@@ -1368,7 +1360,7 @@ const showPolicyConfigWizard = async () => {
             })
             if (paramsResponse) {
                 farmAreaParams.value = {
-                    system_flow: paramsResponse.system_flow || 0,
+                    system_flow: paramsResponse.system_flow !== undefined ? paramsResponse.system_flow : 1,
                     laying_spacing: paramsResponse.laying_spacing || 0,
                     dripper_spacing: paramsResponse.dripper_spacing || 0,
                     dripper_flow: paramsResponse.dripper_flow || 0,
@@ -1379,7 +1371,7 @@ const showPolicyConfigWizard = async () => {
             console.error('获取农场参数失败:', error)
             // 使用默认值
             farmAreaParams.value = {
-                system_flow: 0,
+                system_flow: 1,
                 laying_spacing: 0,
                 dripper_spacing: 0,
                 dripper_flow: 0,
@@ -1440,18 +1432,32 @@ const removeWateringGroup = (index) => {
 const getRecommendedArea = (index) => {
     const params = farmAreaParams.value
     // 公式：系统流量*1000/（667/铺设间距/滴头间距*滴头流量）*系数
-    if (!params.system_flow || params.system_flow <= 0 ||
-        !params.laying_spacing || params.laying_spacing <= 0 ||
-        !params.dripper_spacing || params.dripper_spacing <= 0 ||
-        !params.dripper_flow || params.dripper_flow <= 0) {
+    // 确保参数是数字类型
+    const system_flow = Number(params.system_flow) || 0
+    const laying_spacing = Number(params.laying_spacing) || 0
+    const dripper_spacing = Number(params.dripper_spacing) || 0
+    const dripper_flow = Number(params.dripper_flow) || 0
+    const coefficient = Number(params.coefficient) || 0.9
+    
+    // 检查必需参数是否有效（大于0）
+    if (system_flow <= 0 ||
+        laying_spacing <= 0 ||
+        dripper_spacing <= 0 ||
+        dripper_flow <= 0) {
         return 0
     }
-    const denominator = (667 / params.laying_spacing / params.dripper_spacing) * params.dripper_flow
-    if (denominator === 0) {
+    
+    // 计算分母：667 ÷ 铺设间距 ÷ 滴头间距 × 滴头流量
+    const denominator = (667 / laying_spacing / dripper_spacing) * dripper_flow
+    
+    if (denominator === 0 || !isFinite(denominator)) {
         return 0
     }
-    const result = (params.system_flow * 1000 / denominator) * (params.coefficient || 0.9)
-    return result > 0 ? result : 0
+    
+    // 计算：系统流量 × 1000 ÷ 分母 × 系数
+    const result = (system_flow * 1000 / denominator) * coefficient
+    
+    return result > 0 && isFinite(result) ? result : 0
 }
 
 // 更新建议亩数计算参数
@@ -1463,7 +1469,8 @@ const updateAreaParam = async (paramName, value) => {
             farm_name: currentFarm,
             ...params
         })
-        // 参数已更新，响应式数据会自动更新计算结果
+        // 更新本地参数值，确保响应式更新
+        farmAreaParams.value[paramName] = value
     } catch (error) {
         console.error('更新参数失败:', error)
         ElMessage.error('更新参数失败')
@@ -1745,9 +1752,7 @@ const finishWizard = () => {
         }
     })
 
-    console.log('策略配置完成:', finalConfig)
     // 下发到后端：创建/替换轮灌组策略
-    ;
     (async () => {
         try {
             const farm_name = localStorage.getItem('selectedFarm') || ''

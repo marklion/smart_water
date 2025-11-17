@@ -289,7 +289,7 @@ export default {
                 }
                 
                 return {
-                    system_flow: farm.system_flow || 0,
+                    system_flow: farm.system_flow !== undefined ? farm.system_flow : 1,
                     laying_spacing: farm.laying_spacing || 0,
                     dripper_spacing: farm.dripper_spacing || 0,
                     dripper_flow: farm.dripper_flow || 0,
