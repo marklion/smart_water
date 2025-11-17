@@ -301,6 +301,10 @@ function convert_param(cmd, param) {
             values:['true','false']
         }, {
             cmd: 'set area params',
+            param: 'farm_name',
+            values: ['abcd', '12345', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'a = b.a + 1']
+        }, {
+            cmd: 'set area params',
             param: 'system_flow',
             values: ['1', '10', '100']
         }, {
@@ -758,24 +762,6 @@ export default {
         let cmds = make_pairwise_cmds(cmd_obj);
         print_test_log(`run cmds: ${JSON.stringify(cmds)}`);
         for (let cmd of cmds) {
-            // 如果是 undo 命令且找不到配置，尝试从 undo 命令中提取原始命令
-            if (cmd_obj.cmd.startsWith('undo ') && cmd_obj.depend_define.depends.length === 0) {
-                let original_cmd = cmd_obj.cmd.substring(5); // 去掉 'undo ' 前缀
-                // 尝试查找原始命令的配置，使用常见的 parent 值
-                let possible_parents = ['sw_cli', 'resource', 'farm', 'block', 'policy', 'state', 'device'];
-                for (let possible_parent of possible_parents) {
-                    let test_depend = cmds_depend_prepare(original_cmd, possible_parent);
-                    if (test_depend.parent && test_depend.depends.length > 0) {
-                        // 找到了配置，更新 cmd_obj 的 depend_define
-                        cmd_obj.depend_define = test_depend;
-                        break;
-                    }
-                }
-            }
-            // 在执行 depends 前，确保返回到根上下文，以便正确执行 depends
-            while (cli.current_prompt !== 'sw_cli>') {
-                await cli.run_cmd('return');
-            }
             for (let depend of cmd_obj.depend_define.depends) {
                 await cli.run_cmd(depend);
             }
