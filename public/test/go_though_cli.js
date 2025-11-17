@@ -774,6 +774,40 @@ export default {
             if (cli.current_prompt !== orig_prompt) {
                 let sub_commands = await this.collect_cmds(cli, cmd_obj.cmd);
                 for (let sub_cmd of sub_commands) {
+                    // 如果是 undo 命令，需要确保在正确的上下文中执行
+                    if (sub_cmd.cmd.startsWith('undo ')) {
+                        // 从 undo 命令中提取原始命令
+                        let original_cmd = sub_cmd.cmd.substring(5); // 去掉 'undo ' 前缀
+                        // 查找原始命令的配置，尝试不同的 parent 值
+                        let possible_parents = ['sw_cli', 'resource', 'farm', 'block', 'policy', 'state', 'device'];
+                        let original_cmd_depend = null;
+                        for (let possible_parent of possible_parents) {
+                            let test_depend = cmds_depend_prepare(original_cmd, possible_parent);
+                            if (test_depend.parent && test_depend.depends.length > 0) {
+                                original_cmd_depend = test_depend;
+                                break;
+                            }
+                        }
+                        // 如果找到了配置且有 parent，确保在正确的上下文中执行
+                        if (original_cmd_depend && original_cmd_depend.parent) {
+                            let target_parent = original_cmd_depend.parent;
+                            // 检查当前上下文是否匹配目标 parent
+                            if (!cli.current_prompt.includes(target_parent)) {
+                                // 返回到根上下文
+                                while (cli.current_prompt !== 'sw_cli>') {
+                                    await cli.run_cmd('return');
+                                }
+                                // 按照 depends 路径进入目标上下文（只取上下文切换命令，跳过数据操作命令）
+                                let depends = original_cmd_depend.depends;
+                                for (let dep of depends) {
+                                    if (dep === 'return' || dep.startsWith('add ') || dep.startsWith('set ')) {
+                                        break;
+                                    }
+                                    await cli.run_cmd(dep);
+                                }
+                            }
+                        }
+                    }
                     await this.run_and_check(cli, sub_cmd);
                 }
                 await cli.run_cmd('return');
