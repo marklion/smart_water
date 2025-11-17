@@ -85,13 +85,13 @@ export default {
             ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.longitude || ''}' '${farm.latitude || ''}' '${farm.info || ''}'`);
             // 显示农场的面积参数配置信息
             let areaParams = await resource_lib.get_farm_area_params(farm.name, undefined);
-            if (areaParams && (areaParams.system_flow || areaParams.laying_spacing || areaParams.dripper_spacing || areaParams.dripper_flow || areaParams.coefficient !== undefined)) {
-                let system_flow = areaParams.system_flow || 1;
-                let laying_spacing = areaParams.laying_spacing || 0;
-                let dripper_spacing = areaParams.dripper_spacing || 0;
-                let dripper_flow = areaParams.dripper_flow || 0;
+            if (areaParams && (areaParams.system_flow !== undefined || areaParams.laying_spacing !== undefined || areaParams.dripper_spacing !== undefined || areaParams.dripper_flow !== undefined || areaParams.coefficient !== undefined)) {
+                let system_flow = areaParams.system_flow !== undefined ? areaParams.system_flow : 1;
+                let laying_spacing = areaParams.laying_spacing !== undefined ? areaParams.laying_spacing : 0;
+                let dripper_spacing = areaParams.dripper_spacing !== undefined ? areaParams.dripper_spacing : 0;
+                let dripper_flow = areaParams.dripper_flow !== undefined ? areaParams.dripper_flow : 0;
                 let coefficient = areaParams.coefficient !== undefined ? areaParams.coefficient : 0.9;
-                ret.push(`农场 ${farm.name} 的建议亩数计算参数: 系统流量=${system_flow}, 铺设间距=${laying_spacing}, 滴头间距=${dripper_spacing}, 滴头流量=${dripper_flow}, 系数=${coefficient}`);
+                ret.push(`set area params '${farm.name}' '${system_flow}' '${laying_spacing}' '${dripper_spacing}' '${dripper_flow}' '${coefficient}'`);
             }
         }
         if (this._vorpalInstance) {
