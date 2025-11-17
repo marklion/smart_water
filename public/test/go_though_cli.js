@@ -772,6 +772,10 @@ export default {
                     }
                 }
             }
+            // 在执行 depends 前，确保返回到根上下文，以便正确执行 depends
+            while (cli.current_prompt !== 'sw_cli>') {
+                await cli.run_cmd('return');
+            }
             for (let depend of cmd_obj.depend_define.depends) {
                 await cli.run_cmd(depend);
             }
