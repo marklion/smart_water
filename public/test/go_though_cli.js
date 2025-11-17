@@ -657,8 +657,6 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'set area params',
             parent: 'farm',
             depends: [
-                'resource',
-                'farm',
                 'add farm abcd 1 2 3',
                 'add farm 12345 1 2 3',
                 'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
