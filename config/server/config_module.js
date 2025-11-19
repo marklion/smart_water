@@ -450,6 +450,10 @@ export default {
                 }
                 body.policy_name = policy_name;
                 await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_mixing_policy_config(body));
+                // 添加快速操作: start, stop, reset
+                await policy_lib.add_quick_action(policy_name, '开始', 'prs.variables.set("需要启动", true)', false, token);
+                await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
+                await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
                 return { result: true };
             },
         },

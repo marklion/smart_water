@@ -334,6 +334,11 @@ function convert_param(cmd, param) {
             values: ['a', 'abcd']
         },
         {
+            cmd: 'do quick action',
+            param: 'action_name',
+            values: ['start', 'a', 'abcd']
+        },
+        {
             cmd:'del quick action',
             param: 'action_name',
             values: ['a', 'abcd']
@@ -676,8 +681,9 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'do quick action',
             depends: [
                 'policy a',
-                'return',
-                'quick action false 启动 \'prs.variables.set("test", true)\'',
+                'quick action false start \'prs.variables.set("test", true)\'',
+                'quick action false a \'prs.variables.set("test", true)\'',
+                'quick action false abcd \'prs.variables.set("test", true)\'',
                 'return',
             ],
             teardown: [
