@@ -330,7 +330,7 @@ function convert_param(cmd, param) {
         }, {
             cmd: 'quick action',
             param: 'expression',
-            values: ['\'prs.variables.set("需要启动", true)\'', '\'prs.variables.set("需要启动", false)\'', '\'prs.variables.set("需要重置", true)\'']
+            values: ['prs.variables.set("需要启动", true)', 'prs.variables.set("需要启动", false)', 'prs.variables.set("需要重置", true)']
         }, {
             cmd: 'del quick action',
             param: 'action_name',
