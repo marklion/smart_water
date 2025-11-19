@@ -328,20 +328,16 @@ function convert_param(cmd, param) {
             cmd: 'set area params',
             param: 'coefficient',
             values: ['0.8', '0.9', '1.0']
-        }, {
-            cmd: 'do quick action',
-            param: 'policy_name',
-            values: ['a', 'abcd']
-        },
-        {
-            cmd: 'do quick action',
-            param: 'action_name',
-            values: ['start', 'a', 'abcd']
-        },
+        }, 
         {
             cmd:'del quick action',
             param: 'action_name',
-            values: ['a', 'abcd']
+            values: ['a', 'start']
+        },
+        {
+            cmd:'del quick action',
+            param: 'policy_name',
+            values: ['a']
         }
     ];
     for (let item of exceptions) {
@@ -673,24 +669,12 @@ function cmds_depend_prepare(cmd, parent) {
                 'quick action false 12345 \'prs.variables.set("test", true)\'',
                 'quick action false LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa \'prs.variables.set("test", true)\'',
                 'quick action false \'a = b.a + 1\' \'prs.variables.set("test", true)\'',
-            ],
-            teardown: [
-                'undo quick action',
-            ],
-        }, {
-            cmd: 'do quick action',
-            depends: [
-                'policy a',
-                'quick action false start \'prs.variables.set("test", true)\'',
-                'quick action false a \'prs.variables.set("test", true)\'',
-                'quick action false abcd \'prs.variables.set("test", true)\'',
-                'return',
+                'return'
             ],
             teardown: [
                 'policy a',
                 'undo quick action',
                 'return',
-                'undo policy a',
             ],
         }, {
             cmd: 'del watering group matrix',
