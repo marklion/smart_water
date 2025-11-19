@@ -59,10 +59,6 @@ export default {
             await policy_lib.do_quick_action(args.policy_name, args.action_name);
             return `策略 ${args.policy_name} 的快速操作 ${args.action_name} 已执行`;
         });
-        cli_utils.make_common_cmd(vorpal, 'del quick action <policy_name> <action_name>', '删除策略的快速操作', async (cmd_this, args) => {
-            await policy_lib.del_quick_action(args.policy_name, args.action_name);
-            return `策略 ${args.policy_name} 的快速操作 ${args.action_name} 已删除`;
-        });
         cli_utils.make_display_cmd(vorpal, 'list watering groups', '列出所有轮灌组运行状态', async (cmd_this, args, pageNo) => {
             let result = await policy_lib.list_watering_groups(pageNo);
             let lines = result.groups;

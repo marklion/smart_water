@@ -331,11 +331,6 @@ function convert_param(cmd, param) {
         }, 
         {
             cmd:'del quick action',
-            param: 'policy_name',
-            values: ['a']
-        },
-        {
-            cmd:'del quick action',
             param: 'action_name',
             values: ['a', 'start']
         },
