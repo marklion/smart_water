@@ -658,18 +658,14 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'del quick action',
             parent: 'policy',
             depends: [
-                'policy a',
                 'quick action false a \'prs.variables.set("test", true)\'',
                 'quick action false abcd \'prs.variables.set("test", true)\'',
                 'quick action false 12345 \'prs.variables.set("test", true)\'',
                 'quick action false LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa \'prs.variables.set("test", true)\'',
                 'quick action false \'a = b.a + 1\' \'prs.variables.set("test", true)\'',
-                'return'
             ],
             teardown: [
-                'policy a',
                 'undo quick action',
-                'return',
             ],
         }, {
             cmd: 'del watering group matrix',
