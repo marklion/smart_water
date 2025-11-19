@@ -332,7 +332,7 @@ function convert_param(cmd, param) {
         {
             cmd:'del quick action',
             param: 'action_name',
-            values: ['a', 'start']
+            values: ['a']
         },
     ];
     for (let item of exceptions) {
