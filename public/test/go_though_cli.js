@@ -324,25 +324,14 @@ function convert_param(cmd, param) {
             param: 'coefficient',
             values: ['0.8', '0.9', '1.0']
         }, {
-            cmd: 'quick action',
-            param: 'action_name',
-            values: ['启动', '停止', '重置']
-        }, {
-            cmd: 'quick action',
-            param: 'expression',
-            values: ['prs.variables.set("需要启动", true)', 'prs.variables.set("需要启动", false)', 'prs.variables.set("需要重置", true)']
-        }, {
-            cmd: 'del quick action',
-            param: 'action_name',
-            values: ['启动', '停止']
-        }, {
             cmd: 'do quick action',
             param: 'policy_name',
             values: ['a', 'abcd']
-        }, {
-            cmd: 'do quick action',
+        },
+        {
+            cmd:'del quick action',
             param: 'action_name',
-            values: ['启动', '停止']
+            values: ['a', 'abcd']
         }
     ];
     for (let item of exceptions) {
