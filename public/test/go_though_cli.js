@@ -663,7 +663,10 @@ function cmds_depend_prepare(cmd, parent) {
             parent: 'policy',
             depends: [
                 'policy a',
-                'quick action false 启动 \'prs.variables.set("test", true)\'',
+                'quick action false abcd \'prs.variables.set("test", true)\'',
+                'quick action false 12345 \'prs.variables.set("test", true)\'',
+                'quick action false LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa \'prs.variables.set("test", true)\'',
+                'quick action false \'a = b.a + 1\' \'prs.variables.set("test", true)\'',
             ],
             teardown: [
                 'undo quick action',
