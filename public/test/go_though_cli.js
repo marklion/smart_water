@@ -319,10 +319,30 @@ function convert_param(cmd, param) {
             cmd: 'set area params',
             param: 'dripper_flow',
             values: ['2', '5', '10']
-        }, {
+        },         {
             cmd: 'set area params',
             param: 'coefficient',
             values: ['0.8', '0.9', '1.0']
+        }, {
+            cmd: 'quick action',
+            param: 'action_name',
+            values: ['启动', '停止', '重置']
+        }, {
+            cmd: 'quick action',
+            param: 'expression',
+            values: ['\'prs.variables.set("需要启动", true)\'', '\'prs.variables.set("需要启动", false)\'', '\'prs.variables.set("需要重置", true)\'']
+        }, {
+            cmd: 'del quick action',
+            param: 'action_name',
+            values: ['启动', '停止']
+        }, {
+            cmd: 'do quick action',
+            param: 'policy_name',
+            values: ['a', 'abcd']
+        }, {
+            cmd: 'do quick action',
+            param: 'action_name',
+            values: ['启动', '停止']
         }
     ];
     for (let item of exceptions) {
@@ -634,6 +654,47 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'undo policy a',
                 'undo policy LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa',
+            ],
+        }, {
+            cmd: 'quick action',
+            parent: 'policy',
+            depends: [
+                'policy a',
+                'state a',
+                'return',
+                'init state a',
+                'return',
+            ],
+            teardown: [
+                'undo quick action',
+            ],
+        }, {
+            cmd: 'del quick action',
+            parent: 'policy',
+            depends: [
+                'policy a',
+                'quick action abcd \'prs.variables.set("test", true)\'',
+            ],
+            teardown: [
+                'undo quick action',
+            ],
+        }, {
+            cmd: 'do quick action',
+            no_bdr: true,
+            depends: [
+                'policy a',
+                'state a',
+                'return',
+                'init state a',
+                'return',
+                'quick action abcd \'prs.variables.set("test", true)\'',
+                'return',
+            ],
+            teardown: [
+                'policy a',
+                'undo quick action',
+                'return',
+                'undo policy a',
             ],
         }, {
             cmd: 'del watering group matrix',

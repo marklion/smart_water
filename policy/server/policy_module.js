@@ -475,7 +475,8 @@ export default {
                 try {
                     addItemIfNotExists(policy_array, {
                         name: body.name,
-                        states: []
+                        states: [],
+                        quick_actions: []
                     }, policy => policy.name === body.name);
                     return { result: true };
                 } catch (error) {
@@ -1792,6 +1793,152 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 return { farm_name: policy.farm_name || '' };
             }
+        },
+        add_quick_action: {
+            name: '添加快速操作',
+            description: '为策略添加一个快速操作按钮',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                action_name: { type: String, mean: '操作名称', example: '打开', have_to: true },
+                expression: { type: String, mean: '执行表达式', example: 'prs.variables.set("某个变量", false)', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let quick_actions = ensureArrayExists(policy, 'quick_actions');
+                
+                // 检查是否已存在相同名称的快速操作
+                const existingAction = quick_actions.find(a => a.action_name === body.action_name);
+                if (existingAction) {
+                    existingAction.expression = body.expression;
+                } else {
+                    quick_actions.push({
+                        action_name: body.action_name,
+                        expression: body.expression
+                    });
+                }
+                return { result: true };
+            }
+        },
+        del_quick_action: {
+            name: '删除快速操作',
+            description: '删除策略的一个快速操作',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                action_name: { type: String, mean: '操作名称', example: '打开', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let quick_actions = ensureArrayExists(policy, 'quick_actions');
+                
+                const removed = findAndRemoveFromArray(quick_actions, a => a.action_name === body.action_name);
+                if (!removed) {
+                    throw { err_msg: `快速操作 ${body.action_name} 不存在` };
+                }
+                return { result: true };
+            }
+        },
+        list_quick_actions: {
+            name: '列出快速操作',
+            description: '列出策略的所有快速操作',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true }
+            },
+            result: {
+                quick_actions: {
+                    type: Array,
+                    mean: '快速操作列表',
+                    explain: {
+                        action_name: { type: String, mean: '操作名称', example: '打开' },
+                        expression: { type: String, mean: '执行表达式', example: 'prs.variables.set("某个变量", false)' }
+                    }
+                }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                return { quick_actions: policy.quick_actions || [] };
+            }
+        },
+        do_quick_action: {
+            name: '执行快速操作',
+            description: '执行策略的一个快速操作',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
+                action_name: { type: String, mean: '操作名称', example: '打开', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let policy = validatePolicyExists(body.policy_name);
+                let quick_actions = policy.quick_actions || [];
+                
+                const action = quick_actions.find(a => a.action_name === body.action_name);
+                if (!action) {
+                    throw { err_msg: `快速操作 ${body.action_name} 不存在` };
+                }
+                
+                // 获取策略的运行时状态
+                let runtimeState = policy_runtime_states.get(body.policy_name);
+                if (!runtimeState) {
+                    // 如果策略还没有运行时状态，创建一个基本的运行时状态
+                    runtimeState = {
+                        current_state: null,
+                        variables: new Map(),
+                        last_execution_time: Date.now(),
+                        start_time: Date.now(),
+                        execution_count: 0,
+                        is_first_execution: true,
+                        getSource: async function (sourceName) {
+                            try {
+                                if (!policy.sources || policy.sources.length === 0) {
+                                    throw new Error(`策略 ${policy.name} 中没有定义任何数据源`);
+                                }
+                                const source = policy.sources.find(s => s.name === sourceName);
+                                if (!source) {
+                                    throw new Error(`数据源 ${sourceName} 在策略 ${policy.name} 中不存在`);
+                                }
+                                const driver = await get_driver(source.device, source.data_type);
+                                const readout = await driver[source.data_type]();
+                                const deviceData = { readout };
+                                if (deviceData && deviceData.readout !== undefined) {
+                                    const numericValue = parseFloat(deviceData.readout);
+                                    return numericValue;
+                                } else {
+                                    return 0;
+                                }
+                            } catch (error) {
+                                console.error(`获取数据源 ${sourceName} 读数失败:`, error.message);
+                                return 0;
+                            }
+                        }
+                    };
+                    policy_runtime_states.set(body.policy_name, runtimeState);
+                }
+                
+                // 执行表达式
+                try {
+                    await evaluateAssignmentExpression(action.expression, runtimeState);
+                    console.log(`策略 ${body.policy_name} 执行快速操作 ${body.action_name}: ${action.expression}`);
+                    return { result: true };
+                } catch (error) {
+                    console.error(`执行快速操作失败: ${body.action_name}`, error);
+                    throw { err_msg: `执行快速操作失败: ${error.message}` };
+                }
+            }
         }
     }
 };
@@ -2106,10 +2253,25 @@ async function executeDeviceAction(device, action) {
 
 async function evaluateAssignmentExpression(expression, runtimeState) {
     try {
+        // 创建prs对象，包含variables的get和set方法
+        const prs = {
+            ...runtimeState,
+            variables: {
+                get: function(variableName) {
+                    return runtimeState.variables.get(variableName);
+                },
+                set: function(variableName, value) {
+                    runtimeState.variables.set(variableName, value);
+                    console.log(`设置变量 ${variableName} = ${value}`);
+                    return value;
+                }
+            }
+        };
+        
         // 简化的上下文，只包含基本数据
         const context = {
-            getSource: runtimeState.getSource.bind(runtimeState), // 添加 getSource 函数
-            prs: runtimeState,
+            getSource: runtimeState.getSource ? runtimeState.getSource.bind(runtimeState) : async () => 0, // 添加 getSource 函数
+            prs: prs,
             Date: Date,
             Math: Math,
             abs: Math.abs,
@@ -2130,7 +2292,7 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
 
         // 使用安全的 AST 求值器
         console.log(`表达式求值: ${expression}`);
-        const result = await await evaluator.evaluate(expression, context);
+        const result = await evaluator.evaluate(expression, context);
         console.log(`表达式求值结果: ${result} (类型: ${typeof result})`);
         return result;
     } catch (error) {

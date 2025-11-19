@@ -29,16 +29,34 @@
                 <el-table-column prop="valves" label="阀门" width="240" align="left">
                     <template #default="{ row }">
                         <template v-if="row.valves && row.valves !== '-'">
-                            <el-tag
-                                v-for="(valve, idx) in parseValves(row.valves)"
-                                :key="idx"
-                                size="small"
-                                style="margin-right:4px; margin-bottom:2px;"
-                            >
+                            <el-tag v-for="(valve, idx) in parseValves(row.valves)" :key="idx" size="small"
+                                style="margin-right:4px; margin-bottom:2px;">
                                 {{ valve }}
                             </el-tag>
                         </template>
                         <span v-else>-</span>
+                    </template>
+                </el-table-column>
+
+                <el-table-column label="操作" width="200" align="center" fixed="right">
+                    <template #default="{ row }">
+                        <div class="action-buttons">
+                            <div class="action-buttons-row">
+                                <el-button size="small" type="success" @click="handleQuickAction(row.name, '启动')"
+                                    :loading="quickActionLoading[`${row.name}-启动`]">
+                                    启动
+                                </el-button>
+                                <el-button size="small" type="warning" @click="handleQuickAction(row.name, '跳过')"
+                                    :loading="quickActionLoading[`${row.name}-跳过`]">
+                                    跳过
+                                </el-button>
+                            </div>
+                            <el-button size="small" type="danger" @click="handleQuickAction(row.name, '停止')"
+                                :loading="quickActionLoading[`${row.name}-停止`]"
+                                class="stop-button">
+                                停止
+                            </el-button>
+                        </div>
                     </template>
                 </el-table-column>
             </el-table>
@@ -54,15 +72,16 @@ import call_remote from '../../public/lib/call_remote.js'
 
 // 接收父组件传递的农场参数
 const props = defineProps({
-  farmName: {
-    type: String,
-    default: null
-  }
+    farmName: {
+        type: String,
+        default: null
+    }
 })
 
 // 响应式数据
 const irrigationGroups = ref([])
 const loading = ref(false)
+const quickActionLoading = ref({})
 
 // 加载轮灌组数据
 const loadWateringGroups = async () => {
@@ -71,15 +90,15 @@ const loadWateringGroups = async () => {
         const response = await call_remote('/policy/list_watering_groups', { pageNo: 0 })
         if (response && response.groups) {
             let filteredGroups = response.groups
-            
+
             // 如果有农场参数，则按农场筛选轮灌组
             if (props.farmName) {
                 // 获取所有策略的农场匹配信息
                 const policyFarmMatches = await Promise.all(
                     response.groups.map(async (group) => {
                         try {
-                            const farmMatch = await call_remote('/policy/get_matched_farm', { 
-                                policy_name: group.name 
+                            const farmMatch = await call_remote('/policy/get_matched_farm', {
+                                policy_name: group.name
                             })
                             return {
                                 group,
@@ -93,7 +112,7 @@ const loadWateringGroups = async () => {
                         }
                     })
                 )
-                
+
                 // 筛选出匹配指定农场的轮灌组
                 filteredGroups = policyFarmMatches
                     .filter(item => item.farmName === props.farmName)
@@ -104,7 +123,7 @@ const loadWateringGroups = async () => {
                     filteredGroups = response.groups
                 }
             }
-            
+
             irrigationGroups.value = filteredGroups.map(group => ({
                 name: group.name || '未命名',
                 area: group.area ?? '-',
@@ -184,6 +203,28 @@ const refresh = () => {
     loadWateringGroups()
 }
 
+// 处理快速操作
+const handleQuickAction = async (policyName, actionName) => {
+    const loadingKey = `${policyName}-${actionName}`
+    try {
+        quickActionLoading.value[loadingKey] = true
+        const result = await call_remote('/policy/do_quick_action', {
+            policy_name: policyName,
+            action_name: actionName
+        })
+        if (result.result) {
+            ElMessage.success(`快速操作 ${actionName} 执行成功`)
+            // 重新加载轮灌组数据
+            await loadWateringGroups()
+        }
+    } catch (error) {
+        console.error('执行快速操作失败:', error)
+        ElMessage.error(error.err_msg || `执行快速操作 ${actionName} 失败`)
+    } finally {
+        quickActionLoading.value[loadingKey] = false
+    }
+}
+
 // 暴露数据和方法给父组件
 defineExpose({
     irrigationGroups,
@@ -230,6 +271,27 @@ onMounted(() => {
 
 :deep(.warning-row) {
     background-color: #fef3e2;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.action-buttons-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.action-buttons-row .el-button {
+    flex: 1;
+}
+
+.stop-button {
+    width: 100%;
 }
 
 /* 响应式设计 */
