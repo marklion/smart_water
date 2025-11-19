@@ -108,7 +108,11 @@ async function confirm_policy_status(wgv_name, expected_status) {
     await cli.run_cmd('policy');
     let policies_lines = (await cli.run_cmd(`list policy ${wgv_name}`)).split('\n');
     let status_line_index = policies_lines.findIndex(line => line.startsWith('当前状态'));
-    expect(status_line_index).not.toBe(-1);
+    if (status_line_index === -1) {
+        // 如果找不到"当前状态"行，输出所有行以便调试
+        console.error(`策略 ${wgv_name} 的输出:`, policies_lines.join('\n'));
+        throw new Error(`策略 ${wgv_name} 未找到或未初始化`);
+    }
     let status_line = policies_lines[status_line_index].split(':')[1].trim();
     expect(status_line).toBe(expected_status);
     await cli.run_cmd('return');
@@ -628,5 +632,88 @@ describe('轮灌组策略快速配置和验证', () => {
         await trigger_group_policy('轮灌组2', false);
         await trigger_valve_reset('轮灌阀门3');
         await group_run_once(120, 130);
+    });
+});
+
+async function prepare_fert_mixing_policy_config(start_interval, duration, mixing_pump_name) {
+    const pump_name = mixing_pump_name || '农场1-搅拌泵';
+    let prepare = `
+  device
+    add device '${pump_name}' 'virtualDevice' 'vd.log' '1' '2' '农场1'
+  return
+    `;
+    await prepare_resource_config();
+    for (let line of prepare.trim().split('\n').filter(l => l.trim().length > 0)) {
+        await cli.run_cmd(line.trim());
+    }
+    await cli.run_cmd('config');
+    const parts = [`init fert mixing policy '农场1'`];
+    if (start_interval !== undefined) parts.push(String(start_interval));
+    if (duration !== undefined) parts.push(String(duration));
+    if (mixing_pump_name !== undefined) parts.push(`'${mixing_pump_name}'`);
+    await cli.run_cmd(parts.join(' '));
+    await cli.run_cmd('return');
+}
+
+async function trigger_fert_mixing_policy(is_open) {
+    await cli.run_cmd('policy');
+    await cli.run_cmd(`runtime assignment 农场1-搅拌 false '需要启动' '${is_open ? 'true' : 'false'}'`);
+    await wait_ms(60);
+    await cli.run_cmd('return');
+}
+
+async function setup_fert_mixing_test(start_interval, duration, mixing_pump_name) {
+    await cli.run_cmd('clear');
+    await prepare_fert_mixing_policy_config(start_interval, duration, mixing_pump_name);
+    await begin_policy_run();
+}
+
+async function confirm_mixing_state(is_active, mixing_pump_name = '农场1-搅拌泵') {
+    await confirm_policy_status('农场1-搅拌', is_active ? '搅拌' : '空闲');
+    await confirm_valve_status(mixing_pump_name, is_active);
+}
+
+async function change_mixing_state_and_confirm(is_start, mixing_pump_name = '农场1-搅拌泵') {
+    await trigger_fert_mixing_policy(is_start);
+    const start_point = Date.now();
+    await wait_spend_ms(start_point, 60);
+    await confirm_mixing_state(is_start, mixing_pump_name);
+    return start_point;
+}
+
+describe('肥料搅拌策略快速配置和验证', () => {
+    beforeEach(async () => {
+        await setup_fert_mixing_test(0.033333, 0.016666);
+    }, 120000); // 120秒超时
+    afterEach(async () => {
+        await cli.run_cmd('clear');
+    }, 120000); // 120秒超时
+    test('手动启动和停止搅拌', async () => {
+        await wait_ms(500); // 等待策略扫描周期执行，确保策略已初始化
+        await confirm_mixing_state(false);
+        await change_mixing_state_and_confirm(true);
+        await change_mixing_state_and_confirm(false);
+    });
+    test('搅拌持续时间自动停止', async () => {
+        const start_point = await change_mixing_state_and_confirm(true);
+        await wait_spend_ms(start_point, 1200);
+        await confirm_mixing_state(false);
+    }, 120000);
+    test('定时自动启动搅拌', async () => {
+        await confirm_mixing_state(false);
+        const start_point = Date.now();
+        await wait_spend_ms(start_point, 2060);
+        await confirm_mixing_state(true);
+        await wait_spend_ms(start_point, 3060);
+        await confirm_mixing_state(false);
+    }, 120000);
+    test('搅拌过程中手动停止', async () => {
+        await confirm_mixing_state(false);
+        const start_point = Date.now();
+        await wait_spend_ms(start_point, 2060);
+        await confirm_mixing_state(true);
+        await trigger_fert_mixing_policy(false);
+        await wait_spend_ms(start_point, 2160);
+        await confirm_mixing_state(false);
     });
 });

@@ -65,6 +65,28 @@ export default {
                     return `施肥策略初始化失败`;
                 }
             });
+        cli_utils.make_common_cmd(vorpal, 'init fert mixing policy <farm_name> [start_interval] [duration] [mixing_pump_name]',
+            '快速配置肥料搅拌策略',
+            async (cmd_this, args) => {
+                let config = {
+                    farm_name: args.farm_name
+                };
+                if (args.start_interval) {
+                    config.start_interval = args.start_interval;
+                }
+                if (args.duration) {
+                    config.duration = args.duration;
+                }
+                if (args.mixing_pump_name) {
+                    config.mixing_pump_name = args.mixing_pump_name;
+                }
+                let result = await config_lib.init_fert_mixing_policy(config);
+                if (result.result) {
+                    return `肥料搅拌策略初始化成功`;
+                } else {
+                    return `肥料搅拌策略初始化失败`;
+                }
+            });
         cli_utils.make_common_cmd(vorpal, 'add group policy <policy_name> <farm_name> <pre_fert_time> <post_fert_time> <method> <fert_time> <area_based_amount> <area> <fert_rate> [wgv_array...]',
             '添加轮灌组施肥策略',
             async (cmd_this, args) => {

@@ -407,6 +407,40 @@ export default {
                 return { result: true };
             },
         },
+        init_fert_mixing_policy: {
+            name: '快速配置肥料搅拌策略',
+            description: '快速配置独立的肥料搅拌策略，支持定时自动启动和手动启动/停止',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                start_interval: { type: Number, mean: '启动间隔(分钟)', example: 60, have_to: false },
+                duration: { type: Number, mean: '持续时间(分钟)', example: 6, have_to: false },
+                mixing_pump_name: { type: String, mean: '搅拌泵设备名称', example: '农场1-搅拌泵', have_to: false },
+                mixing_before_time: { type: Number, mean: '启动间隔(分钟)，兼容旧参数', example: 60, have_to: false },
+                mixing_after_time: { type: Number, mean: '持续时间(分钟)，兼容旧参数', example: 6, have_to: false },
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let mixing_pump_name = body.mixing_pump_name || `${body.farm_name}-搅拌泵`;
+                let found_device = await device_management_lib.find_device(mixing_pump_name, token);
+                if (!found_device) {
+                    throw {
+                        err_msg: '初始化肥料搅拌策略失败，缺少必要设备：' + mixing_pump_name
+                    }
+                }
+                let policy_name = `${body.farm_name}-搅拌`;
+                let found_policy = await policy_lib.find_policy(policy_name, token);
+                if (found_policy) {
+                    await policy_lib.del_policy(policy_name, token);
+                }
+                body.policy_name = policy_name;
+                await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_mixing_policy_config(body));
+                return { result: true };
+            },
+        },
         add_group_policy: {
             name: '快速配置添加轮灌组策略',
             description: '快速配置添加轮灌组策略',
