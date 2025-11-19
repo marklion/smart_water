@@ -1802,7 +1802,8 @@ export default {
             params: {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
                 action_name: { type: String, mean: '操作名称', example: '打开', have_to: true },
-                expression: { type: String, mean: '执行表达式', example: 'prs.variables.set("某个变量", false)', have_to: true }
+                expression: { type: String, mean: '执行表达式', example: 'prs.variables.set("某个变量", false)', have_to: true },
+                is_constant: { type: Boolean, mean: '是否为常量表达式', example: false, have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -1811,14 +1812,18 @@ export default {
                 let policy = validatePolicyExists(body.policy_name);
                 let quick_actions = ensureArrayExists(policy, 'quick_actions');
                 
+                const is_constant = body.is_constant === true || body.is_constant === 'true' || body.is_constant === '1';
+                
                 // 检查是否已存在相同名称的快速操作
                 const existingAction = quick_actions.find(a => a.action_name === body.action_name);
                 if (existingAction) {
                     existingAction.expression = body.expression;
+                    existingAction.is_constant = is_constant;
                 } else {
                     quick_actions.push({
                         action_name: body.action_name,
-                        expression: body.expression
+                        expression: body.expression,
+                        is_constant: is_constant
                     });
                 }
                 return { result: true };
@@ -1861,7 +1866,8 @@ export default {
                     mean: '快速操作列表',
                     explain: {
                         action_name: { type: String, mean: '操作名称', example: '打开' },
-                        expression: { type: String, mean: '执行表达式', example: 'prs.variables.set("某个变量", false)' }
+                        expression: { type: String, mean: '执行表达式', example: 'prs.variables.set("某个变量", false)' },
+                        is_constant: { type: Boolean, mean: '是否为常量表达式', example: false }
                     }
                 }
             },
@@ -1931,8 +1937,21 @@ export default {
                 
                 // 执行表达式
                 try {
-                    await evaluateAssignmentExpression(action.expression, runtimeState);
-                    console.log(`策略 ${body.policy_name} 执行快速操作 ${body.action_name}: ${action.expression}`);
+                    if (action.is_constant) {
+                        // 如果是常量表达式，直接解析
+                        const numericValue = parseFloat(action.expression);
+                        if (!isNaN(numericValue)) {
+                            // 数字常量，直接使用
+                            console.log(`策略 ${body.policy_name} 执行快速操作 ${body.action_name}: ${action.expression} (常量: ${numericValue})`);
+                        } else {
+                            // 字符串常量，直接使用
+                            console.log(`策略 ${body.policy_name} 执行快速操作 ${body.action_name}: ${action.expression} (常量: ${action.expression})`);
+                        }
+                    } else {
+                        // 如果是动态表达式，使用表达式求值器
+                        await evaluateAssignmentExpression(action.expression, runtimeState);
+                        console.log(`策略 ${body.policy_name} 执行快速操作 ${body.action_name}: ${action.expression}`);
+                    }
                     return { result: true };
                 } catch (error) {
                     console.error(`执行快速操作失败: ${body.action_name}`, error);

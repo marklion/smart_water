@@ -66,7 +66,7 @@ return
     // 添加快速操作
     await cli.run_cmd('policy');
     await cli.run_cmd('policy adc_policy');
-    await cli.run_cmd("quick action '启动' 'prs.variables.set(\"需要启动\", true)'");
+    await cli.run_cmd("quick action false '启动' 'prs.variables.set(\"需要启动\", true)'");
     await cli.run_cmd('return');
     await cli.run_cmd('return');
     

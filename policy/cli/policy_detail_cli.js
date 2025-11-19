@@ -131,17 +131,18 @@ export default {
         );
 
         cli_utils.make_undo_cmd(vorpal,
-            'quick action <action_name> <expression>',
+            'quick action <is_constant> <action_name> <expression>',
             '添加快速操作按钮',
             '撤销操作 - 删除所有快速操作',
             async (cmd_this, args) => {
+                const is_constant = args.is_constant === 'true' || args.is_constant === '1';
                 // 解析表达式，支持带引号的表达式
                 let expression = args.expression;
                 // 如果表达式以引号开始和结束，去掉引号
                 if (expression.startsWith("'") && expression.endsWith("'")) {
                     expression = expression.slice(1, -1);
                 }
-                await policy_lib.add_quick_action(ins.cur_view_name, args.action_name, expression);
+                await policy_lib.add_quick_action(ins.cur_view_name, args.action_name, expression, is_constant);
                 return `快速操作 ${args.action_name} 已添加`;
             },
             async (cmd_this, args) => {
@@ -248,6 +249,18 @@ export default {
         let matrix = matrixResp.matrix || [];
         for (let item of matrix) {
             ret.push(`watering group matrix '${item.key_name}' '${item.value_name}'`);
+        }
+        // 显示快速操作配置
+        try {
+            let quickActionsResp = await policy_lib.list_quick_actions(view_name);
+            if (quickActionsResp.quick_actions && quickActionsResp.quick_actions.length > 0) {
+                for (let action of quickActionsResp.quick_actions) {
+                    const isConstant = action.is_constant ? 'true' : 'false';
+                    ret.push(`quick action '${isConstant}' '${action.action_name}' '${action.expression}'`);
+                }
+            }
+        } catch (err) {
+            // 忽略获取快速操作时的错误
         }
         return ret;
     },

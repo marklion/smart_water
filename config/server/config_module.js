@@ -329,9 +329,9 @@ export default {
                 }
                 await cli_runtime_lib.do_config_batch(quick_config_template.water_group_config(body));
                 // 添加快速操作: 启动、停止、重置
-                await policy_lib.add_quick_action(body.valve_name, '启动', 'prs.variables.set("需要启动", true)', token);
-                await policy_lib.add_quick_action(body.valve_name, '停止', 'prs.variables.set("需要启动", false)', token);
-                await policy_lib.add_quick_action(body.valve_name, '重置', 'prs.variables.set("需要重置", true)', token);
+                await policy_lib.add_quick_action(body.valve_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
+                await policy_lib.add_quick_action(body.valve_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
+                await policy_lib.add_quick_action(body.valve_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
                 return { result: true };
             }
         },
@@ -372,9 +372,9 @@ export default {
                 body.policy_name = policy_name;
                 await cli_runtime_lib.do_config_batch(quick_config_template.init_water_policy_config(body));
                 // 添加快速操作: 启动、停止、重置
-                await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', token);
-                await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', token);
-                await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', token);
+                await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
+                await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
+                await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
                 return { result: true };
             },
         },
@@ -413,9 +413,9 @@ export default {
                 body.policy_name = policy_name;
                 await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_policy_config(body));
                 // 添加快速操作: 启动、停止、重置
-                await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', token);
-                await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', token);
-                await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', token);
+                await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
+                await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
+                await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
                 return { result: true };
             },
         },
@@ -533,9 +533,9 @@ export default {
                 original_array.push(body.policy_name);
                 let new_expression = '["' + original_array.join('","') + '"]';
                 await policy_lib.init_assignment(`${body.farm_name}-总策略`, '所有轮灌组', new_expression, false, token);
-                await policy_lib.add_quick_action(body.policy_name, '启动', 'prs.variables.set("需要启动", true)', token);
-                await policy_lib.add_quick_action(body.policy_name, '跳过', 'prs.variables.set("需要跳过", true)', token);
-                await policy_lib.add_quick_action(body.policy_name, '停止', 'prs.variables.set("需要启动", false)', token);
+                await policy_lib.add_quick_action(body.policy_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
+                await policy_lib.add_quick_action(body.policy_name, '跳过', 'prs.variables.set("需要跳过", true)', false, token);
+                await policy_lib.add_quick_action(body.policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
                 return { result: true };
             },
         },
@@ -559,9 +559,9 @@ export default {
                 }
                 await cli_runtime_lib.do_config_batch(quick_config_template.init_global_policy(body));
                 // 添加快速操作: 启动、停止、重置
-                await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', token);
-                await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', token);
-                await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', token);
+                await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
+                await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
+                await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
                 return { result: true };
             },
         },

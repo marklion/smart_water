@@ -249,8 +249,13 @@ function convert_param(cmd, param) {
             cmd: 'do crossAssignment',
             param: 'is_constant',
             values: ['true', 'false']
-        }, {
+        },         {
             cmd: 'exit crossAssignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
+            cmd: 'quick action',
             param: 'is_constant',
             values: ['true', 'false']
         },
@@ -658,18 +663,17 @@ function cmds_depend_prepare(cmd, parent) {
             parent: 'policy',
             depends: [
                 'policy a',
-                'quick action 启动 \'prs.variables.set("test", true)\'',
+                'quick action false 启动 \'prs.variables.set("test", true)\'',
             ],
             teardown: [
                 'undo quick action',
             ],
         }, {
             cmd: 'do quick action',
-            no_bdr: true,
             depends: [
                 'policy a',
                 'return',
-                'quick action 启动 \'prs.variables.set("test", true)\'',
+                'quick action false 启动 \'prs.variables.set("test", true)\'',
                 'return',
             ],
             teardown: [
