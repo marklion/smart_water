@@ -3,6 +3,8 @@ import DZ005 from './driver/DZ005.js';
 import dijiang from './driver/dijiang.js';
 import kfd9000 from './driver/kfd9000.js';
 import modbus_relay from './driver/modbus_relay.js';
+import mgg_znf from './driver/mgg_znf.js';
+import BCP8R from './driver/BCP8R.js';
 const driver_array = [
     {
         name: 'virtualDevice',
@@ -19,6 +21,13 @@ const driver_array = [
             'is_opened', 'status_map', 'shutdown'],
         driver: DZ005,
     }, {
+        name: 'WaterGroupValve_v2',
+        config_method: '{outlet:<出水口序号>, broker_url:<MQTT服务器地址>, username:<MQTT用户名>, password:<MQTT密码>}',
+        capability: [
+            'open', 'close', 'readout',
+            'is_opened', 'status_map', 'shutdown'],
+        driver: mgg_znf,
+    }, {
         name: 'FertFlowMeter',
         config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
         capability: [
@@ -31,6 +40,12 @@ const driver_array = [
             'readout', 'total_readout', 'status_map', 'shutdown'],
         driver: kfd9000,
     }, {
+        name:'PressureMeter',
+        config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
+        capability: [
+            'readout', 'status_map', 'shutdown'],
+        driver: BCP8R,
+    },{
         name:'ModbusRelay',
         config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, relay_address:<继电器地址>, poll_interval:<轮询间隔(ms)>}',
         capability: [
