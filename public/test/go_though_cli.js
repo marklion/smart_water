@@ -663,6 +663,7 @@ function cmds_depend_prepare(cmd, parent) {
             parent: 'policy',
             depends: [
                 'policy a',
+                'quick action false a \'prs.variables.set("test", true)\'',
                 'quick action false abcd \'prs.variables.set("test", true)\'',
                 'quick action false 12345 \'prs.variables.set("test", true)\'',
                 'quick action false LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa \'prs.variables.set("test", true)\'',
