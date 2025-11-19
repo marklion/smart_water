@@ -331,14 +331,14 @@ function convert_param(cmd, param) {
         }, 
         {
             cmd:'del quick action',
-            param: 'action_name',
-            values: ['a', 'start']
+            param: 'policy_name',
+            values: ['a']
         },
         {
             cmd:'del quick action',
-            param: 'policy_name',
-            values: ['a']
-        }
+            param: 'action_name',
+            values: ['a', 'start']
+        },
     ];
     for (let item of exceptions) {
         if (item.cmd === cmd && item.param === param) {
