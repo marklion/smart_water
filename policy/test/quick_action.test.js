@@ -73,7 +73,6 @@ return
     // 启动策略扫描
     await cli.run_cmd('policy');
     await cli.run_cmd('scan period 100');
-    await cli.run_cmd('return');
     await wait_ms(200);
     
     // 验证初始状态

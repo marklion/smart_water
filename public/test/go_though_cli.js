@@ -660,10 +660,6 @@ function cmds_depend_prepare(cmd, parent) {
             parent: 'policy',
             depends: [
                 'policy a',
-                'state a',
-                'return',
-                'init state a',
-                'return',
             ],
             teardown: [
                 'undo quick action',
@@ -673,7 +669,7 @@ function cmds_depend_prepare(cmd, parent) {
             parent: 'policy',
             depends: [
                 'policy a',
-                'quick action abcd \'prs.variables.set("test", true)\'',
+                'quick action 启动 \'prs.variables.set("test", true)\'',
             ],
             teardown: [
                 'undo quick action',
@@ -683,11 +679,8 @@ function cmds_depend_prepare(cmd, parent) {
             no_bdr: true,
             depends: [
                 'policy a',
-                'state a',
                 'return',
-                'init state a',
-                'return',
-                'quick action abcd \'prs.variables.set("test", true)\'',
+                'quick action 启动 \'prs.variables.set("test", true)\'',
                 'return',
             ],
             teardown: [
