@@ -179,31 +179,38 @@ return
   init_fert_mixing_policy_config: function (params) {
     let mixing_pump_name = params.mixing_pump_name || `${params.farm_name}-搅拌泵`;
     let start_interval = params.start_interval || params.mixing_before_time || 60; // 启动间隔（分钟），默认60分钟（1小时）
-    let duration = params.duration || params.mixing_after_time || 6; // 持续时间（分钟），默认6分钟
+    let duration = params.duration || params.mixing_after_time || 6; // 期望运行时间（分钟），默认6分钟
     let start_interval_ms = start_interval * 1000 * 60;
     let duration_ms = duration * 1000 * 60;
-    
+
     let config_string = `
 policy
   policy '${params.policy_name}'
     init assignment 'false' '需要启动' 'false'
     init assignment 'false' '启动间隔' '${start_interval_ms}'
-    init assignment 'false' '持续时间' '${duration_ms}'
+    init assignment 'false' '期望运行时间' '${duration_ms}'
+    init assignment 'false' '停留时间' '0'
     state '空闲'
+      enter assignment 'false' '需要启动' 'false'
       enter assignment 'false' '进入时间' 'Date.now()'
+      enter assignment 'false' '停留时间' '0'
+      do assignment 'false' '停留时间' '(Date.now() - prs.variables.get("进入时间"))'
       transformer 'next'
         rule 'false' '搅拌' 'prs.variables.get("需要启动") == true'
       return
       transformer 'timeup'
-        rule 'false' '搅拌' '(Date.now() - prs.variables.get("进入时间")) >= prs.variables.get("启动间隔")'
+        rule 'false' '搅拌' 'prs.variables.get("停留时间") >= prs.variables.get("启动间隔")'
       return
     return
     state '搅拌'
+      enter assignment 'false' '停留时间' '0'
+      enter assignment 'false' '需要启动' 'true'
       enter action '${mixing_pump_name}' 'open'
       enter assignment 'false' '进入时间' 'Date.now()'
       exit action '${mixing_pump_name}' 'close'
+      do assignment 'false' '停留时间' '(Date.now() - prs.variables.get("进入时间"))'
       transformer 'timeup'
-        rule 'false' '空闲' '(Date.now() - prs.variables.get("进入时间")) >= prs.variables.get("持续时间")'
+        rule 'false' '空闲' 'prs.variables.get("停留时间") >= prs.variables.get("期望运行时间")'
       return
       transformer 'next'
         rule 'false' '空闲' 'prs.variables.get("需要启动") == false'

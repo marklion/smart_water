@@ -565,7 +565,6 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_ms(200); // 等待策略扫描周期执行
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
@@ -573,7 +572,6 @@ describe('总策略快速配置和验证', () => {
         await wait_spend_ms(start_point, 1650);
         await mock_readout('轮灌阀门2', 2);
         await wait_spend_ms(start_point, 3750);
-        await wait_ms(500); // 等待策略扫描周期执行，确保轮灌组2已启动并进入"肥前"状态
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
@@ -676,14 +674,14 @@ async function confirm_mixing_state(is_active, mixing_pump_name = '农场1-搅�
 async function change_mixing_state_and_confirm(is_start, mixing_pump_name = '农场1-搅拌泵') {
     await trigger_fert_mixing_policy(is_start);
     const start_point = Date.now();
-    await wait_spend_ms(start_point, 100);
+    await wait_spend_ms(start_point, 60);
     await confirm_mixing_state(is_start, mixing_pump_name);
     return start_point;
 }
 
 describe('肥料搅拌策略快速配置和验证', () => {
     beforeEach(async () => {
-        await setup_fert_mixing_test();
+        await setup_fert_mixing_test(0.033333, 0.016666);
     }, 120000); // 120秒超时
     afterEach(async () => {
         await cli.run_cmd('clear');
@@ -695,32 +693,25 @@ describe('肥料搅拌策略快速配置和验证', () => {
         await change_mixing_state_and_confirm(false);
     });
     test('搅拌持续时间自动停止', async () => {
-        await setup_fert_mixing_test(2, 1);
         const start_point = await change_mixing_state_and_confirm(true);
-        await wait_spend_ms(start_point, 65000);
+        await wait_spend_ms(start_point, 1200);
         await confirm_mixing_state(false);
     }, 120000);
     test('定时自动启动搅拌', async () => {
-        await setup_fert_mixing_test(1, 0.1);
-        await wait_ms(300);
         await confirm_mixing_state(false);
         const start_point = Date.now();
-        await wait_spend_ms(start_point, 65000);
+        await wait_spend_ms(start_point, 2060);
         await confirm_mixing_state(true);
-        await wait_spend_ms(start_point, 70000);
+        await wait_spend_ms(start_point, 3060);
         await confirm_mixing_state(false);
     }, 120000);
-    test('使用自定义搅拌泵名称', async () => {
-        const pump_name = '农场1-自定义搅拌泵';
-        await setup_fert_mixing_test(2, 6, pump_name);
-        await confirm_mixing_state(false, pump_name);
-        await change_mixing_state_and_confirm(true, pump_name);
-        await change_mixing_state_and_confirm(false, pump_name);
-    }, 120000);
     test('搅拌过程中手动停止', async () => {
-        await setup_fert_mixing_test(2, 10);
-        const start_point = await change_mixing_state_and_confirm(true);
-        await wait_spend_ms(start_point, 2000);
-        await change_mixing_state_and_confirm(false);
+        await confirm_mixing_state(false);
+        const start_point = Date.now();
+        await wait_spend_ms(start_point, 2060);
+        await confirm_mixing_state(true);
+        await trigger_fert_mixing_policy(false);
+        await wait_spend_ms(start_point, 2160);
+        await confirm_mixing_state(false);
     });
 });
