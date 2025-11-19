@@ -299,6 +299,30 @@ function convert_param(cmd, param) {
             cmd:'statistic',
             param:'is_increment',
             values:['true','false']
+        }, {
+            cmd: 'set area params',
+            param: 'farm_name',
+            values: ['abcd', '12345', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa', 'a = b.a + 1']
+        }, {
+            cmd: 'set area params',
+            param: 'system_flow',
+            values: ['1', '10', '100']
+        }, {
+            cmd: 'set area params',
+            param: 'laying_spacing',
+            values: ['0.5', '1', '2']
+        }, {
+            cmd: 'set area params',
+            param: 'dripper_spacing',
+            values: ['0.3', '0.4', '0.5']
+        }, {
+            cmd: 'set area params',
+            param: 'dripper_flow',
+            values: ['2', '5', '10']
+        }, {
+            cmd: 'set area params',
+            param: 'coefficient',
+            values: ['0.8', '0.9', '1.0']
         }
     ];
     for (let item of exceptions) {
@@ -628,6 +652,18 @@ function cmds_depend_prepare(cmd, parent) {
             ],
             teardown: [
                 'undo add device',
+            ],
+        }, {
+            cmd: 'set area params',
+            parent: 'farm',
+            depends: [
+                'add farm abcd 1 2 3',
+                'add farm 12345 1 2 3',
+                'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
+                'add farm \'a = b.a + 1\' 1 2 3',
+            ],
+            teardown: [
+                'undo add farm',
             ],
         }
     ];

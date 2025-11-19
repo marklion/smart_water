@@ -21,7 +21,12 @@ export default {
                         location: { type: String, mean: '农场位置', example: '位置1' },
                         longitude: { type: Number, mean: '经度', example: 111.670801 },
                         latitude: { type: Number, mean: '纬度', example: 40.818311 },
-                        info: { type: String, mean: '农场信息', example: '信息1' }
+                        info: { type: String, mean: '农场信息', example: '信息1' },
+                        system_flow: { type: Number, mean: '系统流量', example: 0 },
+                        laying_spacing: { type: Number, mean: '铺设间距', example: 0 },
+                        dripper_spacing: { type: Number, mean: '滴头间距', example: 0 },
+                        dripper_flow: { type: Number, mean: '滴头流量', example: 0 },
+                        coefficient: { type: Number, mean: '系数', example: 0.9 }
                     }
                 },
             },
@@ -64,19 +69,31 @@ export default {
                 
                 let existingFarm = farms.find(farm => farm.name === body.name);
                 if (!existingFarm) {
-                    farms.push({
-                        name: body.name,
-                        location: body.location,
-                        longitude: body.longitude,
-                        latitude: body.latitude,
-                        info: body.info
-                    });
+                farms.push({
+                    name: body.name,
+                    location: body.location,
+                    longitude: body.longitude,
+                    latitude: body.latitude,
+                    info: body.info,
+                    // 建议亩数计算参数
+                    system_flow: 0, // 系统流量
+                    laying_spacing: 0, // 铺设间距
+                    dripper_spacing: 0, // 滴头间距
+                    dripper_flow: 0, // 滴头流量
+                    coefficient: 0.9 // 系数，默认0.9
+                });
                 }
                 else {
                     existingFarm.location = body.location;
                     existingFarm.longitude = body.longitude;
                     existingFarm.latitude = body.latitude;
                     existingFarm.info = body.info;
+                    // 如果新参数未提供，保持原有值
+                    if (body.system_flow !== undefined) existingFarm.system_flow = body.system_flow;
+                    if (body.laying_spacing !== undefined) existingFarm.laying_spacing = body.laying_spacing;
+                    if (body.dripper_spacing !== undefined) existingFarm.dripper_spacing = body.dripper_spacing;
+                    if (body.dripper_flow !== undefined) existingFarm.dripper_flow = body.dripper_flow;
+                    if (body.coefficient !== undefined) existingFarm.coefficient = body.coefficient;
                 }
                 
                 return { result: true };
@@ -216,6 +233,67 @@ export default {
                 return {
                     blocks: current_page_content,
                     total: ret_array.length
+                };
+            },
+        },
+        set_farm_area_params: {
+            name: '设置农场建议亩数计算参数',
+            description: '设置指定农场的建议亩数计算参数',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                system_flow: { type: Number, mean: '系统流量', example: 0, have_to: false },
+                laying_spacing: { type: Number, mean: '铺设间距', example: 0, have_to: false },
+                dripper_spacing: { type: Number, mean: '滴头间距', example: 0, have_to: false },
+                dripper_flow: { type: Number, mean: '滴头流量', example: 0, have_to: false },
+                coefficient: { type: Number, mean: '系数', example: 0.9, have_to: false }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let farm = farms.find(farm => farm.name === body.farm_name);
+                if (!farm) {
+                    throw { err_msg: `农场 ${body.farm_name} 不存在` };
+                }
+                
+                if (body.system_flow !== undefined) farm.system_flow = body.system_flow;
+                if (body.laying_spacing !== undefined) farm.laying_spacing = body.laying_spacing;
+                if (body.dripper_spacing !== undefined) farm.dripper_spacing = body.dripper_spacing;
+                if (body.dripper_flow !== undefined) farm.dripper_flow = body.dripper_flow;
+                if (body.coefficient !== undefined) farm.coefficient = body.coefficient;
+                
+                return { result: true };
+            },
+        },
+        get_farm_area_params: {
+            name: '获取农场建议亩数计算参数',
+            description: '获取指定农场的建议亩数计算参数',
+            is_write: false,
+            is_get_api: true,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true }
+            },
+            result: {
+                system_flow: { type: Number, mean: '系统流量', example: 0 },
+                laying_spacing: { type: Number, mean: '铺设间距', example: 0 },
+                dripper_spacing: { type: Number, mean: '滴头间距', example: 0 },
+                dripper_flow: { type: Number, mean: '滴头流量', example: 0 },
+                coefficient: { type: Number, mean: '系数', example: 0.9 }
+            },
+            func: async function (body, token) {
+                let farm = farms.find(farm => farm.name === body.farm_name);
+                if (!farm) {
+                    throw { err_msg: `农场 ${body.farm_name} 不存在` };
+                }
+                
+                return {
+                    system_flow: farm.system_flow !== undefined ? farm.system_flow : 1,
+                    laying_spacing: farm.laying_spacing || 0,
+                    dripper_spacing: farm.dripper_spacing || 0,
+                    dripper_flow: farm.dripper_flow || 0,
+                    coefficient: farm.coefficient !== undefined ? farm.coefficient : 0.9
                 };
             },
         }
