@@ -249,8 +249,13 @@ function convert_param(cmd, param) {
             cmd: 'do crossAssignment',
             param: 'is_constant',
             values: ['true', 'false']
-        }, {
+        },         {
             cmd: 'exit crossAssignment',
+            param: 'is_constant',
+            values: ['true', 'false']
+        },
+        {
+            cmd: 'quick action',
             param: 'is_constant',
             values: ['true', 'false']
         },
@@ -319,11 +324,16 @@ function convert_param(cmd, param) {
             cmd: 'set area params',
             param: 'dripper_flow',
             values: ['2', '5', '10']
-        }, {
+        },         {
             cmd: 'set area params',
             param: 'coefficient',
             values: ['0.8', '0.9', '1.0']
-        }
+        }, 
+        {
+            cmd:'del quick action',
+            param: 'action_name',
+            values: ['a']
+        },
     ];
     for (let item of exceptions) {
         if (item.cmd === cmd && item.param === param) {
@@ -636,6 +646,28 @@ function cmds_depend_prepare(cmd, parent) {
                 'undo policy LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa',
             ],
         }, {
+            cmd: 'quick action',
+            parent: 'policy',
+            depends: [
+                'policy a',
+            ],
+            teardown: [
+                'undo quick action',
+            ],
+        }, {
+            cmd: 'del quick action',
+            parent: 'policy',
+            depends: [
+                'quick action false a \'prs.variables.set("test", true)\'',
+                'quick action false abcd \'prs.variables.set("test", true)\'',
+                'quick action false 12345 \'prs.variables.set("test", true)\'',
+                'quick action false LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa \'prs.variables.set("test", true)\'',
+                'quick action false \'a = b.a + 1\' \'prs.variables.set("test", true)\'',
+            ],
+            teardown: [
+                'undo quick action',
+            ],
+        }, {
             cmd: 'del watering group matrix',
             depends: [
                 'watering group matrix abcd abcd',
@@ -708,6 +740,10 @@ export default {
             {
                 prompt: 'device',
                 cmd: 'mock total readout'
+            },
+            {
+                prompt: 'policy',
+                cmd: 'do quick action'
             },
             {
                 cmd:'paste',

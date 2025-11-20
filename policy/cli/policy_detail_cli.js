@@ -128,7 +128,40 @@ export default {
                 await policy_lib.match_policy_farm(ins.cur_view_name, null);
                 return `策略 ${ins.cur_view_name} 已解除与农场的匹配`;
             }
-        )
+        );
+
+        cli_utils.make_undo_cmd(vorpal,
+            'quick action <is_constant> <action_name> <expression>',
+            '添加快速操作按钮',
+            '撤销操作 - 删除所有快速操作',
+            async (cmd_this, args) => {
+                const is_constant = args.is_constant === 'true' || args.is_constant === '1';
+                // 解析表达式，支持带引号的表达式
+                let expression = args.expression;
+                // 如果表达式以引号开始和结束，去掉引号
+                if (expression.startsWith("'") && expression.endsWith("'")) {
+                    expression = expression.slice(1, -1);
+                }
+                await policy_lib.add_quick_action(ins.cur_view_name, args.action_name, expression, is_constant);
+                return `快速操作 ${args.action_name} 已添加`;
+            },
+            async (cmd_this, args) => {
+                // 删除所有快速操作
+                let resp = await policy_lib.list_quick_actions(ins.cur_view_name);
+                if (resp.quick_actions && resp.quick_actions.length > 0) {
+                    for (let action of resp.quick_actions) {
+                        await policy_lib.del_quick_action(ins.cur_view_name, action.action_name);
+                    }
+                    return `已删除所有快速操作`;
+                }
+                return `没有快速操作需要删除`;
+            }
+        );
+
+        cli_utils.make_common_cmd(vorpal, 'del quick action <action_name>', '删除一个快速操作', async (cmd_this, args) => {
+            await policy_lib.del_quick_action(ins.cur_view_name, args.action_name);
+            return `快速操作 ${args.action_name} 已删除`;
+        });
 
         return vorpal;
     },
@@ -216,6 +249,18 @@ export default {
         let matrix = matrixResp.matrix || [];
         for (let item of matrix) {
             ret.push(`watering group matrix '${item.key_name}' '${item.value_name}'`);
+        }
+        // 显示快速操作配置
+        try {
+            let quickActionsResp = await policy_lib.list_quick_actions(view_name);
+            if (quickActionsResp.quick_actions && quickActionsResp.quick_actions.length > 0) {
+                for (let action of quickActionsResp.quick_actions) {
+                    const isConstant = action.is_constant ? 'true' : 'false';
+                    ret.push(`quick action '${isConstant}' '${action.action_name}' '${action.expression}'`);
+                }
+            }
+        } catch (err) {
+            // 忽略获取快速操作时的错误
         }
         return ret;
     },

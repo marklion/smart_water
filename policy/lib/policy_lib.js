@@ -208,5 +208,28 @@ export default {
     },
     get_matched_farm:async function(policy_name, token) {
         return await call_remote('/policy/get_matched_farm', { policy_name }, token);
+    },
+    add_quick_action: async function (policy_name, action_name, expression, is_constant, token) {
+        return await call_remote('/policy/add_quick_action', {
+            policy_name,
+            action_name,
+            expression,
+            is_constant: is_constant !== undefined ? is_constant : false
+        }, token);
+    },
+    del_quick_action: async function (policy_name, action_name, token) {
+        return await call_remote('/policy/del_quick_action', {
+            policy_name,
+            action_name
+        }, token);
+    },
+    list_quick_actions: async function (policy_name, token) {
+        return await call_remote('/policy/list_quick_actions', { policy_name }, token);
+    },
+    do_quick_action: async function (policy_name, action_name, token) {
+        return await call_remote('/policy/do_quick_action', {
+            policy_name,
+            action_name
+        }, token);
     }
 }

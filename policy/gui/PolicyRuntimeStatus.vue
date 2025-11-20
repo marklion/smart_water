@@ -26,6 +26,14 @@
             <span class="value">{{ policy.init_variables?.length || 0 }} 个</span>
           </div>
         </div>
+        <!-- 快速操作按钮 -->
+        <div v-if="policy.quick_actions && policy.quick_actions.length > 0" class="quick-actions" @click.stop>
+          <el-button v-for="action in policy.quick_actions" :key="action.action_name" size="small" type="primary"
+            @click="handleQuickAction(policy.name, action.action_name)"
+            :loading="quickActionLoading[`${policy.name}-${action.action_name}`]">
+            {{ action.action_name }}
+          </el-button>
+        </div>
       </div>
     </div>
 
@@ -123,6 +131,9 @@ const editingValue = ref('')
 const assignmentLoading = ref(false)
 const editInput = ref(null)
 
+// 快速操作相关数据
+const quickActionLoading = ref({})
+
 // 自动刷新相关
 const autoRefreshTimer = ref(null)
 const isAutoRefreshing = ref(false)
@@ -133,15 +144,15 @@ const loadWateringGroupPolicies = async () => {
     const response = await call_remote('/policy/list_watering_groups', { pageNo: 0 })
     if (response && response.groups) {
       let filteredGroups = response.groups
-      
+
       // 如果有农场参数，则按农场筛选轮灌组
       if (props.farmName) {
         // 获取所有策略的农场匹配信息
         const policyFarmMatches = await Promise.all(
           response.groups.map(async (group) => {
             try {
-              const farmMatch = await call_remote('/policy/get_matched_farm', { 
-                policy_name: group.name 
+              const farmMatch = await call_remote('/policy/get_matched_farm', {
+                policy_name: group.name
               })
               return {
                 group,
@@ -156,13 +167,13 @@ const loadWateringGroupPolicies = async () => {
             }
           })
         )
-        
+
         // 筛选出匹配指定农场的轮灌组
         filteredGroups = policyFarmMatches
           .filter(item => item.farmName === props.farmName)
           .map(item => item.group)
       }
-      
+
       // 提取策略名称列表
       wateringGroupPolicies.value = filteredGroups.map(group => group.name)
     } else {
@@ -178,25 +189,67 @@ const loadPolicies = async () => {
   try {
     // 先获取轮灌组中的策略名称列表
     await loadWateringGroupPolicies()
-    
+
     const params = { pageNo: 0 }
     // 如果有农场参数，则按农场筛选策略
     if (props.farmName) {
       params.farm_name = props.farmName
     }
     const response = await call_remote('/policy/list_policy', params)
-    
+
     // 过滤掉轮灌组中已显示的策略
     const allPolicies = response.policies || []
-    policies.value = allPolicies.filter(policy => 
+    policies.value = allPolicies.filter(policy =>
       !wateringGroupPolicies.value.includes(policy.name)
     )
-    
+
+    // 为每个策略加载快速操作
+    await loadAllPoliciesQuickActions()
+
     // 为每个策略加载运行时状态
     await loadAllPoliciesRuntime()
   } catch (error) {
     console.error('加载策略列表失败:', error)
     ElMessage.error('加载策略列表失败')
+  }
+}
+
+// 加载所有策略的快速操作
+const loadAllPoliciesQuickActions = async () => {
+  const quickActionPromises = policies.value.map(async (policy) => {
+    try {
+      const result = await call_remote('/policy/list_quick_actions', { policy_name: policy.name })
+      policy.quick_actions = result.quick_actions || []
+    } catch (error) {
+      console.warn(`获取策略 ${policy.name} 快速操作失败:`, error)
+      policy.quick_actions = []
+    }
+  })
+  await Promise.all(quickActionPromises)
+}
+
+// 处理快速操作
+const handleQuickAction = async (policyName, actionName) => {
+  const loadingKey = `${policyName}-${actionName}`
+  try {
+    quickActionLoading.value[loadingKey] = true
+    const result = await call_remote('/policy/do_quick_action', {
+      policy_name: policyName,
+      action_name: actionName
+    })
+    if (result.result) {
+      ElMessage.success(`快速操作 ${actionName} 执行成功`)
+      // 重新加载策略运行时状态
+      if (selectedPolicy.value && selectedPolicy.value.name === policyName) {
+        await loadPolicyRuntime(policyName)
+      }
+      await loadAllPoliciesRuntime()
+    }
+  } catch (error) {
+    console.error('执行快速操作失败:', error)
+    ElMessage.error(error.err_msg || `执行快速操作 ${actionName} 失败`)
+  } finally {
+    quickActionLoading.value[loadingKey] = false
   }
 }
 
@@ -230,7 +283,7 @@ const loadAllPoliciesRuntime = async () => {
       }
     }
   })
-  
+
   const results = await Promise.all(runtimePromises)
   // 将结果存储到 map 中
   results.forEach(({ policyName, runtime }) => {
@@ -242,10 +295,10 @@ const loadAllPoliciesRuntime = async () => {
 const selectPolicyForRuntime = async (policy) => {
   // 停止之前的自动刷新
   stopAutoRefresh()
-  
+
   selectedPolicy.value = policy
   await loadPolicyRuntime(policy.name)
-  
+
   // 开始新的自动刷新
   startAutoRefresh()
 }
@@ -269,7 +322,7 @@ const loadPolicyRuntime = async (policyName) => {
       ...result,
       variables
     }
-    
+
     selectedPolicyRuntime.value = runtimeData
     // 同时更新策略运行时状态映射，以便卡片显示正确的状态
     policyRuntimeMap.value[policyName] = runtimeData
@@ -306,12 +359,12 @@ const getStateDisplayText = (state) => {
 // 获取状态标签类型 - 简化逻辑
 const getStateStatusType = (state) => {
   if (!state) return 'info'
-  
+
   // 只有明确的运行状态才显示为成功（绿色）
   if (state === 'work' || state === 'running' || state === 'active') {
     return 'success'
   }
-  
+
   // 其他所有状态都显示为信息（灰色）
   return 'info'
 }
@@ -386,7 +439,7 @@ const startAutoRefresh = () => {
   if (autoRefreshTimer.value) {
     clearInterval(autoRefreshTimer.value)
   }
-  
+
   autoRefreshTimer.value = setInterval(async () => {
     if (!isAutoRefreshing.value) {
       isAutoRefreshing.value = true
@@ -511,6 +564,7 @@ const handleManualRefresh = () => {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -569,6 +623,16 @@ const handleManualRefresh = () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-bottom: 12px;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e4e7ed;
 }
 
 .info-item {
