@@ -50,6 +50,7 @@
     },
     "dependencies": {
         "acorn": "^8.15.0",
+        "async-mqtt": "^2.6.3",
         "axios": "^1.11.0",
         "clipboardy": "^5.0.0",
         "cls-hooked": "^4.2.2",
