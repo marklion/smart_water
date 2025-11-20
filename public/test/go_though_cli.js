@@ -742,6 +742,10 @@ export default {
                 cmd: 'mock total readout'
             },
             {
+                prompt: 'policy',
+                cmd: 'do quick action'
+            },
+            {
                 cmd:'paste',
             },
             {
