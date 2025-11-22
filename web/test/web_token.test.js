@@ -18,14 +18,16 @@ describe('Web Token 验证测试', () => {
         await start_server();
         // 等待服务器启动
         await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 创建测试用户 - 先删除可能存在的用户，再创建
         try {
-            await callAPI('/auth/del_user', { username: CONFIG.TEST_USER.username }, null, true);
+            await callAPI('/auth/del_user', { username: CONFIG.TEST_USER.username });
         } catch (error) {
             // 用户不存在时会报错，忽略
         }
         
         try {
-            const result = await callAPI('/auth/add_user', CONFIG.TEST_USER, null, true);
+            const result = await callAPI('/auth/add_user', CONFIG.TEST_USER);
             if (!result.success) {
                 console.log('创建测试用户失败:', result.error);
             }
@@ -38,17 +40,12 @@ describe('Web Token 验证测试', () => {
         await close_server();
     });
 
-    async function callAPI(endpoint, data = {}, token = null, isCliRequest = false) {
+    async function callAPI(endpoint, data = {}, token = null) {
         const url = `${CONFIG.SERVER_URL}${CONFIG.API_BASE}${endpoint}`;
         const headers = { 'Content-Type': 'application/json' };
         
         if (token) {
             headers['token'] = token;
-        }
-        
-        // 如果是 CLI 请求，添加特殊标识
-        if (isCliRequest) {
-            headers['X-Request-Source'] = 'cli';
         }
         
         try {
@@ -79,8 +76,9 @@ describe('Web Token 验证测试', () => {
     }
 
     test('应该能够成功登录并获取Token', async () => {
-        // 登录接口不需要 token，应该成功
         const result = await callAPI('/auth/login', CONFIG.TEST_USER);
+        
+        // 如果失败，输出错误信息用于调试
         if (!result.success) {
             console.log('登录失败，错误信息:', result.error);
             console.log('测试用户配置:', CONFIG.TEST_USER);
@@ -97,21 +95,20 @@ describe('Web Token 验证测试', () => {
     });
 
     test('有效Token访问应该成功', async () => {
-        // 使用有效 token 访问需要认证的接口
-        const result = await callAPI('/auth/list_users', {}, authToken, false);
+        const result = await callAPI('/auth/list_users', {}, authToken);
         expect(result.success).toBe(true);
         expect(result.data.result).toBeDefined();
         expect(typeof result.data.result.total).toBe('number');
     });
 
     test('本地请求不需要Token应该成功', async () => {
-        const result = await callAPI('/auth/list_users', {}, null, false);
+        const result = await callAPI('/auth/list_users');
         expect(result.success).toBe(true);
         expect(result.data.result).toBeDefined();
     });
 
     test('无效Token应该被拒绝（本地请求除外）', async () => {
-        const result = await callAPI('/auth/list_users', {}, 'invalid_token', false);
+        const result = await callAPI('/auth/list_users', {}, 'invalid_token');
         expect(result.success).toBe(true); // 本地请求会成功
     });
 });
