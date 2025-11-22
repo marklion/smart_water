@@ -68,7 +68,13 @@ async function call_api(path, params) {
     let ret = '';
     try {
         console.log(`send req:${JSON.stringify(params)} to ${real_path}`);
-        const response = await axios.post(real_path, params);
+        // 测试环境的请求添加 CLI 标识，这样不需要 token
+        const response = await axios.post(real_path, params, {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Request-Source': 'cli'
+            }
+        });
         console.log(`recv resp:${JSON.stringify(response.data)}`);
 
         if (response.data.err_msg) {
