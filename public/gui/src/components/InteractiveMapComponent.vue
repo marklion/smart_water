@@ -410,6 +410,13 @@
                                 <span class="unit">L</span>
                             </div>
 
+                            <div v-if="fertConfigs[group.name].method === 'Time'" class="param-item">
+                                <label>施肥参数：</label>
+                                    <el-input-number v-model="fertConfigs[group.name].fert_time" :min="0"
+                                        :precision="1" placeholder="施肥时间" />
+                                <span class="unit">分钟</span>
+                            </div>
+
                             <div class="param-item">
                                 <label>期望施肥速度：</label>
                                     <el-input-number v-model="fertConfigs[group.name].fert_rate" :min="0" :precision="1"

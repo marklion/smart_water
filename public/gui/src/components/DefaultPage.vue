@@ -149,57 +149,99 @@
     </div>
 
     <!-- 设备详情对话框 -->
-    <el-dialog v-model="deviceDetailDialogVisible" title="设备详情" width="600px" :close-on-click-modal="false">
+    <el-dialog v-model="deviceDetailDialogVisible" title="设备详情" width="800px" :close-on-click-modal="false">
       <div v-if="selectedDeviceDetail" class="device-detail-content">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="设备名称">
-            {{ selectedDeviceDetail.deviceName || selectedDeviceDetail.device_name }}
-          </el-descriptions-item>
-          <el-descriptions-item label="设备类型">
-            {{ selectedDeviceDetail.deviceType || selectedDeviceDetail.driver_name || '未知' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="所属农场">
-            {{ selectedDeviceDetail.farmName || selectedDeviceDetail.farm_name || '未知' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="所属区块">
-            {{ selectedDeviceDetail.blockName || selectedDeviceDetail.block_name || '未知' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="在线状态">
-            <el-tag :type="selectedDeviceDetail.is_online ? 'success' : 'danger'" size="small">
-              {{ selectedDeviceDetail.is_online ? '在线' : '离线' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="设备状态">
-            <el-tag
-              :type="selectedDeviceDetail.status === 'open' || selectedDeviceDetail.status === 'active' ? 'success' : 'info'"
-              size="small">
-              {{ selectedDeviceDetail.status === 'open' ? '开启' : selectedDeviceDetail.status === 'closed' ? '关闭' :
-                selectedDeviceDetail.status === 'active' ? '运行中' : '未激活' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="经度" v-if="selectedDeviceDetail.longitude">
-            {{ selectedDeviceDetail.longitude }}
-          </el-descriptions-item>
-          <el-descriptions-item label="纬度" v-if="selectedDeviceDetail.latitude">
-            {{ selectedDeviceDetail.latitude }}
-          </el-descriptions-item>
-          <el-descriptions-item label="能力集" :span="2" v-if="selectedDeviceDetail.capability">
-            {{ Array.isArray(selectedDeviceDetail.capability) ? selectedDeviceDetail.capability.join(', ') :
-              selectedDeviceDetail.capability }}
-          </el-descriptions-item>
-        </el-descriptions>
+        <!-- 设备基本信息 -->
+        <div class="device-details-section">
+          <h3 class="section-title">{{ selectedDeviceDetail.deviceName || selectedDeviceDetail.device_name }}</h3>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="设备类型">
+              {{ selectedDeviceDetail.deviceType || selectedDeviceDetail.driver_name || '未知' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="所属农场">
+              {{ selectedDeviceDetail.farmName || selectedDeviceDetail.farm_name || '未知' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="所属区块">
+              {{ selectedDeviceDetail.blockName || selectedDeviceDetail.block_name || '未知' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="坐标位置">
+              <span v-if="selectedDeviceDetail.longitude && selectedDeviceDetail.latitude">
+                经度: {{ selectedDeviceDetail.longitude.toFixed(6) }}, 纬度: {{ selectedDeviceDetail.latitude.toFixed(6) }}
+              </span>
+              <span v-else>
+                X: {{ selectedDeviceDetail.x }}, Y: {{ selectedDeviceDetail.y }}
+              </span>
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- 运行时信息区域 -->
+        <div v-if="(selectedDeviceDetail.runtime_info && selectedDeviceDetail.runtime_info.length > 0) || selectedDeviceDetail.is_online !== undefined"
+            class="runtime-info-section" :class="{ loading: refreshingRuntimeInfo }">
+          <div class="section-title">
+            <span>运行时信息</span>
+            <el-button size="small" type="primary" :icon="Refresh" @click="refreshRuntimeInfo"
+                :loading="refreshingRuntimeInfo" circle />
+          </div>
+          <div class="runtime-info-list">
+            <!-- 设备在线状态 -->
+            <div v-if="selectedDeviceDetail.is_online !== undefined" class="runtime-info-item online-status-item">
+              <div class="info-label">
+                <el-icon class="status-icon"
+                    :class="{ 'online': selectedDeviceDetail.is_online, 'offline': !selectedDeviceDetail.is_online }">
+                  <CircleCheck v-if="selectedDeviceDetail.is_online" />
+                  <CircleClose v-else />
+                </el-icon>
+                设备在线状态：
+              </div>
+              <div class="info-value"
+                  :class="{ 'online': selectedDeviceDetail.is_online, 'offline': !selectedDeviceDetail.is_online }">
+                {{ selectedDeviceDetail.is_online ? '在线' : '离线' }}
+              </div>
+            </div>
+            <!-- 其他运行时信息 -->
+            <div v-for="(info, index) in selectedDeviceDetail.runtime_info" :key="index"
+                class="runtime-info-item">
+              <div class="info-label">{{ info.title }}：</div>
+              <div class="info-value">{{ info.text }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 设备操作按钮 -->
+        <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDeviceDetail)">
+          <div class="device-controls-container">
+            <!-- 动态生成的设备操作按钮 -->
+            <div v-for="buttonGroup in getDeviceButtonGroups(selectedDeviceDetail)" :key="buttonGroup.key"
+                :class="buttonGroup.containerClass">
+              <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
+                  :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize"
+                  :class="buttonConfig.buttonClass"
+                  @click="handleDeviceAction(buttonConfig.action, selectedDeviceDetail.deviceName || selectedDeviceDetail.device_name)">
+                <el-icon v-if="buttonConfig.icon" class="mr-1">
+                  <VideoPlay v-if="buttonConfig.icon === 'VideoPlay'" />
+                  <VideoPause v-else-if="buttonConfig.icon === 'VideoPause'" />
+                  <Monitor v-else-if="buttonConfig.icon === 'Monitor'" />
+                  <Close v-else-if="buttonConfig.icon === 'Close'" />
+                </el-icon>
+                {{ buttonConfig.buttonText }}
+              </el-button>
+            </div>
+          </div>
+        </div>
       </div>
       <template #footer>
-        <el-button @click="deviceDetailDialogVisible = false">关闭</el-button>
+        <el-button @click="closeDeviceDetailDialog">关闭</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject } from 'vue'
+import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
-import { Refresh, House } from '@element-plus/icons-vue'
+import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import WateringGroupStatus from '../../../../policy/gui/WateringGroupStatus.vue'
@@ -277,6 +319,9 @@ const deviceListLoading = ref(false)
 // 设备详情对话框
 const deviceDetailDialogVisible = ref(false)
 const selectedDeviceDetail = ref(null)
+const refreshingRuntimeInfo = ref(false)
+const deviceStatuses = ref({}) // 跟踪设备状态
+let runtimeInfoTimer = null // 自动刷新定时器
 
 
 // 组件引用
@@ -565,6 +610,297 @@ const onDeviceClick = (device) => {
 
   selectedDeviceDetail.value = device
   deviceDetailDialogVisible.value = true
+  
+  // 启动自动刷新定时器
+  startRuntimeInfoAutoRefresh()
+}
+
+// 获取设备类型代码 - 用于图标和动作集映射
+const getDeviceType = (device) => {
+  // 优先使用后端返回的设备类型代码
+  if (device.device_type) {
+    // 如果是虚拟设备，从设备名称判断具体类型
+    if (device.device_type === '虚拟设备') {
+      const deviceName = device.device_name || device.deviceName || ''
+      if (deviceName.includes('流量计')) return 'flowmeter'
+      if (deviceName.includes('阀门')) return 'valve'
+      if (deviceName.includes('施肥机')) return 'fertilizer'
+      if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
+      return 'valve' // 默认类型
+    }
+    // 如果不是虚拟设备，直接返回具体类型
+    return device.device_type
+  }
+
+  // 如果没有device_type，则从设备名称推断（向后兼容）
+  const deviceName = device.device_name || device.deviceName || ''
+  if (deviceName.includes('流量计')) return 'flowmeter'
+  if (deviceName.includes('阀门')) return 'valve'
+  if (deviceName.includes('施肥机')) return 'fertilizer'
+  if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
+
+  return 'valve' // 默认类型
+}
+
+// 检查设备是否具有任何能力
+const hasAnyDeviceCapability = (device) => {
+  if (!device) return false
+
+  const allCapabilities = ['open', 'close', 'readout', 'shutdown']
+  return allCapabilities.some(capability => hasDeviceCapability(device, capability))
+}
+
+// 检查设备是否具有特定能力
+const hasDeviceCapability = (device, capability) => {
+  if (!device) return false
+
+  // 从设备的能力集数组中检查
+  if (device.capability && Array.isArray(device.capability)) {
+    return device.capability.includes(capability)
+  }
+
+  // 从原始设备数据中检查
+  if (device.originalDevice && device.originalDevice.capability) {
+    try {
+      const capabilities = JSON.parse(device.originalDevice.capability)
+      return Array.isArray(capabilities) && capabilities.includes(capability)
+    } catch (error) {
+      // 如果不是JSON格式，尝试按逗号分割
+      const capabilities = device.originalDevice.capability.split(',').map(c => c.trim())
+      return capabilities.includes(capability)
+    }
+  }
+
+  return false
+}
+
+// 获取设备按钮分组（动态生成，开启和关闭按钮放在同一行）
+const getDeviceButtonGroups = (device) => {
+  if (!device) return []
+
+  // 获取设备类型
+  const deviceType = getDeviceType(device)
+
+  // 获取设备能力集
+  let capabilities = []
+  if (device.capability) {
+    if (Array.isArray(device.capability)) {
+      capabilities = device.capability
+    } else {
+      try {
+        capabilities = JSON.parse(device.capability)
+      } catch (e) {
+        capabilities = device.capability.split(',').map(c => c.trim())
+      }
+    }
+  }
+
+  // 使用全局函数获取按钮配置
+  const instance = getCurrentInstance()
+  if (!instance || !instance.appContext || !instance.appContext.config || !instance.appContext.config.globalProperties || !instance.appContext.config.globalProperties.$getDeviceButtonConfig) {
+    console.warn('$getDeviceButtonConfig 全局函数未找到')
+    return []
+  }
+  
+  const buttonConfigs = instance.appContext.config.globalProperties.$getDeviceButtonConfig(capabilities, deviceType)
+
+  // 将按钮分组：开启和关闭按钮放在同一行，其他按钮各自一行
+  const groups = []
+
+  // 检查是否有开启和关闭按钮
+  const openButton = buttonConfigs.find(config => config.capability === 'open')
+  const closeButton = buttonConfigs.find(config => config.capability === 'close')
+
+  if (openButton && closeButton) {
+    // 开启和关闭按钮放在同一行
+    groups.push({
+      key: 'open-close-group',
+      containerClass: 'device-control-row',
+      buttons: [openButton, closeButton]
+    })
+  } else {
+    // 如果只有一个，单独显示
+    if (openButton) {
+      groups.push({
+        key: 'open-group',
+        containerClass: 'full-width-buttons-container',
+        buttons: [openButton]
+      })
+    }
+    if (closeButton) {
+      groups.push({
+        key: 'close-group',
+        containerClass: 'full-width-buttons-container',
+        buttons: [closeButton]
+      })
+    }
+  }
+
+  // 其他按钮各自一行
+  const otherButtons = buttonConfigs.filter(config =>
+    config.capability !== 'open' && config.capability !== 'close'
+  )
+
+  otherButtons.forEach(button => {
+    groups.push({
+      key: `${button.capability}-group`,
+      containerClass: 'full-width-buttons-container',
+      buttons: [button]
+    })
+  })
+
+  return groups
+}
+
+// 处理设备操作
+const handleDeviceAction = async (action, deviceName) => {
+  try {
+    switch (action) {
+      case 'openDevice':
+        await openDevice(deviceName)
+        break
+      case 'closeDevice':
+        await closeDevice(deviceName)
+        break
+      case 'readDeviceStatus':
+        await readDeviceStatus(deviceName)
+        break
+      case 'shutdownDevice':
+        await shutdownDevice(deviceName)
+        break
+      default:
+        console.warn('未知的设备操作:', action)
+    }
+    // 操作后刷新运行时信息
+    await refreshRuntimeInfo()
+  } catch (error) {
+    console.error('设备操作失败:', error)
+    ElMessage.error(`设备操作失败: ${error.message || error}`)
+  }
+}
+
+// 打开设备
+const openDevice = async (deviceName) => {
+  try {
+    const response = await call_remote('/device_management/open_device', { device_name: deviceName })
+    if (response.result) {
+      ElMessage.success(`设备 ${deviceName} 已开启`)
+    }
+  } catch (error) {
+    console.error('打开设备失败:', error)
+    ElMessage.error(`打开设备失败: ${error.message || error}`)
+    throw error
+  }
+}
+
+// 关闭设备
+const closeDevice = async (deviceName) => {
+  try {
+    const response = await call_remote('/device_management/close_device', { device_name: deviceName })
+    if (response.result) {
+      ElMessage.success(`设备 ${deviceName} 已关闭`)
+    }
+  } catch (error) {
+    console.error('关闭设备失败:', error)
+    ElMessage.error(`关闭设备失败: ${error.message || error}`)
+    throw error
+  }
+}
+
+// 读取设备状态
+const readDeviceStatus = async (deviceName) => {
+  try {
+    const response = await call_remote('/device_management/readout_device', { device_name: deviceName })
+    ElMessage.success(`设备状态: ${response.readout || '未知'}`)
+    return response.readout
+  } catch (error) {
+    console.error('读取设备状态失败:', error)
+    ElMessage.error('读取设备状态失败')
+    return null
+  }
+}
+
+// 关机设备
+const shutdownDevice = async (deviceName) => {
+  try {
+    const response = await call_remote('/device_management/shutdown_device', { device_name: deviceName })
+    if (response.result) {
+      ElMessage.success(`设备 ${deviceName} 关机成功`)
+    }
+  } catch (error) {
+    console.error('设备关机失败:', error)
+    ElMessage.error(`设备关机失败: ${error.message || error}`)
+  }
+}
+
+// 刷新运行时信息
+const refreshRuntimeInfo = async () => {
+  if (!selectedDeviceDetail.value) return
+
+  try {
+    refreshingRuntimeInfo.value = true
+
+    // 获取最新的设备列表，包含运行时信息
+    const response = await call_remote('/device_management/list_device', {
+      pageNo: 0,
+      farm_name: selectedDeviceDetail.value.farmName || selectedDeviceDetail.value.farm_name,
+      block_name: selectedDeviceDetail.value.blockName || selectedDeviceDetail.value.block_name
+    })
+
+    if (response.devices && response.devices.length > 0) {
+      // 找到当前选中的设备
+      const currentDevice = response.devices.find(device =>
+        device.device_name === (selectedDeviceDetail.value.device_name || selectedDeviceDetail.value.deviceName)
+      )
+
+      if (currentDevice) {
+        // 更新运行时信息
+        if (currentDevice.runtime_info) {
+          selectedDeviceDetail.value.runtime_info = currentDevice.runtime_info
+        }
+        // 更新在线状态
+        if (currentDevice.is_online !== undefined) {
+          selectedDeviceDetail.value.is_online = currentDevice.is_online
+        }
+        ElMessage.success('运行时信息已更新')
+      }
+    }
+  } catch (error) {
+    console.error('刷新运行时信息失败:', error)
+    ElMessage.error('刷新运行时信息失败')
+  } finally {
+    refreshingRuntimeInfo.value = false
+  }
+}
+
+// 启动自动刷新定时器
+const startRuntimeInfoAutoRefresh = () => {
+  // 清除现有定时器
+  if (runtimeInfoTimer) {
+    clearInterval(runtimeInfoTimer)
+  }
+
+  // 每30秒自动刷新一次运行时信息
+  runtimeInfoTimer = setInterval(() => {
+    if (selectedDeviceDetail.value && selectedDeviceDetail.value.runtime_info) {
+      refreshRuntimeInfo()
+    }
+  }, 30000) // 30秒
+}
+
+// 停止自动刷新定时器
+const stopRuntimeInfoAutoRefresh = () => {
+  if (runtimeInfoTimer) {
+    clearInterval(runtimeInfoTimer)
+    runtimeInfoTimer = null
+  }
+}
+
+// 关闭设备详情对话框
+const closeDeviceDetailDialog = () => {
+  // 停止自动刷新定时器
+  stopRuntimeInfoAutoRefresh()
+  deviceDetailDialogVisible.value = false
 }
 
 const onDeviceToggle = (device) => {
@@ -711,6 +1047,15 @@ onMounted(async () => {
 // 组件卸载时清理事件监听器
 onUnmounted(() => {
   window.removeEventListener('farmChanged', handleFarmChange)
+  // 停止自动刷新定时器
+  stopRuntimeInfoAutoRefresh()
+})
+
+// 监听对话框关闭，停止定时器
+watch(() => deviceDetailDialogVisible.value, (isVisible) => {
+  if (!isVisible) {
+    stopRuntimeInfoAutoRefresh()
+  }
 })
 
 
@@ -2317,5 +2662,151 @@ html {
     flex-direction: column;
     gap: 8px;
   }
+}
+
+/* 设备详情对话框样式 */
+.device-detail-content {
+  padding: 10px 0;
+}
+
+.device-details-section {
+  margin-bottom: 24px;
+}
+
+.device-details-section .section-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 运行时信息样式 */
+.runtime-info-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.runtime-info-section .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: #333;
+  font-size: 16px;
+}
+
+.runtime-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.runtime-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.08) 0%, rgba(64, 158, 255, 0.03) 100%);
+  border-radius: 8px;
+  border-left: 4px solid #409eff;
+  transition: all 0.3s ease;
+}
+
+.runtime-info-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+}
+
+.info-label {
+  font-weight: 500;
+  color: #666;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-value {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(64, 158, 255, 0.2);
+}
+
+/* 在线状态特殊样式 */
+.online-status-item {
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.08) 0%, rgba(103, 194, 58, 0.03) 100%) !important;
+  border-left: 4px solid #67c23a !important;
+}
+
+.online-status-item .status-icon {
+  font-size: 16px;
+}
+
+.online-status-item .status-icon.online {
+  color: #67c23a;
+}
+
+.online-status-item .status-icon.offline {
+  color: #f56c6c;
+}
+
+.online-status-item .info-value.online {
+  background: rgba(103, 194, 58, 0.1) !important;
+  border-color: #67c23a !important;
+  color: #67c23a !important;
+}
+
+.online-status-item .info-value.offline {
+  background: rgba(245, 108, 108, 0.1) !important;
+  border-color: #f56c6c !important;
+  color: #f56c6c !important;
+}
+
+/* 运行时信息加载状态 */
+.runtime-info-section.loading .runtime-info-item {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 设备操作按钮样式 */
+.device-actions {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.device-controls-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.device-control-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.full-width-buttons-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.full-width-buttons-container .el-button,
+.device-control-row .el-button {
+  width: 100%;
+}
+
+.mr-1 {
+  margin-right: 4px;
 }
 </style>
