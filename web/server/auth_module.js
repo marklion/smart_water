@@ -19,7 +19,16 @@ function generateToken(username) {
 
 function verifyToken(token) {
     try {
-        return jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
+        // 验证 token 后，检查用户是否仍然存在
+        if (decoded && decoded.username) {
+            const userExists = users.find(u => u.username === decoded.username);
+            if (!userExists) {
+                // 用户已被删除，token 无效
+                return null;
+            }
+        }
+        return decoded;
     } catch (error) {
         return null;
     }

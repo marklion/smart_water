@@ -69,21 +69,27 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('auth_token')
+  console.log('路由守卫执行:', { from: from.path, to: to.path, hasToken: !!token })
+  
   if (to.path === '/login') {
     if (token) {
+      console.log('已登录，从登录页重定向到 /center')
       next('/center')
     } else {
+      console.log('未登录，允许访问登录页')
       next()
     }
   } else {
     if (token) {
-      import('axios').then(axios => {
-        axios.default.defaults.headers.common['token'] = token
-      })
+      // 确保 axios headers 已设置
+      const axios = (await import('axios')).default
+      axios.defaults.headers.common['token'] = token
+      console.log('已登录，允许访问:', to.path)
       next()
     } else {
+      console.log('未登录，重定向到登录页')
       next('/login')
     }
   }

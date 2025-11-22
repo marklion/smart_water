@@ -20,14 +20,15 @@ describe('Web Token 验证测试', () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // 创建测试用户 - 先删除可能存在的用户，再创建
+        // 使用 CLI 请求方式（添加 X-Request-Source: cli 头），这样不需要 token
         try {
-            await callAPI('/auth/del_user', { username: CONFIG.TEST_USER.username });
+            await callAPI('/auth/del_user', { username: CONFIG.TEST_USER.username }, null, true);
         } catch (error) {
             // 用户不存在时会报错，忽略
         }
         
         try {
-            const result = await callAPI('/auth/add_user', CONFIG.TEST_USER);
+            const result = await callAPI('/auth/add_user', CONFIG.TEST_USER, null, true);
             if (!result.success) {
                 console.log('创建测试用户失败:', result.error);
             }
@@ -40,12 +41,17 @@ describe('Web Token 验证测试', () => {
         await close_server();
     });
 
-    async function callAPI(endpoint, data = {}, token = null) {
+    async function callAPI(endpoint, data = {}, token = null, isCliRequest = false) {
         const url = `${CONFIG.SERVER_URL}${CONFIG.API_BASE}${endpoint}`;
         const headers = { 'Content-Type': 'application/json' };
         
         if (token) {
             headers['token'] = token;
+        }
+        
+        // 如果是 CLI 请求，添加特殊标识
+        if (isCliRequest) {
+            headers['X-Request-Source'] = 'cli';
         }
         
         try {
@@ -95,20 +101,28 @@ describe('Web Token 验证测试', () => {
     });
 
     test('有效Token访问应该成功', async () => {
-        const result = await callAPI('/auth/list_users', {}, authToken);
+        // 使用有效 token 访问需要认证的接口
+        const result = await callAPI('/auth/list_users', {}, authToken, false);
         expect(result.success).toBe(true);
         expect(result.data.result).toBeDefined();
         expect(typeof result.data.result.total).toBe('number');
     });
 
-    test('本地请求不需要Token应该成功', async () => {
-        const result = await callAPI('/auth/list_users');
+    test('CLI请求不需要Token应该成功', async () => {
+        // CLI 请求（有 X-Request-Source: cli 头）不需要 token
+        const result = await callAPI('/auth/list_users', {}, null, true);
         expect(result.success).toBe(true);
         expect(result.data.result).toBeDefined();
     });
 
-    test('无效Token应该被拒绝（本地请求除外）', async () => {
-        const result = await callAPI('/auth/list_users', {}, 'invalid_token');
-        expect(result.success).toBe(true); // 本地请求会成功
+    test('无效Token应该被拒绝（CLI请求除外）', async () => {
+        // CLI 请求即使 token 无效也会成功（因为 CLI 请求不需要 token）
+        const result = await callAPI('/auth/list_users', {}, 'invalid_token', true);
+        expect(result.success).toBe(true); // CLI 请求会成功
+        
+        // 非 CLI 请求，无效 token 应该被拒绝
+        const result2 = await callAPI('/auth/list_users', {}, 'invalid_token', false);
+        expect(result2.success).toBe(false);
+        expect(result2.error).toContain('Token');
     });
 });
