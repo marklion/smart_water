@@ -199,10 +199,10 @@
                 </div>
             </div>
 
-            <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDevice)">
-                <div class="device-controls-container">
-                    <!-- 动态生成的设备操作按钮 -->
-                        <div v-for="buttonGroup in getDeviceButtonGroups(selectedDevice)" :key="buttonGroup.key"
+             <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDevice)">
+                 <div class="device-controls-container">
+                     <!-- 动态生成的设备操作按钮 -->
+                         <div v-for="buttonGroup in getDeviceButtonGroupsWrapper(selectedDevice)" :key="buttonGroup.key"
                             :class="buttonGroup.containerClass">
                             <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
                                 :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize"
@@ -462,6 +462,17 @@ import { ElMessage } from 'element-plus'
 import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning, CircleCheck, CircleClose, Setting, Plus, Delete } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
+import { 
+  getDeviceType, 
+  hasDeviceCapability, 
+  hasAnyDeviceCapability, 
+  getDeviceButtonGroups,
+  openDevice,
+  closeDevice,
+  readDeviceStatus,
+  shutdownDevice,
+  refreshRuntimeInfo as refreshRuntimeInfoUtil
+} from '../utils/deviceUtils.js'
 
 // Props
 const props = defineProps({
@@ -679,146 +690,15 @@ const createDeviceMarker = (device) => {
     }
 }
 
-// 获取设备类型代码 - 用于图标和动作集映射
-const getDeviceType = (device) => {
-    // 优先使用后端返回的设备类型代码
-    if (device.device_type) {
-        // 如果是虚拟设备，从设备名称判断具体类型
-        if (device.device_type === '虚拟设备') {
-            const deviceName = device.device_name || device.deviceName || ''
-            if (deviceName.includes('流量计')) return 'flowmeter'
-            if (deviceName.includes('阀门')) return 'valve'
-            if (deviceName.includes('施肥机')) return 'fertilizer'
-            if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
-            return 'valve' // 默认类型
-        }
-        // 如果不是虚拟设备，直接返回具体类型
-        return device.device_type
-    }
-
-    // 如果没有device_type，则从设备名称推断（向后兼容）
-    const deviceName = device.device_name || device.deviceName || ''
-    if (deviceName.includes('流量计')) return 'flowmeter'
-    if (deviceName.includes('阀门')) return 'valve'
-    if (deviceName.includes('施肥机')) return 'fertilizer'
-    if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
-
-    return 'valve' // 默认类型
-}
-
-// 检查设备是否具有任何能力
-const hasAnyDeviceCapability = (device) => {
-    if (!device) return false
-
-    const allCapabilities = ['open', 'close', 'readout', 'shutdown']
-    return allCapabilities.some(capability => hasDeviceCapability(device, capability))
-}
-
-// 检查设备是否具有特定能力
-const hasDeviceCapability = (device, capability) => {
-    if (!device) return false
-
-    // 从设备的能力集数组中检查
-    if (device.capability && Array.isArray(device.capability)) {
-        return device.capability.includes(capability)
-    }
-
-    // 从原始设备数据中检查
-    if (device.originalDevice && device.originalDevice.capability) {
-        try {
-            const capabilities = JSON.parse(device.originalDevice.capability)
-            return Array.isArray(capabilities) && capabilities.includes(capability)
-        } catch (error) {
-            // 如果不是JSON格式，尝试按逗号分割
-            const capabilities = device.originalDevice.capability.split(',').map(c => c.trim())
-            return capabilities.includes(capability)
-        }
-    }
-
-    return false
-}
-
-// 获取设备按钮分组（动态生成，开启和关闭按钮放在同一行）
-const getDeviceButtonGroups = (device) => {
-    if (!device) return []
-
-    // 获取设备类型
-    const deviceType = getDeviceType(device)
-
-    // 获取设备能力集
-    let capabilities = []
-    if (device.capability) {
-        if (Array.isArray(device.capability)) {
-            capabilities = device.capability
-        } else {
-            try {
-                capabilities = JSON.parse(device.capability)
-            } catch (e) {
-                capabilities = device.capability.split(',').map(c => c.trim())
-            }
-        }
-    }
-
-    // 使用全局函数获取按钮配置
-    const buttonConfigs = getCurrentInstance().appContext.config.globalProperties.$getDeviceButtonConfig(capabilities, deviceType)
-
-    // 将按钮分组：开启和关闭按钮放在同一行，其他按钮各自一行
-    const groups = []
-
-    // 检查是否有开启和关闭按钮
-    const openButton = buttonConfigs.find(config => config.capability === 'open')
-    const closeButton = buttonConfigs.find(config => config.capability === 'close')
-
-    if (openButton && closeButton) {
-        // 开启和关闭按钮放在同一行
-        groups.push({
-            key: 'open-close-group',
-            containerClass: 'device-control-row',
-            buttons: [openButton, closeButton]
-        })
-    } else {
-        // 如果只有一个，单独显示
-        if (openButton) {
-            groups.push({
-                key: 'open-group',
-                containerClass: 'full-width-buttons-container',
-                buttons: [openButton]
-            })
-        }
-        if (closeButton) {
-            groups.push({
-                key: 'close-group',
-                containerClass: 'full-width-buttons-container',
-                buttons: [closeButton]
-            })
-        }
-    }
-
-    // 其他按钮各自一行
-    const otherButtons = buttonConfigs.filter(config =>
-        config.capability !== 'open' && config.capability !== 'close'
-    )
-
-    otherButtons.forEach(button => {
-        groups.push({
-            key: `${button.capability}-group`,
-            containerClass: 'full-width-buttons-container',
-            buttons: [button]
-        })
-    })
-
-    return groups
-}
-
 // 处理设备操作
 const handleDeviceAction = async (action, deviceName) => {
     try {
         switch (action) {
             case 'openDevice':
-                await openDevice(deviceName)
+                await openDeviceWrapper(deviceName)
                 break
             case 'closeDevice':
-                await closeDevice(deviceName)
+                await closeDeviceWrapper(deviceName)
                 break
             case 'readDeviceStatus':
                 await readDeviceStatus(deviceName)
@@ -829,10 +709,17 @@ const handleDeviceAction = async (action, deviceName) => {
             default:
                 console.warn('未知的设备操作:', action)
         }
+        // 操作后刷新运行时信息
+        await refreshRuntimeInfo()
     } catch (error) {
         console.error('设备操作失败:', error)
         ElMessage.error(`设备操作失败: ${error.message || error}`)
     }
+}
+
+// 获取设备按钮分组（包装函数以传入 getCurrentInstance）
+const getDeviceButtonGroupsWrapper = (device) => {
+    return getDeviceButtonGroups(device, getCurrentInstance)
 }
 
 // 获取设备状态
@@ -1054,17 +941,6 @@ const closeDevicePanel = () => {
     selectedDevice.value = null
 }
 
-const readDeviceStatus = async (deviceName) => {
-    try {
-        const response = await call_remote('/device_management/readout_device', { device_name: deviceName })
-        ElMessage.success(`设备状态: ${response.readout || '未知'}`)
-        return response.readout
-    } catch (error) {
-        console.error('读取设备状态失败:', error)
-        ElMessage.error('读取设备状态失败')
-        return null
-    }
-}
 
 // 设备切换函数
 const toggleDevice = async (device) => {
@@ -1092,91 +968,26 @@ const toggleDevice = async (device) => {
     }
 }
 
-// 打开设备
-const openDevice = async (deviceName) => {
-    try {
-        const response = await call_remote('/device_management/open_device', { device_name: deviceName })
-        if (response.result) {
-            setDeviceStatus(deviceName, true)
-            ElMessage.success(`设备 ${deviceName} 已开启`)
-            // 重新渲染设备标记以更新状态
-            initDeviceMarkers()
-        }
-    } catch (error) {
-        console.error('打开设备失败:', error)
-        ElMessage.error(`打开设备失败: ${error.message || error}`)
-        throw error
-    }
+// 打开设备（包装函数以更新地图标记）
+const openDeviceWrapper = async (deviceName) => {
+    await openDevice(deviceName)
+    setDeviceStatus(deviceName, true)
+    // 重新渲染设备标记以更新状态
+    initDeviceMarkers()
 }
 
-// 关闭设备
-const closeDevice = async (deviceName) => {
-    try {
-        const response = await call_remote('/device_management/close_device', { device_name: deviceName })
-        if (response.result) {
-            setDeviceStatus(deviceName, false)
-            ElMessage.success(`设备 ${deviceName} 已关闭`)
-            // 重新渲染设备标记以更新状态
-            initDeviceMarkers()
-        }
-    } catch (error) {
-        console.error('关闭设备失败:', error)
-        ElMessage.error(`关闭设备失败: ${error.message || error}`)
-        throw error
-    }
-}
-
-// 关机设备
-const shutdownDevice = async (deviceName) => {
-    try {
-        const response = await call_remote('/device_management/shutdown_device', { device_name: deviceName })
-        if (response.result) {
-            ElMessage.success(`设备 ${deviceName} 关机成功`)
-        }
-    } catch (error) {
-        console.error('设备关机失败:', error)
-        ElMessage.error(`设备关机失败: ${error.message || error}`)
-    }
+// 关闭设备（包装函数以更新地图标记）
+const closeDeviceWrapper = async (deviceName) => {
+    await closeDevice(deviceName)
+    setDeviceStatus(deviceName, false)
+    // 重新渲染设备标记以更新状态
+    initDeviceMarkers()
 }
 
 // 刷新运行时信息
 const refreshRuntimeInfo = async () => {
     if (!selectedDevice.value) return
-
-    try {
-        refreshingRuntimeInfo.value = true
-
-        // 获取最新的设备列表，包含运行时信息
-        const response = await call_remote('/device_management/list_device', {
-            pageNo: 0,
-            farm_name: selectedDevice.value.farmName,
-            block_name: selectedDevice.value.blockName
-        })
-
-        if (response.devices && response.devices.length > 0) {
-            // 找到当前选中的设备
-            const currentDevice = response.devices.find(device =>
-                device.device_name === (selectedDevice.value.device_name || selectedDevice.value.deviceName)
-            )
-
-            if (currentDevice) {
-                // 更新运行时信息
-                if (currentDevice.runtime_info) {
-                    selectedDevice.value.runtime_info = currentDevice.runtime_info
-                }
-                // 更新在线状态
-                if (currentDevice.is_online !== undefined) {
-                    selectedDevice.value.is_online = currentDevice.is_online
-                }
-                ElMessage.success('运行时信息已更新')
-            }
-        }
-    } catch (error) {
-        console.error('刷新运行时信息失败:', error)
-        ElMessage.error('刷新运行时信息失败')
-    } finally {
-        refreshingRuntimeInfo.value = false
-    }
+    await refreshRuntimeInfoUtil(selectedDevice.value, refreshingRuntimeInfo)
 }
 
 // 启动自动刷新定时器
