@@ -202,7 +202,7 @@
              <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDevice)">
                  <div class="device-controls-container">
                      <!-- 动态生成的设备操作按钮 -->
-                         <div v-for="buttonGroup in getDeviceButtonGroupsWrapper(selectedDevice)" :key="buttonGroup.key"
+                         <div v-for="buttonGroup in getDeviceButtonGroupsWrapperLocal(selectedDevice)" :key="buttonGroup.key"
                             :class="buttonGroup.containerClass">
                             <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
                                 :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize"
@@ -466,12 +466,10 @@ import {
   getDeviceType, 
   hasDeviceCapability, 
   hasAnyDeviceCapability, 
-  getDeviceButtonGroups,
-  openDevice,
-  closeDevice,
-  readDeviceStatus,
-  shutdownDevice,
-  refreshRuntimeInfo as refreshRuntimeInfoUtil
+  refreshRuntimeInfo as refreshRuntimeInfoUtil,
+  createRuntimeInfoAutoRefresh,
+  handleDeviceAction as handleDeviceActionUtil,
+  getDeviceButtonGroupsWrapper
 } from '../utils/deviceUtils.js'
 
 // Props
@@ -499,6 +497,13 @@ const loading = ref(true)
 const currentLayerType = ref('卫星地图')
 const refreshingRuntimeInfo = ref(false)
 const deviceStatuses = ref({}) // 跟踪设备状态
+
+// 创建自动刷新定时器管理器
+const runtimeInfoAutoRefresh = createRuntimeInfoAutoRefresh(
+  () => selectedDevice,
+  () => refreshRuntimeInfo(),
+  30000
+)
 
 // 紧急停止相关数据
 const emergencyStopDialogVisible = ref(false)
@@ -534,8 +539,6 @@ let map = null
 let satelliteLayer = null
 let trafficLayer = null
 let markers = []
-// 自动刷新定时器
-let runtimeInfoTimer = null
 
 // 地图初始化
 const initMap = async () => {
@@ -692,34 +695,20 @@ const createDeviceMarker = (device) => {
 
 // 处理设备操作
 const handleDeviceAction = async (action, deviceName) => {
-    try {
-        switch (action) {
-            case 'openDevice':
-                await openDeviceWrapper(deviceName)
-                break
-            case 'closeDevice':
-                await closeDeviceWrapper(deviceName)
-                break
-            case 'readDeviceStatus':
-                await readDeviceStatus(deviceName)
-                break
-            case 'shutdownDevice':
-                await shutdownDevice(deviceName)
-                break
-            default:
-                console.warn('未知的设备操作:', action)
-        }
-        // 操作后刷新运行时信息
-        await refreshRuntimeInfo()
-    } catch (error) {
-        console.error('设备操作失败:', error)
-        ElMessage.error(`设备操作失败: ${error.message || error}`)
+    // 对于需要更新地图标记的操作，使用包装函数
+    if (action === 'openDevice') {
+        await openDeviceWrapper(deviceName)
+    } else if (action === 'closeDevice') {
+        await closeDeviceWrapper(deviceName)
+    } else {
+        // 其他操作使用统一处理函数
+        await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo)
     }
 }
 
-// 获取设备按钮分组（包装函数以传入 getCurrentInstance）
-const getDeviceButtonGroupsWrapper = (device) => {
-    return getDeviceButtonGroups(device, getCurrentInstance)
+// 获取设备按钮分组（使用共享函数）
+const getDeviceButtonGroupsWrapperLocal = (device) => {
+    return getDeviceButtonGroupsWrapper(device, getCurrentInstance)
 }
 
 // 获取设备状态
@@ -992,25 +981,12 @@ const refreshRuntimeInfo = async () => {
 
 // 启动自动刷新定时器
 const startRuntimeInfoAutoRefresh = () => {
-    // 清除现有定时器
-    if (runtimeInfoTimer) {
-        clearInterval(runtimeInfoTimer)
-    }
-
-    // 每30秒自动刷新一次运行时信息
-    runtimeInfoTimer = setInterval(() => {
-        if (selectedDevice.value && selectedDevice.value.runtime_info) {
-            refreshRuntimeInfo()
-        }
-    }, 30000) // 30秒
+    runtimeInfoAutoRefresh.start()
 }
 
 // 停止自动刷新定时器
 const stopRuntimeInfoAutoRefresh = () => {
-    if (runtimeInfoTimer) {
-        clearInterval(runtimeInfoTimer)
-        runtimeInfoTimer = null
-    }
+    runtimeInfoAutoRefresh.stop()
 }
 
 // 紧急停止相关方法

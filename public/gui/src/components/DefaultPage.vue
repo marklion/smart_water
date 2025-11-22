@@ -212,7 +212,7 @@
          <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDeviceDetail)">
            <div class="device-controls-container">
              <!-- 动态生成的设备操作按钮 -->
-             <div v-for="buttonGroup in getDeviceButtonGroupsWrapper(selectedDeviceDetail)" :key="buttonGroup.key"
+             <div v-for="buttonGroup in getDeviceButtonGroupsWrapperLocal(selectedDeviceDetail)" :key="buttonGroup.key"
                 :class="buttonGroup.containerClass">
               <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
                   :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize"
@@ -255,12 +255,10 @@ import {
   getDeviceType, 
   hasDeviceCapability, 
   hasAnyDeviceCapability, 
-  getDeviceButtonGroups,
-  openDevice,
-  closeDevice,
-  readDeviceStatus,
-  shutdownDevice,
-  refreshRuntimeInfo as refreshRuntimeInfoUtil
+  refreshRuntimeInfo as refreshRuntimeInfoUtil,
+  createRuntimeInfoAutoRefresh,
+  handleDeviceAction as handleDeviceActionUtil,
+  getDeviceButtonGroupsWrapper
 } from '../utils/deviceUtils.js'
 
 const route = useRoute()
@@ -332,7 +330,13 @@ const deviceDetailDialogVisible = ref(false)
 const selectedDeviceDetail = ref(null)
 const refreshingRuntimeInfo = ref(false)
 const deviceStatuses = ref({}) // 跟踪设备状态
-let runtimeInfoTimer = null // 自动刷新定时器
+
+// 创建自动刷新定时器管理器
+const runtimeInfoAutoRefresh = createRuntimeInfoAutoRefresh(
+  () => selectedDeviceDetail,
+  () => refreshRuntimeInfo(),
+  30000
+)
 
 
 // 组件引用
@@ -628,29 +632,7 @@ const onDeviceClick = (device) => {
 
 // 处理设备操作
 const handleDeviceAction = async (action, deviceName) => {
-  try {
-    switch (action) {
-      case 'openDevice':
-        await openDevice(deviceName)
-        break
-      case 'closeDevice':
-        await closeDevice(deviceName)
-        break
-      case 'readDeviceStatus':
-        await readDeviceStatus(deviceName)
-        break
-      case 'shutdownDevice':
-        await shutdownDevice(deviceName)
-        break
-      default:
-        console.warn('未知的设备操作:', action)
-    }
-    // 操作后刷新运行时信息
-    await refreshRuntimeInfo()
-  } catch (error) {
-    console.error('设备操作失败:', error)
-    ElMessage.error(`设备操作失败: ${error.message || error}`)
-  }
+  await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo)
 }
 
 // 刷新运行时信息
@@ -659,32 +641,19 @@ const refreshRuntimeInfo = async () => {
   await refreshRuntimeInfoUtil(selectedDeviceDetail.value, refreshingRuntimeInfo)
 }
 
-// 获取设备按钮分组（包装函数以传入 getCurrentInstance）
-const getDeviceButtonGroupsWrapper = (device) => {
-  return getDeviceButtonGroups(device, getCurrentInstance)
+// 获取设备按钮分组（使用共享函数）
+const getDeviceButtonGroupsWrapperLocal = (device) => {
+  return getDeviceButtonGroupsWrapper(device, getCurrentInstance)
 }
 
 // 启动自动刷新定时器
 const startRuntimeInfoAutoRefresh = () => {
-  // 清除现有定时器
-  if (runtimeInfoTimer) {
-    clearInterval(runtimeInfoTimer)
-  }
-
-  // 每30秒自动刷新一次运行时信息
-  runtimeInfoTimer = setInterval(() => {
-    if (selectedDeviceDetail.value && selectedDeviceDetail.value.runtime_info) {
-      refreshRuntimeInfo()
-    }
-  }, 30000) // 30秒
+  runtimeInfoAutoRefresh.start()
 }
 
 // 停止自动刷新定时器
 const stopRuntimeInfoAutoRefresh = () => {
-  if (runtimeInfoTimer) {
-    clearInterval(runtimeInfoTimer)
-    runtimeInfoTimer = null
-  }
+  runtimeInfoAutoRefresh.stop()
 }
 
 // 关闭设备详情对话框

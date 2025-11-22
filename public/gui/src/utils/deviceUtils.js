@@ -250,3 +250,66 @@ export async function refreshRuntimeInfo(selectedDevice, refreshingRuntimeInfo) 
   }
 }
 
+/**
+ * 创建自动刷新定时器管理器
+ */
+export function createRuntimeInfoAutoRefresh(selectedDevice, refreshRuntimeInfoFn, interval = 30000) {
+  let timer = null
+
+  const start = () => {
+    stop() // 先清除现有定时器
+    timer = setInterval(() => {
+      if (selectedDevice.value && selectedDevice.value.runtime_info) {
+        refreshRuntimeInfoFn()
+      }
+    }, interval)
+  }
+
+  const stop = () => {
+    if (timer) {
+      clearInterval(timer)
+      timer = null
+    }
+  }
+
+  return { start, stop }
+}
+
+/**
+ * 处理设备操作（统一处理逻辑）
+ */
+export async function handleDeviceAction(action, deviceName, refreshRuntimeInfoFn) {
+  try {
+    switch (action) {
+      case 'openDevice':
+        await openDevice(deviceName)
+        break
+      case 'closeDevice':
+        await closeDevice(deviceName)
+        break
+      case 'readDeviceStatus':
+        await readDeviceStatus(deviceName)
+        break
+      case 'shutdownDevice':
+        await shutdownDevice(deviceName)
+        break
+      default:
+        console.warn('未知的设备操作:', action)
+    }
+    // 操作后刷新运行时信息
+    if (refreshRuntimeInfoFn) {
+      await refreshRuntimeInfoFn()
+    }
+  } catch (error) {
+    console.error('设备操作失败:', error)
+    ElMessage.error(`设备操作失败: ${error.message || error}`)
+  }
+}
+
+/**
+ * 获取设备按钮分组（包装函数，用于传入 getCurrentInstance）
+ */
+export function getDeviceButtonGroupsWrapper(device, getCurrentInstance) {
+  return getDeviceButtonGroups(device, getCurrentInstance)
+}
+
