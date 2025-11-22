@@ -3,6 +3,7 @@ import App from './App.vue'
 import router from './router'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import { inject_err_handler } from '../../lib/call_remote.js'
 
 // 动态设置页面标题
 const setPageTitle = async () => {
@@ -22,8 +23,33 @@ const setPageTitle = async () => {
   }
 }
 
-// 在应用启动时设置标题
-setPageTitle()
+// 只在非登录页设置标题，登录页会自己获取系统名称（避免重复请求）
+router.afterEach((to) => {
+  if (to.path !== '/login') {
+    setPageTitle()
+  }
+})
+
+// 设置全局错误处理器，处理认证相关错误
+inject_err_handler((err_msg) => {
+  // 检查是否是认证相关的错误
+  const authErrorKeywords = ['缺少token', 'Token无效', 'Token过期', '请先登录', '身份验证失败', 'Token验证失败'];
+  const isAuthError = authErrorKeywords.some(keyword => err_msg.includes(keyword));
+  
+  if (isAuthError) {
+    console.log('检测到认证错误，准备清除 token:', err_msg)
+    console.log('当前路由:', router.currentRoute.value.path)
+    if (router.currentRoute.value.path === '/login') {
+      console.log('当前在登录页，不清除 token')
+      return
+    }
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('username');
+    if (router.currentRoute.value.path !== '/login') {
+      router.push('/login');
+    }
+  }
+});
 
 // 设备能力集操作按钮映射配置
 const deviceCapabilityButtonMapping = {

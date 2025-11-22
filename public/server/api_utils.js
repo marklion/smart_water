@@ -239,17 +239,18 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
                     // 检查是否需要token验证
                     const isLoginApi = this.path === '/auth/login';
                     const isLocalRequest = checkIsLocalRequestSecure(req);
+                    const isCliRequest = req.headers['x-request-source'] === 'cli';
+                    const hasWebModule = app.authModule && app.authModule.verifyToken;
+                    const needAuth = !isLoginApi && (!isLocalRequest || (hasWebModule && !isCliRequest));
                     
-                    if (!isLoginApi && !isLocalRequest) {
-                        // 非登录接口且非本地请求需要验证token（Web访问）
+                    if (needAuth) {
                         if (!token) {
                             ret = result_maker(null, '缺少token，请先登录');
                             res.send(ret);
                             return;
                         }
                         
-                        // 验证token有效性
-                        if (app.authModule && app.authModule.verifyToken) {
+                        if (hasWebModule) {
                             try {
                                 const decoded = app.authModule.verifyToken(token);
                                 if (!decoded) {
@@ -264,8 +265,7 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
                                 return;
                             }
                         }
-                    } else if (isLocalRequest && !isLoginApi) {
-                        // 本地请求（CLI）不需要token，但设置一个默认用户标识
+                    } else if (isLocalRequest && !isLoginApi && (!hasWebModule || isCliRequest)) {
                         req.user = { username: 'cli_user', source: 'local' };
                     }
                 } catch (authError) {

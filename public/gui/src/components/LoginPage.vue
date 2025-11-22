@@ -80,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
@@ -126,12 +126,34 @@ const handleLogin = async () => {
       password: loginForm.password
     })
 
+    console.log('登录响应:', response) // 调试信息
+
     if (response && response.token) {
+      // 保存 token 和用户名
       localStorage.setItem('auth_token', response.token)
       localStorage.setItem('username', loginForm.username)
-      router.push('/center')
+      
+      // 立即设置 axios 的默认 headers，确保后续请求都带上 token
+      const axios = (await import('axios')).default
+      axios.defaults.headers.common['token'] = response.token
+      
+      console.log('Token 已保存并设置到 axios headers')
+      
+      // 等待一下，确保 axios headers 已设置完成
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      // 使用 router.push 跳转
+      try {
+        await router.push('/center')
+        console.log('跳转成功，当前路径:', router.currentRoute.value.path)
+      } catch (error) {
+        console.error('router.push 出错:', error)
+        // 如果跳转失败，使用 window.location 强制跳转
+        window.location.href = window.location.origin + window.location.pathname + '#/center'
+      }
     } else {
-      errorMessage.value = response.message || '登录失败'
+      console.error('登录响应格式错误:', response) // 调试信息
+      errorMessage.value = response?.message || '登录失败：响应格式错误'
     }
   } catch (error) {
     console.error('Login error:', error)

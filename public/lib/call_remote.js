@@ -2,12 +2,24 @@ import axios from 'axios';
 let err_handler = undefined;
 export default async function (url, body, token = '') {
     const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-    const url_prefix = isBrowser ? '' : 'http://localhost:47147';
-    let resp = await axios.post(url_prefix + '/api/v1' + url, body, {
-        headers: {
-            'Content-Type': 'application/json',
-            'token': token
+    const url_prefix = isBrowser ? '' : 'http://localhost:47147'
+    if (!token && isBrowser) {
+        token = localStorage.getItem('auth_token') || '';
+        if (!token && axios.defaults.headers.common && axios.defaults.headers.common['token']) {
+            token = axios.defaults.headers.common['token'];
         }
+    }
+    
+    const headers = {
+        'Content-Type': 'application/json',
+        'token': token
+    };
+    // CLI 请求添加特殊标识，用于服务器识别
+    if (!isBrowser) {
+        headers['X-Request-Source'] = 'cli';
+    }
+    let resp = await axios.post(url_prefix + '/api/v1' + url, body, {
+        headers: headers
     });
     if (resp.data.err_msg) {
         if (err_handler) {
