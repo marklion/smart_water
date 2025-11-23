@@ -142,7 +142,8 @@ const deviceSearchParams = ref({
 });
 
 async function fetch_driver_list(params, pageNo) {
-    const result = await device_management_lib.get_driver_list('abc', pageNo);
+    const token = localStorage.getItem('auth_token') || '';
+    const result = await device_management_lib.get_driver_list(token, pageNo);
     let drivers = result.drivers || [];
 
     // 应用搜索和筛选
@@ -162,7 +163,8 @@ async function fetch_driver_list(params, pageNo) {
 }
 
 async function fetch_device_list(params, pageNo) {
-    const result = await device_management_lib.list_device(pageNo, farmFilter.value, blockFilter.value, 'abc');
+    const token = localStorage.getItem('auth_token') || '';
+    const result = await device_management_lib.list_device(pageNo, farmFilter.value, blockFilter.value, token);
     let devices = result.devices || [];
 
     // 应用搜索
