@@ -152,12 +152,13 @@ export function getDeviceButtonGroups(device, getCurrentInstance) {
 export async function openDevice(deviceName) {
   try {
     const response = await call_remote('/device_management/open_device', { device_name: deviceName })
-    if (response.result) {
+    // call_remote 返回的是 result.result，即 true/false
+    if (response) {
       ElMessage.success(`设备 ${deviceName} 已开启`)
     }
   } catch (error) {
     console.error('打开设备失败:', error)
-    ElMessage.error(`打开设备失败: ${error.message || error}`)
+    ElMessage.error(`打开设备失败: ${error.err_msg || error.message || error}`)
     throw error
   }
 }
@@ -168,12 +169,13 @@ export async function openDevice(deviceName) {
 export async function closeDevice(deviceName) {
   try {
     const response = await call_remote('/device_management/close_device', { device_name: deviceName })
-    if (response.result) {
+    // call_remote 返回的是 result.result，即 true/false
+    if (response) {
       ElMessage.success(`设备 ${deviceName} 已关闭`)
     }
   } catch (error) {
     console.error('关闭设备失败:', error)
-    ElMessage.error(`关闭设备失败: ${error.message || error}`)
+    ElMessage.error(`关闭设备失败: ${error.err_msg || error.message || error}`)
     throw error
   }
 }
