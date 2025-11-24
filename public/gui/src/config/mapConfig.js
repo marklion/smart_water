@@ -37,10 +37,12 @@ export const mapConfig = {
       'flowmeter': '流量计', 
       'fertilizer': '施肥机',
       'sensor': '流量计',  // 传感器使用流量计图标
-      'pump': '电磁阀',    // 泵使用电磁阀图标
+      'pump': '泵',
       'temperature': '流量计',  // 温度传感器使用流量计图标
       'humidity': '流量计',     // 湿度传感器使用流量计图标
-      'pressure': '流量计'      // 压力传感器使用流量计图标
+      'pressure': '压力计',     // 压力传感器使用压力计图标
+      'levelmeter': '液位计',   // 液位计使用液位计图标
+      '液位计': '液位计'
     },
     
     // 设备状态颜色
