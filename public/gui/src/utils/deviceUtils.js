@@ -14,6 +14,9 @@ export function getDeviceType(device) {
       if (deviceName.includes('阀门')) return 'valve'
       if (deviceName.includes('施肥机')) return 'fertilizer'
       if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
+      if (deviceName.includes('泵')) return 'pump'
+      if (deviceName.includes('压力计') || deviceName.includes('压力')) return 'pressure'
+      if (deviceName.includes('液位计') || deviceName.includes('液位')) return 'levelmeter'
       return 'valve' // 默认类型
     }
     // 如果不是虚拟设备，直接返回具体类型
@@ -26,6 +29,9 @@ export function getDeviceType(device) {
   if (deviceName.includes('阀门')) return 'valve'
   if (deviceName.includes('施肥机')) return 'fertilizer'
   if (deviceName.includes('传感器') || deviceName.includes('温度')) return 'sensor'
+  if (deviceName.includes('泵')) return 'pump'
+  if (deviceName.includes('压力计') || deviceName.includes('压力')) return 'pressure'
+  if (deviceName.includes('液位计') || deviceName.includes('液位')) return 'levelmeter'
 
   return 'valve' // 默认类型
 }
