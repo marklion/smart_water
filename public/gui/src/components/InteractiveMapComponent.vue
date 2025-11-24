@@ -469,7 +469,9 @@ import {
   refreshRuntimeInfo as refreshRuntimeInfoUtil,
   createRuntimeInfoAutoRefresh,
   handleDeviceAction as handleDeviceActionUtil,
-  getDeviceButtonGroupsWrapper
+  getDeviceButtonGroupsWrapper,
+  openDevice,
+  closeDevice
 } from '../utils/deviceUtils.js'
 
 // Props
