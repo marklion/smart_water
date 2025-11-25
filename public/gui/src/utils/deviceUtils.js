@@ -190,7 +190,8 @@ export async function closeDevice(deviceName) {
 export async function readDeviceStatus(deviceName) {
   try {
     const response = await call_remote('/device_management/readout_device', { device_name: deviceName })
-    ElMessage.success(`设备状态: ${response.readout || '未知'}`)
+    
+    ElMessage.success(`设备状态: ${response.readout !== null && response.readout !== undefined ? response.readout : '无读数'}`)
     return response.readout
   } catch (error) {
     console.error('读取设备状态失败:', error)

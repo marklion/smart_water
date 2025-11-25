@@ -596,7 +596,8 @@ const loadRealDeviceData = async (farmId) => {
       // 更新基本信息中的设备数量 - 根据在线状态计算
       basicInfo.totalDevices = devices.length
       basicInfo.onlineDevices = devices.filter(d => d.is_online === true).length
-      basicInfo.offlineDevices = devices.filter(d => d.is_online === false).length
+      // 离线设备：明确为 false 或 undefined/null 的都算离线
+      basicInfo.offlineDevices = devices.filter(d => d.is_online !== true).length
 
       // 更新设备列表
       updateDeviceList()
@@ -681,7 +682,8 @@ const updateBasicInfoStats = () => {
 
     // 根据设备的在线状态计算在线和离线设备数量
     const onlineDevices = mapMarkers.value.filter(d => d.is_online === true).length
-    const offlineDevices = mapMarkers.value.filter(d => d.is_online === false).length
+    // 离线设备：明确为 false 或 undefined/null 的都算离线
+    const offlineDevices = mapMarkers.value.filter(d => d.is_online !== true).length
 
     basicInfo.onlineDevices = onlineDevices
     basicInfo.offlineDevices = offlineDevices
