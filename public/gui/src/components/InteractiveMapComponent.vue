@@ -469,7 +469,9 @@ import {
   refreshRuntimeInfo as refreshRuntimeInfoUtil,
   createRuntimeInfoAutoRefresh,
   handleDeviceAction as handleDeviceActionUtil,
-  getDeviceButtonGroupsWrapper
+  getDeviceButtonGroupsWrapper,
+  openDevice,
+  closeDevice
 } from '../utils/deviceUtils.js'
 
 // Props
@@ -742,12 +744,9 @@ const createMarkerContent = (device) => {
     }
 
     return `
-    <div class="device-marker ${deviceType} ${statusClass}">
+    <div class="device-marker ${deviceType} ${statusClass}" title="${deviceName}">
       <div class="marker-icon">
         <img src="/deviceIcon/${iconName}.png" alt="${deviceName}" />
-      </div>
-      <div class="marker-info">
-        <div class="device-name">${deviceName}</div>
       </div>
     </div>
   `
@@ -1362,12 +1361,9 @@ const createValveSelectionMarker = (device, isSelected, groupName) => {
         const selectionClass = isSelected ? 'valve-selected' : ''
         
         const markerContent = `
-            <div class="device-marker valve ${statusClass} ${selectionClass}">
+            <div class="device-marker valve ${statusClass} ${selectionClass}" title="${deviceName}">
                 <div class="marker-icon">
                     <img src="/deviceIcon/${iconName}.png" alt="${deviceName}" />
-                </div>
-                <div class="marker-info">
-                    <div class="device-name">${deviceName}</div>
                 </div>
             </div>
         `
@@ -1429,12 +1425,9 @@ const updateValveSelectionMarkers = (groupName) => {
         const selectionClass = isSelected ? 'valve-selected' : ''
         
         const markerContent = `
-            <div class="device-marker valve ${statusClass} ${selectionClass}">
+            <div class="device-marker valve ${statusClass} ${selectionClass}" title="${deviceName}">
                 <div class="marker-icon">
                     <img src="/deviceIcon/${iconName}.png" alt="${deviceName}" />
-                </div>
-                <div class="marker-info">
-                    <div class="device-name">${deviceName}</div>
                 </div>
             </div>
         `
@@ -2398,7 +2391,7 @@ onUnmounted(() => {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     border: 2px solid #e0e0e0;
     backdrop-filter: blur(10px);
-    min-width: 120px;
+    min-width: 70px;
 }
 
 :deep(.device-marker:hover) {
@@ -2444,25 +2437,10 @@ onUnmounted(() => {
     max-width: 80px;
 }
 
-/* 设备类型颜色 */
-:deep(.device-marker.valve .marker-icon) {
-    border-color: #409eff;
-    background: rgba(64, 158, 255, 0.1);
-}
-
-:deep(.device-marker.flowmeter .marker-icon) {
-    border-color: #e6a23c;
-    background: rgba(230, 162, 60, 0.1);
-}
-
-:deep(.device-marker.fertilizer .marker-icon) {
-    border-color: #9c27b0;
-    background: rgba(156, 39, 176, 0.1);
-}
-
-:deep(.device-marker.sensor .marker-icon) {
-    border-color: #67c23a;
-    background: rgba(103, 194, 58, 0.1);
+/* 设备类型颜色 - 统一样式 */
+:deep(.device-marker .marker-icon) {
+    border-color: #dee2e6;
+    background: #f8f9fa;
 }
 
 /* 设备状态颜色 */
