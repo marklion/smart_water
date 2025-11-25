@@ -37,17 +37,19 @@ export default async function (config_string) {
         open_threshold = '-100'
     }
     let info_get_func = async function () {
-        let device_data = await gdac.get('/openapi/device/query', {
+        let device_data = await gdac.post('/openapi/deviceCommand/pipePressure', {
             deviceSN: deviceSN
         });
-        let real_device = device_data.list[0];
         let pressure_key = 'rightPipePressure';
         if (config.is_left) {
             pressure_key = 'leftPipePressure';
         }
+        let pressure_str = device_data[pressure_key];
+        let is_online = pressure_str !== '' && pressure_str !== null && pressure_str !== undefined;
+        let pressure = is_online ? parseFloat(pressure_str) : null;
         let ret = {
-            online: real_device.online,
-            pressure: parseFloat(real_device.detail[pressure_key])
+            online: is_online,
+            pressure: pressure
         }
         return ret;
     };
