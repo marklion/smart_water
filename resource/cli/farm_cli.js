@@ -134,66 +134,36 @@ export default {
         vorpal.delimiter(prompt)
         return vorpal;
     },
-    make_bdr: async function (view_name) {
+    make_bdr: async function () {
         let ret = []
         // 通过API获取farms数组
         let allFarms = await resource_lib.get_all_farms();
-        
-        // 如果指定了view_name，只处理该农场（虽然farm_cli通常不这样用，但为了安全起见）
-        if (view_name) {
-            let farm = allFarms.find(f => f.name === view_name);
-            if (farm) {
-                ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.longitude || ''}' '${farm.latitude || ''}' '${farm.info || ''}'`);
-                // 显示农场的面积参数配置信息 - 直接从farm对象获取，不需要调用接口
-                if (farm.system_flow !== undefined || farm.laying_spacing !== undefined || farm.dripper_spacing !== undefined || farm.dripper_flow !== undefined || farm.coefficient !== undefined) {
-                    let system_flow = farm.system_flow !== undefined ? farm.system_flow : 1;
-                    let laying_spacing = farm.laying_spacing || 0;
-                    let dripper_spacing = farm.dripper_spacing || 0;
-                    let dripper_flow = farm.dripper_flow || 0;
-                    let coefficient = farm.coefficient !== undefined ? farm.coefficient : 0.9;
-                    let formatParam = (val) => {
-                        if (val === undefined || val === null) return val;
-                        return val.toString();
-                    };
-                    let coefficient_str = (coefficient === 1 || coefficient === 1.0) ? '1.0' : formatParam(coefficient);
-                    ret.push(`set area params '${farm.name}' '${formatParam(system_flow)}' '${formatParam(laying_spacing)}' '${formatParam(dripper_spacing)}' '${formatParam(dripper_flow)}' '${coefficient_str}'`);
-                }
-                // 显示农场的实时数据配置 - 直接从farm对象获取，不需要调用接口
-                if (farm.realtime_configs && farm.realtime_configs.length > 0) {
-                    for (let config of farm.realtime_configs) {
-                        ret.push(`realtime '${farm.name}' '${config.label}' '${config.device_name}' '${config.data_type}'`);
-                    }
-                }
+
+        for (let farm of allFarms) {
+            ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.longitude || ''}' '${farm.latitude || ''}' '${farm.info || ''}'`);
+            // 显示农场的面积参数配置信息 - 直接从farm对象获取，不需要调用接口
+            if (farm.system_flow !== undefined || farm.laying_spacing !== undefined || farm.dripper_spacing !== undefined || farm.dripper_flow !== undefined || farm.coefficient !== undefined) {
+                let system_flow = farm.system_flow !== undefined ? farm.system_flow : 1;
+                let laying_spacing = farm.laying_spacing || 0;
+                let dripper_spacing = farm.dripper_spacing || 0;
+                let dripper_flow = farm.dripper_flow || 0;
+                let coefficient = farm.coefficient !== undefined ? farm.coefficient : 0.9;
+                let formatParam = (val) => {
+                    if (val === undefined || val === null) return val;
+                    return val.toString();
+                };
+                let coefficient_str = (coefficient === 1 || coefficient === 1.0) ? '1.0' : formatParam(coefficient);
+                ret.push(`set area params '${farm.name}' '${formatParam(system_flow)}' '${formatParam(laying_spacing)}' '${formatParam(dripper_spacing)}' '${formatParam(dripper_flow)}' '${coefficient_str}'`);
             }
-        } else {
-            // 处理所有农场
-            for (let farm of allFarms) {
-                ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.longitude || ''}' '${farm.latitude || ''}' '${farm.info || ''}'`);
-                // 显示农场的面积参数配置信息 - 直接从farm对象获取，不需要调用接口
-                if (farm.system_flow !== undefined || farm.laying_spacing !== undefined || farm.dripper_spacing !== undefined || farm.dripper_flow !== undefined || farm.coefficient !== undefined) {
-                    let system_flow = farm.system_flow !== undefined ? farm.system_flow : 1;
-                    let laying_spacing = farm.laying_spacing || 0;
-                    let dripper_spacing = farm.dripper_spacing || 0;
-                    let dripper_flow = farm.dripper_flow || 0;
-                    let coefficient = farm.coefficient !== undefined ? farm.coefficient : 0.9;
-                    let formatParam = (val) => {
-                        if (val === undefined || val === null) return val;
-                        return val.toString();
-                    };
-                    let coefficient_str = (coefficient === 1 || coefficient === 1.0) ? '1.0' : formatParam(coefficient);
-                    ret.push(`set area params '${farm.name}' '${formatParam(system_flow)}' '${formatParam(laying_spacing)}' '${formatParam(dripper_spacing)}' '${formatParam(dripper_flow)}' '${coefficient_str}'`);
-                }
-                // 显示农场的实时数据配置 - 直接从farm对象获取，不需要调用接口
-                if (farm.realtime_configs && farm.realtime_configs.length > 0) {
-                    for (let config of farm.realtime_configs) {
-                        ret.push(`realtime '${farm.name}' '${config.label}' '${config.device_name}' '${config.data_type}'`);
-                    }
+            // 显示农场的实时数据配置 - 显式获取，确保数据正确
+            let realtime_configs = await resource_lib.get_all_realtime_configs(farm.name);
+            if (realtime_configs && realtime_configs.length > 0) {
+                for (let config of realtime_configs) {
+                    ret.push(`realtime '${farm.name}' '${config.label}' '${config.device_name}' '${config.data_type}'`);
                 }
             }
         }
-        // farm_cli 没有子 CLI，不需要处理子 CLI
-        // 只在顶层调用（view_name 为 undefined）时才处理子 CLI
-        if (view_name === undefined && this._vorpalInstance) {
+        if (this._vorpalInstance) {
             ret = ret.concat(await cli_utils.make_sub_bdr(this._vorpalInstance));
         }
         return ret;
