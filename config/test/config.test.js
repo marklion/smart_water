@@ -418,8 +418,8 @@ async function prepare_group_policy_config() {
     await prepare_water_policy_config();
     await prepare_global_policy_config();
     await cli.run_cmd('config');
-    await cli.run_cmd(`add group policy 轮灌组1 农场1 0.02 0.02 定时 0.03 0 20 20 轮灌阀门1 轮灌阀门2`);
-    await cli.run_cmd(`add group policy 轮灌组2 农场1 0.02 0.02 定量 0 0.06 20 40 轮灌阀门3`);
+    await cli.run_cmd(`add group policy 轮灌组1 农场1 0.07 0.02 定时 0.03 20 20 轮灌阀门1 轮灌阀门2`);
+    await cli.run_cmd(`add group policy 轮灌组2 农场1 0.07 0.02 定量 0 20 1 轮灌阀门3`);
     await cli.run_cmd('return');
     await reset_statistics();
 }
@@ -481,11 +481,10 @@ async function group_run_once(begin_total, end_total) {
     await confirm_valve_status('轮灌阀门3', true);
     await confirm_valve_status('农场1-施肥泵', false);
     await wait_spend_ms(start_point, 1560);
-    start_point = Date.now();
     await confirm_policy_status('轮灌组2', '施肥');
     await confirm_valve_status('农场1-施肥泵', true);
     await confirm_valve_status('轮灌阀门3', true);
-    await wait_spend_ms(start_point, 3050);
+    await wait_spend_ms(start_point, 3200);
     start_point = Date.now();
     await confirm_policy_status('轮灌组2', '肥后');
     await confirm_valve_status('农场1-施肥泵', false);
@@ -530,7 +529,7 @@ describe('总策略快速配置和验证', () => {
         await prepare_group_policy_config();
         await mock_readout('农场1-主管道流量计', 50);
         await mock_readout('农场1-主管道压力计', 25);
-        await mock_readout('农场1-施肥流量计', 24);
+        await mock_readout('农场1-施肥流量计', 666.66);
         await mock_readout('农场1-施肥液位计', 50);
         await begin_policy_run();
     });
@@ -597,7 +596,7 @@ describe('轮灌组策略快速配置和验证', () => {
         await cli.run_cmd('save sample.txt');
         await begin_policy_run();
         await sim_water_policy_run(true);
-        await mock_readout('农场1-施肥流量计', 24);
+        await mock_readout('农场1-施肥流量计', 666.66);
         await mock_readout('农场1-施肥液位计', 50);
     });
     afterEach(async () => {

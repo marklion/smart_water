@@ -14,7 +14,9 @@ return
 resource
   farm
     add farm '农场1' '呼市' '1' '2' '玉米'
+    set area params '农场1' '0' '0' '0' '0' '0.9'
     add farm '农场2' '呼市' '1' '2' '番茄'
+    set area params '农场2' '0' '0' '0' '0' '0.9'
   return
   block
     add block '农场1' '地块1' '20' ''
@@ -83,6 +85,9 @@ policy
     return
     init state '空闲'
     match farm '农场1'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
+    quick action 'false' '重置' 'prs.variables.set("需要重置", true)'
   return
   policy '轮灌阀门1'
     init assignment 'false' '需要启动' 'false'
@@ -117,6 +122,9 @@ policy
     return
     init state '关阀'
     match farm '农场1'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
+    quick action 'false' '重置' 'prs.variables.set("需要重置", true)'
   return
   policy '轮灌阀门2'
     init assignment 'false' '需要启动' 'false'
@@ -151,6 +159,9 @@ policy
     return
     init state '关阀'
     match farm '农场1'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
+    quick action 'false' '重置' 'prs.variables.set("需要重置", true)'
   return
   policy '轮灌阀门3'
     init assignment 'false' '需要启动' 'false'
@@ -185,6 +196,9 @@ policy
     return
     init state '关阀'
     match farm '农场1'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
+    quick action 'false' '重置' 'prs.variables.set("需要重置", true)'
   return
   policy '轮灌阀门4'
     init assignment 'false' '需要启动' 'false'
@@ -218,6 +232,9 @@ policy
     return
     init state '关阀'
     match farm '农场2'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
+    quick action 'false' '重置' 'prs.variables.set("需要重置", true)'
   return
   policy '农场1-供水'
     init assignment 'false' '流量告警下限' '10'
@@ -281,6 +298,9 @@ policy
     return
     init state '空闲'
     match farm '农场1'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
+    quick action 'false' '重置' 'prs.variables.set("需要重置", true)'
   return
   policy '农场1-总策略'
     init assignment 'false' '需要启动' 'false'
@@ -345,23 +365,27 @@ policy
     return
     init state '空闲'
     match farm '农场1'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
+    quick action 'false' '重置' 'prs.variables.set("需要重置", true)'
   return
   policy '轮灌组1'
     init assignment 'false' '组内阀门' '"轮灌阀门1,轮灌阀门2"'
-    init assignment 'false' '肥前时间' '1200'
+    init assignment 'false' '肥前时间' '1200.0000000000005'
     init assignment 'false' '施肥时间' '1800'
     init assignment 'false' '肥后时间' '1200'
     init assignment 'false' '施肥策略' '定时'
-    init assignment 'false' '期望每亩施肥量' '0'
-    init assignment 'false' '期望施肥速率' '20'
+    init assignment 'false' '期望每亩施肥量' '20'
+    init assignment 'false' '期望施肥速率' '0'
     init assignment 'false' '面积' '20'
-    init assignment 'false' '期望施肥总量' '0'
+    init assignment 'false' '期望施肥总量' '400'
     init assignment 'false' '需要启动' 'false'
     init assignment 'false' '需要跳过' 'false'
     init assignment 'false' '当前施肥量' '0'
     init assignment 'false' '当前浇水量' '0'
     init assignment 'false' '阶段剩余时间' '0'
     source '供水流量累计读数' '农场1-主管道流量计' 'total_readout'
+    source '施肥平均流量' '农场1-施肥流量计' 'ava_readout'
     state '空闲'
       enter assignment 'false' '当前施肥量' '0'
       enter assignment 'false' '当前浇水量' '0'
@@ -380,6 +404,8 @@ policy
       enter crossAssignment 'false' '"农场1-总策略"' '当前轮灌组已启动' 'true'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '阶段剩余时间' '0'
+      do assignment 'false' '期望施肥速率' 'await prs.getSource("施肥平均流量")'
+      do assignment 'false' '肥前时间' '(prs.variables.get("施肥策略") == "定时"?prs.variables.get("肥前时间"):(0.07 - 0.02 - prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率"))*60 * 1000)'
       do assignment 'false' '阶段剩余时间' 'prs.variables.get("肥前时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60'
       do assignment 'false' '当前浇水量' 'await prs.getSource("供水流量累计读数") - prs.variables.get("主管道流量累计值")'
       transformer 'timeup'
@@ -391,7 +417,8 @@ policy
       enter crossAssignment 'false' '"农场1-施肥"' '需要启动' 'true'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '阶段剩余时间' '0'
-      do assignment 'false' '阶段剩余时间' 'prs.variables.get("施肥策略") == "定时"?(prs.variables.get("施肥时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60):( (prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率")) * 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60 )'
+      do assignment 'false' '期望施肥速率' 'await prs.getSource("施肥平均流量")'
+      do assignment 'false' '阶段剩余时间' 'prs.variables.get("施肥策略") == "定时"?(prs.variables.get("施肥时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60):( (prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率")) * 60 - (Date.now() - prs.variables.get("进入时间"))/1000)'
       do assignment 'false' '当前浇水量' 'await prs.getSource("供水流量累计读数") - prs.variables.get("主管道流量累计值")'
       exit crossAssignment 'false' '"农场1-施肥"' '需要启动' 'false'
       transformer 'timeup'
@@ -428,23 +455,27 @@ policy
     watering group matrix 'total_fert' '当前施肥量'
     watering group matrix 'minute_left' '阶段剩余时间'
     watering group matrix 'valves' '组内阀门'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '跳过' 'prs.variables.set("需要跳过", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
   return
   policy '轮灌组2'
     init assignment 'false' '组内阀门' '"轮灌阀门3"'
-    init assignment 'false' '肥前时间' '1200'
+    init assignment 'false' '肥前时间' '3000'
     init assignment 'false' '施肥时间' '0'
     init assignment 'false' '肥后时间' '1200'
     init assignment 'false' '施肥策略' '定量'
-    init assignment 'false' '期望每亩施肥量' '0.06'
-    init assignment 'false' '期望施肥速率' '40'
-    init assignment 'false' '面积' '20'
-    init assignment 'false' '期望施肥总量' '1.2'
+    init assignment 'false' '期望每亩施肥量' '20'
+    init assignment 'false' '期望施肥速率' '0'
+    init assignment 'false' '面积' '1'
+    init assignment 'false' '期望施肥总量' '20'
     init assignment 'false' '需要启动' 'false'
     init assignment 'false' '需要跳过' 'false'
     init assignment 'false' '当前施肥量' '0'
     init assignment 'false' '当前浇水量' '0'
     init assignment 'false' '阶段剩余时间' '0'
     source '供水流量累计读数' '农场1-主管道流量计' 'total_readout'
+    source '施肥平均流量' '农场1-施肥流量计' 'ava_readout'
     state '空闲'
       enter assignment 'false' '当前施肥量' '0'
       enter assignment 'false' '当前浇水量' '0'
@@ -461,6 +492,8 @@ policy
       enter crossAssignment 'false' '"农场1-总策略"' '当前轮灌组已启动' 'true'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '阶段剩余时间' '0'
+      do assignment 'false' '期望施肥速率' 'await prs.getSource("施肥平均流量")'
+      do assignment 'false' '肥前时间' '(prs.variables.get("施肥策略") == "定时"?prs.variables.get("肥前时间"):(0.07 - 0.02 - prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率"))*60 * 1000)'
       do assignment 'false' '阶段剩余时间' 'prs.variables.get("肥前时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60'
       do assignment 'false' '当前浇水量' 'await prs.getSource("供水流量累计读数") - prs.variables.get("主管道流量累计值")'
       transformer 'timeup'
@@ -472,7 +505,8 @@ policy
       enter crossAssignment 'false' '"农场1-施肥"' '需要启动' 'true'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '阶段剩余时间' '0'
-      do assignment 'false' '阶段剩余时间' 'prs.variables.get("施肥策略") == "定时"?(prs.variables.get("施肥时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60):( (prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率")) * 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60 )'
+      do assignment 'false' '期望施肥速率' 'await prs.getSource("施肥平均流量")'
+      do assignment 'false' '阶段剩余时间' 'prs.variables.get("施肥策略") == "定时"?(prs.variables.get("施肥时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60):( (prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率")) * 60 - (Date.now() - prs.variables.get("进入时间"))/1000)'
       do assignment 'false' '当前浇水量' 'await prs.getSource("供水流量累计读数") - prs.variables.get("主管道流量累计值")'
       exit crossAssignment 'false' '"农场1-施肥"' '需要启动' 'false'
       transformer 'timeup'
@@ -509,6 +543,9 @@ policy
     watering group matrix 'total_fert' '当前施肥量'
     watering group matrix 'minute_left' '阶段剩余时间'
     watering group matrix 'valves' '组内阀门'
+    quick action 'false' '启动' 'prs.variables.set("需要启动", true)'
+    quick action 'false' '跳过' 'prs.variables.set("需要跳过", true)'
+    quick action 'false' '停止' 'prs.variables.set("需要启动", false)'
   return
 return
 web

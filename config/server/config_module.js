@@ -470,13 +470,12 @@ export default {
                         name: { type: String, mean: '阀门名称', example: '轮灌阀门1', have_to: true },
                     }
                 },
-                pre_fert_time: { type: Number, mean: '肥前时间（分钟）', example: 30, have_to: true },
                 post_fert_time: { type: Number, mean: '肥后时间（分钟）', example: 30, have_to: true },
                 method: { type: String, mean: '施肥方式', example: '定时', have_to: true },
                 fert_time: { type: Number, mean: '施肥时间(分钟)', example: 30, have_to: true },
                 area_based_amount: { type: Number, mean: '基于面积施肥量(升/亩)', example: 5, have_to: true },
                 area: { type: Number, mean: '轮灌面积(亩)', example: 10, have_to: true },
-                fert_rate: { type: Number, mean: '施肥速率(升/分钟)', example: 2, have_to: true },
+                total_time: { type: Number, mean: '总灌溉时间(分钟)', example: 120, have_to: true },
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
