@@ -334,6 +334,11 @@ function convert_param(cmd, param) {
             param: 'action_name',
             values: ['a']
         },
+        {
+            cmd: 'realtime',
+            param: 'data_type',
+            values: ['readout', 'total_readout']
+        },
     ];
     for (let item of exceptions) {
         if (item.cmd === cmd && item.param === param) {
