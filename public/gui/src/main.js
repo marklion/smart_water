@@ -3,6 +3,7 @@ import App from './App.vue'
 import router from './router'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import { inject_err_handler } from '../../lib/call_remote.js'
 
 // 动态设置页面标题
@@ -193,6 +194,8 @@ app.config.globalProperties.$hasAnyDeviceCapability = hasAnyDeviceCapability
 app.config.globalProperties.$getDeviceTypeCapabilities = getDeviceTypeCapabilities
 
 app.use(router)
-app.use(ElementPlus)
+app.use(ElementPlus, {
+  locale: zhCn,
+})
 
 app.mount('#app')

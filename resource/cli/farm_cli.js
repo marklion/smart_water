@@ -75,28 +75,92 @@ export default {
                 }
                 return '所有农场的建议亩数计算参数已清除';
             });
+        cli_utils.make_undo_cmd(vorpal,
+            'realtime <farm_name> <label> <device_name> <data_type>',
+            '添加实时数据配置',
+            '删除所有实时数据配置',
+            async (cmd_this, args) => {
+                let farm_name = args.farm_name;
+                let label = args.label;
+                let device_name = args.device_name;
+                let data_type = args.data_type;
+                
+                // 验证data_type
+                if (data_type !== 'readout' && data_type !== 'total_readout') {
+                    return `错误：data_type必须是 'readout' 或 'total_readout'`;
+                }
+                
+                let result = await resource_lib.add_realtime(farm_name, label, device_name, data_type, ins.token);
+                // call_remote 返回的是 result.result，所以这里 result 已经是布尔值了
+                if (result) {
+                    return `实时数据配置 "${label}" 添加成功`;
+                } else {
+                    return `实时数据配置 "${label}" 添加失败`;
+                }
+            },
+            async (cmd_this, args) => {
+                let farms = await resource_lib.get_all_farms();
+                for (let farm of farms) {
+                    let configs = await resource_lib.get_all_realtime_configs(farm.name);
+                    for (let config of configs) {
+                        await resource_lib.del_realtime(farm.name, config.label, ins.token);
+                    }
+                }
+                return '所有实时数据配置已删除';
+            });
+        cli_utils.make_common_cmd(vorpal, 'del realtime <farm_name> <label>', '删除实时数据配置', async (cmd_this, args) => {
+            let farm_name = args.farm_name;
+            let label = args.label;
+            let result = await resource_lib.del_realtime(farm_name, label, ins.token);
+            // call_remote 返回的是 result.result，所以这里 result 已经是布尔值了
+            if (result) {
+                return `实时数据配置 "${label}" 删除成功`;
+            } else {
+                return `实时数据配置 "${label}" 删除失败`;
+            }
+        });
+        cli_utils.make_common_cmd(vorpal, 'list realtime [farm_name]', '列出实时数据配置', async (cmd_this, args) => {
+            let farm_name = args.farm_name;
+            let configs = await resource_lib.get_all_realtime_configs(farm_name);
+            if (configs.length === 0) {
+                return '没有找到实时数据配置';
+            }
+            let output = '实时数据配置列表：\n';
+            for (let config of configs) {
+                output += `  农场: ${config.farm_name}, 显示名称: ${config.label}, 设备: ${config.device_name}, 数据类型: ${config.data_type}\n`;
+            }
+            return output;
+        });
         vorpal.delimiter(prompt)
         return vorpal;
     },
     make_bdr: async function () {
         let ret = []
-        let farms = await resource_lib.get_all_farms()
-        for (let farm of farms) {
+        // 通过API获取farms数组
+        let allFarms = await resource_lib.get_all_farms();
+
+        for (let farm of allFarms) {
             ret.push(`add farm '${farm.name}' '${farm.location}' '${farm.longitude || ''}' '${farm.latitude || ''}' '${farm.info || ''}'`);
-            // 显示农场的面积参数配置信息
-            let areaParams = await resource_lib.get_farm_area_params(farm.name, undefined);
-            if (areaParams && (areaParams.system_flow !== undefined || areaParams.laying_spacing !== undefined || areaParams.dripper_spacing !== undefined || areaParams.dripper_flow !== undefined || areaParams.coefficient !== undefined)) {
-                let system_flow = areaParams.system_flow !== undefined ? areaParams.system_flow : 1;
-                let laying_spacing = areaParams.laying_spacing !== undefined ? areaParams.laying_spacing : 0;
-                let dripper_spacing = areaParams.dripper_spacing !== undefined ? areaParams.dripper_spacing : 0;
-                let dripper_flow = areaParams.dripper_flow !== undefined ? areaParams.dripper_flow : 0;
-                let coefficient = areaParams.coefficient !== undefined ? areaParams.coefficient : 0.9;
+            // 显示农场的面积参数配置信息 - 直接从farm对象获取，不需要调用接口
+            if (farm.system_flow !== undefined || farm.laying_spacing !== undefined || farm.dripper_spacing !== undefined || farm.dripper_flow !== undefined || farm.coefficient !== undefined) {
+                let system_flow = farm.system_flow !== undefined ? farm.system_flow : 1;
+                let laying_spacing = farm.laying_spacing || 0;
+                let dripper_spacing = farm.dripper_spacing || 0;
+                let dripper_flow = farm.dripper_flow || 0;
+                let coefficient = farm.coefficient !== undefined ? farm.coefficient : 0.9;
                 let formatParam = (val) => {
                     if (val === undefined || val === null) return val;
                     return val.toString();
                 };
                 let coefficient_str = (coefficient === 1 || coefficient === 1.0) ? '1.0' : formatParam(coefficient);
                 ret.push(`set area params '${farm.name}' '${formatParam(system_flow)}' '${formatParam(laying_spacing)}' '${formatParam(dripper_spacing)}' '${formatParam(dripper_flow)}' '${coefficient_str}'`);
+            }
+            // 显示农场的实时数据配置 - 显式获取，确保数据正确
+            let realtime_configs = await resource_lib.get_all_realtime_configs(farm.name);
+            if (realtime_configs && realtime_configs.length > 0) {
+                for (let config of realtime_configs) {
+                    ret.push(`realtime '${farm.name}' '${config.label}' '${config.device_name}' '${config.data_type}'`);
+                }
             }
         }
         if (this._vorpalInstance) {

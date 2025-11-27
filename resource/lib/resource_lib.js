@@ -36,5 +36,18 @@ export default {
     },
     get_farm_area_params: async function (farm_name, token) {
         return await call_remote('/resource/get_farm_area_params', { farm_name }, token);
+    },
+    add_realtime: async function (farm_name, label, device_name, data_type, token) {
+        return await call_remote('/resource/add_realtime', { farm_name, label, device_name, data_type }, token);
+    },
+    del_realtime: async function (farm_name, label, token) {
+        return await call_remote('/resource/del_realtime', { farm_name, label }, token);
+    },
+    list_realtime: async function (farm_name, token) {
+        return await call_remote('/resource/list_realtime', { farm_name }, token);
+    },
+    get_all_realtime_configs: async function (farm_name) {
+        let result = await this.list_realtime(farm_name);
+        return result.configs || [];
     }
 }
