@@ -723,10 +723,23 @@ function cmds_depend_prepare(cmd, parent) {
             cmd: 'del realtime',
             parent: 'farm',
             depends: farm_view_prepare.concat([
+                // 为每个可能的 farm_name 创建实时数据配置
                 'realtime abcd abcd abcd readout',
                 'realtime abcd 12345 abcd readout',
                 'realtime abcd \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
                 'realtime abcd \'a = b.a + 1\' abcd readout',
+                'realtime 12345 abcd abcd readout',
+                'realtime 12345 12345 abcd readout',
+                'realtime 12345 \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
+                'realtime 12345 \'a = b.a + 1\' abcd readout',
+                'realtime \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd abcd readout',
+                'realtime \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 12345 abcd readout',
+                'realtime \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
+                'realtime \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' \'a = b.a + 1\' abcd readout',
+                'realtime \'a = b.a + 1\' abcd abcd readout',
+                'realtime \'a = b.a + 1\' 12345 abcd readout',
+                'realtime \'a = b.a + 1\' \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
+                'realtime \'a = b.a + 1\' \'a = b.a + 1\' abcd readout',
             ]),
             teardown: [
                 'undo realtime',
