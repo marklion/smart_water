@@ -394,6 +394,18 @@ function cmds_depend_prepare(cmd, parent) {
         'return',
         'block'
     ];
+    // 专门用于 farm 视图下命令的依赖（不会切换到 block 视图）
+    let farm_view_prepare = [
+        'return',
+        'farm',
+        'add farm abcd 1 2 3',
+        'add farm 12345 1 2 3',
+        'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
+        'add farm \'a = b.a + 1\' 1 2 3',
+    ];
+    let farm_view_teardown = [
+        'undo add farm',
+    ];
     let depends = [
         {
             cmd: 'del enter',
@@ -705,19 +717,12 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'realtime',
             parent: 'farm',
-            depends: [
-                'add farm abcd 1 2 3',
-                'add farm 12345 1 2 3',
-                'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
-                'add farm \'a = b.a + 1\' 1 2 3',
-            ],
-            teardown: [
-                'undo add farm',
-            ],
+            depends: farm_view_prepare,
+            teardown: farm_view_teardown,
         }, {
             cmd: 'del realtime',
             parent: 'farm',
-            depends: farm_related_prepare.concat([
+            depends: farm_view_prepare.concat([
                 'realtime abcd abcd abcd readout',
                 'realtime abcd 12345 abcd readout',
                 'realtime abcd \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
@@ -725,12 +730,12 @@ function cmds_depend_prepare(cmd, parent) {
             ]),
             teardown: [
                 'undo realtime',
-            ].concat(farm_related_teardown),
+            ].concat(farm_view_teardown),
         }, {
             cmd: 'list realtime',
             parent: 'farm',
-            depends: farm_related_prepare,
-            teardown: farm_related_teardown,
+            depends: farm_view_prepare,
+            teardown: farm_view_teardown,
         }
     ];
     let ret = { depends: [], teardown: [] };
