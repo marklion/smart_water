@@ -697,6 +697,35 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'undo add farm',
             ],
+        }, {
+            cmd: 'realtime',
+            parent: 'farm',
+            depends: [
+                'add farm abcd 1 2 3',
+                'add farm 12345 1 2 3',
+                'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
+                'add farm \'a = b.a + 1\' 1 2 3',
+            ],
+            teardown: [
+                'undo add farm',
+            ],
+        }, {
+            cmd: 'del realtime',
+            parent: 'farm',
+            depends: farm_related_prepare.concat([
+                'realtime abcd abcd abcd readout',
+                'realtime abcd 12345 abcd readout',
+                'realtime abcd \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
+                'realtime abcd \'a = b.a + 1\' abcd readout',
+            ]),
+            teardown: [
+                'undo realtime',
+            ].concat(farm_related_teardown),
+        }, {
+            cmd: 'list realtime',
+            parent: 'farm',
+            depends: farm_related_prepare,
+            teardown: farm_related_teardown,
         }
     ];
     let ret = { depends: [], teardown: [] };

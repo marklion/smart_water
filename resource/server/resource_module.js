@@ -1,6 +1,5 @@
 const farms = [];
 
-
 export default {
     name: 'resource',
     description: '资源管理',
@@ -32,8 +31,15 @@ export default {
             },
             func: async function (body, token) {
                 let current_page_content = farms.slice(body.pageNo * 20, (body.pageNo + 1) * 20);
+                // 确保返回的 farm 对象包含所有属性，包括 realtime_configs
+                let farms_with_configs = current_page_content.map(farm => {
+                    return {
+                        ...farm,
+                        realtime_configs: farm.realtime_configs || []
+                    };
+                });
                 return {
-                    farms: current_page_content,
+                    farms: farms_with_configs,
                     total: farms.length,
                 }
             },
@@ -294,6 +300,124 @@ export default {
                     dripper_spacing: farm.dripper_spacing || 0,
                     dripper_flow: farm.dripper_flow || 0,
                     coefficient: farm.coefficient !== undefined ? farm.coefficient : 0.9
+                };
+            },
+        },
+        add_realtime: {
+            name: '添加实时数据配置',
+            description: '为指定农场添加一个实时数据显示配置',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                label: { type: String, mean: '显示名称', example: '农场1主管道当前流量值', have_to: true },
+                device_name: { type: String, mean: '设备名称', example: '农场1主管道流量计', have_to: true },
+                data_type: { type: String, mean: '数据类型', example: 'readout或total_readout', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let farm = farms.find(farm => farm.name === body.farm_name);
+                if (!farm) {
+                    throw { err_msg: `农场 ${body.farm_name} 不存在` };
+                }
+                
+                if (!farm.realtime_configs) {
+                    farm.realtime_configs = [];
+                }
+                
+                // 检查是否已存在相同的配置（根据label判断）
+                let existingIndex = farm.realtime_configs.findIndex(config => config.label === body.label);
+                if (existingIndex !== -1) {
+                    // 更新现有配置
+                    farm.realtime_configs[existingIndex] = {
+                        label: body.label,
+                        device_name: body.device_name,
+                        data_type: body.data_type
+                    };
+                } else {
+                    farm.realtime_configs.push({
+                        label: body.label,
+                        device_name: body.device_name,
+                        data_type: body.data_type
+                    });
+                }
+                
+                return { result: true };
+            },
+        },
+        del_realtime: {
+            name: '删除实时数据配置',
+            description: '删除指定农场的实时数据显示配置',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                label: { type: String, mean: '显示名称', example: '农场1主管道当前流量值', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                let farm = farms.find(farm => farm.name === body.farm_name);
+                if (!farm) {
+                    throw { err_msg: `农场 ${body.farm_name} 不存在` };
+                }
+                
+                if (!farm.realtime_configs) {
+                    throw { err_msg: `农场 ${body.farm_name} 没有实时数据配置` };
+                }
+                
+                let index = farm.realtime_configs.findIndex(config => config.label === body.label);
+                if (index === -1) {
+                    throw { err_msg: `配置 ${body.label} 在农场 ${body.farm_name} 中不存在` };
+                }
+                
+                farm.realtime_configs.splice(index, 1);
+                return { result: true };
+            },
+        },
+        list_realtime: {
+            name: '列出实时数据配置',
+            description: '列出指定农场的所有实时数据显示配置',
+            is_write: false,
+            is_get_api: true,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: false }
+            },
+            result: {
+                configs: {
+                    type: Array,
+                    mean: '实时数据配置列表',
+                    explain: {
+                        farm_name: { type: String, mean: '农场名称', example: '农场1' },
+                        label: { type: String, mean: '显示名称', example: '农场1主管道当前流量值' },
+                        device_name: { type: String, mean: '设备名称', example: '农场1主管道流量计' },
+                        data_type: { type: String, mean: '数据类型', example: 'readout' }
+                    }
+                },
+            },
+            func: async function (body, token) {
+                let ret_array = [];
+                for (let farm of farms) {
+                    if (farm.name === body.farm_name || !body.farm_name) {
+                        if (farm.realtime_configs) {
+                            for (let config of farm.realtime_configs) {
+                                ret_array.push({
+                                    farm_name: farm.name,
+                                    label: config.label,
+                                    device_name: config.device_name,
+                                    data_type: config.data_type
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                return {
+                    configs: ret_array,
+                    total: ret_array.length
                 };
             },
         }
