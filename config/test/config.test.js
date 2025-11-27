@@ -484,7 +484,7 @@ async function group_run_once(begin_total, end_total) {
     await confirm_policy_status('轮灌组2', '施肥');
     await confirm_valve_status('农场1-施肥泵', true);
     await confirm_valve_status('轮灌阀门3', true);
-    await wait_spend_ms(start_point, 3200);
+    await wait_spend_ms(start_point, 3250);
     start_point = Date.now();
     await confirm_policy_status('轮灌组2', '肥后');
     await confirm_valve_status('农场1-施肥泵', false);
