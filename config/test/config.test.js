@@ -553,7 +553,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 2);
         await mock_readout('轮灌阀门2', 2);
         await mock_readout('轮灌阀门3', 5);
-        await wait_spend_ms(start_point, 6450);
+        await wait_spend_ms(start_point, 4450);
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门2', false);
         await confirm_valve_status('轮灌阀门3', false);
@@ -573,14 +573,15 @@ describe('总策略快速配置和验证', () => {
         await wait_spend_ms(start_point, 1650);
         await mock_readout('轮灌阀门2', 2);
         await wait_spend_ms(start_point, 3750);
+        await mock_readout('轮灌阀门3', 5);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门3', true);
         await mock_readout('轮灌阀门1', 2);
-        await mock_readout('轮灌阀门3', 5);
-        await wait_spend_ms(start_point, 6450);
+        await wait_spend_ms(start_point, 4250);
+        await confirm_policy_status('农场1-总策略', '空闲');
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门3', false);
     });
