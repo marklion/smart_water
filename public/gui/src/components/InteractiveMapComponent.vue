@@ -1655,12 +1655,39 @@ const isGroupNameDuplicate = (name, excludeName = null) => {
 
 
 const copyExistingGroup = async (existingGroup) => {
+    if (!existingGroup || !existingGroup.name || typeof existingGroup.name !== 'string') {
+        ElMessage.error('无效的轮灌组数据')
+        return
+    }
     
-    const baseName = existingGroup.name.replace(/\d+$/, '') || '轮灌组'
+    const groupName = existingGroup.name.trim()
+    if (groupName.length > 100) {
+        ElMessage.error('轮灌组名称过长')
+        return
+    }
+    
+    let baseName = '轮灌组'
+    if (groupName.length > 0) {
+        let endIndex = groupName.length
+        while (endIndex > 0 && groupName.charCodeAt(endIndex - 1) >= 48 && groupName.charCodeAt(endIndex - 1) <= 57) {
+            endIndex--
+        }
+        baseName = endIndex > 0 ? groupName.substring(0, endIndex) : '轮灌组'
+    }
+    
+    if (baseName.length > 50) {
+        ElMessage.error('轮灌组基础名称过长')
+        return
+    }
+    
     let defaultName = `${baseName}${wateringGroups.value.length + 1}`
     let counter = 1
     while (isGroupNameDuplicate(defaultName)) {
         counter++
+        if (counter > 10000) {
+            ElMessage.error('无法生成唯一的轮灌组名称')
+            return
+        }
         defaultName = `${baseName}${counter}`
     }
 
