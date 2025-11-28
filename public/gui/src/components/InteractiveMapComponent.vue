@@ -587,18 +587,6 @@
                     </div>
 
                     <div class="fert-config">
-                        
-                        <div style="background: #ffeb3b; padding: 10px; margin-bottom: 10px; font-size: 12px;">
-                            <strong>调试信息：</strong><br>
-                            <div v-for="g in wateringGroups" :key="g.name">
-                                {{ g.name }}: isCopied = {{ g.isCopied }} (类型: {{ typeof g.isCopied }}, 严格等于true: {{
-                                g.isCopied
-                                === true }})
-                            </div>
-                            <div style="margin-top: 5px;">
-                                过滤后数量: {{wateringGroups.filter(g => g.isCopied !== true).length}}
-                            </div>
-                        </div>
                         <div v-for="group in wateringGroups.filter(g => g.isCopied !== true)" :key="group.name"
                             class="group-fert-config">
                             <h4>{{ group.name }}</h4>
@@ -2419,7 +2407,7 @@ const finishWizard = () => {
         const configKey = group.configKey || group.name
         const config = fertConfigs.value[configKey]
         if (!config) {
-            console.error('[调试] 施肥配置缺失:', {
+            console.error('施肥配置缺失:', {
                 轮灌组名称: group.name,
                 configKey: configKey,
                 是否复制: group.isCopied,
