@@ -334,6 +334,11 @@ function convert_param(cmd, param) {
             param: 'action_name',
             values: ['a']
         },
+        {
+            cmd: 'realtime',
+            param: 'data_type',
+            values: ['readout', 'total_readout']
+        },
     ];
     for (let item of exceptions) {
         if (item.cmd === cmd && item.param === param) {
@@ -388,6 +393,18 @@ function cmds_depend_prepare(cmd, parent) {
         'undo add farm',
         'return',
         'block'
+    ];
+    // 专门用于 farm 视图下命令的依赖（不会切换到 block 视图）
+    let farm_view_prepare = [
+        'return',
+        'farm',
+        'add farm abcd 1 2 3',
+        'add farm 12345 1 2 3',
+        'add farm \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 1 2 3',
+        'add farm \'a = b.a + 1\' 1 2 3',
+    ];
+    let farm_view_teardown = [
+        'undo add farm',
     ];
     let depends = [
         {
@@ -697,6 +714,41 @@ function cmds_depend_prepare(cmd, parent) {
             teardown: [
                 'undo add farm',
             ],
+        }, {
+            cmd: 'realtime',
+            parent: 'farm',
+            depends: farm_view_prepare,
+            teardown: farm_view_teardown,
+        }, {
+            cmd: 'del realtime',
+            parent: 'farm',
+            depends: farm_view_prepare.concat([
+                // 为每个可能的 farm_name 创建实时数据配置
+                'realtime abcd abcd abcd readout',
+                'realtime abcd 12345 abcd readout',
+                'realtime abcd \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
+                'realtime abcd \'a = b.a + 1\' abcd readout',
+                'realtime 12345 abcd abcd readout',
+                'realtime 12345 12345 abcd readout',
+                'realtime 12345 \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
+                'realtime 12345 \'a = b.a + 1\' abcd readout',
+                'realtime \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd abcd readout',
+                'realtime \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' 12345 abcd readout',
+                'realtime \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
+                'realtime \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' \'a = b.a + 1\' abcd readout',
+                'realtime \'a = b.a + 1\' abcd abcd readout',
+                'realtime \'a = b.a + 1\' 12345 abcd readout',
+                'realtime \'a = b.a + 1\' \'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa\' abcd readout',
+                'realtime \'a = b.a + 1\' \'a = b.a + 1\' abcd readout',
+            ]),
+            teardown: [
+                'undo realtime',
+            ].concat(farm_view_teardown),
+        }, {
+            cmd: 'list realtime',
+            parent: 'farm',
+            depends: farm_view_prepare,
+            teardown: farm_view_teardown,
         }
     ];
     let ret = { depends: [], teardown: [] };

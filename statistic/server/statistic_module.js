@@ -103,6 +103,8 @@ export default {
             is_get_api: true,
             params: {
                 item_name: { type: String, mean: '统计项名称', example: 'total_water_usage', have_to: true },
+                start_date: { type: String, mean: '开始日期时间', example: '2024-01-01 00:00:00', have_to: false },
+                end_date: { type: String, mean: '结束日期时间', example: '2024-01-31 23:59:59', have_to: false },
             },
             result: {
                 records: {
@@ -116,23 +118,66 @@ export default {
                 let records = [];
                 let pageNo = body.pageNo || 0;
                 const item_name = body.item_name;
+                const start_date = body.start_date;
+                const end_date = body.end_date;
                 const filePath = await get_file_by_item(item_name);
                 try {
                     const data = await fs.promises.readFile(filePath, 'utf8');
                     const lines = data.trim().split('\n').filter(l => l.trim().length > 0);
-                    lines.reverse();
-                    // 只分页记录列表，避免一次性处理所有记录
-                    let cur_page_lines = lines.slice(pageNo * 20, (pageNo + 1) * 20);
-                    for (let line of cur_page_lines) {
+                    
+                    // 解析所有记录（每行可能有多个 timestamp==value 对）
+                    let allRecords = [];
+                    for (let line of lines) {
                         const parts = line.split('==');
-                        if (parts.length >= 3) {
-                            records.push({
-                                timestamp: parts[0],
-                                value: parts[1]
-                            });
+                        // 每行格式：timestamp==value==timestamp==value==...
+                        // 所以 parts 应该是 [timestamp, value, timestamp, value, ...]
+                        for (let i = 0; i < parts.length - 1; i += 2) {
+                            const timestamp = parts[i].trim();
+                            const value = parts[i + 1].trim();
+                            if (timestamp && value) {
+                                allRecords.push({
+                                    timestamp: timestamp,
+                                    value: value,
+                                    line: line // 保存原始行用于排序
+                                });
+                            }
                         }
                     }
-                    return { records: records, total: lines.length };
+                    
+                    // 按时间倒序排列（最新的在前，用于获取最新值）
+                    allRecords.sort((a, b) => {
+                        return new Date(b.timestamp) - new Date(a.timestamp);
+                    });
+                    
+                    // 如果有日期范围参数，进行筛选
+                    if (start_date || end_date) {
+                        const startTime = start_date ? new Date(start_date).getTime() : 0;
+                        const endTime = end_date ? new Date(end_date).getTime() : Date.now();
+                        
+                        allRecords = allRecords.filter(record => {
+                            try {
+                                const recordTime = new Date(record.timestamp).getTime();
+                                return recordTime >= startTime && recordTime <= endTime;
+                            } catch (e) {
+                                console.warn('Invalid timestamp:', record.timestamp);
+                                return false;
+                            }
+                        });
+                    }
+                    
+                    // 分页处理
+                    const total = allRecords.length;
+                    const startIndex = pageNo * 20;
+                    const endIndex = (pageNo + 1) * 20;
+                    const pageRecords = allRecords.slice(startIndex, endIndex);
+                    
+                    // 只返回 timestamp 和 value
+                    records = pageRecords.map(r => ({
+                        timestamp: r.timestamp,
+                        value: r.value
+                    }));
+                    
+                    return { records: records, total: total };
                 } catch (err) {
                     // 如果文件不存在或读取错误，返回空记录列表
                     console.error('read stat file error', filePath, err && err.message);

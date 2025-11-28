@@ -53,9 +53,9 @@ async function wait_ms(ms) {
         }, ms);
     });
 }
-async function wait_spend_ms(start_point,ms) {
-    return new Promise(resolve=>{
-        let int = setInterval(()=>{
+async function wait_spend_ms(start_point, ms) {
+    return new Promise(resolve => {
+        let int = setInterval(() => {
             if (Date.now() - start_point >= ms) {
                 clearInterval(int);
                 resolve();
@@ -142,12 +142,13 @@ export default async function create_cli(processName) {
         ret.output = '';
         ret.process.write(cmd + '\n');
         let wait_gap = 10;
-        if (cmd === 'clear' || cmd.startsWith('restore'))
-        {
+        if (cmd === 'clear' || cmd.startsWith('restore')) {
             wait_gap = 500;
         }
         let resp = await waitForPrompt(prompt, wait_gap);
-        print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+        if (cmd != 'clear') {
+            print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+        }
         ret.current_prompt = resp.prompt;
 
         return resp.content;

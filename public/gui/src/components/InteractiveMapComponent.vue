@@ -372,11 +372,6 @@
                                                             existingGroup.fertConfig?.fert_time || 0 }} 分钟</span>
                                                     </div>
                                                     <div class="detail-row">
-                                                        <span class="detail-label">期望施肥速度：</span>
-                                                        <span class="detail-value">{{
-                                                            existingGroup.fertConfig?.fert_rate || 0 }} L/分钟</span>
-                                                    </div>
-                                                    <div class="detail-row">
                                                         <span class="detail-label">肥前时间：</span>
                                                         <span class="detail-value">{{
                                                             existingGroup.fertConfig?.pre_fert_time || 0 }} 分钟</span>
@@ -603,7 +598,7 @@
                             <div class="fert-params">
                                 <div v-if="fertConfigs[group.configKey || group.name].method === 'AreaBased'"
                                     class="param-item">
-                                    <label>施肥参数：</label>
+                                    <label>每亩施肥量：</label>
                                     <el-input-number v-model="fertConfigs[group.configKey || group.name].AB_fert"
                                         :min="0" :precision="2" placeholder="施肥量" />
                                     <span class="unit">L/亩</span>
@@ -611,7 +606,7 @@
 
                                 <div v-if="fertConfigs[group.configKey || group.name].method === 'Total'"
                                     class="param-item">
-                                    <label>施肥参数：</label>
+                                    <label>施肥总量：</label>
                                     <el-input-number v-model="fertConfigs[group.configKey || group.name].total_fert"
                                         :min="0" :precision="2" placeholder="总量" />
                                     <span class="unit">L</span>
@@ -619,25 +614,18 @@
 
                                 <div v-if="fertConfigs[group.configKey || group.name].method === 'Time'"
                                     class="param-item">
-                                    <label>施肥参数：</label>
+                                    <label>施肥时间：</label>
                                     <el-input-number v-model="fertConfigs[group.configKey || group.name].fert_time"
                                         :min="0" :precision="1" placeholder="施肥时间" />
                                     <span class="unit">分钟</span>
-                                </div>
-
-                                <div class="param-item">
-                                    <label>期望施肥速度：</label>
-                                    <el-input-number v-model="fertConfigs[group.configKey || group.name].fert_rate"
-                                        :min="0" :precision="1" placeholder="速度" />
-                                    <span class="unit">L/分钟</span>
                                 </div>
                             </div>
 
                             <div class="time-params">
                                 <div class="param-item">
-                                    <label>肥前时间：</label>
-                                    <el-input-number v-model="fertConfigs[group.configKey || group.name].pre_fert_time"
-                                        :min="0" :precision="1" placeholder="肥前时间" />
+                                    <label>灌溉总时间：</label>
+                                    <el-input-number v-model="fertConfigs[group.configKey || group.name].total_time"
+                                        :min="0" :precision="1" placeholder="灌溉总时间" />
                                     <span class="unit">分钟</span>
                                 </div>
 
@@ -648,7 +636,6 @@
                                     <span class="unit">分钟</span>
                                 </div>
                             </div>
-                        </div>
                     </div>
                 </div>
 
@@ -700,6 +687,11 @@ import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, Vi
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
 import {
+<<<<<<< HEAD
+    getDeviceType,
+    hasDeviceCapability,
+    hasAnyDeviceCapability,
+    refreshRuntimeInfo as refreshRuntimeInfoUtil,
     getDeviceType,
     hasDeviceCapability,
     hasAnyDeviceCapability,
@@ -1449,6 +1441,7 @@ const showPolicyConfigWizard = async () => {
     }
 }
 
+<<<<<<< HEAD
 
 const parseTimeValue = (expression) => {
     const timeValue = parseFloat(expression) || 0
@@ -1513,8 +1506,6 @@ const parseFertConfigFromVariables = (initVariables, fertConfig) => {
             fertConfig.pre_fert_time = parseTimeValue(expression)
         } else if (varName === 'post_ms' || varName === '肥后时间') {
             fertConfig.post_fert_time = parseTimeValue(expression)
-        } else if (varName === 'fert_rate' || varName === '期望施肥速率') {
-            fertConfig.fert_rate = parseFloat(expression) || 0
         } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
             fertConfig.AB_fert = parseFloat(expression) || 0
         } else if (varName === '期望施肥总量') {
@@ -1550,9 +1541,6 @@ const parseValvesFromGroup = (group) => {
 }
 
 const applyDefaultFertConfig = (fertConfig, area) => {
-    if (fertConfig.AB_fert === 0 && area > 0 && fertConfig.fert_rate > 0 && fertConfig.method === 'AreaBased') {
-        fertConfig.AB_fert = fertConfig.fert_rate
-    }
 }
 
 const loadExistingGroups = async () => {
@@ -1601,7 +1589,7 @@ const loadExistingGroups = async () => {
                     fert_time: 0,
                     pre_fert_time: 0,
                     post_fert_time: 0,
-                    fert_rate: group.fert_rate || 0,
+                    total_time: group.total_time || 0,
                 }
 
                 if (policy?.init_variables) {
@@ -1725,9 +1713,8 @@ const createCopiedGroup = (trimmedName, existingGroup) => {
         AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
         total_fert: existingGroup.fertConfig?.total_fert ?? 0,
         fert_time: existingGroup.fertConfig?.fert_time ?? 0,
-        pre_fert_time: existingGroup.fertConfig?.pre_fert_time ?? 0,
+        total_time: existingGroup.fertConfig?.total_time ?? 0,
         post_fert_time: existingGroup.fertConfig?.post_fert_time ?? 0,
-        fert_rate: existingGroup.fertConfig?.fert_rate ?? 0,
     }
 
     copiedGroups.value.add(trimmedName)
@@ -1849,9 +1836,8 @@ const addWateringGroup = async () => {
             AB_fert: 0,
             total_fert: 0,
             fert_time: 0,
-            pre_fert_time: 0,
+            total_time: 0,
             post_fert_time: 0,
-            fert_rate: 0,
         }
         areaParamsPopoverVisible.value[index] = false
     } catch (error) {
@@ -1868,7 +1854,6 @@ const removeWateringGroup = (index) => {
     delete selectedValveDevices.value[groupName]
     delete fertConfigs.value[groupName]
 
-    
     if (valveSelectionMaps.value[groupName]) {
         valveSelectionMaps.value[groupName].destroy()
         delete valveSelectionMaps.value[groupName]
@@ -1888,7 +1873,6 @@ const getRecommendedArea = (index) => {
     const dripper_flow = Number(params.dripper_flow) || 0
     const coefficient = Number(params.coefficient) || 0.9
 
-    
     if (system_flow <= 0 ||
         laying_spacing <= 0 ||
         dripper_spacing <= 0 ||
@@ -1896,14 +1880,12 @@ const getRecommendedArea = (index) => {
         return 0
     }
 
-    
     const denominator = (667 / laying_spacing / dripper_spacing) * dripper_flow
 
     if (denominator === 0 || !isFinite(denominator)) {
         return 0
     }
 
-    
     const result = (system_flow * 1000 / denominator) * coefficient
 
     return result > 0 && isFinite(result) ? result : 0
@@ -1943,6 +1925,7 @@ const initValveSelectionMap = async (groupName) => {
         }
     }
 
+<<<<<<< HEAD
     
     const group = wateringGroups.value.find(g => (g.configKey || g.name) === groupName || g.name === groupName)
     const configKey = group ? (group.configKey || group.name) : groupName
@@ -1979,7 +1962,6 @@ const initValveSelectionMap = async (groupName) => {
             throw new Error('高德地图API加载失败')
         }
 
-        
         let centerLng = props.center.lng
         let centerLat = props.center.lat
 
@@ -1993,7 +1975,6 @@ const initValveSelectionMap = async (groupName) => {
             }
         }
 
-        
         const selectionMap = new AMap.Map(mapContainerId, {
             zoom: 15,
             center: [centerLng, centerLat],
@@ -2001,7 +1982,6 @@ const initValveSelectionMap = async (groupName) => {
             viewMode: '2D'
         })
 
-        
         const satelliteLayer = new AMap.TileLayer.Satellite({
             zIndex: 1,
             opacity: 1
@@ -2010,7 +1990,6 @@ const initValveSelectionMap = async (groupName) => {
 
         valveSelectionMaps.value[configKey] = selectionMap
 
-        
         const markers = []
         for (const device of availableValveDevices.value) {
             if (!device.longitude || !device.latitude) continue
@@ -2038,11 +2017,11 @@ const createValveSelectionMarker = (device, isSelected, groupName) => {
 
     try {
         const deviceName = device.device_name
-        
-        const deviceType = 'valve' 
+        const deviceType = 'valve'
         const iconName = getDeviceIcon(deviceType)
 
-        
+        // 使用与主地图相同的样式，选中时添加 selected 类
+>>>>>>> origin/main
         const statusClass = isSelected ? 'selected' : ''
         const selectionClass = isSelected ? 'valve-selected' : ''
 
@@ -2062,7 +2041,6 @@ const createValveSelectionMarker = (device, isSelected, groupName) => {
             offset: new AMap.Pixel(0, 0)
         })
 
-        
         marker.on('click', () => {
             toggleValveSelection(device.device_name, groupName)
         })
@@ -2089,7 +2067,6 @@ const toggleValveSelection = (deviceName, groupName) => {
         selectedValveDevices.value[groupName].push(deviceName)
     }
 
-    
     if (valveDisplayMode.value === 'map') {
         updateValveSelectionMarkers(groupName)
     }
@@ -2097,7 +2074,6 @@ const toggleValveSelection = (deviceName, groupName) => {
 
 
 const updateValveSelectionMarkers = (groupName) => {
-    
     const group = wateringGroups.value.find(g => (g.configKey || g.name) === groupName || g.name === groupName)
     const configKey = group ? (group.configKey || group.name) : groupName
 
@@ -2109,8 +2085,6 @@ const updateValveSelectionMarkers = (groupName) => {
         if (!device) return
 
         const isSelected = selectedValveDevices.value[configKey]?.includes(device.device_name) || false
-
-        
         const deviceName = device.device_name
         const deviceType = 'valve'
         const iconName = getDeviceIcon(deviceType)
@@ -2395,6 +2369,7 @@ const nextStep = async () => {
             }
         }
 
+<<<<<<< HEAD
         
         if (allGroupsAreCopied.value) {
             
@@ -2420,7 +2395,7 @@ const nextStep = async () => {
                         fert_time: 0,
                         pre_fert_time: 0,
                         post_fert_time: 0,
-                        fert_rate: 0,
+                        total_time: 0,
                     }
                 } else {
                     
@@ -2431,7 +2406,7 @@ const nextStep = async () => {
                     if (config.fert_time === undefined) config.fert_time = 0
                     if (config.pre_fert_time === undefined) config.pre_fert_time = 0
                     if (config.post_fert_time === undefined) config.post_fert_time = 0
-                    if (config.fert_rate === undefined) config.fert_rate = 0
+                    if (config.total_time === undefined) config.total_time = 0
                 }
             }
             
@@ -2495,6 +2470,10 @@ const finishWizard = () => {
             ElMessage.warning(`请为${group.name}设置有效的定时施肥参数`)
             return
         }
+        if (config.total_time <= 0) {
+            ElMessage.warning(`请为${group.name}设置有效的总灌溉时间参数`)
+            return
+        }
     }
 
     
@@ -2529,9 +2508,8 @@ const finishWizard = () => {
             method: config.method,
             AB_fert: parseFloat(AB_fert.toFixed(2)),
             fert_time: config.method === 'Time' ? config.fert_time : 0,
-            pre_fert_time: config.pre_fert_time || 0,
+            total_time:config.total_time,
             post_fert_time: config.post_fert_time || 0,
-            fert_rate: config.fert_rate || 0,
         }
     }).filter(Boolean) 
 
@@ -2551,7 +2529,6 @@ const finishWizard = () => {
                 return
             }
 
-            
             try {
                 await ensureRequiredPolicies(farm_name)
             } catch (e) {
@@ -2591,12 +2568,10 @@ const ensureRequiredPolicies = async (farm_name) => {
             { name: `${farm_name}-总策略`, type: '总策略' }
         ]
 
-        
         const policyList = await call_remote('/policy/list_policy', { pageNo: 0, farm_name: farm_name })
         const existingPolicies = policyList?.policies || []
         const existingPolicyNames = new Set(existingPolicies.map(p => p.name))
 
-        
         const waterPolicyName = `${farm_name}-供水`
         if (!existingPolicyNames.has(waterPolicyName)) {
             
@@ -2639,7 +2614,6 @@ const ensureRequiredPolicies = async (farm_name) => {
             }
         }
 
-        
         const globalPolicyName = `${farm_name}-总策略`
         if (!existingPolicyNames.has(globalPolicyName)) {
             try {
@@ -2652,7 +2626,6 @@ const ensureRequiredPolicies = async (farm_name) => {
             }
         }
 
-        
         const fertPolicyName = `${farm_name}-施肥`
         if (!existingPolicyNames.has(fertPolicyName)) {
             

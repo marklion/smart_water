@@ -117,6 +117,9 @@ export default async function (config) {
         total_readout: async function() {
             return this.mock_total_value !== null ? this.mock_total_value : 0;
         },
+        ava_readout:async function() {
+            return await this.readout();
+        },
         mock_readout: async function (value) {
             this.mock_value = value; // 存储模拟值
             const deviceType = this.getDeviceType();
