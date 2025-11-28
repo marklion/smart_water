@@ -1725,17 +1725,17 @@ export default {
                 result: { type: Boolean, mean: '是否成功', example: true }
             },
             func: async function (body, token) {
-                // 获取所有现有的轮灌组策略名称
-                const existingGroups = policy_array
-                    .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
-                    .map(p => p.name);
+                const existingGroups = new Set(
+                    policy_array
+                        .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
+                        .map(p => p.name)
+                );
                 
-                const updatedGroups = []; // 记录更新的轮灌组
-                const createdGroups = []; // 记录新增的轮灌组
+                const updatedGroups = [];
+                const createdGroups = [];
                 
-                // 处理传入的轮灌组：区分更新和新增
                 for (const groupConfig of body.groups) {
-                    const isUpdate = existingGroups.includes(groupConfig.name);
+                    const isUpdate = existingGroups.has(groupConfig.name);
                     
                     // 如果是更新操作，先删除旧策略
                     if (isUpdate) {

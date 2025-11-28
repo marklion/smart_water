@@ -991,14 +991,12 @@ const createMarkerContent = (device) => {
     const iconName = getDeviceIcon(deviceType)
     const deviceName = device.label || device.device_name || device.deviceName
 
-    
-    let statusClass = 'offline' 
+    let statusClass
     if (device.is_online === true) {
         statusClass = 'online'
     } else if (device.is_online === false) {
         statusClass = 'offline'
     } else {
-        
         const isOpen = getDeviceStatus(device)
         statusClass = isOpen ? 'active' : 'inactive'
     }
@@ -1452,13 +1450,117 @@ const showPolicyConfigWizard = async () => {
 }
 
 
+const parseTimeValue = (expression) => {
+    const timeValue = parseFloat(expression) || 0
+    return timeValue > 1000 ? timeValue / 60000 : timeValue
+}
+
+const parseValvesFromExpression = (expression) => {
+    if (!expression || expression === '""' || expression === '[]' || expression.trim() === '') {
+        return []
+    }
+
+    let cleanExpression = expression.trim()
+    if (cleanExpression.startsWith('"') && cleanExpression.endsWith('"')) {
+        cleanExpression = cleanExpression.slice(1, -1)
+    }
+
+    if (cleanExpression.startsWith('[') && cleanExpression.endsWith(']')) {
+        const arrayContent = cleanExpression.slice(1, -1).trim()
+        if (!arrayContent) return []
+        
+        const matches = arrayContent.match(/"([^"]+)"/g)
+        if (matches) {
+            return matches.map(m => m.replace(/"/g, '').trim()).filter(Boolean)
+        }
+        return arrayContent.split(',').map(v => v.trim()).filter(Boolean)
+    }
+
+    if (cleanExpression.includes(',')) {
+        const matches = cleanExpression.match(/"([^"]+)"/g)
+        if (matches && matches.length > 1) {
+            return matches.map(m => m.replace(/"/g, '').trim()).filter(Boolean)
+        }
+        return cleanExpression.split(',').map(v => v.trim()).filter(Boolean)
+    }
+
+    const matches = cleanExpression.match(/"([^"]+)"/g)
+    if (matches) {
+        return matches.map(m => m.replace(/"/g, '').trim()).filter(Boolean)
+    }
+    
+    return cleanExpression.trim() ? [cleanExpression.trim()] : []
+}
+
+const parseFertMethod = (expression) => {
+    const methodStr = expression.replace(/"/g, '')
+    if (methodStr === '亩定量' || methodStr === 'AreaBased') return 'AreaBased'
+    if (methodStr === '总定量' || methodStr === 'Total') return 'Total'
+    if (methodStr === '定时' || methodStr === 'Time') return 'Time'
+    return 'AreaBased'
+}
+
+const parseFertConfigFromVariables = (initVariables, fertConfig) => {
+    for (const initVar of initVariables) {
+        const varName = initVar.variable_name
+        const expression = initVar.expression || ''
+
+        if (varName === 'method' || varName === '施肥策略') {
+            fertConfig.method = parseFertMethod(expression)
+        } else if (varName === 'fert_time' || varName === '施肥时间') {
+            fertConfig.fert_time = parseTimeValue(expression)
+        } else if (varName === 'pre_ms' || varName === '肥前时间') {
+            fertConfig.pre_fert_time = parseTimeValue(expression)
+        } else if (varName === 'post_ms' || varName === '肥后时间') {
+            fertConfig.post_fert_time = parseTimeValue(expression)
+        } else if (varName === 'fert_rate' || varName === '期望施肥速率') {
+            fertConfig.fert_rate = parseFloat(expression) || 0
+        } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
+            fertConfig.AB_fert = parseFloat(expression) || 0
+        } else if (varName === '期望施肥总量') {
+            fertConfig.total_fert = parseFloat(expression) || 0
+        }
+    }
+}
+
+const parseAreaFromVariable = (initVariables) => {
+    for (const initVar of initVariables) {
+        const varName = initVar.variable_name
+        if (varName === 'area' || varName === '面积') {
+            const areaValue = parseFloat(initVar.expression) || 0
+            if (areaValue > 0) {
+                return areaValue
+            }
+        }
+    }
+    return null
+}
+
+const parseValvesFromGroup = (group) => {
+    if (!group.valves || group.valves === '-') {
+        return []
+    }
+
+    if (group.valves.includes('|')) {
+        return group.valves.split('|').map(v => v.trim()).filter(Boolean)
+    }
+
+    const matches = group.valves.match(/"([^"]+)"/g)
+    return matches ? matches.map(m => m.replace(/"/g, '')) : []
+}
+
+const applyDefaultFertConfig = (fertConfig, area) => {
+    if (fertConfig.AB_fert === 0 && area > 0 && fertConfig.fert_rate > 0 && fertConfig.method === 'AreaBased') {
+        fertConfig.AB_fert = fertConfig.fert_rate
+    }
+}
+
 const loadExistingGroups = async () => {
     try {
         const currentFarm = props.devices.length > 0 ? (props.devices[0].farmName || props.devices[0].farm_name) : '默认农场'
 
         const response = await call_remote('/policy/list_watering_groups', { pageNo: 0 })
         if (response && response.groups) {
-            
             let filteredGroups = response.groups
             if (currentFarm && currentFarm !== '默认农场') {
                 const policyFarmMatches = await Promise.all(
@@ -1484,16 +1586,12 @@ const loadExistingGroups = async () => {
                     .map(item => item.group)
             }
 
-            
             const policyListResponse = await call_remote('/policy/list_policy', { pageNo: 0 })
             const allPolicies = policyListResponse?.policies || []
 
-            
             existingGroups.value = await Promise.all(filteredGroups.map(async (group) => {
-                
                 const policy = allPolicies.find(p => p.name === group.name)
 
-                
                 let area = group.area || 0
                 let valves = []
                 let fertConfig = {
@@ -1506,118 +1604,26 @@ const loadExistingGroups = async () => {
                     fert_rate: group.fert_rate || 0,
                 }
 
-                if (policy && policy.init_variables) {
-                    
+                if (policy?.init_variables) {
+                    const areaFromVar = parseAreaFromVariable(policy.init_variables)
+                    if (areaFromVar !== null) {
+                        area = areaFromVar
+                    }
+
                     for (const initVar of policy.init_variables) {
                         const varName = initVar.variable_name
-                        const expression = initVar.expression || ''
-
-                        
-                        if (varName === 'area' || varName === '面积') {
-                            const areaValue = parseFloat(expression) || 0
-                            if (areaValue > 0) {
-                                area = areaValue
-                            }
-                        }
-
-                        
                         if (varName === 'valves' || varName === '组内阀门') {
-                            if (expression && expression !== '""' && expression !== '[]' && expression.trim() !== '') {
-                                
-                                let cleanExpression = expression.trim()
-                                if (cleanExpression.startsWith('"') && cleanExpression.endsWith('"')) {
-                                    cleanExpression = cleanExpression.slice(1, -1)
-                                }
-
-                                
-                                if (cleanExpression.startsWith('[') && cleanExpression.endsWith(']')) {
-                                    const arrayContent = cleanExpression.slice(1, -1).trim()
-                                    if (arrayContent) {
-                                        const matches = arrayContent.match(/"([^"]+)"/g)
-                                        if (matches) {
-                                            valves = matches.map(m => m.replace(/"/g, '').trim()).filter(Boolean)
-                                        } else {
-                                            
-                                            valves = arrayContent.split(',').map(v => v.trim()).filter(Boolean)
-                                        }
-                                    }
-                                } else if (cleanExpression.includes(',')) {
-                                    
-                                    
-                                    const matches = cleanExpression.match(/"([^"]+)"/g)
-                                    if (matches && matches.length > 1) {
-                                        
-                                        valves = matches.map(m => m.replace(/"/g, '').trim()).filter(Boolean)
-                                    } else {
-                                        
-                                        valves = cleanExpression.split(',').map(v => v.trim()).filter(Boolean)
-                                    }
-                                } else {
-                                    
-                                    const matches = cleanExpression.match(/"([^"]+)"/g)
-                                    if (matches) {
-                                        valves = matches.map(m => m.replace(/"/g, '').trim()).filter(Boolean)
-                                    } else if (cleanExpression.trim()) {
-                                        
-                                        valves = [cleanExpression.trim()].filter(Boolean)
-                                    }
-                                }
-
-                            }
-                        }
-
-                        if (varName === 'method' || varName === '施肥策略') {
-                            
-                            const methodStr = expression.replace(/"/g, '')
-                            if (methodStr === '亩定量' || methodStr === 'AreaBased') {
-                                fertConfig.method = 'AreaBased'
-                            } else if (methodStr === '总定量' || methodStr === 'Total') {
-                                fertConfig.method = 'Total'
-                            } else if (methodStr === '定时' || methodStr === 'Time') {
-                                fertConfig.method = 'Time'
-                            }
-                        } else if (varName === 'fert_time' || varName === '施肥时间') {
-                            
-                            const timeValue = parseFloat(expression) || 0
-                            
-                            fertConfig.fert_time = timeValue > 1000 ? timeValue / 60000 : timeValue
-                        } else if (varName === 'pre_ms' || varName === '肥前时间') {
-                            
-                            const timeValue = parseFloat(expression) || 0
-                            fertConfig.pre_fert_time = timeValue > 1000 ? timeValue / 60000 : timeValue
-                        } else if (varName === 'post_ms' || varName === '肥后时间') {
-                            
-                            const timeValue = parseFloat(expression) || 0
-                            fertConfig.post_fert_time = timeValue > 1000 ? timeValue / 60000 : timeValue
-                        } else if (varName === 'fert_rate' || varName === '期望施肥速率') {
-                            fertConfig.fert_rate = parseFloat(expression) || 0
-                        } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
-                            fertConfig.AB_fert = parseFloat(expression) || 0
-                        } else if (varName === '期望施肥总量') {
-                            fertConfig.total_fert = parseFloat(expression) || 0
+                            valves = parseValvesFromExpression(initVar.expression || '')
+                            break
                         }
                     }
 
-                    
-                    if (fertConfig.AB_fert === 0 && area > 0 && fertConfig.fert_rate > 0) {
-                        
-                        if (fertConfig.method === 'AreaBased') {
-                            fertConfig.AB_fert = fertConfig.fert_rate
-                        }
-                    }
+                    parseFertConfigFromVariables(policy.init_variables, fertConfig)
+                    applyDefaultFertConfig(fertConfig, area)
                 }
 
-                
-                if (valves.length === 0 && group.valves && group.valves !== '-') {
-                    
-                    if (group.valves.includes('|')) {
-                        valves = group.valves.split('|').map(v => v.trim()).filter(Boolean)
-                    } else {
-                        const matches = group.valves.match(/"([^"]+)"/g)
-                        if (matches) {
-                            valves = matches.map(m => m.replace(/"/g, ''))
-                        }
-                    }
+                if (valves.length === 0) {
+                    valves = parseValvesFromGroup(group)
                 }
 
                 return {
@@ -1654,44 +1660,90 @@ const isGroupNameDuplicate = (name, excludeName = null) => {
 }
 
 
-const copyExistingGroup = async (existingGroup) => {
+const validateExistingGroup = (existingGroup) => {
     if (!existingGroup || !existingGroup.name || typeof existingGroup.name !== 'string') {
         ElMessage.error('无效的轮灌组数据')
-        return
+        return null
     }
     
     const groupName = existingGroup.name.trim()
     if (groupName.length > 100) {
         ElMessage.error('轮灌组名称过长')
-        return
+        return null
     }
     
-    let baseName = '轮灌组'
-    if (groupName.length > 0) {
-        let endIndex = groupName.length
-        while (endIndex > 0 && groupName.charCodeAt(endIndex - 1) >= 48 && groupName.charCodeAt(endIndex - 1) <= 57) {
-            endIndex--
-        }
-        baseName = endIndex > 0 ? groupName.substring(0, endIndex) : '轮灌组'
+    return groupName
+}
+
+const extractBaseName = (groupName) => {
+    if (groupName.length === 0) {
+        return '轮灌组'
     }
     
+    let endIndex = groupName.length
+    while (endIndex > 0 && groupName.charCodeAt(endIndex - 1) >= 48 && groupName.charCodeAt(endIndex - 1) <= 57) {
+        endIndex--
+    }
+    
+    const baseName = endIndex > 0 ? groupName.substring(0, endIndex) : '轮灌组'
     if (baseName.length > 50) {
         ElMessage.error('轮灌组基础名称过长')
-        return
+        return null
     }
     
+    return baseName
+}
+
+const generateDefaultName = (baseName) => {
     let defaultName = `${baseName}${wateringGroups.value.length + 1}`
     let counter = 1
     while (isGroupNameDuplicate(defaultName)) {
         counter++
         if (counter > 10000) {
             ElMessage.error('无法生成唯一的轮灌组名称')
-            return
+            return null
         }
         defaultName = `${baseName}${counter}`
     }
+    return defaultName
+}
 
+const createCopiedGroup = (trimmedName, existingGroup) => {
+    const index = wateringGroups.value.length
     
+    wateringGroups.value.push({
+        name: trimmedName,
+        area: existingGroup.area || 0,
+        isCopied: true,
+        configKey: trimmedName
+    })
+
+    selectedValveDevices.value[trimmedName] = []
+
+    fertConfigs.value[trimmedName] = {
+        method: existingGroup.fertConfig?.method || 'AreaBased',
+        AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
+        total_fert: existingGroup.fertConfig?.total_fert ?? 0,
+        fert_time: existingGroup.fertConfig?.fert_time ?? 0,
+        pre_fert_time: existingGroup.fertConfig?.pre_fert_time ?? 0,
+        post_fert_time: existingGroup.fertConfig?.post_fert_time ?? 0,
+        fert_rate: existingGroup.fertConfig?.fert_rate ?? 0,
+    }
+
+    copiedGroups.value.add(trimmedName)
+    areaParamsPopoverVisible.value[index] = false
+}
+
+const copyExistingGroup = async (existingGroup) => {
+    const groupName = validateExistingGroup(existingGroup)
+    if (!groupName) return
+    
+    const baseName = extractBaseName(groupName)
+    if (!baseName) return
+    
+    const defaultName = generateDefaultName(baseName)
+    if (!defaultName) return
+
     try {
         const { value: newName } = await ElMessageBox.prompt(
             `请输入新轮灌组的名称（复制自：${existingGroup.name}）`,
@@ -1714,50 +1766,18 @@ const copyExistingGroup = async (existingGroup) => {
             }
         )
 
-        if (!newName || newName.trim() === '') {
-            ElMessage.warning('轮灌组名称不能为空')
+        const trimmedName = newName?.trim()
+        if (!trimmedName || isGroupNameDuplicate(trimmedName)) {
+            if (!trimmedName) {
+                ElMessage.warning('轮灌组名称不能为空')
+            } else {
+                ElMessage.error('该轮灌组名称已存在，请使用其他名称')
+            }
             return
         }
 
-        const trimmedName = newName.trim()
-        if (isGroupNameDuplicate(trimmedName)) {
-            ElMessage.error('该轮灌组名称已存在，请使用其他名称')
-            return
-        }
+        createCopiedGroup(trimmedName, existingGroup)
 
-        const index = wateringGroups.value.length
-        
-        
-        
-        wateringGroups.value.push({
-            name: trimmedName,
-            area: existingGroup.area || 0,
-            isCopied: true, 
-            configKey: trimmedName 
-        })
-
-        
-        selectedValveDevices.value[trimmedName] = []
-
-        
-        
-        const configKey = trimmedName
-        fertConfigs.value[configKey] = {
-            method: existingGroup.fertConfig?.method || 'AreaBased',
-            AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
-            total_fert: existingGroup.fertConfig?.total_fert ?? 0,
-            fert_time: existingGroup.fertConfig?.fert_time ?? 0,
-            pre_fert_time: existingGroup.fertConfig?.pre_fert_time ?? 0,
-            post_fert_time: existingGroup.fertConfig?.post_fert_time ?? 0,
-            fert_rate: existingGroup.fertConfig?.fert_rate ?? 0,
-        }
-
-        
-        copiedGroups.value.add(trimmedName)
-
-        areaParamsPopoverVisible.value[index] = false
-
-        
         if (wizardStep.value === 2) {
             await nextTick()
             await initValveSelectionMap(trimmedName)
@@ -2224,6 +2244,86 @@ const exitFullscreenMap = () => {
 }
 
 
+const getMapCenterFromDevices = () => {
+    if (availableValveDevices.value.length === 0) {
+        return { lng: props.center.lng, lat: props.center.lat }
+    }
+
+    const lngs = availableValveDevices.value.map(d => d.longitude).filter(Boolean)
+    const lats = availableValveDevices.value.map(d => d.latitude).filter(Boolean)
+
+    if (lngs.length === 0 || lats.length === 0) {
+        return { lng: props.center.lng, lat: props.center.lat }
+    }
+
+    return {
+        lng: lngs.reduce((a, b) => a + b, 0) / lngs.length,
+        lat: lats.reduce((a, b) => a + b, 0) / lats.length
+    }
+}
+
+const createFullscreenMapMarkers = (fullscreenMap, groupName) => {
+    const markers = []
+    for (const device of availableValveDevices.value) {
+        if (!device.longitude || !device.latitude) continue
+
+        const isSelected = selectedValveDevices.value[groupName]?.includes(device.device_name) || false
+        const marker = createValveSelectionMarker(device, isSelected, groupName)
+        
+        if (marker) {
+            fullscreenMap.add(marker)
+            markers.push(marker)
+        }
+    }
+    return markers
+}
+
+const calculateZoomFromRange = (lngs, lats) => {
+    const lngRange = Math.max(...lngs) - Math.min(...lngs)
+    const latRange = Math.max(...lats) - Math.min(...lats)
+    const maxRange = Math.max(lngRange, latRange)
+    
+    if (maxRange <= 0) return null
+    return maxRange > 0.1 ? 12 : maxRange > 0.05 ? 13 : 14
+}
+
+const getDeviceCoordinates = () => {
+    const lngs = availableValveDevices.value.map(d => d.longitude).filter(Boolean)
+    const lats = availableValveDevices.value.map(d => d.latitude).filter(Boolean)
+    return { lngs, lats }
+}
+
+const adjustMapView = (fullscreenMap, markers) => {
+    if (markers.length > 0) {
+        fullscreenMap.setFitView(markers, false, [100, 100, 100, 100])
+        return
+    }
+
+    const { lngs, lats } = getDeviceCoordinates()
+    if (lngs.length === 0 || lats.length === 0) return
+
+    const center = {
+        lng: lngs.reduce((a, b) => a + b, 0) / lngs.length,
+        lat: lats.reduce((a, b) => a + b, 0) / lats.length
+    }
+    
+    fullscreenMap.setCenter([center.lng, center.lat])
+    
+    const zoom = calculateZoomFromRange(lngs, lats)
+    if (zoom !== null) {
+        fullscreenMap.setZoom(zoom)
+    }
+}
+
+const ensureAMapLoaded = async () => {
+    if (!globalThis.AMap) {
+        await loadAMapScript()
+    }
+    if (!globalThis.AMap) {
+        throw new Error('高德地图API加载失败')
+    }
+}
+
 const initFullscreenMap = async (groupName) => {
     await nextTick()
 
@@ -2234,91 +2334,30 @@ const initFullscreenMap = async (groupName) => {
         return
     }
 
-    
     if (fullscreenMapInstance.value) {
         fullscreenMapInstance.value.destroy()
     }
 
     try {
-        
-        if (!globalThis.AMap) {
-            await loadAMapScript()
-        }
+        await ensureAMapLoaded()
 
-        if (!globalThis.AMap) {
-            throw new Error('高德地图API加载失败')
-        }
-
-        
-        let centerLng = props.center.lng
-        let centerLat = props.center.lat
-
-        if (availableValveDevices.value.length > 0) {
-            const lngs = availableValveDevices.value.map(d => d.longitude).filter(Boolean)
-            const lats = availableValveDevices.value.map(d => d.latitude).filter(Boolean)
-
-            if (lngs.length > 0 && lats.length > 0) {
-                centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length
-                centerLat = lats.reduce((a, b) => a + b, 0) / lats.length
-            }
-        }
-
-        
+        const center = getMapCenterFromDevices()
         const fullscreenMap = new AMap.Map(mapContainerId, {
             zoom: 15,
-            center: [centerLng, centerLat],
+            center: [center.lng, center.lat],
             mapStyle: 'amap://styles/normal',
             viewMode: '2D'
         })
 
-        
         const satelliteLayer = new AMap.TileLayer.Satellite({
             zIndex: 1,
             opacity: 1
         })
         fullscreenMap.add(satelliteLayer)
-
         fullscreenMapInstance.value = fullscreenMap
 
-        
-        const markers = []
-        for (const device of availableValveDevices.value) {
-            if (!device.longitude || !device.latitude) continue
-
-            const isSelected = selectedValveDevices.value[groupName]?.includes(device.device_name) || false
-
-            const marker = createValveSelectionMarker(device, isSelected, groupName)
-            if (marker) {
-                fullscreenMap.add(marker)
-                markers.push(marker)
-            }
-        }
-
-        
-        if (markers.length > 0) {
-            
-            fullscreenMap.setFitView(markers, false, [100, 100, 100, 100])
-        } else {
-            
-            if (availableValveDevices.value.length > 0) {
-                const lngs = availableValveDevices.value.map(d => d.longitude).filter(Boolean)
-                const lats = availableValveDevices.value.map(d => d.latitude).filter(Boolean)
-                if (lngs.length > 0 && lats.length > 0) {
-                    const centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length
-                    const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length
-                    fullscreenMap.setCenter([centerLng, centerLat])
-                    
-                    const lngRange = Math.max(...lngs) - Math.min(...lngs)
-                    const latRange = Math.max(...lats) - Math.min(...lats)
-                    const maxRange = Math.max(lngRange, latRange)
-                    if (maxRange > 0) {
-                        
-                        const zoom = maxRange > 0.1 ? 12 : maxRange > 0.05 ? 13 : 14
-                        fullscreenMap.setZoom(zoom)
-                    }
-                }
-            }
-        }
+        const markers = createFullscreenMapMarkers(fullscreenMap, groupName)
+        adjustMapView(fullscreenMap, markers)
 
     } catch (error) {
         console.error('初始化全屏地图失败:', error)
@@ -2555,11 +2594,11 @@ const ensureRequiredPolicies = async (farm_name) => {
         
         const policyList = await call_remote('/policy/list_policy', { pageNo: 0, farm_name: farm_name })
         const existingPolicies = policyList?.policies || []
-        const existingPolicyNames = existingPolicies.map(p => p.name)
+        const existingPolicyNames = new Set(existingPolicies.map(p => p.name))
 
         
         const waterPolicyName = `${farm_name}-供水`
-        if (!existingPolicyNames.includes(waterPolicyName)) {
+        if (!existingPolicyNames.has(waterPolicyName)) {
             
             const requiredDevices = [
                 `${farm_name}-主泵`,
@@ -2573,9 +2612,9 @@ const ensureRequiredPolicies = async (farm_name) => {
                     pageNo: 0
                 })
                 const existingDevices = deviceList?.devices || []
-                const existingDeviceNames = existingDevices.map(d => d.device_name)
+                const existingDeviceNames = new Set(existingDevices.map(d => d.device_name))
 
-                const missingDevices = requiredDevices.filter(name => !existingDeviceNames.includes(name))
+                const missingDevices = requiredDevices.filter(name => !existingDeviceNames.has(name))
                 if (missingDevices.length > 0) {
                     throw new Error(`缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`)
                 }
@@ -2602,7 +2641,7 @@ const ensureRequiredPolicies = async (farm_name) => {
 
         
         const globalPolicyName = `${farm_name}-总策略`
-        if (!existingPolicyNames.includes(globalPolicyName)) {
+        if (!existingPolicyNames.has(globalPolicyName)) {
             try {
                 await call_remote('/config/init_global_policy', {
                     farm_name: farm_name,
@@ -2615,7 +2654,7 @@ const ensureRequiredPolicies = async (farm_name) => {
 
         
         const fertPolicyName = `${farm_name}-施肥`
-        if (!existingPolicyNames.includes(fertPolicyName)) {
+        if (!existingPolicyNames.has(fertPolicyName)) {
             
             const requiredFertDevices = [
                 `${farm_name}-施肥泵`,
@@ -2629,16 +2668,16 @@ const ensureRequiredPolicies = async (farm_name) => {
                     pageNo: 0
                 })
                 const existingDevices = deviceList?.devices || []
-                const existingDeviceNames = existingDevices.map(d => d.device_name)
+                const existingDeviceNames = new Set(existingDevices.map(d => d.device_name))
 
-                const missingDevices = requiredFertDevices.filter(name => !existingDeviceNames.includes(name))
+                const missingDevices = requiredFertDevices.filter(name => !existingDeviceNames.has(name))
                 if (missingDevices.length > 0) {
                     throw new Error(`缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`)
                 }
 
                 await call_remote('/config/init_fert_policy', {
                     farm_name: farm_name,
-                    flow_expected_value: 2.0,
+                    flow_expected_value: 2,
                     flow_warning_max_offset: 0.5,
                     flow_check_interval: 60,
                     level_warning_limit: 0.8,
@@ -3612,6 +3651,8 @@ onUnmounted(() => {
 
 .existing-group-btn {
     transition: all 0.3s ease;
+    flex: 1;
+    min-width: 0;
 }
 
 .existing-group-btn:hover {
@@ -3635,11 +3676,6 @@ onUnmounted(() => {
     margin-bottom: 0;
 }
 
-.existing-group-btn {
-    flex: 1;
-    min-width: 0;
-}
-
 .view-group-btn {
     flex-shrink: 0;
     width: auto;
@@ -3661,12 +3697,10 @@ onUnmounted(() => {
 }
 
 .popover-header {
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #409eff;
-    background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
     margin: -12px -12px 12px -12px;
     padding: 10px 12px;
+    border-bottom: 2px solid #409eff;
+    background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
 }
 
 .popover-title {
@@ -3690,7 +3724,7 @@ onUnmounted(() => {
     margin-bottom: 0;
 }
 
-.section-title {
+.detail-section .section-title {
     margin: 0 0 10px 0;
     font-size: 14px;
     font-weight: 600;
@@ -3701,7 +3735,7 @@ onUnmounted(() => {
     align-items: center;
 }
 
-.section-title::before {
+.detail-section .section-title::before {
     content: '';
     width: 3px;
     height: 14px;
