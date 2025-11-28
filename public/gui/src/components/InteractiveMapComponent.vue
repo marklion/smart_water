@@ -636,6 +636,7 @@
                                     <span class="unit">分钟</span>
                                 </div>
                             </div>
+                        </div>
                     </div>
                 </div>
 
@@ -687,11 +688,6 @@ import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, Vi
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
 import {
-<<<<<<< HEAD
-    getDeviceType,
-    hasDeviceCapability,
-    hasAnyDeviceCapability,
-    refreshRuntimeInfo as refreshRuntimeInfoUtil,
     getDeviceType,
     hasDeviceCapability,
     hasAnyDeviceCapability,
@@ -1441,8 +1437,6 @@ const showPolicyConfigWizard = async () => {
     }
 }
 
-<<<<<<< HEAD
-
 const parseTimeValue = (expression) => {
     const timeValue = parseFloat(expression) || 0
     return timeValue > 1000 ? timeValue / 60000 : timeValue
@@ -1925,12 +1919,9 @@ const initValveSelectionMap = async (groupName) => {
         }
     }
 
-<<<<<<< HEAD
-    
     const group = wateringGroups.value.find(g => (g.configKey || g.name) === groupName || g.name === groupName)
     const configKey = group ? (group.configKey || group.name) : groupName
 
-    
     if (valveSelectionMaps.value[configKey]) {
         try {
             valveSelectionMaps.value[configKey].destroy()
@@ -2020,8 +2011,6 @@ const createValveSelectionMarker = (device, isSelected, groupName) => {
         const deviceType = 'valve'
         const iconName = getDeviceIcon(deviceType)
 
-        // 使用与主地图相同的样式，选中时添加 selected 类
->>>>>>> origin/main
         const statusClass = isSelected ? 'selected' : ''
         const selectionClass = isSelected ? 'valve-selected' : ''
 
@@ -2369,8 +2358,6 @@ const nextStep = async () => {
             }
         }
 
-<<<<<<< HEAD
-        
         if (allGroupsAreCopied.value) {
             
             await finishWizard()
