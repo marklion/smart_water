@@ -1545,9 +1545,36 @@ export default {
                 result: { type: Boolean, mean: '是否成功', example: true }
             },
             func: async function (body, token) {
-                // 删除既有的轮灌组策略
-                await deleteExistingWateringGroupPolicies(token);
+                const existingGroups = new Set(
+                    policy_array
+                        .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
+                        .map(p => p.name)
+                );
+                
+                const updatedGroups = [];
+                const createdGroups = [];
+                
                 for (const groupConfig of body.groups) {
+                    const isUpdate = existingGroups.has(groupConfig.name);
+                    
+                    // 如果是更新操作，先删除旧策略
+                    if (isUpdate) {
+                        try {
+                            await policy_lib.del_policy(groupConfig.name, token);
+                            updatedGroups.push(groupConfig.name);
+                        } catch (e) {
+                            // 兜底处理，避免残留
+                            const removed = findAndRemoveByName(policy_array, groupConfig.name);
+                            if (removed) {
+                                policy_runtime_states.delete(groupConfig.name);
+                            }
+                            updatedGroups.push(groupConfig.name);
+                        }
+                    } else {
+                        createdGroups.push(groupConfig.name);
+                    }
+                    
+                    // 创建/更新轮灌组策略（add_group_policy 内部会处理策略已存在的情况）
                     await config_lib.add_group_policy({
                         policy_name: groupConfig.name,
                         farm_name:body.farm_name,
@@ -1560,7 +1587,20 @@ export default {
                         area: groupConfig.area,
                     }, token);
                 }
-                return { result: true };
+                
+                // 记录操作结果
+                if (updatedGroups.length > 0) {
+                    console.log(`已更新轮灌组: ${updatedGroups.join(', ')}`);
+                }
+                if (createdGroups.length > 0) {
+                    console.log(`已新增轮灌组: ${createdGroups.join(', ')}`);
+                }
+                
+                return { 
+                    result: true,
+                    updated: updatedGroups,
+                    created: createdGroups
+                };
             }
         },
         match_policy_farm: {
