@@ -10,7 +10,7 @@ const driver_array = [
         name: 'virtualDevice',
         config_method: '[log_file]',
         capability: [
-            'open', 'close', 'readout', 'mock_readout',
+            'open', 'close', 'readout', 'mock_readout','ava_readout',
             'is_opened', 'status_map', 'shutdown', 'total_readout', 'mock_total_readout'],
         driver: virtual_driver,
     }, {
@@ -31,7 +31,7 @@ const driver_array = [
         name: 'FertFlowMeter',
         config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
         capability: [
-            'readout', 'status_map', 'shutdown'],
+            'readout', 'status_map', 'shutdown', 'ava_readout'],
         driver: dijiang,
     },{
         name:'WaterFlowMeter',

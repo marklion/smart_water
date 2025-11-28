@@ -277,185 +277,6 @@ async function deleteExistingWateringGroupPolicies(token) {
     }
 }
 
-/**
- * 计算施肥率
- */
-function calculateFertRate(group) {
-    if (group.method === 'AreaBased') {
-        return Number(group.AB_fert || 0);
-    }
-    if (group.method === 'Total') {
-        return group.area > 0 ? Number((Number(group.total_fert || 0) / Number(group.area)).toFixed(2)) : 0;
-    }
-    if (group.method === 'Time') {
-        return group.fert_time > 0 ? Number((Number(group.area) / Number(group.fert_time)).toFixed(1)) : 0;
-    }
-    return 0;
-}
-
-/**
- * 初始化轮灌组策略的变量
- */
-async function initializeWateringGroupVariables(group, fert_rate, token) {
-    const methodMap = {
-        AreaBased: '亩定量',
-        Total: '总定量',
-        Time: '定时'
-    };
-
-    const valvesExpr = (group.valves || []).map(v => `"${v}"`).join(' ');
-    const preMs = Math.max(0, Number(group.pre_fert_time || 0)) * 3600000;
-    const fertMs = Math.max(0, Number(group.fert_time || 0)) * 3600000;
-    const postMs = Math.max(0, Number(group.post_fert_time || 0)) * 3600000;
-
-    await policy_lib.init_assignment(group.name, 'area', String(group.area), true, token);
-    await policy_lib.init_assignment(group.name, 'method', `"${methodMap[group.method] || group.method}"`, false, token);
-    await policy_lib.init_assignment(group.name, 'fert_rate', String(fert_rate), true, token);
-    await policy_lib.init_assignment(group.name, 'fert_time', String(group.fert_time), true, token);
-    await policy_lib.init_assignment(group.name, 'total_water', '0', true, token);
-    await policy_lib.init_assignment(group.name, 'total_fert', '0', true, token);
-    await policy_lib.init_assignment(group.name, 'minute_left', '0', true, token);
-    await policy_lib.init_assignment(group.name, 'valves', valvesExpr || '""', true, token);
-    await policy_lib.init_assignment(group.name, 'pre_ms', String(preMs), true, token);
-    await policy_lib.init_assignment(group.name, 'fert_ms', String(fertMs), true, token);
-    await policy_lib.init_assignment(group.name, 'post_ms', String(postMs), true, token);
-
-    return { preMs, fertMs, postMs };
-}
-
-/**
- * 设置轮灌组矩阵
- */
-async function setWateringGroupMatrix(policy, token) {
-    const matrix = [
-        { key_name: 'area', value_name: 'area' },
-        { key_name: 'method', value_name: 'method' },
-        { key_name: 'fert_rate', value_name: 'fert_rate' },
-        { key_name: 'total_water', value_name: 'total_water' },
-        { key_name: 'total_fert', value_name: 'total_fert' },
-        { key_name: 'minute_left', value_name: 'minute_left' },
-        { key_name: 'valves', value_name: 'valves' },
-    ];
-    try {
-        await policy_lib.set_watering_group_matrix(policy.name, matrix, token);
-    } catch (e) {
-        policy.watering_group_matrix = matrix;
-    }
-}
-
-/**
- * 绑定策略到农场
- */
-async function bindPolicyToFarm(policy, farm_name, token) {
-    if (!farm_name) return;
-
-    try {
-        await policy_lib.match_policy_farm(policy.name, farm_name, token);
-    } catch (e) {
-        policy.farm_name = farm_name;
-    }
-}
-
-/**
- * 生成轮灌组策略模板
- */
-function generateWateringGroupTemplate(group, preMs, fertMs, postMs, farm_name) {
-    const farmLine = farm_name ? `\n                        match farm '${farm_name}'` : '';
-    const closeActions = (group.valves || []).map(v => `\n                        enter action '${v}' 'close'`).join('');
-    const openActions = (group.valves || []).map(v => `\n                        enter action '${v}' 'open'`).join('');
-
-    return `policy
-                        policy '${group.name}'
-                        init assignment 'false' 'pre_ms' '${preMs}'
-                        init assignment 'false' 'post_ms' '${postMs}'
-                        init assignment 'false' '启动开关' 'false'
-                        init assignment 'false' '需要跳过' 'false'
-                        source 'flow_cumulative' '主管道流量计' 'total_readout'
-                        state '空闲'${closeActions}
-                        exit assignment 'false' '主管道流量累计值' 'await prs.getSource("flow_cumulative")'
-                        transformer 'next'
-                            rule 'false' '肥前' 'prs.variables.get("启动开关") == true'
-                        return
-                        return
-                        state '肥前'${openActions}
-                        enter crossAssignment 'false' '主策略' '${group.name}已启动' 'true'
-                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
-                        enter assignment 'false' 'enter_time' 'Date.now()'
-                        transformer 'timeup'
-                            rule 'false' '施肥' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("pre_ms")'
-                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
-                        return
-                        return
-                        state '施肥'
-                        enter crossAssignment 'false' '施肥策略' '启动开关' 'true'
-                        enter assignment 'false' 'enter_time' 'Date.now()'
-                        exit crossAssignment 'false' '施肥策略' '启动开关' 'false'
-                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
-                        do assignment 'false' 'tf' 'prs.variables.get("fr")*((Date.now() - prs.variables.get("enter_time"))/1000)'
-                        transformer 'timeup'
-                            rule 'false' '肥后' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("fert_ms")'
-                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
-                            statistic '肥后' '${group.name}累计施肥量' 'prs.variables.get("tf")'
-                            statistic '收尾' '${group.name}累计施肥量' 'prs.variables.get("tf")'
-                        return
-                        return
-                        state '肥后'
-                        exit action '主管道流量计' 'readout'
-                        enter assignment 'false' 'enter_time' 'Date.now()'
-                        do assignment 'false' 'tw' 'await prs.getSource("flow_cumulative") - prs.variables.get("主管道流量累计值")'
-                        transformer 'timeup'
-                            rule 'false' '收尾' 'Date.now() - prs.variables.get("enter_time") > prs.variables.get("post_ms")'
-                            rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
-                            statistic '收尾' '${group.name}累计供水量' 'tw'
-                        return
-                        return
-                        state '收尾'
-                        enter crossAssignment 'false' '主策略' '${group.name}已启动' 'false'
-                        transformer 'next'
-                            rule 'false' '空闲' 'prs.variables.get("启动开关") == false'
-                        return
-                        return
-                        init state '空闲'${farmLine}
-                    return`;
-}
-
-/**
- * 创建并初始化单个轮灌组策略
- */
-async function createWateringGroupPolicy(group, farm_name, token) {
-    // 创建策略
-    await policy_lib.add_policy(group.name, token);
-    const policy = validatePolicyExists(group.name);
-
-    // 计算施肥率
-    const fert_rate = calculateFertRate(group);
-
-    // 初始化变量
-    const { preMs, fertMs, postMs } = await initializeWateringGroupVariables(group, fert_rate, token);
-
-    // 设置轮灌组矩阵
-    await setWateringGroupMatrix(policy, token);
-
-    // 绑定农场
-    await bindPolicyToFarm(policy, farm_name, token);
-
-    // 生成并应用模板
-    const templateSm = generateWateringGroupTemplate(group, preMs, fertMs, postMs, farm_name);
-    policy.template_sm = templateSm;
-    try {
-        await applyTemplateSm(templateSm);
-    } catch (e) {
-        // 忽略模板应用错误，继续执行
-    }
-
-    // 初始化运行时状态
-    try {
-        await processPolicyExecution(policy);
-    } catch (e) {
-        console.error(`初始化策略 ${group.name} 运行时状态失败:`, e);
-    }
-}
-
 export default {
     name: 'policy',
     description: '策略管理',
@@ -1713,10 +1534,9 @@ export default {
                         method: { type: String, mean: '施肥方式 AreaBased/Total/Time', example: 'AreaBased', have_to: true },
                         AB_fert: { type: Number, mean: '亩定量(L/亩)', example: 10, have_to: false },
                         total_fert: { type: Number, mean: '总定量(L)', example: 500, have_to: false },
-                        fert_time: { type: Number, mean: '定时(小时)', example: 0.6, have_to: false },
-                        pre_fert_time: { type: Number, mean: '肥前时间(小时)', example: 0, have_to: false },
-                        post_fert_time: { type: Number, mean: '肥后时间(小时)', example: 0, have_to: false },
-                        fert_rate: { type: Number, mean: '期望施肥速度(L/min)', example: 1.5, have_to: false},
+                        fert_time: { type: Number, mean: '定时', example: 0.6, have_to: false },
+                        post_fert_time: { type: Number, mean: '肥后时间', example: 0, have_to: false },
+                        total_time:{ type: Number, mean: '总时间', example: 2, have_to: false },
                     }
                 },
                 farm_name: { type: String, mean: '默认绑定的农场名称', example: '科技农场', have_to: false }
@@ -1732,13 +1552,12 @@ export default {
                         policy_name: groupConfig.name,
                         farm_name:body.farm_name,
                         wgv_array: groupConfig.valves.map(v => ({ name: v })),
-                        pre_fert_time:groupConfig.pre_fert_time,
+                        total_time: groupConfig.total_time,
                         post_fert_time:groupConfig.post_fert_time,
                         method: groupConfig.method == 'Time'?'定时':'定量',
                         fert_time: groupConfig.fert_time,
                         area_based_amount: groupConfig.AB_fert,
                         area: groupConfig.area,
-                        fert_rate: groupConfig.fert_rate,
                     }, token);
                 }
                 return { result: true };
@@ -1811,9 +1630,9 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let quick_actions = ensureArrayExists(policy, 'quick_actions');
-                
+
                 const is_constant = body.is_constant === true || body.is_constant === 'true' || body.is_constant === '1';
-                
+
                 // 检查是否已存在相同名称的快速操作
                 const existingAction = quick_actions.find(a => a.action_name === body.action_name);
                 if (existingAction) {
@@ -1844,7 +1663,7 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let quick_actions = ensureArrayExists(policy, 'quick_actions');
-                
+
                 const removed = findAndRemoveFromArray(quick_actions, a => a.action_name === body.action_name);
                 if (!removed) {
                     throw { err_msg: `快速操作 ${body.action_name} 不存在` };
@@ -1891,12 +1710,12 @@ export default {
             func: async function (body, token) {
                 let policy = validatePolicyExists(body.policy_name);
                 let quick_actions = policy.quick_actions || [];
-                
+
                 const action = quick_actions.find(a => a.action_name === body.action_name);
                 if (!action) {
                     throw { err_msg: `快速操作 ${body.action_name} 不存在` };
                 }
-                
+
                 // 获取策略的运行时状态
                 let runtimeState = policy_runtime_states.get(body.policy_name);
                 if (!runtimeState) {
@@ -1934,7 +1753,7 @@ export default {
                     };
                     policy_runtime_states.set(body.policy_name, runtimeState);
                 }
-                
+
                 // 执行表达式
                 try {
                     if (action.is_constant) {
@@ -2286,7 +2105,7 @@ async function evaluateAssignmentExpression(expression, runtimeState) {
                 }
             }
         };
-        
+
         // 简化的上下文，只包含基本数据
         const context = {
             getSource: runtimeState.getSource ? runtimeState.getSource.bind(runtimeState) : async () => 0, // 添加 getSource 函数

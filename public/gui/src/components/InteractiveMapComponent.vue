@@ -397,39 +397,32 @@
 
                         <div class="fert-params">
                             <div v-if="fertConfigs[group.name].method === 'AreaBased'" class="param-item">
-                                <label>施肥参数：</label>
+                                <label>每亩施肥量：</label>
                                     <el-input-number v-model="fertConfigs[group.name].AB_fert" :min="0" :precision="2"
                                         placeholder="施肥量" />
                                 <span class="unit">L/亩</span>
                             </div>
 
                             <div v-if="fertConfigs[group.name].method === 'Total'" class="param-item">
-                                <label>施肥参数：</label>
+                                <label>施肥总量：</label>
                                     <el-input-number v-model="fertConfigs[group.name].total_fert" :min="0"
                                         :precision="2" placeholder="总量" />
                                 <span class="unit">L</span>
                             </div>
 
                             <div v-if="fertConfigs[group.name].method === 'Time'" class="param-item">
-                                <label>施肥参数：</label>
+                                <label>施肥时间：</label>
                                     <el-input-number v-model="fertConfigs[group.name].fert_time" :min="0"
                                         :precision="1" placeholder="施肥时间" />
                                 <span class="unit">分钟</span>
-                            </div>
-
-                            <div class="param-item">
-                                <label>期望施肥速度：</label>
-                                    <el-input-number v-model="fertConfigs[group.name].fert_rate" :min="0" :precision="1"
-                                        placeholder="速度" />
-                                <span class="unit">L/分钟</span>
                             </div>
                         </div>
 
                         <div class="time-params">
                             <div class="param-item">
-                                <label>肥前时间：</label>
-                                    <el-input-number v-model="fertConfigs[group.name].pre_fert_time" :min="0"
-                                        :precision="1" placeholder="肥前时间" />
+                                <label>灌溉总时间：</label>
+                                    <el-input-number v-model="fertConfigs[group.name].total_time" :min="0"
+                                        :precision="1" placeholder="灌溉总时间" />
                                 <span class="unit">分钟</span>
                             </div>
 
@@ -462,10 +455,10 @@ import { ElMessage } from 'element-plus'
 import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning, CircleCheck, CircleClose, Setting, Plus, Delete } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
-import { 
-  getDeviceType, 
-  hasDeviceCapability, 
-  hasAnyDeviceCapability, 
+import {
+  getDeviceType,
+  hasDeviceCapability,
+  hasAnyDeviceCapability,
   refreshRuntimeInfo as refreshRuntimeInfoUtil,
   createRuntimeInfoAutoRefresh,
   handleDeviceAction as handleDeviceActionUtil,
@@ -1196,9 +1189,8 @@ const addWateringGroup = () => {
         AB_fert: 0,
         total_fert: 0,
         fert_time: 0,
-        pre_fert_time: 0,
+        total_time:0,
         post_fert_time: 0,
-        fert_rate: 0,
     }
     areaParamsPopoverVisible.value[index] = false
 }
@@ -1208,7 +1200,7 @@ const removeWateringGroup = (index) => {
     wateringGroups.value.splice(index, 1)
     delete selectedValveDevices.value[groupName]
     delete fertConfigs.value[groupName]
-    
+
     // 清理地图实例
     if (valveSelectionMaps.value[groupName]) {
         valveSelectionMaps.value[groupName].destroy()
@@ -1228,7 +1220,7 @@ const getRecommendedArea = (index) => {
     const dripper_spacing = Number(params.dripper_spacing) || 0
     const dripper_flow = Number(params.dripper_flow) || 0
     const coefficient = Number(params.coefficient) || 0.9
-    
+
     // 检查必需参数是否有效（大于0）
     if (system_flow <= 0 ||
         laying_spacing <= 0 ||
@@ -1236,17 +1228,17 @@ const getRecommendedArea = (index) => {
         dripper_flow <= 0) {
         return 0
     }
-    
+
     // 计算分母：667 ÷ 铺设间距 ÷ 滴头间距 × 滴头流量
     const denominator = (667 / laying_spacing / dripper_spacing) * dripper_flow
-    
+
     if (denominator === 0 || !isFinite(denominator)) {
         return 0
     }
-    
+
     // 计算：系统流量 × 1000 ÷ 分母 × 系数
     const result = (system_flow * 1000 / denominator) * coefficient
-    
+
     return result > 0 && isFinite(result) ? result : 0
 }
 
@@ -1270,43 +1262,43 @@ const updateAreaParam = async (paramName, value) => {
 // 初始化阀门选择地图
 const initValveSelectionMap = async (groupName) => {
     await nextTick()
-    
+
     const mapContainerId = `valve-selection-map-${groupName}`
     const container = document.getElementById(mapContainerId)
     if (!container) {
         console.error('找不到地图容器:', mapContainerId)
         return
     }
-    
+
     // 如果地图已存在，先销毁
     if (valveSelectionMaps.value[groupName]) {
         valveSelectionMaps.value[groupName].destroy()
     }
-    
+
     try {
         // 确保高德地图API已加载
         if (!globalThis.AMap) {
             await loadAMapScript()
         }
-        
+
         if (!globalThis.AMap) {
             throw new Error('高德地图API加载失败')
         }
-        
+
         // 计算地图中心点（所有阀门的中心）
         let centerLng = props.center.lng
         let centerLat = props.center.lat
-        
+
         if (availableValveDevices.value.length > 0) {
             const lngs = availableValveDevices.value.map(d => d.longitude).filter(Boolean)
             const lats = availableValveDevices.value.map(d => d.latitude).filter(Boolean)
-            
+
             if (lngs.length > 0 && lats.length > 0) {
                 centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length
                 centerLat = lats.reduce((a, b) => a + b, 0) / lats.length
             }
         }
-        
+
         // 创建地图实例
         const selectionMap = new AMap.Map(mapContainerId, {
             zoom: 15,
@@ -1314,32 +1306,32 @@ const initValveSelectionMap = async (groupName) => {
             mapStyle: 'amap://styles/normal',
             viewMode: '2D'
         })
-        
+
         // 添加卫星图层
         const satelliteLayer = new AMap.TileLayer.Satellite({
             zIndex: 1,
             opacity: 1
         })
         selectionMap.add(satelliteLayer)
-        
+
         valveSelectionMaps.value[groupName] = selectionMap
-        
+
         // 创建标记
         const markers = []
         for (const device of availableValveDevices.value) {
             if (!device.longitude || !device.latitude) continue
-            
+
             const isSelected = selectedValveDevices.value[groupName]?.includes(device.device_name) || false
-            
+
             const marker = createValveSelectionMarker(device, isSelected, groupName)
             if (marker) {
                 selectionMap.add(marker)
                 markers.push(marker)
             }
         }
-        
+
         valveSelectionMarkers.value[groupName] = markers
-        
+
     } catch (error) {
         console.error('初始化阀门选择地图失败:', error)
         ElMessage.error('地图加载失败')
@@ -1349,17 +1341,17 @@ const initValveSelectionMap = async (groupName) => {
 // 创建阀门选择标记
 const createValveSelectionMarker = (device, isSelected, groupName) => {
     if (!globalThis.AMap) return null
-    
+
     try {
         const deviceName = device.device_name
         // 使用 getDeviceIcon 函数获取正确的图标
         const deviceType = 'valve' // WaterGroupValve 使用阀门类型
         const iconName = getDeviceIcon(deviceType)
-        
+
         // 使用与主地图相同的样式，选中时添加 selected 类
         const statusClass = isSelected ? 'selected' : ''
         const selectionClass = isSelected ? 'valve-selected' : ''
-        
+
         const markerContent = `
             <div class="device-marker valve ${statusClass} ${selectionClass}" title="${deviceName}">
                 <div class="marker-icon">
@@ -1367,19 +1359,19 @@ const createValveSelectionMarker = (device, isSelected, groupName) => {
                 </div>
             </div>
         `
-        
+
         const marker = new AMap.Marker({
             position: [device.longitude, device.latitude],
             content: markerContent,
             anchor: 'center',
             offset: new AMap.Pixel(0, 0)
         })
-        
+
         // 添加点击事件
         marker.on('click', () => {
             toggleValveSelection(device.device_name, groupName)
         })
-        
+
         return marker
     } catch (error) {
         console.error('创建阀门选择标记失败:', error)
@@ -1392,7 +1384,7 @@ const toggleValveSelection = (deviceName, groupName) => {
     if (!selectedValveDevices.value[groupName]) {
         selectedValveDevices.value[groupName] = []
     }
-    
+
     const index = selectedValveDevices.value[groupName].indexOf(deviceName)
     if (index > -1) {
         // 取消选择
@@ -1401,7 +1393,7 @@ const toggleValveSelection = (deviceName, groupName) => {
         // 选择
         selectedValveDevices.value[groupName].push(deviceName)
     }
-    
+
     // 更新标记显示
     updateValveSelectionMarkers(groupName)
 }
@@ -1410,20 +1402,20 @@ const toggleValveSelection = (deviceName, groupName) => {
 const updateValveSelectionMarkers = (groupName) => {
     const markers = valveSelectionMarkers.value[groupName]
     if (!markers) return
-    
+
     markers.forEach((marker, index) => {
         const device = availableValveDevices.value[index]
         if (!device) return
-        
+
         const isSelected = selectedValveDevices.value[groupName]?.includes(device.device_name) || false
-        
+
         // 重新创建标记内容，使用与主地图相同的样式
         const deviceName = device.device_name
         const deviceType = 'valve'
         const iconName = getDeviceIcon(deviceType)
         const statusClass = isSelected ? 'selected' : ''
         const selectionClass = isSelected ? 'valve-selected' : ''
-        
+
         const markerContent = `
             <div class="device-marker valve ${statusClass} ${selectionClass}" title="${deviceName}">
                 <div class="marker-icon">
@@ -1431,7 +1423,7 @@ const updateValveSelectionMarkers = (groupName) => {
                 </div>
             </div>
         `
-        
+
         marker.setContent(markerContent)
     })
 }
@@ -1480,10 +1472,9 @@ const nextStep = async () => {
                     method: 'AreaBased',
                     AB_fert: 0,
                     total_fert: 0,
+                    total_time:0,
                     fert_time: 0,
-                    pre_fert_time: 0,
                     post_fert_time: 0,
-                    fert_rate: 0,
                 }
             }
         }
@@ -1538,6 +1529,10 @@ const finishWizard = () => {
             ElMessage.warning(`请为${group.name}设置有效的定时施肥参数`)
             return
         }
+        if (config.total_time <= 0) {
+            ElMessage.warning(`请为${group.name}设置有效的总灌溉时间参数`)
+            return
+        }
     }
 
     // 生成最终配置JSON
@@ -1570,9 +1565,8 @@ const finishWizard = () => {
             method: config.method,
             AB_fert: parseFloat(AB_fert.toFixed(2)),
             fert_time: config.method === 'Time' ? config.fert_time : 0,
-            pre_fert_time: config.pre_fert_time || 0,
+            total_time:config.total_time,
             post_fert_time: config.post_fert_time || 0,
-            fert_rate: config.fert_rate || 0,
         }
     }).filter(Boolean) // 过滤掉 null 值
 
@@ -1586,15 +1580,15 @@ const finishWizard = () => {
     (async () => {
         try {
             const farm_name = localStorage.getItem('selectedFarm') || ''
-            
+
             if (!farm_name) {
                 ElMessage.error('请先选择农场')
                 return
             }
-            
+
             console.log('开始下发轮灌组策略，农场:', farm_name)
             console.log('配置数据:', finalConfig)
-            
+
             // 先检查并创建必要的策略
             try {
                 await ensureRequiredPolicies(farm_name)
@@ -1604,10 +1598,10 @@ const finishWizard = () => {
                 ElMessage.error(e?.err_msg || e?.message || '检查必要策略失败: ' + String(e))
                 return
             }
-            
+
             const resp = await call_remote('/policy/apply_wizard_groups', { groups: finalConfig, farm_name })
             console.log('下发响应:', resp)
-            
+
             if (resp && resp.result) {
                 ElMessage.success('轮灌组策略已下发并生效')
                 policyConfigWizardVisible.value = false
@@ -1629,20 +1623,20 @@ const ensureRequiredPolicies = async (farm_name) => {
     if (!farm_name) {
         throw new Error('请先选择农场')
     }
-    
+
     try {
         // 先检查策略是否已存在
         const requiredPolicies = [
             { name: `${farm_name}-供水`, type: '供水策略' },
             { name: `${farm_name}-总策略`, type: '总策略' }
         ]
-        
+
         // 检查所有策略是否存在
         const policyList = await call_remote('/policy/list_policy', { pageNo: 0, farm_name: farm_name })
         const existingPolicies = policyList?.policies || []
         const existingPolicyNames = existingPolicies.map(p => p.name)
         console.log('当前农场策略列表:', existingPolicyNames)
-        
+
         // 检查并创建供水策略
         const waterPolicyName = `${farm_name}-供水`
         if (!existingPolicyNames.includes(waterPolicyName)) {
@@ -1652,7 +1646,7 @@ const ensureRequiredPolicies = async (farm_name) => {
                 `${farm_name}-主管道压力计`,
                 `${farm_name}-主管道流量计`
             ]
-            
+
             try {
                 const deviceList = await call_remote('/device_management/list_device', {
                     farm_name: farm_name,
@@ -1661,12 +1655,12 @@ const ensureRequiredPolicies = async (farm_name) => {
                 const existingDevices = deviceList?.devices || []
                 const existingDeviceNames = existingDevices.map(d => d.device_name)
                 console.log('当前农场设备列表:', existingDeviceNames)
-                
+
                 const missingDevices = requiredDevices.filter(name => !existingDeviceNames.includes(name))
                 if (missingDevices.length > 0) {
                     throw new Error(`缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`)
                 }
-                
+
                 await call_remote('/config/init_water_policy', {
                     farm_name: farm_name,
                     flow_warning_low_limit: 1,
@@ -1689,7 +1683,7 @@ const ensureRequiredPolicies = async (farm_name) => {
         } else {
             console.log('供水策略已存在，跳过创建')
         }
-        
+
         // 检查并创建总策略
         const globalPolicyName = `${farm_name}-总策略`
         if (!existingPolicyNames.includes(globalPolicyName)) {
@@ -1705,7 +1699,7 @@ const ensureRequiredPolicies = async (farm_name) => {
         } else {
             console.log('总策略已存在，跳过创建')
         }
-        
+
         // 检查并创建施肥策略
         const fertPolicyName = `${farm_name}-施肥`
         if (!existingPolicyNames.includes(fertPolicyName)) {
@@ -1715,7 +1709,7 @@ const ensureRequiredPolicies = async (farm_name) => {
                 `${farm_name}-施肥流量计`,
                 `${farm_name}-施肥液位计`
             ]
-            
+
             try {
                 const deviceList = await call_remote('/device_management/list_device', {
                     farm_name: farm_name,
@@ -1723,12 +1717,12 @@ const ensureRequiredPolicies = async (farm_name) => {
                 })
                 const existingDevices = deviceList?.devices || []
                 const existingDeviceNames = existingDevices.map(d => d.device_name)
-                
+
                 const missingDevices = requiredFertDevices.filter(name => !existingDeviceNames.includes(name))
                 if (missingDevices.length > 0) {
                     throw new Error(`缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`)
                 }
-                
+
                 await call_remote('/config/init_fert_policy', {
                     farm_name: farm_name,
                     flow_expected_value: 2.0,  // 期望流量值
