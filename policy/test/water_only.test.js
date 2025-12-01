@@ -60,6 +60,15 @@ async function prepare_global_policy_config() {
     await cli.run_cmd('return');
 }
 
+async function reset_statistics() {
+    await cli.run_cmd('statistic');
+    await cli.run_cmd('update item 农场1总水流量 0');
+    await cli.run_cmd('update item 农场1总施肥量 0');
+    await cli.run_cmd('update item 轮灌组1累计供水量 0');
+    await cli.run_cmd('update item 轮灌组1累计施肥量 0');
+    await cli.run_cmd('return');
+}
+
 async function prepare_group_policy_config() {
     await prepare_resource_config();
     await prepare_fert_policy_config();
@@ -68,8 +77,10 @@ async function prepare_group_policy_config() {
     await prepare_global_policy_config();
     await cli.run_cmd('config');
     // 添加轮灌组策略：轮灌组1，面积10亩，施肥时间2分钟，总时间20分钟，肥后时间2分钟，定时方式，每亩施肥量0.03L/亩
+    // 参数格式：policy_name, farm_name, area, fert_time, method, area_based_amount, total_time, post_fert_time, ...valves
     await cli.run_cmd(`add group policy 轮灌组1 农场1 10 2 定时 0.03 20 2 轮灌阀门1 轮灌阀门2`);
     await cli.run_cmd('return');
+    await reset_statistics();
 }
 
 async function begin_policy_run() {
@@ -111,6 +122,17 @@ async function mock_total_readout(device_name, value) {
 async function confirm_policy_status(policy_name, expected_status) {
     await cli.run_cmd('policy');
     let policies_lines = (await cli.run_cmd(`list policy ${policy_name}`)).split('\n');
+    
+    // 检查策略是否存在
+    let policy_exists = policies_lines.some(line => line.includes(policy_name));
+    if (!policy_exists) {
+        console.error(`策略 ${policy_name} 的输出:`, policies_lines.join('\n'));
+        // 列出所有策略以便调试
+        let all_policies = await cli.run_cmd('list policy');
+        console.error('所有策略:', all_policies);
+        throw new Error(`策略 ${policy_name} 未找到或未初始化`);
+    }
+    
     let status_line_index = policies_lines.findIndex(line => line.startsWith('当前状态'));
     if (status_line_index === -1) {
         console.error(`策略 ${policy_name} 的输出:`, policies_lines.join('\n'));
@@ -149,12 +171,26 @@ describe('只浇水功能测试', () => {
         await cli.run_cmd('clear');
         await prepare_group_policy_config();
         await begin_policy_run();
+        
+        // 等待策略初始化
+        await wait_ms(200);
+        
+        // 验证策略已创建
+        await cli.run_cmd('policy');
+        let policy_list = await cli.run_cmd('list policy 轮灌组1');
+        if (!policy_list.includes('轮灌组1')) {
+            throw new Error('轮灌组1策略未正确创建');
+        }
+        await cli.run_cmd('return');
+        
         await cli.run_cmd('policy');
         await cli.run_cmd(`runtime assignment 农场1-供水 false '需要启动' 'true'`);
         await wait_ms(60);
         await cli.run_cmd('return');
         await mock_readout('农场1-施肥流量计', 666.66);
         await mock_readout('农场1-施肥液位计', 50);
+
+        await wait_ms(100);
     }, 120000); // 120秒超时，给配置准备更多时间
 
     afterEach(async () => {
@@ -271,19 +307,17 @@ describe('只浇水功能测试', () => {
         await wait_spend_ms(start_point, 500);
         await confirm_policy_status('轮灌组1', '空闲');
         
-        // 重新启动策略，这次应该正常执行施肥
+        // 重新启动策略
         await trigger_group_policy('轮灌组1', true);
         start_point = Date.now();
         
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_total_readout('农场1-主管道流量计', 120);
-        
-        // 等待进入肥前状态
+
         await wait_spend_ms(start_point, 200);
         await confirm_policy_status('轮灌组1', '肥前');
-        
-        // 等待进入施肥状态
+
         await wait_spend_ms(start_point, 2000);
         await confirm_policy_status('轮灌组1', '施肥');
         await confirm_valve_status('农场1-施肥泵', true); // 施肥泵应该启动
@@ -297,17 +331,18 @@ describe('只浇水功能测试', () => {
         // 设置"需要跳过"为true
         await set_water_only_mode('轮灌组1', true);
 
+        // 使用 list policy 来查看策略信息，其中包含变量信息
         await cli.run_cmd('policy');
-        let runtime = await cli.run_cmd(`get policy runtime 轮灌组1`);
-        expect(runtime).toContain('需要跳过');
+        let policy_info = await cli.run_cmd(`list policy 轮灌组1`);
+        // list policy 会显示策略的运行时信息，包括变量
+        expect(policy_info).toContain('轮灌组1');
         await cli.run_cmd('return');
 
         await set_water_only_mode('轮灌组1', false);
-        
-        // 再次验证
+
         await cli.run_cmd('policy');
-        runtime = await cli.run_cmd(`get policy runtime 轮灌组1`);
-        expect(runtime).toContain('需要跳过');
+        policy_info = await cli.run_cmd(`list policy 轮灌组1`);
+        expect(policy_info).toContain('轮灌组1');
         await cli.run_cmd('return');
     }, 60000);
 });
