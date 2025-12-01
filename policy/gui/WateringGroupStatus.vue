@@ -244,7 +244,7 @@ const handleQuickAction = async (policyName, actionName) => {
     }
 }
 
-// 加载每个轮灌组的"需要跳过"状态
+// 加载每个轮灌组的"是否浇水"状态
 const loadWaterOnlyStates = async () => {
     for (const group of irrigationGroups.value) {
         try {
@@ -258,8 +258,8 @@ const loadWaterOnlyStates = async () => {
                 } catch (e) {
                     console.warn(`解析策略 ${group.name} 变量数据失败:`, e)
                 }
-                // 如果"需要跳过"为true，则"只浇水"按钮应该被选中
-                waterOnlyMode.value[group.name] = variables['需要跳过'] === true
+                // 如果"是否浇水"为true，则"只浇水"按钮应该被选中
+                waterOnlyMode.value[group.name] = variables['是否浇水'] === true
             }
         } catch (error) {
             console.warn(`获取策略 ${group.name} 运行时状态失败:`, error)
@@ -276,18 +276,28 @@ const handleWaterOnlyToggle = async (policyName) => {
     try {
         waterOnlyLoading.value[policyName] = true
         
-        // 设置"需要跳过"变量
+        // 设置"是否浇水"变量
         // 使用布尔值的字符串表示，让表达式求值器正确解析
         const result = await call_remote('/policy/runtime_assignment', {
             policy_name: policyName,
-            variable_name: '需要跳过',
+            variable_name: '是否浇水',
             expression: newState ? 'true' : 'false', // 使用布尔值字符串
             is_constant: false // 使用表达式求值，确保布尔值正确解析
         })
         
         if (result.result) {
+            // 如果启用只浇水模式，需要停止当前的施肥流程（设置"需要启动"为false）
+            if (newState) {
+                await call_remote('/policy/runtime_assignment', {
+                    policy_name: policyName,
+                    variable_name: '需要启动',
+                    expression: 'false',
+                    is_constant: false
+                })
+            }
+            
             waterOnlyMode.value[policyName] = newState
-            ElMessage.success(newState ? '已启用只浇水模式（跳过施肥）' : '已关闭只浇水模式')
+            ElMessage.success(newState ? '已启用只浇水模式' : '已关闭只浇水模式')
             // 重新加载轮灌组数据
             await loadWateringGroups()
         }
