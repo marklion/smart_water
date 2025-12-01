@@ -85,7 +85,7 @@ async function prepare_group_policy_config() {
 
 async function begin_policy_run() {
     await cli.run_cmd('policy');
-    await cli.run_cmd('scan period 500');
+    await cli.run_cmd('scan period 50');
     await wait_ms(60);
     await cli.run_cmd('return');
 }
@@ -172,16 +172,33 @@ describe('只浇水功能测试', () => {
         await prepare_group_policy_config();
         await begin_policy_run();
         
-        // 等待策略初始化
-        await wait_ms(200);
+        // 等待策略扫描周期执行几次，确保策略初始化完成
+        await wait_ms(300);
         
-        // 验证策略已创建
-        await cli.run_cmd('policy');
-        let policy_list = await cli.run_cmd('list policy 轮灌组1');
-        if (!policy_list.includes('轮灌组1')) {
+        // 验证策略已创建（重试几次）
+        let retry_count = 0;
+        let policy_exists = false;
+        while (retry_count < 5 && !policy_exists) {
+            await cli.run_cmd('policy');
+            let policy_list = await cli.run_cmd('list policy 轮灌组1');
+            policy_exists = policy_list.includes('轮灌组1');
+            if (!policy_exists) {
+                await cli.run_cmd('return');
+                await wait_ms(100);
+                retry_count++;
+            } else {
+                await cli.run_cmd('return');
+            }
+        }
+        
+        if (!policy_exists) {
+            // 列出所有策略以便调试
+            await cli.run_cmd('policy');
+            let all_policies = await cli.run_cmd('list policy');
+            console.error('所有策略:', all_policies);
+            await cli.run_cmd('return');
             throw new Error('轮灌组1策略未正确创建');
         }
-        await cli.run_cmd('return');
         
         await cli.run_cmd('policy');
         await cli.run_cmd(`runtime assignment 农场1-供水 false '需要启动' 'true'`);
@@ -190,7 +207,8 @@ describe('只浇水功能测试', () => {
         await mock_readout('农场1-施肥流量计', 666.66);
         await mock_readout('农场1-施肥液位计', 50);
 
-        await wait_ms(100);
+        // 等待所有配置生效
+        await wait_ms(150);
     }, 120000); // 120秒超时，给配置准备更多时间
 
     afterEach(async () => {
@@ -198,14 +216,15 @@ describe('只浇水功能测试', () => {
     }, 30000);
 
     test('在肥前状态启用只浇水模式，应该直接跳到收尾状态', async () => {
-        // 启动轮灌组策略
+        // 先设置流量计读数，再启动策略
+        await mock_total_readout('农场1-主管道流量计', 100);
         await trigger_group_policy('轮灌组1', true);
         let start_point = Date.now();
 
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
-        await mock_total_readout('农场1-主管道流量计', 100);
 
+        // 等待策略进入肥前状态（参考其他测试用例，等待60ms）
         await wait_spend_ms(start_point, 200);
         await confirm_policy_status('轮灌组1', '肥前');
         await confirm_valve_status('轮灌阀门1', true);
@@ -228,13 +247,15 @@ describe('只浇水功能测试', () => {
     }, 60000);
 
     test('在施肥状态启用只浇水模式，应该立即跳到收尾状态', async () => {
+        // 先设置流量计读数，再启动策略
+        await mock_total_readout('农场1-主管道流量计', 100);
         await trigger_group_policy('轮灌组1', true);
         let start_point = Date.now();
 
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
-        await mock_total_readout('农场1-主管道流量计', 100);
 
+        // 等待进入肥前状态
         await wait_spend_ms(start_point, 200);
         await confirm_policy_status('轮灌组1', '肥前');
         
@@ -259,16 +280,17 @@ describe('只浇水功能测试', () => {
     }, 60000);
 
     test('启用只浇水模式后，策略应该跳过施肥阶段', async () => {
-
         await set_water_only_mode('轮灌组1', true);
 
+        // 先设置流量计读数，再启动策略
+        await mock_total_readout('农场1-主管道流量计', 100);
         await trigger_group_policy('轮灌组1', true);
         let start_point = Date.now();
 
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
-        await mock_total_readout('农场1-主管道流量计', 100);
 
+        // 等待策略执行（只浇水模式应该直接跳到收尾）
         await wait_spend_ms(start_point, 400);
 
         await confirm_policy_status('轮灌组1', '收尾');
@@ -308,13 +330,14 @@ describe('只浇水功能测试', () => {
         await confirm_policy_status('轮灌组1', '空闲');
         
         // 重新启动策略
+        await mock_total_readout('农场1-主管道流量计', 120);
         await trigger_group_policy('轮灌组1', true);
         start_point = Date.now();
         
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
-        await mock_total_readout('农场1-主管道流量计', 120);
 
+        // 等待进入肥前状态
         await wait_spend_ms(start_point, 200);
         await confirm_policy_status('轮灌组1', '肥前');
 
