@@ -633,6 +633,135 @@ describe('轮灌组策略快速配置和验证', () => {
         await trigger_valve_reset('轮灌阀门3');
         await group_run_once(120, 130);
     });
+    
+    test('在肥前状态启用只浇水模式，应该直接跳到收尾状态', async () => {
+        await mock_total_readout('农场1-主管道流量计', 100);
+        await trigger_group_policy('轮灌组1', true);
+        let start_point = Date.now();
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+        await wait_spend_ms(start_point, 60);
+        await confirm_policy_status('轮灌组1', '肥前');
+        await confirm_valve_status('轮灌阀门1', true);
+        await confirm_valve_status('轮灌阀门2', true);
+        await confirm_valve_status('农场1-施肥泵', false);
+        
+        // 启用只浇水模式（设置"需要跳过"为true）
+        await cli.run_cmd('policy');
+        await cli.run_cmd(`runtime assignment 轮灌组1 false '需要跳过' 'true'`);
+        await wait_ms(60);
+        await cli.run_cmd('return');
+        
+        // 等待策略响应
+        await wait_spend_ms(start_point, 400);
+        
+        // 验证策略应该直接跳到收尾状态，跳过施肥和肥后
+        await confirm_policy_status('轮灌组1', '收尾');
+        await confirm_valve_status('农场1-施肥泵', false); // 施肥泵不应该启动
+        
+        await trigger_group_policy('轮灌组1', false);
+        await wait_spend_ms(start_point, 500);
+        await confirm_policy_status('轮灌组1', '空闲');
+    });
+    
+    test('在施肥状态启用只浇水模式，应该立即跳到收尾状态', async () => {
+        await mock_total_readout('农场1-主管道流量计', 100);
+        await trigger_group_policy('轮灌组1', true);
+        let start_point = Date.now();
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+        await wait_spend_ms(start_point, 60);
+        await confirm_policy_status('轮灌组1', '肥前');
+        await wait_spend_ms(start_point, 1560);
+        start_point = Date.now();
+        await confirm_policy_status('轮灌组1', '施肥');
+        await confirm_valve_status('农场1-施肥泵', true); // 施肥泵应该已启动
+        
+        // 启用只浇水模式（设置"需要跳过"为true）
+        await cli.run_cmd('policy');
+        await cli.run_cmd(`runtime assignment 轮灌组1 false '需要跳过' 'true'`);
+        await wait_ms(60);
+        await cli.run_cmd('return');
+        
+        // 等待策略响应
+        await wait_spend_ms(start_point, 400);
+        
+        // 验证策略应该立即跳到收尾状态
+        await confirm_policy_status('轮灌组1', '收尾');
+        await confirm_valve_status('农场1-施肥泵', false); // 施肥泵应该已关闭
+        
+        await trigger_group_policy('轮灌组1', false);
+        await wait_spend_ms(start_point, 500);
+        await confirm_policy_status('轮灌组1', '空闲');
+    });
+    
+    test('启用只浇水模式后，策略应该跳过施肥阶段', async () => {
+        // 先启用只浇水模式
+        await cli.run_cmd('policy');
+        await cli.run_cmd(`runtime assignment 轮灌组1 false '需要跳过' 'true'`);
+        await wait_ms(60);
+        await cli.run_cmd('return');
+        
+        await mock_total_readout('农场1-主管道流量计', 100);
+        await trigger_group_policy('轮灌组1', true);
+        let start_point = Date.now();
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+        await wait_spend_ms(start_point, 400);
+        
+        await confirm_policy_status('轮灌组1', '收尾');
+        await confirm_valve_status('轮灌阀门1', true); // 阀门应该打开（浇水）
+        await confirm_valve_status('轮灌阀门2', true);
+        await confirm_valve_status('农场1-施肥泵', false); // 施肥泵不应该启动
+        
+        await trigger_group_policy('轮灌组1', false);
+        await wait_spend_ms(start_point, 500);
+        await confirm_policy_status('轮灌组1', '空闲');
+    });
+    
+    test('关闭只浇水模式后，策略应该正常执行施肥', async () => {
+        // 先启用只浇水模式
+        await cli.run_cmd('policy');
+        await cli.run_cmd(`runtime assignment 轮灌组1 false '需要跳过' 'true'`);
+        await wait_ms(60);
+        await cli.run_cmd('return');
+        
+        await mock_total_readout('农场1-主管道流量计', 100);
+        await trigger_group_policy('轮灌组1', true);
+        let start_point = Date.now();
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+        await wait_spend_ms(start_point, 400);
+        await confirm_policy_status('轮灌组1', '收尾');
+        await confirm_valve_status('农场1-施肥泵', false);
+        
+        // 关闭只浇水模式（设置"需要跳过"为false）
+        await cli.run_cmd('policy');
+        await cli.run_cmd(`runtime assignment 轮灌组1 false '需要跳过' 'false'`);
+        await wait_ms(60);
+        await cli.run_cmd('return');
+        
+        // 停止当前策略
+        await trigger_group_policy('轮灌组1', false);
+        await wait_spend_ms(start_point, 500);
+        await confirm_policy_status('轮灌组1', '空闲');
+        
+        // 重新启动策略，这次应该正常执行施肥
+        await mock_total_readout('农场1-主管道流量计', 120);
+        await trigger_group_policy('轮灌组1', true);
+        start_point = Date.now();
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+        await wait_spend_ms(start_point, 60);
+        await confirm_policy_status('轮灌组1', '肥前');
+        await wait_spend_ms(start_point, 1560);
+        start_point = Date.now();
+        await confirm_policy_status('轮灌组1', '施肥');
+        await confirm_valve_status('农场1-施肥泵', true); // 施肥泵应该启动
+        
+        await trigger_group_policy('轮灌组1', false);
+        await wait_spend_ms(start_point, 100);
+    });
 });
 
 async function prepare_fert_mixing_policy_config(start_interval, duration, mixing_pump_name) {
