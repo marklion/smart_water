@@ -294,12 +294,18 @@ policy
       do assignment 'false' '肥前时间' '(prs.variables.get("施肥策略") == "定时"?prs.variables.get("肥前时间"):(${params.total_time} - ${params.post_fert_time} - prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率"))*60 * 1000)'
       do assignment 'false' '阶段剩余时间' 'prs.variables.get("肥前时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60'
       do assignment 'false' '当前浇水量' 'await prs.getSource("供水流量累计读数") - prs.variables.get("主管道流量累计值")'
+      transformer 'next'
+        rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
+      return
       transformer 'timeup'
-        rule 'false' '施肥' 'prs.variables.get("阶段剩余时间") < 0'
+        rule 'false' '施肥' 'prs.variables.get("阶段剩余时间") < 0 && prs.variables.get("需要跳过") != true'
         rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
       return
     return
     state '施肥'
+      transformer 'next'
+        rule 'false' '收尾' 'prs.variables.get("需要跳过") == true'
+      return
       enter crossAssignment 'false' '"${params.farm_name}-施肥"' '需要启动' 'true'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '阶段剩余时间' '0'
