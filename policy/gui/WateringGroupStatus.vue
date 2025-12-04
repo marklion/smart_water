@@ -258,8 +258,8 @@ const loadWaterOnlyStates = async () => {
                 } catch (e) {
                     console.warn(`解析策略 ${group.name} 变量数据失败:`, e)
                 }
-                // 如果"是否浇水"为true，则"只浇水"按钮应该被选中
-                waterOnlyMode.value[group.name] = variables['是否浇水'] === true
+                // 如果"是否只浇水"为true，则"只浇水"按钮应该被选中
+                waterOnlyMode.value[group.name] = variables['是否只浇水'] === true
             }
         } catch (error) {
             console.warn(`获取策略 ${group.name} 运行时状态失败:`, error)
@@ -276,11 +276,11 @@ const handleWaterOnlyToggle = async (policyName) => {
     try {
         waterOnlyLoading.value[policyName] = true
         
-        // 设置"是否浇水"变量
+        // 设置"是否只浇水"变量
         // 使用布尔值的字符串表示，让表达式求值器正确解析
         const result = await call_remote('/policy/runtime_assignment', {
             policy_name: policyName,
-            variable_name: '是否浇水',
+            variable_name: '是否只浇水',
             expression: newState ? 'true' : 'false', // 使用布尔值字符串
             is_constant: false // 使用表达式求值，确保布尔值正确解析
         })
