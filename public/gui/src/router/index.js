@@ -62,6 +62,16 @@ const router = createRouter({
             component: () => import('../../../../policy/gui/PolicyTemplateConfigSimple.vue'),
             parent: '配置中心',
             icon: MenuIcons.DOCUMENT
+          },
+          {
+            name: '策略程序设定向导',
+            path: '/policy_wizard',
+            component: () => import('../../../../policy/gui/PolicyWizard.vue'),
+            icon: MenuIcons.DOCUMENT,
+            hidden: true,
+            meta: {
+              hideMenu: true
+            }
           }
         ])
       ]
