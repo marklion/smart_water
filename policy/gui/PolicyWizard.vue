@@ -25,11 +25,7 @@
 
                 <!-- 步骤1：创建轮灌组 -->
                 <div v-if="wizardStep === 1" class="wizard-step-content">
-                    <div class="step-header">
-                        <h3>步骤1：创建轮灌组</h3>
-                        <p>请创建轮灌组并设置每个组的面积</p>
-                    </div>
-
+                
                     <div class="watering-groups-config">
                         <div class="groups-header">
                             <span>轮灌组列表</span>
@@ -222,8 +218,6 @@
                 <!-- 步骤2：分配设备 -->
                 <div v-if="wizardStep === 2" class="wizard-step-content">
                     <div class="step-header">
-                        <h3>步骤2：分配阀门设备</h3>
-                        <p class="step-description">为每个轮灌组选择阀门设备</p>
                         <div v-if="availableValveDevices.length === 0" class="no-devices-warning">
                             <el-alert title="未找到WaterGroupValve设备" type="warning"
                                 description="当前农场没有找到WaterGroupValve类型的设备，请先配置相关设备" :closable="false" show-icon />
@@ -333,10 +327,6 @@
 
                 <!-- 步骤3：施肥配置 -->
                 <div v-if="wizardStep === 3" class="wizard-step-content">
-                    <div class="step-header">
-                        <h3>步骤3：施肥配置</h3>
-                        <p>为每个轮灌组设置施肥方式和参数</p>
-                    </div>
 
                     <div class="fert-config">
                         <div v-for="group in wateringGroups.filter(g => g.isCopied !== true)" :key="group.name"
@@ -1799,9 +1789,13 @@ onMounted(async () => {
 
 <style scoped>
 .policy-wizard-page {
-    padding: 20px;
+    padding: 0;
     background-color: #f5f5f5;
     min-height: 100vh;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     /* 隐藏滚动条 */
     scrollbar-width: none;
     /* Firefox */
@@ -1815,8 +1809,20 @@ onMounted(async () => {
 }
 
 .wizard-card {
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+}
+
+.wizard-card :deep(.el-card__body) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
 }
 
 .card-header {
@@ -1843,7 +1849,11 @@ onMounted(async () => {
 }
 
 .policy-wizard {
-    padding: 20px 0;
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .wizard-steps {
@@ -1852,26 +1862,15 @@ onMounted(async () => {
 
 .wizard-step-content {
     margin: 30px 0;
-    min-height: 400px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
 }
 
-.step-header {
-    margin-bottom: 24px;
-    text-align: center;
-}
 
-.step-header h3 {
-    margin: 0 0 8px 0;
-    color: #303133;
-    font-size: 20px;
-    font-weight: 600;
-}
 
-.step-header p {
-    margin: 0;
-    color: #606266;
-    font-size: 14px;
-}
 
 .watering-groups-config {
     background: #f8f9fa;
@@ -1964,6 +1963,11 @@ onMounted(async () => {
     background: #f8f9fa;
     border-radius: 8px;
     padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .group-switcher {
@@ -1985,7 +1989,11 @@ onMounted(async () => {
 }
 
 .group-device-config.active {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .group-device-header {
@@ -2006,6 +2014,11 @@ onMounted(async () => {
     background: white;
     border-radius: 8px;
     padding: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .valve-list-header {
@@ -2026,8 +2039,9 @@ onMounted(async () => {
 }
 
 .valve-list-content {
-    max-height: 500px;
+    flex: 1;
     overflow-y: auto;
+    min-height: 0;
     /* 隐藏滚动条 */
     scrollbar-width: none;
     /* Firefox */
@@ -2414,11 +2428,17 @@ onMounted(async () => {
 
 .valve-selection-map-container {
     margin-top: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 800px;
 }
 
 .valve-selection-map {
     width: 100%;
-    height: 500px;
+    flex: 1;
+    min-height: 750px;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid #e4e7ed;
