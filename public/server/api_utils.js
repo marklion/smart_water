@@ -188,7 +188,7 @@ function api_param_check(param_req, input) {
     return ret;
 }
 
-function make_api(path, module, is_write, need_rbac, params, result, title, description, is_get_api = false) {
+function make_api(path, module, is_write, need_rbac, params, result, title, description, is_get_api = false, is_file_download = false) {
     let temp_params = { ...params };
     let temp_result = { ...result };
     if (is_get_api) {
@@ -196,7 +196,7 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
         temp_result.total = { type: Number, mean: '总数', example: 100 };
     }
     let ret = {
-        path: path, module: module, is_write: is_write, need_rbac: need_rbac, params: temp_params, result: temp_result, title: title, description: description,
+        path: path, module: module, is_write: is_write, need_rbac: need_rbac, params: temp_params, result: temp_result, title: title, description: description, is_file_download: is_file_download,
         add_handler: function (handler) {
             this.handler = handler;
             return this;
@@ -284,8 +284,30 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
                         if (is_get_api && body.pageNo == undefined) {
                             body.pageNo = 0;
                         }
-                        let result = await this.handler(body, token);
-                        ret = result_maker(result, '', make_req_example(this.result))
+                        
+                        // 检查是否是文件下载接口
+                        if (this.is_file_download) {
+                            try {
+                                let fileBuffer = await this.handler(body, token, res);
+                                // 如果handler已经设置了响应头并发送了响应，直接返回
+                                if (!res.headersSent) {
+                                    res.send(fileBuffer);
+                                }
+                                return;
+                            } catch (fileError) {
+                                console.error('文件下载错误:', fileError);
+                                if (!res.headersSent) {
+                                    ret = result_maker(null, fileError.message || '文件下载失败');
+                                } else {
+                                    return; // 如果已经发送了响应头，直接返回
+                                }
+                                // 继续到下面的错误处理
+                            }
+                        } else {
+                            // 非文件下载接口，正常处理
+                            let result = await this.handler(body, token);
+                            ret = result_maker(result, '', make_req_example(this.result))
+                        }
                     } catch (error) {
                         console.log(error);
                         if (error.err_msg) {
@@ -298,7 +320,9 @@ function make_api(path, module, is_write, need_rbac, params, result, title, desc
                 }
                 let end_time = new Date().getTime();
                 console.log((end_time - start_time) + '->' + this.path);
-                res.send(ret);
+                if (!res.headersSent) {
+                    res.send(ret);
+                }
             });
             app.help_info.push(this.make_help_info());
         },

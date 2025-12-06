@@ -24,7 +24,7 @@ async function module_install(app, module) {
         mkapi('/' + mo.name + '/' + method_name,
             mo.name, method.is_write, method.need_rbac,
             method.params, method.result, method.name,
-            method.description, method.is_get_api).add_handler(
+            method.description, method.is_get_api, method.is_file_download).add_handler(
                 method.func
             ).install(app);
     });
