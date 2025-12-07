@@ -1,6 +1,7 @@
 import pty from 'node-pty';
 import moment from 'moment';
 import axios from 'axios';
+import stripAnsi from 'strip-ansi';
 let g_server = null;
 function print_test_log(log, need_equal_sign = false) {
     let now = moment().format('YYYY-MM-DD HH:mm:ss:SSS');
@@ -104,37 +105,49 @@ export default async function create_cli(processName) {
     });
     ret.output = '';
     ret.process.on('data', function (data) {
-        ret.output += data;
-        if (data.includes('是否继续显示')) {
+        let cleanData = stripAnsi(data);
+        ret.output += cleanData;
+        if (cleanData.includes('是否继续显示')) {
             ret.process.write('y\n');
         }
     });
+    ret.last_output = '';
     async function waitForPrompt(prompt, wait_gap = 10) {
         return new Promise((resolve) => {
             const checkOutput = setInterval(() => {
-                let lines = ret.output.split('\n');
-                lines = lines.map(line => line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, ''));
-                let promptLine = lines.find(line => {
-                    return line.endsWith(prompt)
-                });
-                if (promptLine) {
-                    lines = lines.slice(1);
-                    lines = lines.filter(line => line.trim() !== '');
-
-                    ret.output = lines.join('\n');
-                    clearInterval(checkOutput);
-                    let outputBeforePrompt = ''
-                    let index = ret.output.indexOf(promptLine);
-                    if (index > 0 && ret.output[index - 1] === '\n') {
-                        index--;
-                        outputBeforePrompt = ret.output.substring(0, index);
+                let promptLine = null;
+                let lines = []
+                let cur_output = ret.output;
+                if (ret.last_output.length == cur_output.length) {
+                    if (cur_output.endsWith(prompt)) {
+                        lines = cur_output.split('\n');
+                        if (lines.length > 0) {
+                            let lastLine = lines[lines.length - 1];
+                            if (lastLine.endsWith(prompt)) {
+                                promptLine = lastLine;
+                            }
+                        }
                     }
-                    ret.output = ret.output.substring(index + promptLine.length);
-                    resolve({
-                        prompt: promptLine,
-                        content: outputBeforePrompt,
-                    });
+                    if (promptLine) {
+                        lines = lines.slice(1);
+                        lines = lines.filter(line => line.trim() !== '');
+
+                        cur_output = lines.join('\n');
+                        clearInterval(checkOutput);
+                        let outputBeforePrompt = ''
+                        let index = cur_output.indexOf(promptLine);
+                        if (index > 0 && cur_output[index - 1] === '\n') {
+                            index--;
+                            outputBeforePrompt = cur_output.substring(0, index);
+                        }
+                        ret.output = cur_output.substring(index + promptLine.length);
+                        resolve({
+                            prompt: promptLine,
+                            content: outputBeforePrompt,
+                        });
+                    }
                 }
+                ret.last_output = cur_output;
             }, wait_gap);
         });
     }
@@ -142,13 +155,20 @@ export default async function create_cli(processName) {
         ret.output = '';
         ret.process.write(cmd + '\n');
         let wait_gap = 10;
+        let real_prompt = prompt;
         if (cmd === 'clear' || cmd.startsWith('restore')) {
-            wait_gap = 500;
+            if (ret.current_prompt) {
+                real_prompt = ret.current_prompt;
+            }
+            else {
+                real_prompt = 'sw_cli> ';
+            }
         }
-        let resp = await waitForPrompt(prompt, wait_gap);
-        if (cmd != 'clear') {
-            print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+        let resp = await waitForPrompt(real_prompt, wait_gap);
+        if (cmd.startsWith('restore')) {
+            resp = await waitForPrompt(real_prompt, wait_gap);
         }
+        print_test_log(`In ${ret.current_prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
         ret.current_prompt = resp.prompt;
 
         return resp.content;

@@ -381,6 +381,11 @@
                                                         <span class="detail-value">{{
                                                             existingGroup.fertConfig?.post_fert_time || 0 }} 分钟</span>
                                                     </div>
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">总灌溉时间：</span>
+                                                        <span class="detail-value">{{
+                                                            existingGroup.fertConfig?.total_time || 0 }} 分钟</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </template>
@@ -1504,6 +1509,16 @@ const parseFertConfigFromVariables = (initVariables, fertConfig) => {
             fertConfig.AB_fert = parseFloat(expression) || 0
         } else if (varName === '期望施肥总量') {
             fertConfig.total_fert = parseFloat(expression) || 0
+        } else if (varName === 'total_time' || varName === '总时间' || varName === '总灌溉时间') {
+            fertConfig.total_time = parseTimeValue(expression)
+        }
+    }
+    
+    // 如果 total_time 未设置，尝试从其他时间参数计算
+    if (!fertConfig.total_time || fertConfig.total_time <= 0) {
+        const calculatedTotal = (fertConfig.pre_fert_time || 0) + (fertConfig.fert_time || 0) + (fertConfig.post_fert_time || 0)
+        if (calculatedTotal > 0) {
+            fertConfig.total_time = calculatedTotal
         }
     }
 }
@@ -1702,13 +1717,36 @@ const createCopiedGroup = (trimmedName, existingGroup) => {
 
     selectedValveDevices.value[trimmedName] = []
 
+    // 确保正确读取所有参数，包括 total_time
+    const sourceFertConfig = existingGroup.fertConfig || {}
+    const totalTime = sourceFertConfig.total_time !== undefined ? sourceFertConfig.total_time : 0
+    
+    // 如果 total_time 为 0，尝试从其他时间参数计算（与 parseFertConfigFromVariables 逻辑一致）
+    let finalTotalTime = totalTime
+    if (!finalTotalTime || finalTotalTime <= 0) {
+        const calculatedTotal = (sourceFertConfig.pre_fert_time || 0) + (sourceFertConfig.fert_time || 0) + (sourceFertConfig.post_fert_time || 0)
+        if (calculatedTotal > 0) {
+            finalTotalTime = calculatedTotal
+        }
+    }
+
     fertConfigs.value[trimmedName] = {
-        method: existingGroup.fertConfig?.method || 'AreaBased',
-        AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
-        total_fert: existingGroup.fertConfig?.total_fert ?? 0,
-        fert_time: existingGroup.fertConfig?.fert_time ?? 0,
-        total_time: existingGroup.fertConfig?.total_time ?? 0,
-        post_fert_time: existingGroup.fertConfig?.post_fert_time ?? 0,
+        method: sourceFertConfig.method || 'AreaBased',
+        AB_fert: sourceFertConfig.AB_fert ?? 0,
+        total_fert: sourceFertConfig.total_fert ?? 0,
+        fert_time: sourceFertConfig.fert_time ?? 0,
+        total_time: finalTotalTime,
+        post_fert_time: sourceFertConfig.post_fert_time ?? 0,
+        pre_fert_time: sourceFertConfig.pre_fert_time ?? 0,
+    }
+
+    // 调试信息：如果 total_time 仍然为 0，记录警告
+    if (finalTotalTime <= 0) {
+        console.warn('复制轮灌组时 total_time 为 0:', {
+            源轮灌组: existingGroup.name,
+            新轮灌组: trimmedName,
+            fertConfig: sourceFertConfig
+        })
     }
 
     copiedGroups.value.add(trimmedName)
