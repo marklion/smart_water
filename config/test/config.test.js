@@ -543,7 +543,7 @@ describe('总策略快速配置和验证', () => {
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
-        await wait_spend_ms(start_point, 4700);
+        await wait_spend_ms(start_point, 4650);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();

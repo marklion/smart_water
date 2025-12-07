@@ -344,8 +344,7 @@ policy
     state '收尾'
       enter crossAssignment 'false' '"${params.farm_name}-总策略"' '当前轮灌组已启动' 'false'
       transformer 'next'
-        rule 'false' '浇水' 'prs.variables.get("是否浇水") == true'
-        rule 'false' '空闲' 'prs.variables.get("需要启动") == false && prs.variables.get("是否浇水") == false'
+        rule 'false' '空闲' 'prs.variables.get("需要启动") == false'
       return
     return
     init state '空闲'
