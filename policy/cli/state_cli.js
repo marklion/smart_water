@@ -230,7 +230,7 @@ export default {
 
         this._vorpalInstance.delimiter(prompt);
         this.cur_view_name = args.view_name;
-        return `已进入状态视图: ${prompt}`;
+        return `已进入状态视图: ${prompt.slice(0, -2)}`;
     },
     get_all_views: async function () {
         let ret = []
@@ -279,7 +279,7 @@ export default {
                     });
                 }
             });
-            
+
             // 显示告警模板
             if (resp.state.warning_template) {
                 ret.push(`warning '${resp.state.warning_template}'`);

@@ -111,31 +111,43 @@ export default async function create_cli(processName) {
             ret.process.write('y\n');
         }
     });
+    ret.last_output = '';
     async function waitForPrompt(prompt, wait_gap = 10) {
         return new Promise((resolve) => {
             const checkOutput = setInterval(() => {
-                let lines = ret.output.split('\n');
-                let promptLine = lines.find(line => {
-                    return line.endsWith(prompt)
-                });
-                if (promptLine) {
-                    lines = lines.slice(1);
-                    lines = lines.filter(line => line.trim() !== '');
-
-                    ret.output = lines.join('\n');
-                    clearInterval(checkOutput);
-                    let outputBeforePrompt = ''
-                    let index = ret.output.indexOf(promptLine);
-                    if (index > 0 && ret.output[index - 1] === '\n') {
-                        index--;
-                        outputBeforePrompt = ret.output.substring(0, index);
+                let promptLine = null;
+                let lines = []
+                let cur_output = ret.output;
+                if (ret.last_output.length == cur_output.length) {
+                    if (cur_output.endsWith(prompt)) {
+                        lines = cur_output.split('\n');
+                        if (lines.length > 0) {
+                            let lastLine = lines[lines.length - 1];
+                            if (lastLine.endsWith(prompt)) {
+                                promptLine = lastLine;
+                            }
+                        }
                     }
-                    ret.output = ret.output.substring(index + promptLine.length);
-                    resolve({
-                        prompt: promptLine,
-                        content: outputBeforePrompt,
-                    });
+                    if (promptLine) {
+                        lines = lines.slice(1);
+                        lines = lines.filter(line => line.trim() !== '');
+
+                        cur_output = lines.join('\n');
+                        clearInterval(checkOutput);
+                        let outputBeforePrompt = ''
+                        let index = cur_output.indexOf(promptLine);
+                        if (index > 0 && cur_output[index - 1] === '\n') {
+                            index--;
+                            outputBeforePrompt = cur_output.substring(0, index);
+                        }
+                        ret.output = cur_output.substring(index + promptLine.length);
+                        resolve({
+                            prompt: promptLine,
+                            content: outputBeforePrompt,
+                        });
+                    }
                 }
+                ret.last_output = cur_output;
             }, wait_gap);
         });
     }
@@ -153,7 +165,10 @@ export default async function create_cli(processName) {
             }
         }
         let resp = await waitForPrompt(real_prompt, wait_gap);
-        print_test_log(`In ${real_prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+        if (cmd.startsWith('restore')) {
+            resp = await waitForPrompt(real_prompt, wait_gap);
+        }
+        print_test_log(`In ${ret.current_prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
         ret.current_prompt = resp.prompt;
 
         return resp.content;

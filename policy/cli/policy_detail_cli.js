@@ -171,7 +171,7 @@ export default {
 
         this._vorpalInstance.delimiter(prompt);
         this.cur_view_name = args.view_name;
-        return `已进入策略视图: ${prompt}`;
+        return `已进入策略视图: ${prompt.slice(0, -2)}`;
     },
     get_all_views: async function () {
         let ret = []
