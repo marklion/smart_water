@@ -153,7 +153,7 @@ export default async function create_cli(processName) {
             }
         }
         let resp = await waitForPrompt(real_prompt, wait_gap);
-        print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
+        print_test_log(`In ${real_prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
         ret.current_prompt = resp.prompt;
 
         return resp.content;
