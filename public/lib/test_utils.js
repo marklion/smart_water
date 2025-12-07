@@ -1,6 +1,7 @@
 import pty from 'node-pty';
 import moment from 'moment';
 import axios from 'axios';
+import stripAnsi from 'strip-ansi';
 let g_server = null;
 function print_test_log(log, need_equal_sign = false) {
     let now = moment().format('YYYY-MM-DD HH:mm:ss:SSS');
@@ -104,8 +105,9 @@ export default async function create_cli(processName) {
     });
     ret.output = '';
     ret.process.on('data', function (data) {
-        ret.output += data;
-        if (data.includes('是否继续显示')) {
+        let cleanData = stripAnsi(data);
+        ret.output += cleanData;
+        if (cleanData.includes('是否继续显示')) {
             ret.process.write('y\n');
         }
     });
@@ -113,7 +115,6 @@ export default async function create_cli(processName) {
         return new Promise((resolve) => {
             const checkOutput = setInterval(() => {
                 let lines = ret.output.split('\n');
-                lines = lines.map(line => line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, ''));
                 let promptLine = lines.find(line => {
                     return line.endsWith(prompt)
                 });
@@ -142,13 +143,17 @@ export default async function create_cli(processName) {
         ret.output = '';
         ret.process.write(cmd + '\n');
         let wait_gap = 10;
+        let real_prompt = prompt;
         if (cmd === 'clear' || cmd.startsWith('restore')) {
-            wait_gap = 500;
+            if (ret.current_prompt) {
+                real_prompt = ret.current_prompt;
+            }
+            else {
+                real_prompt = 'sw_cli> ';
+            }
         }
-        let resp = await waitForPrompt(prompt, wait_gap);
-        if (cmd != 'clear') {
-            print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
-        }
+        let resp = await waitForPrompt(real_prompt, wait_gap);
+        print_test_log(`In ${resp.prompt} Run Cmd: ${cmd} -> Output:\n${resp.content}`);
         ret.current_prompt = resp.prompt;
 
         return resp.content;
