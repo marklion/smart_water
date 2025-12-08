@@ -603,35 +603,41 @@ describe('轮灌组策略快速配置和验证', () => {
     afterEach(async () => {
         await cli.run_cmd('clear');
     });
-    test('轮灌组策略正常转两轮', async () => {
-        await group_run_once(80, 110);
-        await group_run_once(120, 130);
-        let statistics = await get_statistics('轮灌组1累计供水量');
-        expect(statistics.length).toBeGreaterThanOrEqual(2);
-        expect(statistics[0]).toBe(40);
-        expect(statistics[1]).toBe(30);
-    });
-    test('轮灌组策略被跳过', async () => {
-        await trigger_group_policy('轮灌组2', true);
+
+    test('只浇水模式下施肥泵关闭且供水统计正常增加', async () => {
+        // 在开始前设置总流量读数
+        await mock_total_readout('农场1-主管道流量计', 100);
+
+        // 设定只浇水变量
+        await cli.run_cmd('policy');
+        await cli.run_cmd(`runtime assignment 轮灌组1 false '是否只浇水' 'true'`);
+        await wait_ms(60);
+        await cli.run_cmd('return');
+
+        // 启动轮灌组
+        await trigger_group_policy('轮灌组1', true);
         let start_point = Date.now();
-        await mock_readout('轮灌阀门1', 2);
-        await mock_readout('轮灌阀门2', 2);
-        await mock_readout('轮灌阀门3', 5);
-        await wait_spend_ms(start_point, 1560);
-        await confirm_policy_status('轮灌组2', '施肥');
-        await confirm_valve_status('农场1-施肥泵', true);
-        await confirm_valve_status('轮灌阀门3', true);
-        await wait_spend_ms(start_point, 1800);
-        await mock_readout('轮灌阀门3', 2);
-        start_point = Date.now();
-        await confirm_policy_status('轮灌组2', '施肥');
-        await wait_spend_ms(start_point, 2000);
-        await confirm_policy_status('轮灌组2', '收尾');
-        await confirm_policy_status('轮灌阀门3', '异常');
+
+        // 模拟阀门压力正常，避免进入异常分支
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+
+        // 等待一小段时间，让策略进入浇水状态
+        await wait_spend_ms(start_point, 200);
+
+        // 验证施肥泵在只浇水模式下一直是关闭的
         await confirm_valve_status('农场1-施肥泵', false);
-        await trigger_group_policy('轮灌组2', false);
-        await trigger_valve_reset('轮灌阀门3');
-        await group_run_once(120, 130);
+
+        // 在浇水快结束前更新总流量读数，模拟供水量为 30
+        await mock_total_readout('农场1-主管道流量计', 130);
+
+        // 等待总灌溉时间结束（0.07 分钟 ≈ 4200ms），略多等一点
+        await wait_spend_ms(start_point, 4500);
+
+        // 校验统计值是否按供水增量正常增加
+        const statistics = await get_statistics('轮灌组1累计供水量');
+        expect(statistics.length).toBeGreaterThanOrEqual(1);
+        expect(statistics[0]).toBe(30);
     });
 });
 

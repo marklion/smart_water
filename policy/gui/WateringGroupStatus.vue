@@ -10,7 +10,21 @@
         <div class="watering-groups-table">
             <el-table :data="irrigationGroups" stripe border :loading="loading" empty-text="暂无轮灌组数据"
                 :row-class-name="tableRowClassName">
-                <el-table-column prop="name" label="轮灌组" width="150" align="left" show-overflow-tooltip />
+                <el-table-column prop="name" label="轮灌组" width="220" align="left">
+                    <template #default="{ row }">
+                        <div class="group-name-with-button">
+                            <span class="group-name" :title="row.name">{{ row.name }}</span>
+                            <el-button 
+                                size="small" 
+                                :type="waterOnlyMode[row.name] ? 'success' : 'default'"
+                                @click.stop="handleWaterOnlyToggle(row.name)"
+                                :loading="waterOnlyLoading[row.name]"
+                                class="water-only-button-inline">
+                                只浇水
+                            </el-button>
+                        </div>
+                    </template>
+                </el-table-column>
                 <el-table-column prop="area" label="面积/亩" width="100" align="center" />
                 <el-table-column prop="method" label="灌溉方式" width="100" align="center" />
                 <el-table-column prop="fert_rate" label="施肥率(L/亩)" width="120" align="center" />
@@ -82,6 +96,8 @@ const props = defineProps({
 const irrigationGroups = ref([])
 const loading = ref(false)
 const quickActionLoading = ref({})
+const waterOnlyMode = ref({}) // 跟踪每个轮灌组的"只浇水"状态
+const waterOnlyLoading = ref({}) // 跟踪"只浇水"按钮的加载状态
 
 // 加载轮灌组数据
 const loadWateringGroups = async () => {
@@ -135,6 +151,9 @@ const loadWateringGroups = async () => {
                 cur_state: group.cur_state || '未知',
                 valves: group.valves || '-'
             }))
+            
+            // 加载每个轮灌组的"需要跳过"状态，用于初始化"只浇水"按钮状态
+            await loadWaterOnlyStates()
         } else {
             irrigationGroups.value = []
         }
@@ -225,6 +244,71 @@ const handleQuickAction = async (policyName, actionName) => {
     }
 }
 
+// 加载每个轮灌组的"是否浇水"状态
+const loadWaterOnlyStates = async () => {
+    for (const group of irrigationGroups.value) {
+        try {
+            const runtimeResult = await call_remote('/policy/get_policy_runtime', {
+                policy_name: group.name
+            })
+            if (runtimeResult && runtimeResult.variables) {
+                let variables = {}
+                try {
+                    variables = JSON.parse(runtimeResult.variables)
+                } catch (e) {
+                    console.warn(`解析策略 ${group.name} 变量数据失败:`, e)
+                }
+                // 如果"是否只浇水"为true，则"只浇水"按钮应该被选中
+                waterOnlyMode.value[group.name] = variables['是否只浇水'] === true
+            }
+        } catch (error) {
+            console.warn(`获取策略 ${group.name} 运行时状态失败:`, error)
+            waterOnlyMode.value[group.name] = false
+        }
+    }
+}
+
+// 处理"只浇水"按钮切换
+const handleWaterOnlyToggle = async (policyName) => {
+    const currentState = waterOnlyMode.value[policyName] || false
+    const newState = !currentState
+    
+    try {
+        waterOnlyLoading.value[policyName] = true
+        
+        // 设置"是否只浇水"变量
+        // 使用布尔值的字符串表示，让表达式求值器正确解析
+        const result = await call_remote('/policy/runtime_assignment', {
+            policy_name: policyName,
+            variable_name: '是否只浇水',
+            expression: newState ? 'true' : 'false', // 使用布尔值字符串
+            is_constant: false // 使用表达式求值，确保布尔值正确解析
+        })
+        
+        if (result.result) {
+            // 如果启用只浇水模式，需要停止当前的施肥流程（设置"需要启动"为false）
+            if (newState) {
+                await call_remote('/policy/runtime_assignment', {
+                    policy_name: policyName,
+                    variable_name: '需要启动',
+                    expression: 'false',
+                    is_constant: false
+                })
+            }
+            
+            waterOnlyMode.value[policyName] = newState
+            ElMessage.success(newState ? '已启用只浇水模式' : '已关闭只浇水模式')
+            // 重新加载轮灌组数据
+            await loadWateringGroups()
+        }
+    } catch (error) {
+        console.error('切换只浇水模式失败:', error)
+        ElMessage.error(error.err_msg || '切换只浇水模式失败')
+    } finally {
+        waterOnlyLoading.value[policyName] = false
+    }
+}
+
 // 暴露数据和方法给父组件
 defineExpose({
     irrigationGroups,
@@ -288,6 +372,23 @@ onMounted(() => {
 
 .action-buttons-row .el-button {
     flex: 1;
+}
+
+.group-name-with-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.group-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.water-only-button-inline {
+    flex-shrink: 0;
 }
 
 .stop-button {

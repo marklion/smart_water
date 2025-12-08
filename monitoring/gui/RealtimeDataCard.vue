@@ -49,15 +49,8 @@
             <div class="data-value" :class="item.valueClass">
               {{ item.value }}
             </div>
-            <el-button
-              type="primary"
-              :icon="View"
-              circle
-              size="small"
-              class="history-btn-center"
-              @click.stop="openHistoryDialog(item)"
-              title="查看历史数据"
-            />
+            <el-button type="primary" :icon="View" circle size="small" class="history-btn-center"
+              @click.stop="openHistoryDialog(item)" title="查看历史数据" />
             <div class="data-unit">{{ item.unit }}</div>
           </div>
         </div>
@@ -79,49 +72,26 @@
   </el-card>
 
   <!-- 历史数据对话框 - 独立弹窗 -->
-  <el-dialog
-    v-model="historyDialogVisible"
-    :title="`${currentHistoryItem?.label || ''} - 历史数据`"
-    width="800px"
-    :close-on-click-modal="false"
-    class="history-dialog"
-    :append-to-body="true"
-    destroy-on-close
-  >
+  <el-dialog v-model="historyDialogVisible" :title="`${currentHistoryItem?.label || ''} - 历史数据`" width="800px"
+    :close-on-click-modal="false" class="history-dialog" :append-to-body="true" destroy-on-close>
     <div class="history-filter">
       <div class="filter-header">
         <div class="filter-title">
-          <el-icon class="filter-icon"><Calendar /></el-icon>
+          <el-icon class="filter-icon">
+            <Calendar />
+          </el-icon>
           <span>日期范围筛选</span>
         </div>
       </div>
       <div class="date-range-picker">
-        <el-date-picker
-          v-model="dateRange"
-          type="datetimerange"
-          range-separator="至"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          format="YYYY-MM-DD HH:mm:ss"
-          value-format="YYYY-MM-DD HH:mm:ss"
-          size="default"
-          class="date-picker-input"
-        />
+        <el-date-picker v-model="dateRange" type="datetimerange" range-separator="至" start-placeholder="开始日期"
+          end-placeholder="结束日期" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" size="default"
+          class="date-picker-input" />
         <div class="filter-actions">
-          <el-button 
-            type="primary" 
-            :icon="Search"
-            @click="applyDateFilter" 
-            :loading="historyLoading"
-            class="query-btn"
-          >
+          <el-button type="primary" :icon="Search" @click="applyDateFilter" :loading="historyLoading" class="query-btn">
             查询
           </el-button>
-          <el-button 
-            :icon="RefreshLeft"
-            @click="resetDateFilter"
-            class="reset-btn"
-          >
+          <el-button :icon="RefreshLeft" @click="resetDateFilter" class="reset-btn">
             重置
           </el-button>
         </div>
@@ -130,21 +100,24 @@
     <div v-loading="historyLoading" class="history-content">
       <div class="table-header" v-if="filteredHistoryData.length > 0">
         <div class="data-count">
-          <el-icon><Clock /></el-icon>
+          <el-icon>
+            <Clock />
+          </el-icon>
           <span>共 {{ filteredHistoryData.length }} 条记录</span>
         </div>
+        <el-button type="success" :icon="Download" @click="exportToExcel" :loading="exporting" size="small"
+          class="export-btn">
+          导出Excel
+        </el-button>
       </div>
-      <el-table
-        :data="filteredHistoryData"
-        stripe
-        max-height="400"
-        class="history-table"
-        :row-class-name="tableRowClassName"
-      >
+      <el-table :data="filteredHistoryData" stripe max-height="400" class="history-table"
+        :row-class-name="tableRowClassName">
         <el-table-column prop="timestamp" label="时间" width="200">
           <template #default="{ row }">
             <div class="timestamp-cell">
-              <el-icon class="time-icon"><Clock /></el-icon>
+              <el-icon class="time-icon">
+                <Clock />
+              </el-icon>
               <span>{{ row.timestamp }}</span>
             </div>
           </template>
@@ -173,7 +146,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, Clock, View, Calendar, Search, RefreshLeft } from '@element-plus/icons-vue'
+import { Refresh, Clock, View, Calendar, Search, RefreshLeft, Download } from '@element-plus/icons-vue'
 import call_remote from '../../public/lib/call_remote.js'
 
 // 定义props
@@ -198,6 +171,7 @@ const historyData = ref([]) // 所有历史数据
 const filteredHistoryData = ref([]) // 筛选后的历史数据
 const currentHistoryItem = ref(null)
 const dateRange = ref(null) // 日期范围
+const exporting = ref(false) // 导出状态
 
 // 实时数据 - 动态存储用户配置的统计项
 const realtimeData = reactive({})
@@ -239,7 +213,7 @@ const deviceDataItems = computed(() => {
     // 根据索引分配样式类
     const valueClasses = ['primary', 'success', 'warning', 'info', 'danger']
     const valueClass = valueClasses[index % valueClasses.length]
-    
+
     return {
       key: key,
       label: data.label || key,
@@ -433,7 +407,7 @@ const loadRealtimeConfigs = async (force = false) => {
   if (configsLoaded.value && !force) {
     return
   }
-  
+
   try {
     const configResponse = await call_remote('/resource/list_realtime', {
       farm_name: props.farmName || undefined
@@ -479,21 +453,21 @@ const loadDeviceRealtimeData = async () => {
     const deviceDataResult = {}
     for (const config of realtimeConfigs.value) {
       const key = `${config.farm_name}_${config.label}` // 使用农场名和标签作为唯一key
-      
+
       try {
         let value = 0
         let unit = ''
-        
+
         // 根据data_type调用不同的接口
         if (config.data_type === 'readout') {
           const readoutResponse = await call_remote('/device_management/readout_device', {
             device_name: config.device_name
           })
-          
+
           if (readoutResponse && readoutResponse.readout !== null && readoutResponse.readout !== undefined) {
             value = parseFloat(readoutResponse.readout) || 0
           }
-          
+
           // 从缓存获取设备信息，如果没有则调用接口
           if (!deviceInfoCache[config.device_name]) {
             try {
@@ -501,7 +475,7 @@ const loadDeviceRealtimeData = async () => {
                 pageNo: 0,
                 device_name: config.device_name
               })
-              
+
               if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
                 deviceInfoCache[config.device_name] = deviceResponse.devices[0]
               }
@@ -509,7 +483,7 @@ const loadDeviceRealtimeData = async () => {
               console.warn(`获取设备 ${config.device_name} 信息失败:`, error)
             }
           }
-          
+
           if (deviceInfoCache[config.device_name]) {
             const device = deviceInfoCache[config.device_name]
             unit = getDeviceUnit(device.device_name, device.driver_name)
@@ -518,11 +492,11 @@ const loadDeviceRealtimeData = async () => {
           const readoutResponse = await call_remote('/device_management/readout_device', {
             device_name: config.device_name
           })
-          
+
           if (readoutResponse && readoutResponse.total_readout !== null && readoutResponse.total_readout !== undefined) {
             value = parseFloat(readoutResponse.total_readout) || 0
           }
-          
+
           // 从缓存获取设备信息，如果没有则调用接口
           if (!deviceInfoCache[config.device_name]) {
             try {
@@ -530,7 +504,7 @@ const loadDeviceRealtimeData = async () => {
                 pageNo: 0,
                 device_name: config.device_name
               })
-              
+
               if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
                 deviceInfoCache[config.device_name] = deviceResponse.devices[0]
               }
@@ -538,7 +512,7 @@ const loadDeviceRealtimeData = async () => {
               console.warn(`获取设备 ${config.device_name} 信息失败:`, error)
             }
           }
-          
+
           if (deviceInfoCache[config.device_name]) {
             const device = deviceInfoCache[config.device_name]
             unit = getDeviceUnit(device.device_name, device.driver_name)
@@ -700,13 +674,13 @@ const applyDateFilter = async () => {
   if (!currentHistoryItem.value) {
     return
   }
-  
+
   if (!dateRange.value || dateRange.value.length !== 2) {
     // 如果没有选择日期范围，重新加载所有数据
     await loadHistoryData(currentHistoryItem.value.key)
     return
   }
-  
+
   const [startDate, endDate] = dateRange.value
   await loadHistoryDataWithDateRange(currentHistoryItem.value.key, startDate, endDate)
 }
@@ -718,7 +692,7 @@ const loadHistoryDataWithDateRange = async (itemName, startDate, endDate) => {
     const allRecords = []
     let pageNo = 0
     let hasMore = true
-    
+
     while (hasMore && pageNo < 10) { // 最多获取10页，避免数据过多
       const response = await call_remote('/statistic/list_item_history', {
         item_name: itemName,
@@ -726,7 +700,7 @@ const loadHistoryDataWithDateRange = async (itemName, startDate, endDate) => {
         start_date: startDate,
         end_date: endDate
       })
-      
+
       if (response && response.records && response.records.length > 0) {
         allRecords.push(...response.records)
         // 如果返回的记录数少于预期，说明没有更多数据了
@@ -739,12 +713,12 @@ const loadHistoryDataWithDateRange = async (itemName, startDate, endDate) => {
         hasMore = false
       }
     }
-    
+
     // 按时间正序排列
     filteredHistoryData.value = allRecords.sort((a, b) => {
       return new Date(a.timestamp) - new Date(b.timestamp)
     })
-    
+
     if (filteredHistoryData.value.length === 0) {
       ElMessage.info('所选日期范围内暂无数据')
     }
@@ -771,13 +745,13 @@ const loadHistoryData = async (itemName) => {
     const allRecords = []
     let pageNo = 0
     let hasMore = true
-    
+
     while (hasMore && pageNo < 10) { // 最多获取10页，避免数据过多
       const response = await call_remote('/statistic/list_item_history', {
         item_name: itemName,
         pageNo: pageNo
       })
-      
+
       if (response && response.records && response.records.length > 0) {
         allRecords.push(...response.records)
         // 如果返回的记录数少于预期，说明没有更多数据了
@@ -790,15 +764,15 @@ const loadHistoryData = async (itemName) => {
         hasMore = false
       }
     }
-    
+
     // 按时间正序排列
     historyData.value = allRecords.sort((a, b) => {
       return new Date(a.timestamp) - new Date(b.timestamp)
     })
-    
+
     // 初始化筛选后的数据为所有数据
     filteredHistoryData.value = [...historyData.value]
-    
+
     if (historyData.value.length === 0) {
       ElMessage.info('暂无历史数据')
     }
@@ -818,6 +792,82 @@ const tableRowClassName = ({ rowIndex }) => {
     return 'even-row'
   }
   return 'odd-row'
+}
+
+// 导出Excel
+const exportToExcel = async () => {
+  if (!currentHistoryItem.value || filteredHistoryData.value.length === 0) {
+    ElMessage.warning('没有可导出的数据')
+    return
+  }
+
+  try {
+    exporting.value = true
+
+    const token = localStorage.getItem('auth_token')
+    if (!token) {
+      ElMessage.error('请先登录')
+      return
+    }
+
+    // 准备请求参数
+    const params = {
+      item_name: currentHistoryItem.value.key,
+      item_label: currentHistoryItem.value.label || currentHistoryItem.value.key,
+      unit: currentHistoryItem.value.unit || ''
+    }
+
+    // 如果有日期范围，添加到参数中
+    if (dateRange.value && dateRange.value.length === 2) {
+      params.start_date = dateRange.value[0]
+      params.end_date = dateRange.value[1]
+    }
+
+    // 调用后端接口下载文件
+    const response = await fetch('/api/v1/statistic/export_item_history_excel', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'token': token
+      },
+      body: JSON.stringify(params)
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ err_msg: '导出失败' }))
+      throw new Error(errorData.err_msg || '导出失败')
+    }
+
+    // 获取文件名（从响应头中获取）
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let fileName = `${currentHistoryItem.value.label || '历史数据'}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (fileNameMatch && fileNameMatch[1]) {
+        fileName = decodeURIComponent(fileNameMatch[1].replace(/['"]/g, ''))
+      }
+    }
+
+    // 获取文件blob
+    const blob = await response.blob()
+
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    ElMessage.success(`已成功导出 ${filteredHistoryData.value.length} 条记录`)
+  } catch (error) {
+    console.error('导出Excel失败:', error)
+    ElMessage.error(error.message || '导出失败，请稍后重试')
+  } finally {
+    exporting.value = false
+  }
 }
 
 // 暴露方法给父组件
@@ -989,7 +1039,7 @@ defineExpose({
   padding: 0;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
-  box-shadow: 
+  box-shadow:
     0 2px 8px rgba(102, 126, 234, 0.4),
     0 0 0 2px rgba(255, 255, 255, 0.8);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -999,7 +1049,7 @@ defineExpose({
 
 .history-btn-center:hover {
   transform: scale(1.15) rotate(5deg);
-  box-shadow: 
+  box-shadow:
     0 4px 16px rgba(102, 126, 234, 0.6),
     0 0 0 4px rgba(255, 255, 255, 0.9);
   background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
@@ -1011,13 +1061,16 @@ defineExpose({
 }
 
 @keyframes pulse {
-  0%, 100% {
-    box-shadow: 
+
+  0%,
+  100% {
+    box-shadow:
       0 2px 8px rgba(102, 126, 234, 0.4),
       0 0 0 2px rgba(255, 255, 255, 0.8);
   }
+
   50% {
-    box-shadow: 
+    box-shadow:
       0 2px 12px rgba(102, 126, 234, 0.6),
       0 0 0 3px rgba(255, 255, 255, 0.9);
   }
@@ -1075,7 +1128,7 @@ defineExpose({
   padding: 20px;
   background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
   border-radius: 12px;
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.05),
     0 2px 4px rgba(0, 0, 0, 0.02);
   border: 1px solid #e4e7ed;
@@ -1163,6 +1216,9 @@ defineExpose({
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 2px solid #f0f2f5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .data-count {
@@ -1172,6 +1228,17 @@ defineExpose({
   font-size: 14px;
   color: #606266;
   font-weight: 500;
+}
+
+.export-btn {
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(103, 194, 58, 0.3);
+  transition: all 0.3s ease;
+}
+
+.export-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.4);
 }
 
 .data-count .el-icon {

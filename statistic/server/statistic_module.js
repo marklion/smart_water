@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import moment from 'moment';
+import XLSX from 'xlsx';
 import statistic_lib from '../lib/statistic_lib.js';
 
 // 统计文件目录（可通过环境变量 STAT_FILE_DIR 覆盖），默认使用当前工作目录保持向后兼容
@@ -69,7 +70,6 @@ export default {
                 let items = [];
                 let pageNo = body.pageNo || 0;
                 const files = (await fs.promises.readdir(STAT_DIR)).filter(f => f.startsWith('st_') && f.endsWith('.txt'));
-                // 只分页文件名列表，避免一次性处理所有文件
                 let cur_page_files = files.slice(pageNo * 20, (pageNo + 1) * 20);
                 for (let file of cur_page_files) {
                     const item_name = path.basename(file, '.txt');
@@ -89,7 +89,6 @@ export default {
                             }
                         }
                     } catch (err) {
-                        // 忽略单个文件读取错误，继续列出其他文件
                         console.error('read stat file error', filePath, err && err.message);
                     }
                 }
@@ -121,16 +120,20 @@ export default {
                 const start_date = body.start_date;
                 const end_date = body.end_date;
                 const filePath = await get_file_by_item(item_name);
+                const parseTime = (str) => {
+                    if (!str) return NaN;
+                    const m = moment(str, 'YYYY-MM-DD HH:mm:ss', true);
+                    if (m.isValid()) return m.valueOf();
+                    const d = new Date(str);
+                    return isNaN(d.getTime()) ? NaN : d.getTime();
+                };
                 try {
                     const data = await fs.promises.readFile(filePath, 'utf8');
                     const lines = data.trim().split('\n').filter(l => l.trim().length > 0);
-                    
-                    // 解析所有记录（每行可能有多个 timestamp==value 对）
+
                     let allRecords = [];
                     for (let line of lines) {
                         const parts = line.split('==');
-                        // 每行格式：timestamp==value==timestamp==value==...
-                        // 所以 parts 应该是 [timestamp, value, timestamp, value, ...]
                         for (let i = 0; i < parts.length - 1; i += 2) {
                             const timestamp = parts[i].trim();
                             const value = parts[i + 1].trim();
@@ -149,19 +152,18 @@ export default {
                         return new Date(b.timestamp) - new Date(a.timestamp);
                     });
                     
-                    // 如果有日期范围参数，进行筛选
+
                     if (start_date || end_date) {
-                        const startTime = start_date ? new Date(start_date).getTime() : 0;
-                        const endTime = end_date ? new Date(end_date).getTime() : Date.now();
+                        const startTime = start_date ? parseTime(start_date) : 0;
+                        const endTime = end_date ? parseTime(end_date) : Infinity;
                         
                         allRecords = allRecords.filter(record => {
-                            try {
-                                const recordTime = new Date(record.timestamp).getTime();
-                                return recordTime >= startTime && recordTime <= endTime;
-                            } catch (e) {
+                            const recordTime = parseTime(record.timestamp);
+                            if (isNaN(recordTime)) {
                                 console.warn('Invalid timestamp:', record.timestamp);
                                 return false;
                             }
+                            return recordTime >= startTime && recordTime <= endTime;
                         });
                     }
                     
@@ -170,8 +172,7 @@ export default {
                     const startIndex = pageNo * 20;
                     const endIndex = (pageNo + 1) * 20;
                     const pageRecords = allRecords.slice(startIndex, endIndex);
-                    
-                    // 只返回 timestamp 和 value
+
                     records = pageRecords.map(r => ({
                         timestamp: r.timestamp,
                         value: r.value
@@ -179,9 +180,122 @@ export default {
                     
                     return { records: records, total: total };
                 } catch (err) {
-                    // 如果文件不存在或读取错误，返回空记录列表
                     console.error('read stat file error', filePath, err && err.message);
                     return { records: [], total: 0 };
+                }
+            }
+        },
+        export_item_history_excel: {
+            name: '导出统计项历史记录Excel',
+            description: '导出某个统计项的历史记录为Excel文件',
+            is_write: false,
+            is_get_api: false,
+            is_file_download: true, // 标记为文件下载接口
+            params: {
+                item_name: { type: String, mean: '统计项名称', example: 'total_water_usage', have_to: true },
+                start_date: { type: String, mean: '开始日期时间', example: '2024-01-01 00:00:00', have_to: false },
+                end_date: { type: String, mean: '结束日期时间', example: '2024-01-31 23:59:59', have_to: false },
+                item_label: { type: String, mean: '统计项显示名称', example: '主管流量', have_to: false },
+                unit: { type: String, mean: '单位', example: 'L/h', have_to: false },
+            },
+            result: {
+                
+            },
+            func: async function (body, token, res) {
+                const item_name = body.item_name;
+                const start_date = body.start_date;
+                const end_date = body.end_date;
+                const item_label = body.item_label || item_name;
+                const unit = body.unit || '';
+                const parseTime = (str) => {
+                    if (!str) return NaN;
+                    const m = moment(str, 'YYYY-MM-DD HH:mm:ss', true);
+                    if (m.isValid()) return m.valueOf();
+                    const d = new Date(str);
+                    return isNaN(d.getTime()) ? NaN : d.getTime();
+                };
+                
+                const filePath = await get_file_by_item(item_name);
+                try {
+                    const data = await fs.promises.readFile(filePath, 'utf8');
+                    const lines = data.trim().split('\n').filter(l => l.trim().length > 0);
+                    
+                    // 解析所有记录
+                    let allRecords = [];
+                    for (let line of lines) {
+                        const parts = line.split('==');
+                        for (let i = 0; i < parts.length - 1; i += 2) {
+                            const timestamp = parts[i].trim();
+                            const value = parts[i + 1].trim();
+                            if (timestamp && value) {
+                                allRecords.push({
+                                    timestamp: timestamp,
+                                    value: value
+                                });
+                            }
+                        }
+                    }
+                    
+                    // 按时间正序排列
+                    allRecords.sort((a, b) => {
+                        return new Date(a.timestamp) - new Date(b.timestamp);
+                    });
+                    
+                    // 如果有日期范围参数，进行筛选
+                    if (start_date || end_date) {
+                        const startTime = start_date ? parseTime(start_date) : 0;
+                        const endTime = end_date ? parseTime(end_date) : Infinity;
+                        
+                        allRecords = allRecords.filter(record => {
+                            const recordTime = parseTime(record.timestamp);
+                            if (isNaN(recordTime)) {
+                                console.warn('Invalid timestamp:', record.timestamp);
+                                return false;
+                            }
+                            return recordTime >= startTime && recordTime <= endTime;
+                        });
+                    }
+                    
+                    // 准备导出数据
+                    const exportData = allRecords.map((row, index) => ({
+                        '序号': index + 1,
+                        '时间': row.timestamp,
+                        '数值': parseFloat(row.value).toFixed(2),
+                        '单位': unit
+                    }));
+
+                    const wb = XLSX.utils.book_new();
+
+                    const ws = XLSX.utils.json_to_sheet(exportData);
+
+                    ws['!cols'] = [
+                        { wch: 8 },  // 序号
+                        { wch: 20 }, // 时间
+                        { wch: 15 }, // 数值
+                        { wch: 10 }  // 单位
+                    ];
+                    
+                    // 添加工作表到工作簿
+                    XLSX.utils.book_append_sheet(wb, ws, '历史数据');
+                    
+                    // 生成文件名
+                    const dateStr = moment().format('YYYYMMDD');
+                    const safeLabel = item_label.replace(/[\/\\?*|":<>]/g, '_'); // 替换文件名中的非法字符
+                    const fileName = `${safeLabel}_${dateStr}.xlsx`;
+                    
+                    // 生成Excel文件缓冲区
+                    const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+                    
+                    // 设置响应头
+                    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+                    res.setHeader('Content-Length', excelBuffer.length);
+                    
+                    // 返回文件流
+                    return excelBuffer;
+                } catch (err) {
+                    console.error('导出Excel失败:', filePath, err && err.message);
+                    throw new Error('导出Excel失败: ' + (err.message || '未知错误'));
                 }
             }
         },
