@@ -1,7 +1,7 @@
-import resolve from 'rollup-plugin-node-resolve'
-import commonjs from 'rollup-plugin-commonjs';
 import copy from 'rollup-plugin-copy';
 import plug_json from '@rollup/plugin-json'
+import commonjs from '@rollup/plugin-commonjs';
+import resolve from '@rollup/plugin-node-resolve';
 
 export default {
   input: 'public/server/index.js', // 你的入口文件
@@ -12,6 +12,11 @@ export default {
     entryFileNames: '[name].js', // 输出文件名
   },
   external: [
+    'node:bufferutil',
+    'node:stream/promises',
+    'node:timers/promises',
+    'node:v8',
+    'node:process',
     'node:events',
     'node:http',
     'node:https',
@@ -19,14 +24,8 @@ export default {
     'node:net',
     'node:fs',
     'node:zlib',
-    'path',
-    'fs',
-    'http',
-    'https',
-    'url',
-    'util',
-    'stream',
-    'crypto',
+    'node:dgram',
+    'node:worker_threads',
     'node:stream',
     'node:crypto',
     'node:util',
@@ -42,6 +41,14 @@ export default {
     'node:punycode',
     'node:tty',
     'node:string_decoder',
+    'path',
+    'fs',
+    'http',
+    'https',
+    'url',
+    'util',
+    'stream',
+    'crypto',
     'querystring',
     'assert',
     'os',
@@ -57,6 +64,14 @@ export default {
     'events',
     'tty',
     'string_decoder',
+    'net',
+    'dgram',
+    'worker_threads',
+    'get-stream',
+    'unicorn-magic',
+    'bufferutil',
+    'utf-8-validate',
+    'modbus-serial',
   ],
   plugins: [
     resolve({
@@ -69,6 +84,7 @@ export default {
       targets: [
         // 复制 assets 目录到输出目录
         { src: 'public/server/web/*', dest: 'dist/server/web' },
+        { src: 'public/server/mobile/*', dest: 'dist/server/mobile' },
       ],
       hook: 'writeBundle' // 在打包完成后执行
     }),

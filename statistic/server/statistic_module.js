@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import moment from 'moment';
-import XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 import statistic_lib from '../lib/statistic_lib.js';
 
 // 统计文件目录（可通过环境变量 STAT_FILE_DIR 覆盖），默认使用当前工作目录保持向后兼容
@@ -146,17 +146,17 @@ export default {
                             }
                         }
                     }
-                    
+
                     // 按时间倒序排列（最新的在前，用于获取最新值）
                     allRecords.sort((a, b) => {
                         return new Date(b.timestamp) - new Date(a.timestamp);
                     });
-                    
+
 
                     if (start_date || end_date) {
                         const startTime = start_date ? parseTime(start_date) : 0;
                         const endTime = end_date ? parseTime(end_date) : Infinity;
-                        
+
                         allRecords = allRecords.filter(record => {
                             const recordTime = parseTime(record.timestamp);
                             if (isNaN(recordTime)) {
@@ -166,7 +166,7 @@ export default {
                             return recordTime >= startTime && recordTime <= endTime;
                         });
                     }
-                    
+
                     // 分页处理
                     const total = allRecords.length;
                     const startIndex = pageNo * 20;
@@ -177,7 +177,7 @@ export default {
                         timestamp: r.timestamp,
                         value: r.value
                     }));
-                    
+
                     return { records: records, total: total };
                 } catch (err) {
                     console.error('read stat file error', filePath, err && err.message);
@@ -199,7 +199,7 @@ export default {
                 unit: { type: String, mean: '单位', example: 'L/h', have_to: false },
             },
             result: {
-                
+
             },
             func: async function (body, token, res) {
                 const item_name = body.item_name;
@@ -214,12 +214,12 @@ export default {
                     const d = new Date(str);
                     return isNaN(d.getTime()) ? NaN : d.getTime();
                 };
-                
+
                 const filePath = await get_file_by_item(item_name);
                 try {
                     const data = await fs.promises.readFile(filePath, 'utf8');
                     const lines = data.trim().split('\n').filter(l => l.trim().length > 0);
-                    
+
                     // 解析所有记录
                     let allRecords = [];
                     for (let line of lines) {
@@ -235,17 +235,17 @@ export default {
                             }
                         }
                     }
-                    
+
                     // 按时间正序排列
                     allRecords.sort((a, b) => {
                         return new Date(a.timestamp) - new Date(b.timestamp);
                     });
-                    
+
                     // 如果有日期范围参数，进行筛选
                     if (start_date || end_date) {
                         const startTime = start_date ? parseTime(start_date) : 0;
                         const endTime = end_date ? parseTime(end_date) : Infinity;
-                        
+
                         allRecords = allRecords.filter(record => {
                             const recordTime = parseTime(record.timestamp);
                             if (isNaN(recordTime)) {
@@ -255,7 +255,7 @@ export default {
                             return recordTime >= startTime && recordTime <= endTime;
                         });
                     }
-                    
+
                     // 准备导出数据
                     const exportData = allRecords.map((row, index) => ({
                         '序号': index + 1,
@@ -274,23 +274,23 @@ export default {
                         { wch: 15 }, // 数值
                         { wch: 10 }  // 单位
                     ];
-                    
+
                     // 添加工作表到工作簿
                     XLSX.utils.book_append_sheet(wb, ws, '历史数据');
-                    
+
                     // 生成文件名
                     const dateStr = moment().format('YYYYMMDD');
                     const safeLabel = item_label.replace(/[\/\\?*|":<>]/g, '_'); // 替换文件名中的非法字符
                     const fileName = `${safeLabel}_${dateStr}.xlsx`;
-                    
+
                     // 生成Excel文件缓冲区
                     const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-                    
+
                     // 设置响应头
                     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
                     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
                     res.setHeader('Content-Length', excelBuffer.length);
-                    
+
                     // 返回文件流
                     return excelBuffer;
                 } catch (err) {

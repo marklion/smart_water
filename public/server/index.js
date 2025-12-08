@@ -13,8 +13,6 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.help_info = [];
-app.use(historyApiFallback());
-
 import mkapi from './api_utils.js';
 async function module_install(app, module) {
     let mo = module;
@@ -46,6 +44,16 @@ async function init_super_user() {
 // 托管前端静态文件
 let web_dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'web');
 console.log(`Web directory: ${web_dir}`);
+let mobile_dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'mobile');
+console.log(`Mobile directory: ${mobile_dir}`);
+
+// SPA fallback for web; keep /mobile paths untouched
+app.use('/mobile', express.static(mobile_dir));
+app.use(historyApiFallback({
+    rewrites: [
+        { from: /^\/mobile\/.*$/, to: (context) => context.parsedUrl.pathname },
+    ],
+}));
 app.use(express.static(web_dir));
 
 app.post('/api/v1/restart', async (req, res)=>{
