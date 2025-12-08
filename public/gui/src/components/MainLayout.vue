@@ -1,7 +1,7 @@
 <template>
     <el-container class="main-layout">
         <!-- 顶部导航栏 -->
-        <el-header class="app-header">
+        <el-header v-if="!shouldHideHeader" class="app-header">
             <div class="header-left">
                 <div class="header-title">
                     <img src="/logo.png" alt="Logo" class="system-logo" />
@@ -52,14 +52,16 @@
 
         <el-container class="app-body">
             <!-- 顶部菜单栏 (水平模式) -->
-            <el-header height="auto" class="menu-header">
+            <el-header v-if="!shouldHideMenu" height="auto" class="menu-header">
                 <MenuBar mode="horizontal" :collapsed="false">
                     <template #right>
                         <!-- 农场选择器 -->
                         <div class="farm-selector-container" v-if="showFarmSelector">
                             <span class="selector-label">选择农场：</span>
-                            <el-select v-model="selectedFarm" class="farm-select-main" size="default" @change="onFarmChange">
-                                <el-option v-for="farm in farmList" :key="farm.id" :label="farm.name" :value="farm.id" />
+                            <el-select v-model="selectedFarm" class="farm-select-main" size="default"
+                                @change="onFarmChange">
+                                <el-option v-for="farm in farmList" :key="farm.id" :label="farm.name"
+                                    :value="farm.id" />
                             </el-select>
                         </div>
 
@@ -77,7 +79,7 @@
         </el-container>
 
         <!-- 底部技术支持信息 -->
-        <el-footer v-if="!isDashboard" class="app-footer">
+        <el-footer v-if="!isDashboard && !shouldHideMenu" class="app-footer">
             <div class="tech-support">
                 <el-avatar :size="16" :src="logoSrc" class="company-logo"></el-avatar>
                 <div class="company-info">
@@ -128,9 +130,9 @@ const showCitySwitcher = computed(() => route.name === '监控中心')
 
 // 城市变化相关的响应式数据
 const cityChangeData = ref({
-  city: '',
-  location: null,
-  timestamp: null
+    city: '',
+    location: null,
+    timestamp: null
 })
 
 // 提供城市变化数据给子组件
@@ -169,17 +171,17 @@ const getCurrentSolarTerm = (date) => {
     // 找到最接近的节气
     let closestTerm = solarTerms[0]
     let minDiff = Infinity
-    
+
     for (const term of solarTerms) {
         const termDate = new Date(`${date.getFullYear()}-${term.date}`)
         const diff = Math.abs(date - termDate)
-        
+
         if (diff < minDiff) {
             minDiff = diff
             closestTerm = term
         }
     }
-    
+
     return closestTerm.name
 }
 
@@ -188,10 +190,20 @@ const isDashboard = computed(() => {
     return route.path === '/dashboard' || route.path === '/web/dashboard'
 })
 
+// 判断是否应该隐藏标题栏
+const shouldHideHeader = computed(() => {
+    return route.meta?.hideHeader === true || route.meta?.hideLayout === true
+})
+
+// 判断是否应该隐藏导航栏
+const shouldHideMenu = computed(() => {
+    return route.meta?.hideMenu === true || route.meta?.hideLayout === true
+})
+
 // 更新时间
 const updateTime = () => {
     const now = new Date()
-    
+
     // 格式化时间 HH:MM:SS
     const timeString = now.toLocaleTimeString('zh-CN', {
         hour12: false,
@@ -223,7 +235,7 @@ const getSystemName = async () => {
 // 更新日期和节气
 const updateDateInfo = () => {
     const now = new Date()
-    
+
     // 格式化日期 年/月/日 星期X
     const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
     const weekDay = weekDays[now.getDay()]
@@ -232,7 +244,7 @@ const updateDateInfo = () => {
     const day = String(now.getDate()).padStart(2, '0')
     const dateString = `${year}/${month}/${day}`
     currentDate.value = `${dateString} ${weekDay}`
-    
+
     // 获取当前节气
     currentSolarTerm.value = getCurrentSolarTerm(now)
 }
@@ -252,13 +264,13 @@ const loadFarmList = async () => {
                 latitude: farm.latitude
             }))
             selectedFarm.value = farmList.value[0].id
-            
+
             // 暴露农场列表到全局，供 DefaultPage 使用
             window.farmList = farmList.value
-            
+
             // 保存到 localStorage
             localStorage.setItem('selectedFarm', selectedFarm.value)
-            
+
             // 只有在监控中心页面才触发初始农场数据加载事件
             if (route.name === '监控中心') {
                 // 延迟触发，确保 DefaultPage 已经准备好
@@ -281,7 +293,7 @@ const loadFarmList = async () => {
 const onFarmChange = async (farmId) => {
     // 保存到 localStorage
     localStorage.setItem('selectedFarm', farmId)
-    
+
     // 触发全局事件，通知监控中心页面农场已切换
     window.dispatchEvent(new CustomEvent('farmChanged', { detail: { farmId } }))
 }
@@ -332,26 +344,26 @@ onMounted(() => {
     if (storedUsername) {
         username.value = storedUsername
     }
-    
+
     // 获取系统名称
     getSystemName()
-    
+
     // 初始化时间和日期信息
     updateTime()
     updateDateInfo()
-    
+
     // 加载农场列表
     loadFarmList()
-    
+
     // 加载保存的城市
     const savedCity = localStorage.getItem('weather_selected_city')
     if (savedCity) {
         currentCity.value = savedCity
     }
-    
+
     // 每秒更新一次时间
     setInterval(updateTime, 1000)
-    
+
     // 每分钟更新一次日期信息
     setInterval(updateDateInfo, 60000)
 })
@@ -464,12 +476,12 @@ const logout = () => {
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
-    background: linear-gradient(135deg, 
-        rgba(64, 158, 255, 0.08) 0%, 
-        rgba(64, 158, 255, 0.12) 100%);
+    background: linear-gradient(135deg,
+            rgba(64, 158, 255, 0.08) 0%,
+            rgba(64, 158, 255, 0.12) 100%);
     border-radius: 8px;
     border: 1px solid rgba(64, 158, 255, 0.2);
-    box-shadow: 
+    box-shadow:
         0 2px 8px rgba(64, 158, 255, 0.1),
         0 1px 2px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
@@ -477,7 +489,7 @@ const logout = () => {
 
 .header-tools .city-switcher-container:hover {
     transform: translateY(-1px);
-    box-shadow: 
+    box-shadow:
         0 4px 12px rgba(64, 158, 255, 0.15),
         0 2px 4px rgba(0, 0, 0, 0.08);
     border-color: rgba(64, 158, 255, 0.3);
@@ -547,7 +559,7 @@ const logout = () => {
     color: #1e40af;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
     letter-spacing: 3px;
-    text-shadow: 
+    text-shadow:
         0 2px 4px rgba(0, 0, 0, 0.1),
         0 0 20px rgba(30, 64, 175, 0.3);
     position: relative;
@@ -598,6 +610,16 @@ const logout = () => {
     background: var(--el-bg-color-page);
     padding: 0;
     overflow: auto;
+    /* 隐藏滚动条 */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+}
+
+.content-main::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
 }
 
 /* 响应式设计 */
@@ -623,22 +645,22 @@ const logout = () => {
     .username {
         display: none;
     }
-    
+
     .time-display-container {
         padding: 8px 16px;
         border-radius: 12px;
     }
-    
+
     .time-display {
         font-size: 16px;
         letter-spacing: 2px;
     }
-    
+
     .date-info {
         padding: 6px 12px;
         border-radius: 10px;
     }
-    
+
     .date-display {
         font-size: 14px;
     }
@@ -667,22 +689,22 @@ const logout = () => {
     .header-tools {
         gap: 8px;
     }
-    
+
     .time-display-container {
         padding: 6px 12px;
         border-radius: 10px;
     }
-    
+
     .time-display {
         font-size: 14px;
         letter-spacing: 1.5px;
     }
-    
+
     .date-info {
         padding: 4px 8px;
         border-radius: 8px;
     }
-    
+
     .date-display {
         font-size: 12px;
     }
@@ -696,12 +718,12 @@ const logout = () => {
     gap: 8px;
     margin-right: 16px;
     padding: 6px 12px;
-    background: linear-gradient(135deg, 
-        rgba(64, 158, 255, 0.08) 0%, 
-        rgba(64, 158, 255, 0.12) 100%);
+    background: linear-gradient(135deg,
+            rgba(64, 158, 255, 0.08) 0%,
+            rgba(64, 158, 255, 0.12) 100%);
     border-radius: 8px;
     border: 1px solid rgba(64, 158, 255, 0.2);
-    box-shadow: 
+    box-shadow:
         0 2px 8px rgba(64, 158, 255, 0.1),
         0 1px 2px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
@@ -710,7 +732,7 @@ const logout = () => {
 .farm-selector-container:hover,
 .city-switcher-container:hover {
     transform: translateY(-1px);
-    box-shadow: 
+    box-shadow:
         0 4px 12px rgba(64, 158, 255, 0.15),
         0 2px 4px rgba(0, 0, 0, 0.08);
     border-color: rgba(64, 158, 255, 0.3);
@@ -736,12 +758,12 @@ const logout = () => {
     display: flex;
     align-items: center;
     padding: 8px 16px;
-    background: linear-gradient(135deg, 
-        rgba(16, 185, 129, 0.08) 0%, 
-        rgba(16, 185, 129, 0.12) 100%);
+    background: linear-gradient(135deg,
+            rgba(16, 185, 129, 0.08) 0%,
+            rgba(16, 185, 129, 0.12) 100%);
     border-radius: 12px;
     border: 1px solid rgba(16, 185, 129, 0.2);
-    box-shadow: 
+    box-shadow:
         0 4px 20px rgba(16, 185, 129, 0.1),
         0 1px 4px rgba(0, 0, 0, 0.05),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -758,16 +780,16 @@ const logout = () => {
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, 
-        transparent, 
-        rgba(255, 255, 255, 0.15), 
-        transparent);
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.15),
+            transparent);
     transition: left 0.5s ease;
 }
 
 .date-info:hover {
     transform: translateY(-1px);
-    box-shadow: 
+    box-shadow:
         0 6px 25px rgba(16, 185, 129, 0.15),
         0 2px 8px rgba(0, 0, 0, 0.08),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -784,7 +806,7 @@ const logout = () => {
     color: #059669;
     white-space: nowrap;
     font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    text-shadow: 
+    text-shadow:
         0 1px 2px rgba(0, 0, 0, 0.1),
         0 0 10px rgba(5, 150, 105, 0.2);
     position: relative;

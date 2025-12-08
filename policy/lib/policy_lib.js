@@ -231,5 +231,11 @@ export default {
             policy_name,
             action_name
         }, token);
+    },
+    apply_wizard_groups: async function (groups, farm_name, token) {
+        return await call_remote('/policy/apply_wizard_groups', {
+            groups,
+            farm_name
+        }, token);
     }
 }

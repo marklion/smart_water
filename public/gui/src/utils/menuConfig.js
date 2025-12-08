@@ -16,7 +16,7 @@
  * @returns {object} 路由配置对象
  */
 export function createRoute(name, path, component, options = {}) {
-  const { parent = null, icon, permission, hidden = false } = options
+  const { parent = null, icon, permission, hidden = false, ...restOptions } = options
 
   return {
     name,
@@ -26,7 +26,8 @@ export function createRoute(name, path, component, options = {}) {
       parent,
       icon,
       permission,
-      hidden
+      hidden,
+      ...(restOptions.meta || {}) // 合并额外的 meta 字段
     }
   }
 }
@@ -128,7 +129,11 @@ export function createPolicyRoute(name, path, component, icon = MenuIcons.SETTIN
  */
 export function batchCreateRoutes(routeConfigs) {
   return routeConfigs.map(config => {
-    const { name, path, component, ...options } = config
+    const { name, path, component, meta, ...options } = config
+    // 如果配置中有 meta，将其合并到 options 中
+    if (meta) {
+      options.meta = meta
+    }
     return createRoute(name, path, component, options)
   })
 }
