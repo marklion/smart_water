@@ -4,12 +4,29 @@
     "configurations": [
         {
             "name": "Dev Gui",
-            "type":"node",
+            "type": "node",
             "request": "launch",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run",
                 "dev_gui"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "postDebugTask": "kill-dev-terminals"
+        },
+        {
+            "name": "Dev Mobile",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev_mobile"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
@@ -60,12 +77,12 @@
             "configurations": [
                 "Dev Server",
                 "Dev CLI",
-                "Dev Gui"
+                "Dev Gui",
+                "Dev Mobile"
             ]
         }
     ]
 }
-
 /*
 说明（可选）:
 - 点击 "Start Dev Server + Dev CLI" 会同时启动两个调试终端，分别运行 npm run dev_server 和 npm run dev_cli。
