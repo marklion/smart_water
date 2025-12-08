@@ -1,37 +1,45 @@
 {
-	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^fui-(.*)": "firstui-uni/firstui/fui-$1/fui-$1.vue"
+		}
+	},
+	"pages": [
 		{
-			"path": "pages/index",
+			"path": "pages/login",
 			"style": {
-				"navigationBarTitleText": "概览"
+				"navigationStyle": "custom"
 			}
 		},
 		{
-			"path": "../../../device/mobile/device_mobile",
+			"path": "pages/index",
 			"style": {
-				"navigationBarTitleText": "设备管理"
+				"navigationStyle": "custom"
 			}
 		}
 	],
 	"globalStyle": {
-		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "uni-app",
-		"navigationBarBackgroundColor": "#F8F8F8",
-		"backgroundColor": "#F8F8F8"
+		"navigationBarTextStyle": "white",
+		"navigationBarTitleText": "智能灌溉管理系统",
+		"navigationBarBackgroundColor": "#409eff",
+		"backgroundColor": "#f5f7fb"
 	},
 	"tabBar": {
-		"color": "#7A7E83",
-		"selectedColor": "#3cc51f",
-		"borderStyle": "black",
+		"color": "#8a93a6",
+		"selectedColor": "#409eff",
+		"borderStyle": "white",
 		"backgroundColor": "#ffffff",
+		"height": "60px",
+		"fontSize": "14px",
+		"iconWidth": "28px",
+		"spacing": "4px",
 		"list": [
 			{
 				"pagePath": "pages/index",
-				"text": "概览"
-			},
-			{
-				"pagePath": "../../../device/mobile/device_mobile",
-				"text": "设备"
+				"text": "首页",
+				"iconPath": "static/tabbar/home.png",
+				"selectedIconPath": "static/tabbar/home-active.png"
 			}
 		]
 	}
