@@ -11,6 +11,11 @@ export default {
     entryFileNames: '[name].js', // 输出文件名
   },
   external: [
+    'node:bufferutil',
+    'node:stream/promises',
+    'node:timers/promises',
+    'node:v8',
+    'node:process',
     'node:events',
     'node:http',
     'node:https',
@@ -18,6 +23,8 @@ export default {
     'node:net',
     'node:fs',
     'node:zlib',
+    'node:dgram',
+    'node:worker_threads',
     'node:stream',
     'node:crypto',
     'node:util',
@@ -56,6 +63,13 @@ export default {
     'events',
     'tty',
     'string_decoder',
+    'net',
+    'dgram',
+    'worker_threads',
+    'get-stream',
+    'unicorn-magic',
+    'bufferutil',
+    'utf-8-validate',
   ],
   plugins: [
     resolve({
