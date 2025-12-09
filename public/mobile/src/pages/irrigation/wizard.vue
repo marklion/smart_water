@@ -791,8 +791,16 @@ const isGroupNameDuplicate = (name, excludeName = null) => {
 
 // 复制已配置的轮灌组
 const copyExistingGroup = (existingGroup) => {
-    const groupName = existingGroup.name.trim()
-    const baseName = groupName.replace(/\d+$/, '') || '轮灌组'
+    let groupName = existingGroup.name.trim()
+    if (groupName.length > 100) {
+        console.warn('轮灌组名称过长，已截断')
+        groupName = groupName.substring(0, 100)
+    }
+    let endIndex = groupName.length
+    while (endIndex > 0 && groupName.charCodeAt(endIndex - 1) >= 48 && groupName.charCodeAt(endIndex - 1) <= 57) {
+        endIndex--
+    }
+    const baseName = endIndex > 0 ? groupName.substring(0, endIndex) : '轮灌组'
     let defaultName = `${baseName}${wateringGroups.value.length + 1}`
     let counter = 1
     while (isGroupNameDuplicate(defaultName)) {
