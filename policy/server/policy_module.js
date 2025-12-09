@@ -1554,39 +1554,46 @@ export default {
                 const updatedGroups = [];
                 const createdGroups = [];
                 
+                // 处理更新操作的辅助函数
+                const handleUpdate = async (groupName) => {
+                    try {
+                        await policy_lib.del_policy(groupName, token);
+                    } catch (e) {
+                        // 兜底处理，避免残留
+                        const removed = findAndRemoveByName(policy_array, groupName);
+                        if (removed) {
+                            policy_runtime_states.delete(groupName);
+                        }
+                    }
+                    updatedGroups.push(groupName);
+                };
+                
+                // 创建策略的辅助函数
+                const createGroupPolicy = async (groupConfig) => {
+                    await config_lib.add_group_policy({
+                        policy_name: groupConfig.name,
+                        farm_name:body.farm_name,
+                        wgv_array: groupConfig.valves.map(v => ({ name: v })),
+                        total_time: groupConfig.total_time,
+                        post_fert_time:groupConfig.post_fert_time,
+                        method: groupConfig.method == 'Time'?'定时':'定量',
+                        fert_time: groupConfig.fert_time,
+                        area_based_amount: groupConfig.AB_fert,
+                        area: groupConfig.area,
+                    }, token);
+                };
+                
                 for (const groupConfig of body.groups) {
                     const isUpdate = existingGroups.has(groupConfig.name);
                     
-                    // 如果是更新操作，先删除旧策略
                     if (isUpdate) {
-                        try {
-                            await policy_lib.del_policy(groupConfig.name, token);
-                            updatedGroups.push(groupConfig.name);
-                        } catch (e) {
-                            // 兜底处理，避免残留
-                            const removed = findAndRemoveByName(policy_array, groupConfig.name);
-                            if (removed) {
-                                policy_runtime_states.delete(groupConfig.name);
-                            }
-                            updatedGroups.push(groupConfig.name);
-                        }
+                        await handleUpdate(groupConfig.name);
                     } else {
                         createdGroups.push(groupConfig.name);
                     }
                     
-                    // 创建/更新轮灌组策略（add_group_policy 内部会处理策略已存在的情况）
                     try {
-                        await config_lib.add_group_policy({
-                            policy_name: groupConfig.name,
-                            farm_name:body.farm_name,
-                            wgv_array: groupConfig.valves.map(v => ({ name: v })),
-                            total_time: groupConfig.total_time,
-                            post_fert_time:groupConfig.post_fert_time,
-                            method: groupConfig.method == 'Time'?'定时':'定量',
-                            fert_time: groupConfig.fert_time,
-                            area_based_amount: groupConfig.AB_fert,
-                            area: groupConfig.area,
-                        }, token);
+                        await createGroupPolicy(groupConfig);
                     } catch (e) {
                         console.error(`创建轮灌组策略 ${groupConfig.name} 失败:`, e);
                         throw { err_msg: `创建轮灌组策略 ${groupConfig.name} 失败: ${e.err_msg || e.message || String(e)}` };

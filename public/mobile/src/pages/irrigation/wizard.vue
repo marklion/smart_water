@@ -709,8 +709,8 @@ const loadExistingGroups = async () => {
             const policyListResponse = await call_remote('/policy/list_policy', { pageNo: 0 }, token)
             const allPolicies = policyListResponse?.policies || []
 
-            existingGroups.value = await Promise.all(filteredGroups.map(async (group) => {
-                const policy = allPolicies.find(p => p.name === group.name)
+            // 解析单个轮灌组配置的辅助函数
+            const parseGroupConfig = (group, policy) => {
                 let area = group.area || 0
                 let valves = []
                 let fertConfig = {
@@ -722,42 +722,56 @@ const loadExistingGroups = async () => {
                     total_time: group.total_time || 0,
                 }
 
-                if (policy?.init_variables) {
-                    const areaFromVar = parseAreaFromVariable(policy.init_variables)
-                    if (areaFromVar !== null) {
-                        area = areaFromVar
-                    }
-                    for (const initVar of policy.init_variables) {
-                        const varName = initVar.variable_name
-                        if (varName === 'valves' || varName === '组内阀门') {
-                            valves = parseValvesFromExpression(initVar.expression || '')
-                            break
-                        }
-                    }
-                    parseFertConfigFromVariables(policy.init_variables, fertConfig, area)
+                if (!policy?.init_variables) {
+                    return { area, valves, fertConfig }
+                }
 
-                    let preTimeMs = 0
-                    let fertTimeMs = 0
-                    let postTimeMs = 0
-                    for (const initVar of policy.init_variables) {
-                        const varName = initVar.variable_name
-                        const expression = initVar.expression || ''
-                        if (varName === '肥前时间') {
-                            preTimeMs = parseFloat(expression) || 0
-                        } else if (varName === '施肥时间') {
-                            fertTimeMs = parseFloat(expression) || 0
-                        } else if (varName === '肥后时间') {
-                            postTimeMs = parseFloat(expression) || 0
-                        }
-                    }
-                    if (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0) {
-                        fertConfig.total_time = (preTimeMs + fertTimeMs + postTimeMs) / 60000
+                // 解析面积
+                const areaFromVar = parseAreaFromVariable(policy.init_variables)
+                if (areaFromVar !== null) {
+                    area = areaFromVar
+                }
+
+                // 解析阀门
+                for (const initVar of policy.init_variables) {
+                    const varName = initVar.variable_name
+                    if (varName === 'valves' || varName === '组内阀门') {
+                        valves = parseValvesFromExpression(initVar.expression || '')
+                        break
                     }
                 }
 
-                if (valves.length === 0) {
-                    valves = parseValvesFromGroup(group)
+                // 解析施肥配置
+                parseFertConfigFromVariables(policy.init_variables, fertConfig, area)
+
+                // 解析时间值
+                let preTimeMs = 0
+                let fertTimeMs = 0
+                let postTimeMs = 0
+                for (const initVar of policy.init_variables) {
+                    const varName = initVar.variable_name
+                    const expression = initVar.expression || ''
+                    if (varName === '肥前时间') {
+                        preTimeMs = parseFloat(expression) || 0
+                    } else if (varName === '施肥时间') {
+                        fertTimeMs = parseFloat(expression) || 0
+                    } else if (varName === '肥后时间') {
+                        postTimeMs = parseFloat(expression) || 0
+                    }
                 }
+                if (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0) {
+                    fertConfig.total_time = (preTimeMs + fertTimeMs + postTimeMs) / 60000
+                }
+
+                return { area, valves, fertConfig }
+            }
+
+            existingGroups.value = await Promise.all(filteredGroups.map(async (group) => {
+                const policy = allPolicies.find(p => p.name === group.name)
+                const { area, valves: parsedValves, fertConfig } = parseGroupConfig(group, policy)
+
+                // 如果阀门列表为空，尝试从轮灌组数据中获取
+                const valves = parsedValves.length === 0 ? parseValvesFromGroup(group) : parsedValves
 
                 return {
                     name: group.name,
@@ -984,35 +998,46 @@ const onMarkerTap = (e) => {
     }
 }
 
+// 验证步骤1：检查轮灌组和面积
+const validateStep1 = () => {
+    if (wateringGroups.value.length === 0) {
+        uni.showToast({ title: '请至少创建一个轮灌组', icon: 'none' })
+        return false
+    }
+    for (const group of wateringGroups.value) {
+        if (group.area <= 0) {
+            uni.showToast({ title: `请为${group.name}设置有效的面积`, icon: 'none' })
+            return false
+        }
+    }
+    return true
+}
+
+// 验证步骤2：检查阀门分配
+const validateStep2 = () => {
+    for (const group of wateringGroups.value) {
+        const configKey = group.configKey || group.name
+        if (!selectedValveDevices.value[configKey] || selectedValveDevices.value[configKey].length === 0) {
+            uni.showToast({ title: `请为${group.name}分配至少一个阀门设备`, icon: 'none' })
+            return false
+        }
+    }
+    return true
+}
+
 // 步骤导航
 const nextStep = async () => {
     if (wizardStep.value === 1) {
-        if (wateringGroups.value.length === 0) {
-            uni.showToast({ title: '请至少创建一个轮灌组', icon: 'none' })
-            return
-        }
-        for (const group of wateringGroups.value) {
-            if (group.area <= 0) {
-                uni.showToast({ title: `请为${group.name}设置有效的面积`, icon: 'none' })
-                return
-            }
-        }
+        if (!validateStep1()) return
         wizardStep.value = 2
         await loadValveDevices()
     } else if (wizardStep.value === 2) {
-        for (const group of wateringGroups.value) {
-            const configKey = group.configKey || group.name
-            if (!selectedValveDevices.value[configKey] || selectedValveDevices.value[configKey].length === 0) {
-                uni.showToast({ title: `请为${group.name}分配至少一个阀门设备`, icon: 'none' })
-                return
-            }
-        }
+        if (!validateStep2()) return
         if (allGroupsAreCopied.value) {
             await finishWizard()
             return
-        } else {
-            wizardStep.value = 3
         }
+        wizardStep.value = 3
     }
 }
 
@@ -1030,6 +1055,54 @@ const goBack = () => {
     })
 }
 
+// 验证施肥配置
+const validateFertConfig = (group, config) => {
+    if (!config) {
+        uni.showToast({ title: `请为${group.name}设置施肥配置`, icon: 'none' })
+        return false
+    }
+    if (config.method === 'AreaBased' && config.AB_fert <= 0) {
+        uni.showToast({ title: `请为${group.name}设置有效的亩定量施肥参数`, icon: 'none' })
+        return false
+    }
+    if (config.method === 'Total' && config.total_fert <= 0) {
+        uni.showToast({ title: `请为${group.name}设置有效的总定量施肥参数`, icon: 'none' })
+        return false
+    }
+    if (config.method === 'Time' && config.fert_time <= 0) {
+        uni.showToast({ title: `请为${group.name}设置有效的定时施肥参数`, icon: 'none' })
+        return false
+    }
+    if (config.total_time <= 0) {
+        uni.showToast({ title: `请为${group.name}设置有效的总灌溉时间参数`, icon: 'none' })
+        return false
+    }
+    return true
+}
+
+// 构建最终配置
+const buildFinalConfig = (group) => {
+    const configKey = group.configKey || group.name
+    const config = fertConfigs.value[configKey]
+    let AB_fert = config.AB_fert
+    let total_fert = config.total_fert || 0
+    if (config.method === 'Total') {
+        AB_fert = config.total_fert / group.area
+        total_fert = config.total_fert
+    }
+    return {
+        name: group.name,
+        area: group.area,
+        valves: selectedValveDevices.value[group.name] || [],
+        method: config.method,
+        AB_fert: parseFloat(AB_fert.toFixed(2)),
+        total_fert: config.method === 'Total' ? parseFloat(total_fert.toFixed(2)) : undefined,
+        fert_time: config.method === 'Time' ? config.fert_time : 0,
+        total_time: config.total_time,
+        post_fert_time: config.post_fert_time || 0,
+    }
+}
+
 // 完成配置
 const finishWizard = async () => {
     if (wateringGroups.value.length === 0) {
@@ -1037,52 +1110,17 @@ const finishWizard = async () => {
         return
     }
 
+    // 验证所有轮灌组的配置
     for (const group of wateringGroups.value) {
         const configKey = group.configKey || group.name
         const config = fertConfigs.value[configKey]
-        if (!config) {
-            uni.showToast({ title: `请为${group.name}设置施肥配置`, icon: 'none' })
-            return
-        }
-        if (config.method === 'AreaBased' && config.AB_fert <= 0) {
-            uni.showToast({ title: `请为${group.name}设置有效的亩定量施肥参数`, icon: 'none' })
-            return
-        }
-        if (config.method === 'Total' && config.total_fert <= 0) {
-            uni.showToast({ title: `请为${group.name}设置有效的总定量施肥参数`, icon: 'none' })
-            return
-        }
-        if (config.method === 'Time' && config.fert_time <= 0) {
-            uni.showToast({ title: `请为${group.name}设置有效的定时施肥参数`, icon: 'none' })
-            return
-        }
-        if (config.total_time <= 0) {
-            uni.showToast({ title: `请为${group.name}设置有效的总灌溉时间参数`, icon: 'none' })
+        if (!validateFertConfig(group, config)) {
             return
         }
     }
 
-    const finalConfig = wateringGroups.value.map(group => {
-        const configKey = group.configKey || group.name
-        const config = fertConfigs.value[configKey]
-        let AB_fert = config.AB_fert
-        let total_fert = config.total_fert || 0
-        if (config.method === 'Total') {
-            AB_fert = config.total_fert / group.area
-            total_fert = config.total_fert
-        }
-        return {
-            name: group.name,
-            area: group.area,
-            valves: selectedValveDevices.value[group.name] || [],
-            method: config.method,
-            AB_fert: parseFloat(AB_fert.toFixed(2)),
-            total_fert: config.method === 'Total' ? parseFloat(total_fert.toFixed(2)) : undefined,
-            fert_time: config.method === 'Time' ? config.fert_time : 0,
-            total_time: config.total_time,
-            post_fert_time: config.post_fert_time || 0,
-        }
-    }).filter(Boolean)
+    // 构建最终配置
+    const finalConfig = wateringGroups.value.map(buildFinalConfig).filter(Boolean)
 
     if (finalConfig.length === 0) {
         uni.showToast({ title: '没有有效的轮灌组配置', icon: 'none' })
@@ -1108,6 +1146,7 @@ const finishWizard = async () => {
             return
         }
 
+        // 下发配置
         console.log('下发轮灌组配置:', { groups: finalConfig, farm_name })
         const resp = await call_remote('/policy/apply_wizard_groups', {
             groups: finalConfig,
@@ -1131,119 +1170,114 @@ const finishWizard = async () => {
     }
 }
 
+// 检查设备是否存在
+const checkDevicesExist = async (farm_name, requiredDevices, token) => {
+    const deviceList = await call_remote('/device_management/list_device', {
+        farm_name: farm_name,
+        pageNo: 0
+    }, token)
+    const existingDevices = deviceList?.devices || []
+    const existingDeviceNames = new Set(existingDevices.map(d => d.device_name))
+    return requiredDevices.filter(name => !existingDeviceNames.has(name))
+}
+
+// 创建供水策略
+const createWaterPolicy = async (farm_name, token) => {
+    const requiredDevices = [
+        `${farm_name}-主泵`,
+        `${farm_name}-主管道压力计`,
+        `${farm_name}-主管道流量计`
+    ]
+
+    const missingDevices = await checkDevicesExist(farm_name, requiredDevices, token)
+    if (missingDevices.length > 0) {
+        const errorMsg = `缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`
+        throw new Error(errorMsg + `。请先配置以下设备（设备名称格式必须为"${farm_name}-设备名"）：\n1. ${farm_name}-主泵\n2. ${farm_name}-主管道压力计\n3. ${farm_name}-主管道流量计`)
+    }
+
+    await call_remote('/config/init_water_policy', {
+        farm_name: farm_name,
+        flow_warning_low_limit: 1,
+        flow_warning_high_limit: 6,
+        pressure_warning_low_limit: 0.1,
+        pressure_warning_high_limit: 0.25,
+        pressure_shutdown_low_limit: 0.05,
+        pressure_shutdown_high_limit: 0.3,
+        flow_check_interval: 60,
+        pressure_shutdown_check_interval: 3
+    }, token)
+}
+
+// 创建总策略
+const createGlobalPolicy = async (farm_name, token) => {
+    await call_remote('/config/init_global_policy', {
+        farm_name: farm_name,
+        start_hour: 8
+    }, token)
+}
+
+// 创建施肥策略（可选）
+const createFertPolicy = async (farm_name, token) => {
+    const requiredFertDevices = [
+        `${farm_name}-施肥泵`,
+        `${farm_name}-施肥流量计`,
+        `${farm_name}-施肥液位计`
+    ]
+
+    try {
+        const missingDevices = await checkDevicesExist(farm_name, requiredFertDevices, token)
+        if (missingDevices.length > 0) {
+            console.warn(`缺少施肥策略必要设备：${missingDevices.join('、')}，跳过创建施肥策略`)
+            return
+        }
+
+        await call_remote('/config/init_fert_policy', {
+            farm_name: farm_name,
+            flow_expected_value: 2,
+            flow_warning_max_offset: 0.5,
+            flow_check_interval: 60,
+            level_warning_limit: 0.8,
+            level_shutdown_limit: 0.5,
+            level_check_interval: 60
+        }, token)
+    } catch (e) {
+        console.warn('创建施肥策略失败:', e)
+    }
+}
+
 // 确保必要的策略存在
 const ensureRequiredPolicies = async (farm_name, token) => {
     if (!farm_name) {
         throw new Error('请先选择农场')
     }
 
-    try {
-        // 检查并创建必要的策略
-        const requiredPolicies = [
-            { name: `${farm_name}-供水`, type: '供水策略' },
-            { name: `${farm_name}-总策略`, type: '总策略' }
-        ]
+    const policyList = await call_remote('/policy/list_policy', { pageNo: 0, farm_name: farm_name }, token)
+    const existingPolicies = policyList?.policies || []
+    const existingPolicyNames = new Set(existingPolicies.map(p => p.name))
 
-        const policyList = await call_remote('/policy/list_policy', { pageNo: 0, farm_name: farm_name }, token)
-        const existingPolicies = policyList?.policies || []
-        const existingPolicyNames = new Set(existingPolicies.map(p => p.name))
-
-        // 检查并创建供水策略
-        const waterPolicyName = `${farm_name}-供水`
-        if (!existingPolicyNames.has(waterPolicyName)) {
-            const requiredDevices = [
-                `${farm_name}-主泵`,
-                `${farm_name}-主管道压力计`,
-                `${farm_name}-主管道流量计`
-            ]
-
-            try {
-                const deviceList = await call_remote('/device_management/list_device', {
-                    farm_name: farm_name,
-                    pageNo: 0
-                }, token)
-                const existingDevices = deviceList?.devices || []
-                const existingDeviceNames = new Set(existingDevices.map(d => d.device_name))
-
-                const missingDevices = requiredDevices.filter(name => !existingDeviceNames.has(name))
-                if (missingDevices.length > 0) {
-                    throw new Error(`缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`)
-                }
-
-                await call_remote('/config/init_water_policy', {
-                    farm_name: farm_name,
-                    flow_warning_low_limit: 1,
-                    flow_warning_high_limit: 6,
-                    pressure_warning_low_limit: 0.1,
-                    pressure_warning_high_limit: 0.25,
-                    pressure_shutdown_low_limit: 0.05,
-                    pressure_shutdown_high_limit: 0.3,
-                    flow_check_interval: 60,
-                    pressure_shutdown_check_interval: 3
-                }, token)
-            } catch (e) {
-                if (e?.err_msg && e.err_msg.includes('缺少必要设备')) {
-                    throw new Error(e.err_msg + `。请先配置以下设备（设备名称格式必须为"${farm_name}-设备名"）：\n1. ${farm_name}-主泵\n2. ${farm_name}-主管道压力计\n3. ${farm_name}-主管道流量计`)
-                }
+    // 检查并创建供水策略
+    const waterPolicyName = `${farm_name}-供水`
+    if (!existingPolicyNames.has(waterPolicyName)) {
+        try {
+            await createWaterPolicy(farm_name, token)
+        } catch (e) {
+            if (e?.err_msg && e.err_msg.includes('缺少必要设备')) {
                 throw e
             }
-        }
-
-        // 检查并创建总策略
-        const globalPolicyName = `${farm_name}-总策略`
-        if (!existingPolicyNames.has(globalPolicyName)) {
-            try {
-                await call_remote('/config/init_global_policy', {
-                    farm_name: farm_name,
-                    start_hour: 8
-                }, token)
-            } catch (e) {
-                throw e
-            }
-        }
-
-        // 检查并创建施肥策略（可选，但建议创建）
-        const fertPolicyName = `${farm_name}-施肥`
-        if (!existingPolicyNames.has(fertPolicyName)) {
-            const requiredFertDevices = [
-                `${farm_name}-施肥泵`,
-                `${farm_name}-施肥流量计`,
-                `${farm_name}-施肥液位计`
-            ]
-
-            try {
-                const deviceList = await call_remote('/device_management/list_device', {
-                    farm_name: farm_name,
-                    pageNo: 0
-                }, token)
-                const existingDevices = deviceList?.devices || []
-                const existingDeviceNames = new Set(existingDevices.map(d => d.device_name))
-
-                const missingDevices = requiredFertDevices.filter(name => !existingDeviceNames.has(name))
-                if (missingDevices.length > 0) {
-                    // 施肥策略是可选的，如果缺少设备就跳过
-                    console.warn(`缺少施肥策略必要设备：${missingDevices.join('、')}，跳过创建施肥策略`)
-                } else {
-                    await call_remote('/config/init_fert_policy', {
-                        farm_name: farm_name,
-                        flow_expected_value: 2,
-                        flow_warning_max_offset: 0.5,
-                        flow_check_interval: 60,
-                        level_warning_limit: 0.8,
-                        level_shutdown_limit: 0.5,
-                        level_check_interval: 60
-                    }, token)
-                }
-            } catch (e) {
-                // 施肥策略是可选的，失败也不影响
-                console.warn('创建施肥策略失败:', e)
-            }
-        }
-    } catch (e) {
-        if (e?.err_msg && e.err_msg.includes('缺少必要设备')) {
             throw e
         }
-        throw e
+    }
+
+    // 检查并创建总策略
+    const globalPolicyName = `${farm_name}-总策略`
+    if (!existingPolicyNames.has(globalPolicyName)) {
+        await createGlobalPolicy(farm_name, token)
+    }
+
+    // 检查并创建施肥策略（可选）
+    const fertPolicyName = `${farm_name}-施肥`
+    if (!existingPolicyNames.has(fertPolicyName)) {
+        await createFertPolicy(farm_name, token)
     }
 }
 

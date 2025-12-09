@@ -1020,6 +1020,60 @@ const handleQuickAction = async (policyName, actionName) => {
     }
 }
 
+// 解析策略初始化变量中的时间值
+const parseTimeValues = (initVariables) => {
+    let preTimeMs = 0
+    let fertTimeMs = 0
+    let postTimeMs = 0
+
+    for (const initVar of initVariables) {
+        const varName = initVar.variable_name
+        const expression = initVar.expression || ''
+        if (varName === '肥前时间') {
+            preTimeMs = parseFloat(expression) || 0
+        } else if (varName === '施肥时间') {
+            fertTimeMs = parseFloat(expression) || 0
+        } else if (varName === '肥后时间') {
+            postTimeMs = parseFloat(expression) || 0
+        }
+    }
+
+    return { preTimeMs, fertTimeMs, postTimeMs }
+}
+
+// 从策略初始化变量中解析配置
+const parsePolicyConfig = (initVariables, group, fertConfig) => {
+    let area = group.area || 0
+    let valves = []
+
+    // 解析面积
+    const areaFromVar = parseAreaFromVariable(initVariables)
+    if (areaFromVar !== null) {
+        area = areaFromVar
+    }
+
+    // 解析阀门
+    for (const initVar of initVariables) {
+        const varName = initVar.variable_name
+        if (varName === 'valves' || varName === '组内阀门') {
+            valves = parseValvesFromExpression(initVar.expression || '')
+            break
+        }
+    }
+
+    // 解析施肥配置
+    parseFertConfigFromVariables(initVariables, fertConfig, area)
+
+    // 计算总灌溉时间
+    const { preTimeMs, fertTimeMs, postTimeMs } = parseTimeValues(initVariables)
+    if (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0) {
+        const totalMs = preTimeMs + fertTimeMs + postTimeMs
+        fertConfig.total_time = totalMs / 60000 // 转换为分钟
+    }
+
+    return { area, valves }
+}
+
 // 查看策略配置（按照PC端逻辑）
 const viewPolicyConfig = async (policyName) => {
     showPolicyConfigDialog.value = true
@@ -1044,9 +1098,7 @@ const viewPolicyConfig = async (policyName) => {
             return
         }
 
-        // 初始化配置数据（按照PC端逻辑）
-        let area = group.area || 0
-        let valves = []
+        // 初始化配置数据
         const fertConfig = {
             method: 'AreaBased',
             AB_fert: 0,
@@ -1056,48 +1108,14 @@ const viewPolicyConfig = async (policyName) => {
             total_time: group.total_time || 0,
         }
 
+        let area = group.area || 0
+        let valves = []
+
         // 从策略的初始化变量中解析配置
         if (policy.init_variables) {
-            // 解析面积
-            const areaFromVar = parseAreaFromVariable(policy.init_variables)
-            if (areaFromVar !== null) {
-                area = areaFromVar
-            }
-
-            // 解析阀门
-            for (const initVar of policy.init_variables) {
-                const varName = initVar.variable_name
-                if (varName === 'valves' || varName === '组内阀门') {
-                    valves = parseValvesFromExpression(initVar.expression || '')
-                    break
-                }
-            }
-
-            // 解析施肥配置
-            parseFertConfigFromVariables(policy.init_variables, fertConfig, area)
-
-            // 计算总灌溉时间：肥前时间 + 施肥时间 + 肥后时间
-            let preTimeMs = 0
-            let fertTimeMs = 0
-            let postTimeMs = 0
-
-            for (const initVar of policy.init_variables) {
-                const varName = initVar.variable_name
-                const expression = initVar.expression || ''
-                if (varName === '肥前时间') {
-                    preTimeMs = parseFloat(expression) || 0
-                } else if (varName === '施肥时间') {
-                    fertTimeMs = parseFloat(expression) || 0
-                } else if (varName === '肥后时间') {
-                    postTimeMs = parseFloat(expression) || 0
-                }
-            }
-
-            // 如果从策略变量中读取到了时间值，计算总时间（转换为分钟）
-            if (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0) {
-                const totalMs = preTimeMs + fertTimeMs + postTimeMs
-                fertConfig.total_time = totalMs / 60000 // 转换为分钟
-            }
+            const parsed = parsePolicyConfig(policy.init_variables, group, fertConfig)
+            area = parsed.area
+            valves = parsed.valves
         }
 
         // 如果阀门列表为空，尝试从轮灌组数据中获取
