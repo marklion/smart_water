@@ -3,9 +3,8 @@
         <!-- 顶部标题栏 -->
         <PageHeader ref="pageHeaderRef" :show-farm-selector="true" @farm-change="onFarmChange" />
 
-        <!-- 设备列表 - 使用 scroll-view 支持下拉刷新 -->
-        <scroll-view class="device-list-scroll" scroll-y refresher-enabled :refresher-triggered="refreshing"
-            @refresherrefresh="onRefresh" :enable-back-to-top="true">
+        <!-- 设备列表 - 使用 scroll-view 支持滚动 -->
+        <scroll-view class="device-list-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="device-list">
                 <view v-if="loading && deviceList.length === 0" class="loading-container">
                     <fui-text :text="'加载中...'" :size="28" color="#909399"></fui-text>
@@ -512,6 +511,7 @@ onShow(async () => {
     left: 0;
     right: 0;
     width: 100%;
+    height: calc(100vh - 168rpx - 120rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     box-sizing: border-box;
 }
 

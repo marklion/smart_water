@@ -80,8 +80,8 @@ export const getCityLocation = async (cityName) => {
     
     if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
       const location = data.geocodes[0].location.split(',')
-      const lng = parseFloat(location[0])
-      const lat = parseFloat(location[1])
+      const lng = Number.parseFloat(location[0])
+      const lat = Number.parseFloat(location[1])
       
       return { lng, lat }
     } else {

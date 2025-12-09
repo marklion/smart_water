@@ -2,7 +2,7 @@
     <view class="page">
         <PageHeader ref="pageHeaderRef" :show-farm-selector="true" @farm-change="onFarmChange" />
 
-        <scroll-view class="content-scroll" scroll-y>
+        <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="content">
                 <view class="header-row">
                     <view class="title">策略程序设定向导</view>
@@ -347,7 +347,7 @@
 
 <script setup>
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { onMounted, ref, computed, nextTick } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
 import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
@@ -432,19 +432,19 @@ const parseValvesFromExpression = (expression) => {
         if (!arrayContent) return []
         const matches = arrayContent.match(/"([^"]+)"/g)
         if (matches) {
-            return matches.map(m => m.replace(/"/g, '').trim()).filter(Boolean)
+            return matches.map(m => m.replaceAll('"', '').trim()).filter(Boolean)
         }
         return arrayContent.split(',').map(v => v.trim()).filter(Boolean)
     }
     const matches = cleanExpression.match(/"([^"]+)"/g)
     if (matches) {
-        return matches.map(m => m.replace(/"/g, '').trim()).filter(Boolean)
+        return matches.map(m => m.replaceAll('"', '').trim()).filter(Boolean)
     }
     return cleanExpression.trim() ? [cleanExpression.trim()] : []
 }
 
 const parseFertMethod = (expression) => {
-    const methodStr = expression.replace(/"/g, '')
+    const methodStr = expression.replaceAll('"', '')
     if (methodStr === '亩定量' || methodStr === 'AreaBased') return 'AreaBased'
     if (methodStr === '总定量' || methodStr === 'Total') return 'Total'
     if (methodStr === '定时' || methodStr === 'Time') return 'Time'
@@ -452,7 +452,7 @@ const parseFertMethod = (expression) => {
 }
 
 const parseTimeValue = (expression) => {
-    const value = parseFloat(expression) || 0
+    const value = Number.parseFloat(expression) || 0
     if (value > 1000) {
         return value / 60000
     }
@@ -470,9 +470,9 @@ const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
         } else if (varName === 'post_ms' || varName === '肥后时间') {
             fertConfig.post_fert_time = parseTimeValue(expression)
         } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
-            fertConfig.AB_fert = parseFloat(expression) || 0
+            fertConfig.AB_fert = Number.parseFloat(expression) || 0
         } else if (varName === '期望施肥总量') {
-            fertConfig.total_fert = parseFloat(expression) || 0
+            fertConfig.total_fert = Number.parseFloat(expression) || 0
         }
     }
     if (fertConfig.method === 'Total' && fertConfig.total_fert > 0 && area > 0) {
@@ -487,7 +487,7 @@ const parseAreaFromVariable = (initVariables) => {
     for (const initVar of initVariables) {
         const varName = initVar.variable_name
         if (varName === 'area' || varName === '面积') {
-            const areaValue = parseFloat(initVar.expression) || 0
+            const areaValue = Number.parseFloat(initVar.expression) || 0
             if (areaValue > 0) {
                 return areaValue
             }
@@ -504,7 +504,7 @@ const parseValvesFromGroup = (group) => {
         return group.valves.split('|').map(v => v.trim()).filter(Boolean)
     }
     const matches = group.valves.match(/"([^"]+)"/g)
-    return matches ? matches.map(m => m.replace(/"/g, '')) : []
+    return matches ? matches.map(m => m.replaceAll('"', '')) : []
 }
 
 // 打开弹窗
@@ -694,6 +694,7 @@ const loadExistingGroups = async () => {
                                 farmName: farmMatch.farm_name
                             }
                         } catch (error) {
+                            console.warn(`获取策略 ${group.name} 的匹配农场失败:`, error)
                             return {
                                 group,
                                 farmName: null
@@ -752,11 +753,11 @@ const loadExistingGroups = async () => {
                     const varName = initVar.variable_name
                     const expression = initVar.expression || ''
                     if (varName === '肥前时间') {
-                        preTimeMs = parseFloat(expression) || 0
+                        preTimeMs = Number.parseFloat(expression) || 0
                     } else if (varName === '施肥时间') {
-                        fertTimeMs = parseFloat(expression) || 0
+                        fertTimeMs = Number.parseFloat(expression) || 0
                     } else if (varName === '肥后时间') {
-                        postTimeMs = parseFloat(expression) || 0
+                        postTimeMs = Number.parseFloat(expression) || 0
                     }
                 }
                 if (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0) {
@@ -811,7 +812,7 @@ const copyExistingGroup = (existingGroup) => {
         groupName = groupName.substring(0, 100)
     }
     let endIndex = groupName.length
-    while (endIndex > 0 && groupName.charCodeAt(endIndex - 1) >= 48 && groupName.charCodeAt(endIndex - 1) <= 57) {
+    while (endIndex > 0 && groupName.codePointAt(endIndex - 1) >= 48 && groupName.codePointAt(endIndex - 1) <= 57) {
         endIndex--
     }
     const baseName = endIndex > 0 ? groupName.substring(0, endIndex) : '轮灌组'
@@ -1095,8 +1096,8 @@ const buildFinalConfig = (group) => {
         area: group.area,
         valves: selectedValveDevices.value[group.name] || [],
         method: config.method,
-        AB_fert: parseFloat(AB_fert.toFixed(2)),
-        total_fert: config.method === 'Total' ? parseFloat(total_fert.toFixed(2)) : undefined,
+        AB_fert: Number.parseFloat(AB_fert.toFixed(2)),
+        total_fert: config.method === 'Total' ? Number.parseFloat(total_fert.toFixed(2)) : undefined,
         fert_time: config.method === 'Time' ? config.fert_time : 0,
         total_time: config.total_time,
         post_fert_time: config.post_fert_time || 0,
@@ -1295,12 +1296,12 @@ const getRecommendedArea = (index) => {
     }
 
     const denominator = (667 / laying_spacing / dripper_spacing) * dripper_flow
-    if (denominator === 0 || !isFinite(denominator)) {
+    if (denominator === 0 || !Number.isFinite(denominator)) {
         return 0
     }
 
     const result = (system_flow * 1000 / denominator) * coefficient
-    return result > 0 && isFinite(result) ? result : 0
+    return result > 0 && Number.isFinite(result) ? result : 0
 }
 
 // 临时参数计算建议亩数（用于弹窗预览）
@@ -1317,12 +1318,12 @@ const getTempRecommendedArea = () => {
     }
 
     const denominator = (667 / laying_spacing / dripper_spacing) * dripper_flow
-    if (denominator === 0 || !isFinite(denominator)) {
+    if (denominator === 0 || !Number.isFinite(denominator)) {
         return 0
     }
 
     const result = (system_flow * 1000 / denominator) * coefficient
-    return result > 0 && isFinite(result) ? result : 0
+    return result > 0 && Number.isFinite(result) ? result : 0
 }
 
 // 显示建议亩数参数设置弹窗
@@ -1605,6 +1606,7 @@ onMounted(async () => {
     left: 0;
     right: 0;
     width: 100%;
+    height: calc(100vh - 168rpx - 120rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     box-sizing: border-box;
 }
 

@@ -3,9 +3,8 @@
         <!-- 顶部标题栏 -->
         <PageHeader ref="pageHeaderRef" :show-farm-selector="false" />
 
-        <!-- 主要内容区域 - 使用 scroll-view 支持下拉刷新 -->
-        <scroll-view class="content-scroll" scroll-y refresher-enabled :refresher-triggered="refreshing"
-            @refresherrefresh="onRefresh" :enable-back-to-top="true">
+        <!-- 主要内容区域 - 使用 scroll-view 支持滚动 -->
+        <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="content">
                 <!-- 用户信息卡片 -->
                 <view class="user-card">
@@ -177,6 +176,7 @@ onShow(async () => {
     left: 0;
     right: 0;
     width: 100%;
+    height: calc(100vh - 168rpx - 120rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     box-sizing: border-box;
 }
 

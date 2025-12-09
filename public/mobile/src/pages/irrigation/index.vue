@@ -6,9 +6,8 @@
             <text class="plus-icon">+</text>
         </view>
 
-        <!-- 主要内容区域 - 使用 scroll-view 支持下拉刷新 -->
-        <scroll-view class="content-scroll" scroll-y enable-back-to-top refresher-enabled
-            :refresher-triggered="refreshing" @refresherrefresh="onRefresh">
+        <!-- 主要内容区域 - 使用 scroll-view 支持滚动 -->
+        <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="content">
                 <WeatherCard />
                 <WarningCard />
@@ -502,7 +501,7 @@ const parseValves = (valveStr) => {
     if (!valveStr || valveStr === '-') return []
     const quoted = valveStr.match(/"([^"]+)"/g)
     if (quoted && quoted.length) {
-        return quoted.map(i => i.replace(/"/g, ''))
+        return quoted.map(i => i.replaceAll('"', ''))
     }
     return valveStr.split(/[,|\s]+/).map(v => v.trim()).filter(Boolean)
 }
@@ -511,15 +510,15 @@ const parseValves = (valveStr) => {
 const parseValvesFromExpression = (expression) => {
     if (!expression || expression === '-') return []
     if (expression.includes('|')) {
-        return expression.split('|').map(v => v.trim().replace(/"/g, '')).filter(Boolean)
+        return expression.split('|').map(v => v.trim().replaceAll('"', '')).filter(Boolean)
     }
     const matches = expression.match(/"([^"]+)"/g)
-    return matches ? matches.map(m => m.replace(/"/g, '')) : []
+    return matches ? matches.map(m => m.replaceAll('"', '')) : []
 }
 
 // 解析施肥方式（PC端逻辑）
 const parseFertMethod = (expression) => {
-    const methodStr = (expression || '').replace(/"/g, '')
+    const methodStr = (expression || '').replaceAll('"', '')
     if (methodStr === '亩定量' || methodStr === 'AreaBased') return 'AreaBased'
     if (methodStr === '总定量' || methodStr === 'Total') return 'Total'
     if (methodStr === '定时' || methodStr === 'Time') return 'Time'
@@ -528,7 +527,7 @@ const parseFertMethod = (expression) => {
 
 // 解析时间值（PC端逻辑，毫秒转分钟）
 const parseTimeValue = (expression) => {
-    const value = parseFloat(expression) || 0
+    const value = Number.parseFloat(expression) || 0
     // 如果是毫秒，转换为分钟
     if (value > 1000) {
         return value / 60000
@@ -542,7 +541,7 @@ const parseAreaFromVariable = (initVariables) => {
     for (const initVar of initVariables) {
         const varName = initVar.variable_name
         if (varName === 'area' || varName === '面积') {
-            const areaValue = parseFloat(initVar.expression) || 0
+            const areaValue = Number.parseFloat(initVar.expression) || 0
             if (areaValue > 0) {
                 return areaValue
             }
@@ -566,9 +565,9 @@ const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
         } else if (varName === 'post_ms' || varName === '肥后时间') {
             fertConfig.post_fert_time = parseTimeValue(expression)
         } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
-            fertConfig.AB_fert = parseFloat(expression) || 0
+            fertConfig.AB_fert = Number.parseFloat(expression) || 0
         } else if (varName === '期望施肥总量') {
-            fertConfig.total_fert = parseFloat(expression) || 0
+            fertConfig.total_fert = Number.parseFloat(expression) || 0
         }
     }
 
@@ -841,6 +840,7 @@ const filterByFarm = async (groups) => {
             }
         } catch (e) {
             // 忽略异常，默认不过滤
+            console.warn(`获取策略 ${g.name} 的匹配农场失败:`, e)
             result.push(g)
         }
     }
@@ -911,10 +911,10 @@ const calcRecommendedArea = () => {
     if (system_flow <= 0 || laying_spacing <= 0 || dripper_spacing <= 0 || dripper_flow <= 0) return null
 
     const denominator = (667 / laying_spacing / dripper_spacing) * dripper_flow
-    if (denominator === 0 || !isFinite(denominator)) return null
+    if (denominator === 0 || !Number.isFinite(denominator)) return null
 
     const result = (system_flow * 1000 / denominator) * coefficient
-    if (!result || !isFinite(result) || result <= 0) return null
+    if (!result || !Number.isFinite(result) || result <= 0) return null
     return Number(result.toFixed(2))
 }
 
@@ -1030,11 +1030,11 @@ const parseTimeValues = (initVariables) => {
         const varName = initVar.variable_name
         const expression = initVar.expression || ''
         if (varName === '肥前时间') {
-            preTimeMs = parseFloat(expression) || 0
+            preTimeMs = Number.parseFloat(expression) || 0
         } else if (varName === '施肥时间') {
-            fertTimeMs = parseFloat(expression) || 0
+            fertTimeMs = Number.parseFloat(expression) || 0
         } else if (varName === '肥后时间') {
-            postTimeMs = parseFloat(expression) || 0
+            postTimeMs = Number.parseFloat(expression) || 0
         }
     }
 
@@ -1246,6 +1246,7 @@ onShow(async () => {
     left: 0;
     right: 0;
     width: 100%;
+    height: calc(100vh - 168rpx - 120rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     box-sizing: border-box;
 }
 

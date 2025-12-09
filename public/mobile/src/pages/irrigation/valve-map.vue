@@ -44,7 +44,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import { mapConfig, loadAMapScript } from '../../config/mapConfig.js'
@@ -312,58 +312,9 @@ const updateAMapMarkers = () => {
 
         const isSelected = selectedValves.value.includes(valve.device_name)
 
-        // 获取图标完整路径（H5端需要完整URL）
-        const getIconUrl = (iconName) => {
-            // 如果是H5环境，需要转换为完整URL
-            if (typeof window !== 'undefined' && window.location) {
-                const baseUrl = window.location.origin
-                const pathname = window.location.pathname
-                const port = window.location.port
-
-                // 开发环境：PC端和移动端可能运行在不同的端口或路径
-                // 优先尝试PC端的路径（去掉/mobile前缀）
-                if (pathname.startsWith('/mobile')) {
-                    // 移动端H5：访问PC端的图标路径
-                    // 在开发环境中，PC端的图标在根路径下
-                    return `${baseUrl}/deviceIcon/${iconName}.png`
-                } else {
-                    // 直接使用PC端路径
-                    return `${baseUrl}/deviceIcon/${iconName}.png`
-                }
-            }
-            // App端使用相对路径
-            return `/deviceIcon/${iconName}.png`
-        }
-
         // 添加图片加载错误处理和调试（避免无限循环）
         let retryCount = 0
         const maxRetries = 2
-        const handleImageError = (img, iconName) => {
-            retryCount++
-            console.error(`图片加载失败 (尝试 ${retryCount}/${maxRetries}):`, img.src)
-
-            if (retryCount > maxRetries) {
-                console.error('所有路径都失败，无法加载图标:', iconName)
-                // 显示一个占位符
-                img.style.display = 'none'
-                // 创建一个占位符div
-                const placeholder = document.createElement('div')
-                placeholder.style.width = '32px'
-                placeholder.style.height = '32px'
-                placeholder.style.backgroundColor = '#409eff'
-                placeholder.style.borderRadius = '50%'
-                placeholder.style.display = 'flex'
-                placeholder.style.alignItems = 'center'
-                placeholder.style.justifyContent = 'center'
-                placeholder.style.color = '#fff'
-                placeholder.style.fontSize = '12px'
-                placeholder.textContent = '阀'
-                img.parentNode.replaceChild(placeholder, img)
-                return
-            }
-
-            const baseUrl = typeof window !== 'undefined' && window.location ? window.location.origin : ''
-            const pathname = typeof window !== 'undefined' && window.location ? window.location.pathname : ''
 
             // 尝试多个可能的路径
             let nextPath = ''
@@ -405,8 +356,7 @@ const updateAMapMarkers = () => {
         }
 
         const getNextIconPath = (retryCount) => {
-            const baseUrl = typeof window !== 'undefined' && window.location ? window.location.origin : ''
-            const pathname = typeof window !== 'undefined' && window.location ? window.location.pathname : ''
+            const baseUrl = typeof globalThis.window !== 'undefined' && globalThis.window.location ? globalThis.window.location.origin : ''
 
             // 优先使用移动端的static路径（图标已复制到移动端）
             const paths = [
@@ -429,7 +379,7 @@ const updateAMapMarkers = () => {
 
         iconImg.alt = valve.device_name
         iconImg.onerror = () => {
-            const retryCount = parseInt(iconImg.dataset.retryCount || '0')
+            const retryCount = Number.parseInt(iconImg.dataset.retryCount || '0')
             console.error(`图标加载失败 (尝试 ${retryCount + 1}):`, iconImg.src)
 
             if (retryCount < 2) {
