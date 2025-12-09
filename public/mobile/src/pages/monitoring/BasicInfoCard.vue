@@ -70,11 +70,11 @@ const loadBasicInfo = async () => {
       }
       return
     }
-    
-    const result = await call_remote('/monitoring/getBasicInfo', { 
-      farmName: props.farmName 
+
+    const result = await call_remote('/monitoring/getBasicInfo', {
+      farmName: props.farmName
     })
-    
+
     basicInfo.value = {
       waterGroupCount: result.waterGroupCount || 0,
       farmArea: result.totalArea || 0,
@@ -95,13 +95,17 @@ watch(() => props.farmName, () => {
 onMounted(() => {
   loadBasicInfo()
 })
+
+defineExpose({
+  refresh: loadBasicInfo
+})
 </script>
 
 <style lang="scss" scoped>
 .premium-card {
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
   border-radius: 32rpx !important;
-  box-shadow: 
+  box-shadow:
     0 16rpx 64rpx rgba(0, 0, 0, 0.08),
     0 4rpx 16rpx rgba(0, 0, 0, 0.04),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.8);
@@ -162,7 +166,7 @@ onMounted(() => {
   border-radius: 16rpx;
   border: 1px solid rgba(255, 255, 255, 0.5);
   text-align: center;
-  box-shadow: 
+  box-shadow:
     0 4rpx 16rpx rgba(0, 0, 0, 0.06),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.8);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -182,7 +186,7 @@ onMounted(() => {
 
 .basic-info-item:hover {
   transform: translateY(-4rpx);
-  box-shadow: 
+  box-shadow:
     0 16rpx 48rpx rgba(0, 0, 0, 0.08),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
   border-color: rgba(102, 126, 234, 0.2);
@@ -211,4 +215,3 @@ onMounted(() => {
   color: #f56c6c;
 }
 </style>
-
