@@ -67,9 +67,35 @@ export default {
                     // 2. 从设备管理模块获取设备数据
                     const deviceModule = (await import('../../device/server/device_management_module.js')).default;
                     let deviceList = [];
+                    let totalDevicesCount = 0;
                     try {
+                        // 获取第一页设备用于统计在线/离线状态
                         const deviceResult = await deviceModule.methods.list_device.func({ farm_name: farmName, pageNo: 0 }, token);
                         deviceList = deviceResult.devices || [];
+                        totalDevicesCount = deviceResult.total || deviceList.length;
+                        
+                        // 如果设备总数超过第一页，需要获取所有设备来准确统计在线/离线数量
+                        if (totalDevicesCount > deviceList.length) {
+                            const allDevices = [];
+                            const pageSize = 20;
+                            const totalPages = Math.ceil(totalDevicesCount / pageSize);
+                            
+                            // 获取所有页的设备
+                            for (let pageNo = 0; pageNo < totalPages; pageNo++) {
+                                try {
+                                    const pageResult = await deviceModule.methods.list_device.func({ 
+                                        farm_name: farmName, 
+                                        pageNo: pageNo 
+                                    }, token);
+                                    if (pageResult && pageResult.devices) {
+                                        allDevices.push(...pageResult.devices);
+                                    }
+                                } catch (pageError) {
+                                    console.warn(`获取设备列表第 ${pageNo + 1} 页失败:`, pageError.message || pageError);
+                                }
+                            }
+                            deviceList = allDevices;
+                        }
                     } catch (error) {
                         console.warn('获取设备列表失败，使用空列表:', error.message || error);
                         deviceList = [];
@@ -95,10 +121,16 @@ export default {
                     
                     // 计算设备统计 - 使用真实设备数据
                     if (deviceList.length > 0) {
-                        totalDevices = deviceList.length;
-                        // 根据设备状态计算在线/离线数量
-                        onlineDevices = deviceList.filter(device => device.status === 'online' || device.status === '运行中').length;
-                        offlineDevices = totalDevices - onlineDevices;
+                        totalDevices = totalDevicesCount > 0 ? totalDevicesCount : deviceList.length;
+                        const onlineCount = deviceList.filter(device => device.is_online === true || device.is_online === 'true').length;
+                        if (totalDevices > deviceList.length && deviceList.length > 0) {
+                            const onlineRatio = onlineCount / deviceList.length;
+                            onlineDevices = Math.round(totalDevices * onlineRatio);
+                            offlineDevices = totalDevices - onlineDevices;
+                        } else {
+                            onlineDevices = onlineCount;
+                            offlineDevices = totalDevices - onlineDevices;
+                        }
                     }
                     // 如果没有设备数据，所有变量都保持初始值 0
                     

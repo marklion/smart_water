@@ -5,16 +5,13 @@
     </view>
     <view class="card-body panel-body">
       <view v-if="panelDataList.length > 0" class="panel-grid">
-        <view 
-          v-for="(item, index) in panelDataList" 
-          :key="index" 
-          class="panel-item"
-        >
+        <view v-for="(item, index) in panelDataList" :key="index" class="panel-item">
           <view class="panel-label">
             <fui-text :text="item.label" :size="24" color="#606266"></fui-text>
           </view>
           <view class="panel-value">
-            <fui-text :text="formatPanelValue(item.value, item.unit)" :size="40" :fontWeight="700" :color="getPanelValueColor(index)"></fui-text>
+            <fui-text :text="formatPanelValue(item.value, item.unit)" :size="40" :fontWeight="700"
+              :color="getPanelValueColor(index)"></fui-text>
             <fui-text v-if="item.unit" :text="item.unit" :size="22" color="#909399" :padding="[4, 0, 0, 8]"></fui-text>
           </view>
         </view>
@@ -38,10 +35,10 @@ const panelDataList = ref([])
 const generatePanelLabel = (itemName) => {
   // 移除农场名称前缀
   let name = itemName.replace(/^[^_]+_/, '')
-  
+
   // 将下划线替换为空格
   name = name.replace(/_/g, ' ')
-  
+
   // 常见的中文映射
   const translations = {
     'total flow': '总计流量',
@@ -62,14 +59,14 @@ const generatePanelLabel = (itemName) => {
     'valve': '阀门',
     'sensor': '传感器'
   }
-  
+
   // 尝试匹配翻译
   for (const [en, zh] of Object.entries(translations)) {
     if (name.toLowerCase().includes(en)) {
       return zh
     }
   }
-  
+
   // 如果没有匹配，返回原始名称（首字母大写）
   return name.split(' ').map(word =>
     word.charAt(0).toUpperCase() + word.slice(1)
@@ -102,7 +99,7 @@ const formatPanelValue = (value, unit) => {
   if (value === null || value === undefined) return '0.00'
   const num = parseFloat(value)
   if (isNaN(num)) return '0.00'
-  
+
   // 根据单位决定小数位数
   if (unit === 'MPa' || unit === 'm³/h' || unit === 'L/h') {
     return num.toFixed(2)
@@ -126,7 +123,7 @@ const loadPanelData = async () => {
   try {
     // 获取所有统计项列表（st_开头的文件）
     const itemsResponse = await call_remote('/statistic/list_items', { pageNo: 0 })
-    
+
     if (!itemsResponse || !itemsResponse.items || itemsResponse.items.length === 0) {
       panelDataList.value = []
       return
@@ -146,11 +143,11 @@ const loadPanelData = async () => {
         if (historyResponse && historyResponse.records && historyResponse.records.length > 0) {
           const latestRecord = historyResponse.records[0]
           const value = parseFloat(latestRecord.value) || 0
-          
+
           // 生成显示标签（和PC端逻辑一致）
           const label = generatePanelLabel(item.item_name)
           const unit = getPanelUnit(item.item_name)
-          
+
           panelList.push({
             label: label,
             value: value,
@@ -173,13 +170,17 @@ const loadPanelData = async () => {
 onMounted(() => {
   loadPanelData()
 })
+
+defineExpose({
+  refresh: loadPanelData
+})
 </script>
 
 <style lang="scss" scoped>
 .premium-card {
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
   border-radius: 32rpx !important;
-  box-shadow: 
+  box-shadow:
     0 16rpx 64rpx rgba(0, 0, 0, 0.08),
     0 4rpx 16rpx rgba(0, 0, 0, 0.04),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.8);
@@ -238,7 +239,7 @@ onMounted(() => {
   border-radius: 24rpx;
   border: 1px solid rgba(255, 255, 255, 0.5);
   text-align: center;
-  box-shadow: 
+  box-shadow:
     0 4rpx 16rpx rgba(0, 0, 0, 0.06),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.8);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -258,7 +259,7 @@ onMounted(() => {
 
 .panel-item:hover {
   transform: translateY(-4rpx);
-  box-shadow: 
+  box-shadow:
     0 16rpx 48rpx rgba(0, 0, 0, 0.08),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
   border-color: rgba(64, 158, 255, 0.2);
@@ -280,4 +281,3 @@ onMounted(() => {
   text-align: center;
 }
 </style>
-

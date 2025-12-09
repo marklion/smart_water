@@ -10,16 +10,13 @@
     </view>
     <view class="card-body realtime-body">
       <view v-if="realtimeDataList.length > 0" class="realtime-grid">
-        <view 
-          v-for="(item, index) in realtimeDataList" 
-          :key="index" 
-          class="realtime-item"
-        >
+        <view v-for="(item, index) in realtimeDataList" :key="index" class="realtime-item">
           <view class="realtime-label">
             <fui-text :text="item.label" :size="24" color="#606266"></fui-text>
           </view>
           <view class="realtime-value">
-            <fui-text :text="formatValue(item.value)" :size="36" :fontWeight="700" :color="getValueColor(item.value, item.label)"></fui-text>
+            <fui-text :text="formatValue(item.value)" :size="36" :fontWeight="700"
+              :color="getValueColor(item.value, item.label)"></fui-text>
             <fui-text v-if="item.unit" :text="item.unit" :size="20" color="#909399" :padding="[4, 0, 0, 8]"></fui-text>
           </view>
         </view>
@@ -98,7 +95,7 @@ const loadRealtimeData = async () => {
   try {
     // 获取实时数据配置
     const configResponse = await call_remote('/resource/list_realtime', { pageNo: 0 })
-    
+
     // 如果没有配置，清空数据
     if (!configResponse || !configResponse.configs || configResponse.configs.length === 0) {
       realtimeDataList.value = []
@@ -179,13 +176,17 @@ onUnmounted(() => {
     realtimeTimer = null
   }
 })
+
+defineExpose({
+  refresh: loadRealtimeData
+})
 </script>
 
 <style lang="scss" scoped>
 .premium-card {
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
   border-radius: 32rpx !important;
-  box-shadow: 
+  box-shadow:
     0 16rpx 64rpx rgba(0, 0, 0, 0.08),
     0 4rpx 16rpx rgba(0, 0, 0, 0.04),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.8);
@@ -256,7 +257,7 @@ onUnmounted(() => {
   border-radius: 24rpx;
   border: 1px solid rgba(255, 255, 255, 0.5);
   text-align: center;
-  box-shadow: 
+  box-shadow:
     0 4rpx 16rpx rgba(0, 0, 0, 0.06),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.8);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -276,7 +277,7 @@ onUnmounted(() => {
 
 .realtime-item:hover {
   transform: translateY(-4rpx);
-  box-shadow: 
+  box-shadow:
     0 16rpx 48rpx rgba(0, 0, 0, 0.08),
     inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
   border-color: rgba(64, 158, 255, 0.2);
@@ -298,4 +299,3 @@ onUnmounted(() => {
   text-align: center;
 }
 </style>
-
