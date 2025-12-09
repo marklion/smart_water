@@ -3,14 +3,15 @@
     <!-- 顶部标题栏 -->
     <PageHeader ref="pageHeaderRef" :show-farm-selector="true" @farm-change="onFarmChange" />
 
-    <!-- 用户欢迎信息 -->
-    <view class="user-welcome">
-      <fui-text :text="userInfo + ', 欢迎您'" :size="28" color="#606266"></fui-text>
-    </view>
-
-    <!-- 主要内容区域 -->
+    <!-- 主要内容区域 - 使用 scroll-view 支持下拉刷新 -->
     <scroll-view class="content-scroll" scroll-y refresher-enabled :refresher-triggered="refreshing"
-      @refresherrefresh="onRefresh">
+      @refresherrefresh="onRefresh" :enable-back-to-top="true">
+      <!-- 用户欢迎信息 -->
+      <view class="user-welcome">
+        <fui-text :text="userInfo + ', 欢迎您'" :size="28" color="#606266"></fui-text>
+      </view>
+
+      <!-- 内容区域 -->
       <view class="content">
         <!-- 基本信息卡片 -->
         <BasicInfoCard ref="basicInfoCardRef" :farmName="currentFarmName" />
@@ -29,7 +30,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, nextTick } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import call_remote from '../../../lib/call_remote.js'
 import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -41,6 +43,7 @@ import DataPanelCard from './monitoring/DataPanelCard.vue'
 const userInfo = ref('')
 const refreshing = ref(false)
 const pageLoading = ref(false)
+const isFirstLoad = ref(true) // 标记是否是首次加载
 
 // 组件引用
 const pageHeaderRef = ref(null)
@@ -128,7 +131,8 @@ const onRefresh = async () => {
   }
 }
 
-onMounted(async () => {
+// 页面显示时加载/刷新数据
+onShow(async () => {
   // 检查登录状态
   const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null)
   if (!token) {
@@ -138,7 +142,12 @@ onMounted(async () => {
     return
   }
 
-  pageLoading.value = true
+  // 首次加载时显示全屏加载动画
+  if (isFirstLoad.value) {
+    pageLoading.value = true
+    isFirstLoad.value = false
+  }
+
   try {
     loadUserInfo()
     // 等待顶部组件加载完成，获取当前农场名称
@@ -148,24 +157,45 @@ onMounted(async () => {
       currentFarmName.value = pageHeaderRef.value.getCurrentFarmName()
     }
     // 其他数据由各个组件自行加载
+  } catch (error) {
+    console.error('加载数据失败:', error)
   } finally {
-    // 延迟一下再隐藏加载，确保数据已经渲染
-    setTimeout(() => {
-      pageLoading.value = false
-    }, 300)
+    if (pageLoading.value) {
+      // 延迟一下再隐藏加载，确保数据已经渲染
+      setTimeout(() => {
+        pageLoading.value = false
+      }, 300)
+    }
   }
 })
 </script>
 
 <style lang="scss" scoped>
 .page {
-  min-height: 100vh;
+  height: 100vh;
+  width: 100vw;
   background: linear-gradient(180deg, #f0f4f8 0%, #e8edf2 50%, #dde5ec 100%);
-  padding-bottom: 80px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  position: relative;
 }
 
+/* 内容滚动区域 - scroll-view 需要明确高度 */
+.content-scroll {
+  position: fixed;
+  /* PageHeader 总高度 = min-height(120rpx) + padding-top(24rpx + safe-area) + padding-bottom(24rpx) = 168rpx + env(safe-area-inset-top) */
+  top: calc(168rpx + env(safe-area-inset-top));
+  /* 底部 tabBar 高度 + 安全区 */
+  bottom: calc(120rpx + env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
+  width: 100%;
+  box-sizing: border-box;
+  /* 移除所有默认间距，确保紧贴顶部 */
+  margin: 0;
+  padding: 0;
+}
 
 /* 用户欢迎信息 */
 .user-welcome {
@@ -174,21 +204,15 @@ onMounted(async () => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-/* 内容滚动区域 */
-.content-scroll {
-  flex: 1;
-  box-sizing: border-box;
-  overflow-y: auto;
-}
-
 /* 内容区域 */
 .content {
   padding: 32rpx;
   display: flex;
   flex-direction: column;
   gap: 32rpx;
-  min-height: 100%;
   box-sizing: border-box;
+  padding-bottom: 32rpx;
+  /* 底部留出一些间距即可，不需要为 tabBar 留空间，因为 scroll-view 已经限制了底部 */
 }
 
 /* 响应式调整 */

@@ -18,6 +18,12 @@
         },
         /* 模块配置 */
         "modules" : {},
+        /* 地图配置 */
+        "maps" : {
+            "amap" : {
+                "key" : "1cf464a131ce91dfd0e56d28bd80d786"
+            }
+        },
         /* 应用发布信息 */
         "distribute" : {
             /* android打包配置 */

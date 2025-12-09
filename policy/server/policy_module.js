@@ -1575,17 +1575,22 @@ export default {
                     }
                     
                     // 创建/更新轮灌组策略（add_group_policy 内部会处理策略已存在的情况）
-                    await config_lib.add_group_policy({
-                        policy_name: groupConfig.name,
-                        farm_name:body.farm_name,
-                        wgv_array: groupConfig.valves.map(v => ({ name: v })),
-                        total_time: groupConfig.total_time,
-                        post_fert_time:groupConfig.post_fert_time,
-                        method: groupConfig.method == 'Time'?'定时':'定量',
-                        fert_time: groupConfig.fert_time,
-                        area_based_amount: groupConfig.AB_fert,
-                        area: groupConfig.area,
-                    }, token);
+                    try {
+                        await config_lib.add_group_policy({
+                            policy_name: groupConfig.name,
+                            farm_name:body.farm_name,
+                            wgv_array: groupConfig.valves.map(v => ({ name: v })),
+                            total_time: groupConfig.total_time,
+                            post_fert_time:groupConfig.post_fert_time,
+                            method: groupConfig.method == 'Time'?'定时':'定量',
+                            fert_time: groupConfig.fert_time,
+                            area_based_amount: groupConfig.AB_fert,
+                            area: groupConfig.area,
+                        }, token);
+                    } catch (e) {
+                        console.error(`创建轮灌组策略 ${groupConfig.name} 失败:`, e);
+                        throw { err_msg: `创建轮灌组策略 ${groupConfig.name} 失败: ${e.err_msg || e.message || String(e)}` };
+                    }
                 }
                 
                 // 记录操作结果

@@ -103,16 +103,21 @@ onMounted(async () => {
 <style lang="scss" scoped>
 /* 顶部标题栏 */
 .header {
-  padding: 40rpx 40rpx 24rpx 40rpx;
+  padding: calc(24rpx + env(safe-area-inset-top)) 40rpx 24rpx 40rpx;
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+  box-sizing: border-box;
+  min-height: 120rpx; /* 固定高度便于内容区域预留空间 */
 }
 
 .header-left {
