@@ -25,6 +25,24 @@
 			}
 		},
 		{
+			"path": "pages/irrigation/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/irrigation/wizard",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/irrigation/valve-map",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/profile/index",
 			"style": {
 				"navigationStyle": "custom"
@@ -58,6 +76,12 @@
 				"text": "设备",
 				"iconPath": "static/tabbar/device.png",
 				"selectedIconPath": "static/tabbar/device-active.png"
+			},
+			{
+				"pagePath": "pages/irrigation/index",
+				"text": "灌溉",
+				"iconPath": "static/tabbar/Irrigation.png",
+				"selectedIconPath": "static/tabbar/Irrigation-active.png"
 			},
 			{
 				"pagePath": "pages/profile/index",

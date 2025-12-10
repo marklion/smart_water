@@ -3,110 +3,113 @@
         <!-- 顶部标题栏 -->
         <PageHeader ref="pageHeaderRef" :show-farm-selector="true" @farm-change="onFarmChange" />
 
-        <!-- 设备列表 -->
-        <scroll-view class="device-list" scroll-y refresher-enabled :refresher-triggered="refreshing"
-            @refresherrefresh="onRefresh">
-            <view v-if="loading && deviceList.length === 0" class="loading-container">
-                <fui-text :text="'加载中...'" :size="28" color="#909399"></fui-text>
-            </view>
+        <!-- 设备列表 - 使用 scroll-view 支持滚动 -->
+        <scroll-view class="device-list-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
+            <view class="device-list">
+                <view v-if="loading && deviceList.length === 0" class="loading-container">
+                    <fui-text :text="'加载中...'" :size="28" color="#909399"></fui-text>
+                </view>
 
-            <view v-else-if="deviceList.length === 0" class="empty-container">
-                <fui-text :text="'暂无设备'" :size="28" color="#909399"></fui-text>
-                <fui-text :text="emptyMessage" :size="24" color="#C0C4CC"></fui-text>
-            </view>
+                <view v-else-if="deviceList.length === 0" class="empty-container">
+                    <fui-text :text="'暂无设备'" :size="28" color="#909399"></fui-text>
+                    <fui-text :text="emptyMessage" :size="24" color="#C0C4CC"></fui-text>
+                </view>
 
-            <view v-else class="device-items">
-                <view v-for="device in deviceList" :key="device.device_name" class="device-card">
-                    <!-- 设备基本信息 -->
-                    <view class="device-header">
-                        <view class="device-name-row">
-                            <view class="device-name-info">
-                                <fui-text :text="device.device_name" :size="32" :fontWeight="600"
-                                    color="#303133"></fui-text>
-                            </view>
-                            <view class="status-badge" :class="device.is_online ? 'online' : 'offline'">
-                                <view class="status-dot"></view>
-                                <fui-text :text="device.is_online ? '在线' : '离线'" :size="22"
-                                    :color="device.is_online ? '#67C23A' : '#909399'"></fui-text>
-                            </view>
-                        </view>
-                        <view class="device-meta">
-                            <view class="meta-item">
-                                <view class="meta-label">类型</view>
-                                <fui-text :text="getDeviceTypeName(device.device_type)" :size="24"
-                                    color="#303133"></fui-text>
-                            </view>
-                            <view v-if="device.farm_name" class="meta-item">
-                                <view class="meta-label">农场</view>
-                                <fui-text :text="device.farm_name" :size="24" color="#303133"></fui-text>
-                            </view>
-                            <view v-if="device.block_name" class="meta-item">
-                                <view class="meta-label">区块</view>
-                                <fui-text :text="device.block_name" :size="24" color="#303133"></fui-text>
-                            </view>
-                        </view>
-                    </view>
-
-                    <!-- 运行时信息 -->
-                    <view
-                        v-if="(device.runtime_info && device.runtime_info.length > 0) || device.is_online !== undefined"
-                        class="runtime-info-section">
-                        <view class="runtime-title">
-                            <fui-text :text="'运行时信息'" :size="28" :fontWeight="600" color="#303133"></fui-text>
-                        </view>
-                        <view class="runtime-info-list">
-                            <!-- 设备在线状态 -->
-                            <view v-if="device.is_online !== undefined" class="runtime-info-item online-status-item"
-                                :class="device.is_online ? 'online' : 'offline'">
-                                <view class="info-label">
-                                    <view class="status-icon" :class="device.is_online ? 'online' : 'offline'"></view>
-                                    <fui-text :text="'设备在线状态：'" :size="24" color="#606266"></fui-text>
+                <view v-else class="device-items">
+                    <view v-for="device in deviceList" :key="device.device_name" class="device-card">
+                        <!-- 设备基本信息 -->
+                        <view class="device-header">
+                            <view class="device-name-row">
+                                <view class="device-name-info">
+                                    <fui-text :text="device.device_name" :size="32" :fontWeight="600"
+                                        color="#303133"></fui-text>
                                 </view>
-                                <view class="info-value" :class="device.is_online ? 'online' : 'offline'">
-                                    <fui-text :text="device.is_online ? '在线' : '离线'" :size="24"
-                                        :color="device.is_online ? '#67C23A' : '#F56C6C'"></fui-text>
+                                <view class="status-badge" :class="device.is_online ? 'online' : 'offline'">
+                                    <view class="status-dot"></view>
+                                    <fui-text :text="device.is_online ? '在线' : '离线'" :size="22"
+                                        :color="device.is_online ? '#67C23A' : '#909399'"></fui-text>
                                 </view>
                             </view>
-                            <!-- 其他运行时信息 -->
-                            <view v-for="(info, idx) in device.runtime_info" :key="idx" class="runtime-info-item">
-                                <view class="info-label">
-                                    <fui-text :text="info.title + '：'" :size="24" color="#606266"></fui-text>
+                            <view class="device-meta">
+                                <view class="meta-item">
+                                    <view class="meta-label">类型</view>
+                                    <fui-text :text="getDeviceTypeName(device.device_type)" :size="24"
+                                        color="#303133"></fui-text>
                                 </view>
-                                <view class="info-value">
-                                    <fui-text :text="info.text" :size="24" color="#303133"></fui-text>
+                                <view v-if="device.farm_name" class="meta-item">
+                                    <view class="meta-label">农场</view>
+                                    <fui-text :text="device.farm_name" :size="24" color="#303133"></fui-text>
+                                </view>
+                                <view v-if="device.block_name" class="meta-item">
+                                    <view class="meta-label">区块</view>
+                                    <fui-text :text="device.block_name" :size="24" color="#303133"></fui-text>
                                 </view>
                             </view>
                         </view>
-                    </view>
 
-                    <!-- 设备控制区域 -->
-                    <view v-if="hasAnyCapability(device)" class="device-control-area">
-                        <view class="normal-control-section">
-                            <view class="section-header">
-                                <fui-text :text="'设备控制'" :size="26" :fontWeight="600" color="#303133"></fui-text>
+                        <!-- 运行时信息 -->
+                        <view
+                            v-if="(device.runtime_info && device.runtime_info.length > 0) || device.is_online !== undefined"
+                            class="runtime-info-section">
+                            <view class="runtime-title">
+                                <fui-text :text="'运行时信息'" :size="28" :fontWeight="600" color="#303133"></fui-text>
                             </view>
-
-                            <!-- 能力集显示 -->
-                            <view class="capability-section">
-                                <view class="capability-tags">
-                                    <view v-for="cap in getDeviceCapabilities(device)" :key="cap"
-                                        class="capability-tag">
-                                        <fui-text :text="getCapabilityName(cap)" :size="22" color="#409eff"></fui-text>
+                            <view class="runtime-info-list">
+                                <!-- 设备在线状态 -->
+                                <view v-if="device.is_online !== undefined" class="runtime-info-item online-status-item"
+                                    :class="device.is_online ? 'online' : 'offline'">
+                                    <view class="info-label">
+                                        <view class="status-icon" :class="device.is_online ? 'online' : 'offline'">
+                                        </view>
+                                        <fui-text :text="'设备在线状态：'" :size="24" color="#606266"></fui-text>
+                                    </view>
+                                    <view class="info-value" :class="device.is_online ? 'online' : 'offline'">
+                                        <fui-text :text="device.is_online ? '在线' : '离线'" :size="24"
+                                            :color="device.is_online ? '#67C23A' : '#F56C6C'"></fui-text>
+                                    </view>
+                                </view>
+                                <!-- 其他运行时信息 -->
+                                <view v-for="(info, idx) in device.runtime_info" :key="idx" class="runtime-info-item">
+                                    <view class="info-label">
+                                        <fui-text :text="info.title + '：'" :size="24" color="#606266"></fui-text>
+                                    </view>
+                                    <view class="info-value">
+                                        <fui-text :text="info.text" :size="24" color="#303133"></fui-text>
                                     </view>
                                 </view>
                             </view>
+                        </view>
 
-                            <!-- 控制按钮 -->
-                            <view class="control-buttons">
-                                <view v-for="buttonGroup in getDeviceButtonGroups(device)" :key="buttonGroup.key"
-                                    :class="buttonGroup.containerClass">
-                                    <view v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
-                                        class="control-btn"
-                                        :class="[buttonConfig.buttonClass, { disabled: !device.is_online || controlLoading[device.device_name] }]"
-                                        @click="handleDeviceAction(buttonConfig.action, device)">
-                                        <fui-text
-                                            :text="controlLoading[device.device_name] ? buttonConfig.loadingText || '操作中...' : buttonConfig.buttonText"
-                                            :size="26" color="#ffffff"></fui-text>
+                        <!-- 设备控制区域 -->
+                        <view v-if="hasAnyCapability(device)" class="device-control-area">
+                            <view class="normal-control-section">
+                                <view class="section-header">
+                                    <fui-text :text="'设备控制'" :size="26" :fontWeight="600" color="#303133"></fui-text>
+                                </view>
+
+                                <!-- 能力集显示 -->
+                                <view class="capability-section">
+                                    <view class="capability-tags">
+                                        <view v-for="cap in getDeviceCapabilities(device)" :key="cap"
+                                            class="capability-tag">
+                                            <fui-text :text="getCapabilityName(cap)" :size="22"
+                                                color="#409eff"></fui-text>
+                                        </view>
+                                    </view>
+                                </view>
+
+                                <!-- 控制按钮 -->
+                                <view class="control-buttons">
+                                    <view v-for="buttonGroup in getDeviceButtonGroups(device)" :key="buttonGroup.key"
+                                        :class="buttonGroup.containerClass">
+                                        <view v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
+                                            class="control-btn"
+                                            :class="[buttonConfig.buttonClass, { disabled: !device.is_online || controlLoading[device.device_name] }]"
+                                            @click="handleDeviceAction(buttonConfig.action, device)">
+                                            <fui-text
+                                                :text="controlLoading[device.device_name] ? buttonConfig.loadingText || '操作中...' : buttonConfig.buttonText"
+                                                :size="26" color="#ffffff"></fui-text>
+                                        </view>
                                     </view>
                                 </view>
                             </view>
@@ -122,7 +125,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import call_remote from '../../../../lib/call_remote.js'
 import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import PageHeader from '../../components/PageHeader.vue'
@@ -135,6 +139,7 @@ const controlLoading = ref({})
 const currentFarmName = ref('')
 const pageHeaderRef = ref(null)
 const pageLoading = ref(false)
+const isFirstLoad = ref(true) // 标记是否是首次加载
 
 // 设备能力按钮映射配置
 const deviceCapabilityButtonMapping = {
@@ -450,7 +455,8 @@ const executeDeviceAction = async (action, deviceName) => {
     }
 }
 
-onMounted(async () => {
+// 页面显示时加载/刷新数据
+onShow(async () => {
     // 检查登录状态
     const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null)
     if (!token) {
@@ -460,7 +466,12 @@ onMounted(async () => {
         return
     }
 
-    pageLoading.value = true
+    // 首次加载时显示全屏加载动画
+    if (isFirstLoad.value) {
+        pageLoading.value = true
+        isFirstLoad.value = false
+    }
+
     try {
         // 等待顶部组件加载完成，获取当前农场名称
         if (pageHeaderRef.value) {
@@ -468,31 +479,47 @@ onMounted(async () => {
             currentFarmName.value = pageHeaderRef.value.getCurrentFarmName()
         }
         await loadDeviceList()
+    } catch (error) {
+        console.error('加载数据失败:', error)
     } finally {
-        // 延迟一下再隐藏加载，确保数据已经渲染
-        setTimeout(() => {
-            pageLoading.value = false
-        }, 300)
+        if (pageLoading.value) {
+            // 延迟一下再隐藏加载，确保数据已经渲染
+            setTimeout(() => {
+                pageLoading.value = false
+            }, 300)
+        }
     }
 })
 </script>
 
 <style lang="scss" scoped>
 .page {
-    min-height: 100vh;
+    height: 100vh;
+    width: 100vw;
     background: linear-gradient(180deg, #f0f4f8 0%, #e8edf2 50%, #dde5ec 100%);
-    padding-bottom: 100rpx;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    position: relative;
 }
 
+/* 设备列表滚动区域 - scroll-view 需要明确高度 */
+.device-list-scroll {
+    position: fixed;
+    top: calc(168rpx + env(safe-area-inset-top));
+    bottom: calc(120rpx + env(safe-area-inset-bottom));
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: calc(100vh - 168rpx - 120rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    box-sizing: border-box;
+}
 
 /* 设备列表 */
 .device-list {
-    flex: 1;
     padding: 32rpx;
     box-sizing: border-box;
-    overflow-y: auto;
+    padding-bottom: 32rpx;
 }
 
 .loading-container,
