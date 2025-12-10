@@ -110,6 +110,27 @@ const getDeviceUnit = (deviceName, driverName) => {
   }
 }
 
+// 获取设备信息（带缓存）
+const getDeviceInfo = async (deviceName, deviceInfoCache) => {
+  // 从缓存获取设备信息，如果没有则调用接口
+  if (!deviceInfoCache[deviceName]) {
+    try {
+      const deviceResponse = await call_remote('/device_management/list_device', {
+        pageNo: 0,
+        device_name: deviceName
+      })
+
+      if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
+        deviceInfoCache[deviceName] = deviceResponse.devices[0]
+      }
+    } catch (error) {
+      console.warn(`获取设备 ${deviceName} 信息失败:`, error)
+    }
+  }
+
+  return deviceInfoCache[deviceName] || null
+}
+
 // 加载实时数据
 const loadRealtimeData = async () => {
   try {
@@ -133,65 +154,26 @@ const loadRealtimeData = async () => {
         let value = 0
         let unit = ''
 
-        // 根据data_type调用不同的接口
-        if (config.data_type === 'readout') {
-          const readoutResponse = await call_remote('/device_management/readout_device', {
-            device_name: config.device_name
-          })
+        // 调用readout接口
+        const readoutResponse = await call_remote('/device_management/readout_device', {
+          device_name: config.device_name
+        })
 
+        // 根据data_type获取对应的值
+        if (config.data_type === 'readout') {
           if (readoutResponse && readoutResponse.readout !== null && readoutResponse.readout !== undefined) {
             value = parseFloat(readoutResponse.readout) || 0
           }
-
-          // 从缓存获取设备信息，如果没有则调用接口
-          if (!deviceInfoCache[config.device_name]) {
-            try {
-              const deviceResponse = await call_remote('/device_management/list_device', {
-                pageNo: 0,
-                device_name: config.device_name
-              })
-
-              if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
-                deviceInfoCache[config.device_name] = deviceResponse.devices[0]
-              }
-            } catch (error) {
-              console.warn(`获取设备 ${config.device_name} 信息失败:`, error)
-            }
-          }
-
-          if (deviceInfoCache[config.device_name]) {
-            const device = deviceInfoCache[config.device_name]
-            unit = getDeviceUnit(device.device_name, device.driver_name)
-          }
         } else if (config.data_type === 'total_readout') {
-          const readoutResponse = await call_remote('/device_management/readout_device', {
-            device_name: config.device_name
-          })
-
           if (readoutResponse && readoutResponse.total_readout !== null && readoutResponse.total_readout !== undefined) {
             value = parseFloat(readoutResponse.total_readout) || 0
           }
+        }
 
-          // 从缓存获取设备信息，如果没有则调用接口
-          if (!deviceInfoCache[config.device_name]) {
-            try {
-              const deviceResponse = await call_remote('/device_management/list_device', {
-                pageNo: 0,
-                device_name: config.device_name
-              })
-
-              if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
-                deviceInfoCache[config.device_name] = deviceResponse.devices[0]
-              }
-            } catch (error) {
-              console.warn(`获取设备 ${config.device_name} 信息失败:`, error)
-            }
-          }
-
-          if (deviceInfoCache[config.device_name]) {
-            const device = deviceInfoCache[config.device_name]
-            unit = getDeviceUnit(device.device_name, device.driver_name)
-          }
+        // 获取设备信息并提取单位
+        const device = await getDeviceInfo(config.device_name, deviceInfoCache)
+        if (device) {
+          unit = getDeviceUnit(device.device_name, device.driver_name)
         }
 
         // 使用配置的label作为显示标签
