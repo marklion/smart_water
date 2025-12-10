@@ -241,6 +241,56 @@ export default {
                 },
             },
             func: async function (body, token) {
+                // 根据 driver_name / device_name 兜底设备类型（兼容 valva）
+                const normalizeDeviceType = (device) => {
+                    const driverName = (device.driver_name || '').toLowerCase()
+                    const driverTypeMap = {
+                        pump: 'pump',
+                        waterflowmeter: 'flowmeter',
+                        flowmeter: 'flowmeter',
+                        pressuremeter: 'pressure',
+                        pressure: 'pressure',
+                        watergroupvalve: 'valve',
+                        valve: 'valve',
+                        fertpump: 'pump',
+                        fertilize: 'fertilizer',
+                        fert: 'fertilizer',
+                        level: 'level',
+                        liquidlevel: 'level',
+                        levelmeter: 'level',
+                        mixer: 'pump',
+                        stir: 'pump',
+                        mix: 'pump'
+                    }
+                    // 先从驱动名精确/包含映射
+                    for (const [key, val] of Object.entries(driverTypeMap)) {
+                        if (driverName.includes(key)) return val
+                    }
+
+                    const inferFromName = (name = '') => {
+                        const n = name.toLowerCase()
+                        if (n.includes('泵') || n.includes('搅拌') || n.includes('混合') || n.includes('mix')) return 'pump'
+                        if (n.includes('流量计')) return 'flowmeter'
+                        if (n.includes('压力')) return 'pressure'
+                        if (n.includes('液位') || n.includes('液面') || n.includes('水位') || n.includes('level')) return 'level'
+                        if (n.includes('阀')) return 'valve'
+                        return ''
+                    }
+
+                    const t = (device.device_type || '').toLowerCase()
+                    const inferred = inferFromName(device.device_name)
+
+                    // 如果设备名称能强匹配泵/流量计/压力/液位，则优先使用（即使 t 是 valve/valva）
+                    if (inferred && inferred !== 'valve') return inferred
+
+                    // 兼容 valva
+                    if (t === 'valva') return inferred || 'valve'
+
+                    if (t) return t
+
+                    // t 为空时，尝试用名称推断；仍无则阀门兜底
+                    return inferred || 'valve'
+                }
                 let filtered_devices = [];
                 device_array.forEach(device => {
                     if (body.farm_name && device.farm_name !== body.farm_name) return;
@@ -254,7 +304,7 @@ export default {
                         device_name: device.device_name,
                         driver_name: device.driver_name,
                         config_key: device.config_key,
-                        device_type: device.device_type || 'valve',
+                        device_type: normalizeDeviceType(device),
                         capability: JSON.stringify(capability),
                         farm_name: device.farm_name || '',
                         block_name: device.block_name || '',

@@ -6,6 +6,22 @@
         <!-- 设备列表 - 使用 scroll-view 支持滚动 -->
         <scroll-view class="device-list-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="device-list">
+                <view class="filter-bar">
+                    <view class="filter-title">
+                        <fui-text :text="'设备类型筛选'" :size="26" color="#606266"></fui-text>
+                    </view>
+                    <picker mode="selector" :range="deviceTypeOptions" range-key="label" @change="onTypeChange">
+                        <view class="filter-pill">
+                            <text class="filter-icon">🔍</text>
+                            <fui-text :text="currentTypeLabel" :size="26" color="#303133"></fui-text>
+                            <text class="picker-arrow">▼</text>
+                        </view>
+                    </picker>
+                    <view class="filter-meta">
+                        <fui-text :text="`当前: ${filteredDeviceList.length} / 总计: ${deviceList.length}`" :size="22"
+                            color="#909399"></fui-text>
+                    </view>
+                </view>
                 <view v-if="loading && deviceList.length === 0" class="loading-container">
                     <fui-text :text="'加载中...'" :size="28" color="#909399"></fui-text>
                 </view>
@@ -16,7 +32,7 @@
                 </view>
 
                 <view v-else class="device-items">
-                    <view v-for="device in deviceList" :key="device.device_name" class="device-card">
+                    <view v-for="device in filteredDeviceList" :key="device.device_name" class="device-card">
                         <!-- 设备基本信息 -->
                         <view class="device-header">
                             <view class="device-name-row">
@@ -43,6 +59,11 @@
                                 <view v-if="device.block_name" class="meta-item">
                                     <view class="meta-label">区块</view>
                                     <fui-text :text="device.block_name" :size="24" color="#303133"></fui-text>
+                                </view>
+                                <view v-if="device.longitude || device.latitude" class="meta-item">
+                                    <view class="meta-label">经纬度</view>
+                                    <fui-text :text="`${device.longitude ?? '-'}, ${device.latitude ?? '-'}`" :size="24"
+                                        color="#303133"></fui-text>
                                 </view>
                             </view>
                         </view>
@@ -133,6 +154,7 @@ import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
 
 const deviceList = ref([])
+const deviceTypeFilter = ref('')
 const loading = ref(false)
 const refreshing = ref(false)
 const controlLoading = ref({})
@@ -305,24 +327,82 @@ const deviceTypeMap = {
     pump: '泵',
     temperature: '温度传感器',
     humidity: '湿度传感器',
-    pressure: '压力传感器'
+    pressure: '压力计',
+    level: '液位计'
+}
+
+// 根据 driver_name 进行兜底推断
+const inferTypeByDriver = (driverName = '') => {
+    const dn = driverName.toLowerCase()
+    if (dn.includes('pump')) return 'pump'
+    if (dn.includes('flow')) return 'flowmeter'
+    if (dn.includes('pressure')) return 'pressure'
+    if (dn.includes('valv')) return 'valve'
+    return ''
+}
+
+const normalizeType = (device) => {
+    const t = (device.device_type || '').toLowerCase()
+    const driver = device.driver_name || ''
+    if (t === 'valva') return 'valve' // 后端拼写错误兜底
+    if (t) return t
+    const inferred = inferTypeByDriver(driver)
+    return inferred || t || ''
 }
 
 const getDeviceTypeName = (type) => {
     return deviceTypeMap[type] || type || '未知'
 }
 
+const deviceTypeOptions = [
+    { label: '全部设备', value: '' },
+    { label: '阀门', value: 'valve' },
+    { label: '泵', value: 'pump' },
+    { label: '流量计', value: 'flowmeter' },
+    { label: '压力计', value: 'pressure' },
+    { label: '液位计', value: 'level' },
+]
+
+const currentTypeLabel = computed(() => {
+    const found = deviceTypeOptions.find(opt => opt.value === deviceTypeFilter.value)
+    return found ? found.label : '全部设备'
+})
+
+const typeStats = computed(() => {
+    const stat = {}
+    deviceList.value.forEach(d => {
+        const key = (d.device_type || d.driver_name || '未知').toLowerCase()
+        stat[key] = (stat[key] || 0) + 1
+    })
+    return stat
+})
+
+const filteredDeviceList = computed(() => {
+    if (!deviceTypeFilter.value) return deviceList.value
+    const target = deviceTypeFilter.value.toLowerCase()
+    return deviceList.value.filter(d => {
+        const norm = normalizeType(d)
+        if (norm) {
+            if (target === 'valve') {
+                // 阀门兼容 valva/valve
+                return norm === 'valve'
+            }
+            return norm === target
+        }
+        // 若无类型，再用 driver_name 兜底
+        const driver = (d.driver_name || '').toLowerCase()
+        return driver.includes(target)
+    })
+})
+
+const onTypeChange = (e) => {
+    const idx = Number(e.detail.value || 0)
+    const opt = deviceTypeOptions[idx] || deviceTypeOptions[0]
+    deviceTypeFilter.value = opt.value
+}
+
 // 设备类型图标映射
 
-// 检查设备是否有某个能力
-const hasCapability = (device, capability) => {
-    try {
-        const capabilities = JSON.parse(device.capability || '[]')
-        return capabilities.includes(capability)
-    } catch (e) {
-        return false
-    }
-}
 
 // 检查设备是否有任何能力
 const hasAnyCapability = (device) => {
@@ -360,6 +440,19 @@ const loadDeviceList = async () => {
                 type: deviceList.value[0].device_type,
                 capability: deviceList.value[0].capability
             })
+            // 统计后端返回的类型和驱动，便于排查
+            const typeStatsLog = deviceList.value.reduce((acc, d) => {
+                const t = (d.device_type || 'undefined').toLowerCase()
+                acc[t] = (acc[t] || 0) + 1
+                return acc
+            }, {})
+            const driverStatsLog = deviceList.value.reduce((acc, d) => {
+                const t = (d.driver_name || 'undefined').toLowerCase()
+                acc[t] = (acc[t] || 0) + 1
+                return acc
+            }, {})
+            console.log('device_type 统计:', typeStatsLog)
+            console.log('driver_name 统计:', driverStatsLog)
         }
     } catch (error) {
         console.error('加载设备列表失败:', error)
@@ -503,6 +596,43 @@ onShow(async () => {
     position: relative;
 }
 
+.filter-bar {
+    padding: 8rpx 24rpx 0;
+    box-sizing: border-box;
+}
+
+.filter-title {
+    margin-bottom: 4rpx;
+}
+
+.filter-pill {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    background: #ffffff;
+    border-radius: 999rpx;
+    padding: 16rpx 24rpx;
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 28rpx;
+    color: #303133;
+}
+
+.filter-icon {
+    font-size: 28rpx;
+    color: #909399;
+}
+
+.picker-arrow {
+    font-size: 26rpx;
+    color: #909399;
+    margin-left: auto;
+}
+
+.filter-meta {
+    margin-top: 8rpx;
+}
+
 /* 设备列表滚动区域 - scroll-view 需要明确高度 */
 .device-list-scroll {
     position: fixed;
@@ -517,7 +647,7 @@ onShow(async () => {
 
 /* 设备列表 */
 .device-list {
-    padding: 32rpx;
+    padding: 8rpx 24rpx 32rpx;
     box-sizing: border-box;
     padding-bottom: 32rpx;
 }
