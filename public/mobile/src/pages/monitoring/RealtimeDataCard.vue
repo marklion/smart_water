@@ -90,6 +90,26 @@ const getValueColor = (value, label) => {
   return '#303133'
 }
 
+// 根据设备类型获取单位
+const getDeviceUnit = (deviceName, driverName) => {
+  const name = (deviceName || driverName || '').toLowerCase()
+  if (name.includes('flow') || name.includes('流量') || name.includes('流速')) {
+    return 'm³/h'
+  } else if (name.includes('pressure') || name.includes('压力')) {
+    return 'MPa'
+  } else if (name.includes('temperature') || name.includes('温度')) {
+    return '°C'
+  } else if (name.includes('液位') || name.includes('level')) {
+    return 'm'
+  } else if (name.includes('valve') || name.includes('阀门')) {
+    return ''
+  } else if (name.includes('pump') || name.includes('泵')) {
+    return ''
+  } else {
+    return ''
+  }
+}
+
 // 加载实时数据
 const loadRealtimeData = async () => {
   try {
@@ -105,39 +125,89 @@ const loadRealtimeData = async () => {
 
     const configs = configResponse.configs
     const realtimeList = []
+    const deviceInfoCache = {} // 设备信息缓存
 
     // 根据配置获取设备实时数据
     for (const config of configs) {
       try {
-        // 获取设备信息
-        const deviceResult = await call_remote('/device_management/get_device', {
-          device_name: config.device_name
-        })
+        let value = 0
+        let unit = ''
 
-        if (deviceResult && deviceResult.device) {
-          const device = deviceResult.device
-          // 根据配置的item_name获取对应的值
-          let value = 0
-          let label = config.item_name || config.device_name
+        // 根据data_type调用不同的接口
+        if (config.data_type === 'readout') {
+          const readoutResponse = await call_remote('/device_management/readout_device', {
+            device_name: config.device_name
+          })
 
-          // 从设备数据中获取对应的值
-          if (device.current_values && device.current_values[config.item_name]) {
-            value = parseFloat(device.current_values[config.item_name]) || 0
-          } else if (device.value !== undefined) {
-            value = parseFloat(device.value) || 0
+          if (readoutResponse && readoutResponse.readout !== null && readoutResponse.readout !== undefined) {
+            value = parseFloat(readoutResponse.readout) || 0
           }
 
-          // 只添加有值的配置项
-          if (value > 0 || device.is_online) {
-            realtimeList.push({
-              label: label,
-              value: value,
-              unit: getUnitForItem(config.item_name || config.device_name)
-            })
+          // 从缓存获取设备信息，如果没有则调用接口
+          if (!deviceInfoCache[config.device_name]) {
+            try {
+              const deviceResponse = await call_remote('/device_management/list_device', {
+                pageNo: 0,
+                device_name: config.device_name
+              })
+
+              if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
+                deviceInfoCache[config.device_name] = deviceResponse.devices[0]
+              }
+            } catch (error) {
+              console.warn(`获取设备 ${config.device_name} 信息失败:`, error)
+            }
+          }
+
+          if (deviceInfoCache[config.device_name]) {
+            const device = deviceInfoCache[config.device_name]
+            unit = getDeviceUnit(device.device_name, device.driver_name)
+          }
+        } else if (config.data_type === 'total_readout') {
+          const readoutResponse = await call_remote('/device_management/readout_device', {
+            device_name: config.device_name
+          })
+
+          if (readoutResponse && readoutResponse.total_readout !== null && readoutResponse.total_readout !== undefined) {
+            value = parseFloat(readoutResponse.total_readout) || 0
+          }
+
+          // 从缓存获取设备信息，如果没有则调用接口
+          if (!deviceInfoCache[config.device_name]) {
+            try {
+              const deviceResponse = await call_remote('/device_management/list_device', {
+                pageNo: 0,
+                device_name: config.device_name
+              })
+
+              if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
+                deviceInfoCache[config.device_name] = deviceResponse.devices[0]
+              }
+            } catch (error) {
+              console.warn(`获取设备 ${config.device_name} 信息失败:`, error)
+            }
+          }
+
+          if (deviceInfoCache[config.device_name]) {
+            const device = deviceInfoCache[config.device_name]
+            unit = getDeviceUnit(device.device_name, device.driver_name)
           }
         }
+
+        // 使用配置的label作为显示标签
+        realtimeList.push({
+          label: config.label || config.device_name,
+          value: value,
+          unit: unit || getUnitForItem(config.label || config.device_name)
+        })
       } catch (error) {
         console.warn(`获取设备 ${config.device_name} 实时数据失败:`, error)
+        // 即使失败也添加配置项，但值为0
+        realtimeList.push({
+          label: config.label || config.device_name,
+          value: 0,
+          unit: getUnitForItem(config.label || config.device_name)
+        })
       }
     }
 
@@ -162,7 +232,7 @@ const startRealtimeTimer = () => {
   }
   realtimeTimer = setInterval(() => {
     loadRealtimeData()
-  }, 30000) // 每30秒刷新一次
+  }, 3000) // 每3秒刷新一次（与PC端保持一致）
 }
 
 onMounted(() => {
@@ -247,14 +317,15 @@ defineExpose({
 
 .realtime-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200rpx, 1fr));
   gap: 16rpx;
+  width: 100%;
 }
 
 .realtime-item {
   padding: 24rpx 32rpx;
   background: linear-gradient(145deg, #ffffff, #f8f9fa);
-  border-radius: 24rpx;
+  border-radius: 16rpx;
   border: 1px solid rgba(255, 255, 255, 0.5);
   text-align: center;
   box-shadow:
