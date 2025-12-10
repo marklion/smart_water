@@ -178,7 +178,11 @@ const initAMap = async () => {
         amapInstance = new AMap.Map('amap-container', {
             zoom: 12,
             center: center,
-            mapStyle: 'amap://styles/normal'
+            mapStyle: 'amap://styles/normal',
+            scrollWheelZoom: true, // 启用鼠标滚轮缩放
+            dragEnable: true, // 启用拖拽
+            zoomEnable: true, // 启用缩放
+            doubleClickZoom: true // 启用双击缩放
         })
 
         // 添加控件
@@ -311,30 +315,6 @@ const updateAMapMarkers = () => {
         if (!valve.latitude || !valve.longitude) return
 
         const isSelected = selectedValves.value.includes(valve.device_name)
-
-        // 添加图片加载错误处理和调试（避免无限循环）
-        let retryCount = 0
-        const maxRetries = 2
-
-            // 尝试多个可能的路径
-            let nextPath = ''
-            if (retryCount === 1) {
-                // 第一次重试：尝试PC端的完整路径（去掉/mobile前缀）
-                if (pathname.startsWith('/mobile')) {
-                    nextPath = `${baseUrl.replace('/mobile', '')}/deviceIcon/${iconName}.png`
-                } else {
-                    nextPath = `${baseUrl}/deviceIcon/${iconName}.png`
-                }
-            } else if (retryCount === 2) {
-                // 第二次重试：尝试移动端的static路径
-                nextPath = `${baseUrl}/mobile/static/deviceIcon/${iconName}.png`
-            }
-
-            if (nextPath) {
-                console.log('尝试备用路径:', nextPath)
-                img.src = nextPath
-            }
-        }
 
         // 判断选中状态（使用策略向导的样式）
         const statusClass = isSelected ? 'selected' : ''
@@ -581,6 +561,7 @@ const confirmSelection = () => {
     flex: 1;
     width: 100%;
     position: relative;
+    overflow: hidden;
 }
 
 .valve-map {
@@ -592,6 +573,9 @@ const confirmSelection = () => {
     width: 100%;
     height: 100%;
     position: relative;
+    touch-action: pan-x pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+    pointer-events: auto;
 }
 
 /* 策略向导的蓝色标记样式（已通过injectMarkerStyles注入，这里保留作为备用） */
