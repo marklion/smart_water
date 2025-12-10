@@ -37,24 +37,25 @@ import fuiCard from 'firstui-uni/firstui/fui-card/fui-card.vue'
 const realtimeDataList = ref([])
 const lastUpdateTime = ref('--:--:--')
 
-// 获取单位
-const getUnitForItem = (itemName) => {
-  if (itemName.includes('流量') || itemName.includes('流速')) {
+// 统一的单位获取函数（支持中英文）
+const getUnit = (name) => {
+  const lowerName = (name || '').toLowerCase()
+  if (lowerName.includes('flow') || lowerName.includes('流量') || lowerName.includes('流速')) {
     return 'm³/h'
   }
-  if (itemName.includes('压力')) {
+  if (lowerName.includes('pressure') || lowerName.includes('压力')) {
     return 'MPa'
   }
-  if (itemName.includes('液位')) {
-    return 'm'
-  }
-  if (itemName.includes('温度')) {
+  if (lowerName.includes('temperature') || lowerName.includes('温度')) {
     return '°C'
   }
-  if (itemName.includes('施肥') || itemName.includes('肥料')) {
+  if (lowerName.includes('液位') || lowerName.includes('level')) {
+    return 'm'
+  }
+  if (lowerName.includes('施肥') || lowerName.includes('肥料') || lowerName.includes('fertilizer')) {
     return 'L'
   }
-  if (itemName.includes('用水') || itemName.includes('水量')) {
+  if (lowerName.includes('用水') || lowerName.includes('水量') || lowerName.includes('water')) {
     return 'm³'
   }
   return ''
@@ -90,119 +91,96 @@ const getValueColor = (value, label) => {
   return '#303133'
 }
 
-// 根据设备类型获取单位
-const getDeviceUnit = (deviceName, driverName) => {
-  const name = (deviceName || driverName || '').toLowerCase()
-  if (name.includes('flow') || name.includes('流量') || name.includes('流速')) {
-    return 'm³/h'
-  } else if (name.includes('pressure') || name.includes('压力')) {
-    return 'MPa'
-  } else if (name.includes('temperature') || name.includes('温度')) {
-    return '°C'
-  } else if (name.includes('液位') || name.includes('level')) {
-    return 'm'
-  } else if (name.includes('valve') || name.includes('阀门')) {
-    return ''
-  } else if (name.includes('pump') || name.includes('泵')) {
-    return ''
-  } else {
-    return ''
-  }
-}
-
 // 获取设备信息（带缓存）
 const getDeviceInfo = async (deviceName, deviceInfoCache) => {
-  // 从缓存获取设备信息，如果没有则调用接口
-  if (!deviceInfoCache[deviceName]) {
-    try {
-      const deviceResponse = await call_remote('/device_management/list_device', {
-        pageNo: 0,
-        device_name: deviceName
-      })
-
-      if (deviceResponse && deviceResponse.devices && deviceResponse.devices.length > 0) {
-        deviceInfoCache[deviceName] = deviceResponse.devices[0]
-      }
-    } catch (error) {
-      console.warn(`获取设备 ${deviceName} 信息失败:`, error)
-    }
+  if (deviceInfoCache[deviceName]) {
+    return deviceInfoCache[deviceName]
   }
 
-  return deviceInfoCache[deviceName] || null
+  try {
+    const deviceResponse = await call_remote('/device_management/list_device', {
+      pageNo: 0,
+      device_name: deviceName
+    })
+
+    if (deviceResponse?.devices?.length > 0) {
+      deviceInfoCache[deviceName] = deviceResponse.devices[0]
+      return deviceInfoCache[deviceName]
+    }
+  } catch (error) {
+    console.warn(`获取设备 ${deviceName} 信息失败:`, error)
+  }
+
+  return null
+}
+
+// 创建数据项
+const createDataItem = (config, value, unit) => ({
+  label: config.label || config.device_name,
+  value: value,
+  unit: unit || getUnit(config.label || config.device_name)
+})
+
+// 清空数据
+const clearData = () => {
+  realtimeDataList.value = []
+  lastUpdateTime.value = '--:--:--'
+}
+
+// 从readout响应中提取值
+const extractValue = (readoutResponse, dataType) => {
+  if (dataType === 'readout' && readoutResponse?.readout != null) {
+    return parseFloat(readoutResponse.readout) || 0
+  }
+  if (dataType === 'total_readout' && readoutResponse?.total_readout != null) {
+    return parseFloat(readoutResponse.total_readout) || 0
+  }
+  return 0
 }
 
 // 加载实时数据
 const loadRealtimeData = async () => {
   try {
-    // 获取实时数据配置
     const configResponse = await call_remote('/resource/list_realtime', { pageNo: 0 })
 
-    // 如果没有配置，清空数据
-    if (!configResponse || !configResponse.configs || configResponse.configs.length === 0) {
-      realtimeDataList.value = []
-      lastUpdateTime.value = '--:--:--'
+    if (!configResponse?.configs?.length) {
+      clearData()
       return
     }
 
     const configs = configResponse.configs
     const realtimeList = []
-    const deviceInfoCache = {} // 设备信息缓存
+    const deviceInfoCache = {}
 
     // 根据配置获取设备实时数据
     for (const config of configs) {
       try {
-        let value = 0
-        let unit = ''
-
         // 调用readout接口
         const readoutResponse = await call_remote('/device_management/readout_device', {
           device_name: config.device_name
         })
 
-        // 根据data_type获取对应的值
-        if (config.data_type === 'readout') {
-          if (readoutResponse && readoutResponse.readout !== null && readoutResponse.readout !== undefined) {
-            value = parseFloat(readoutResponse.readout) || 0
-          }
-        } else if (config.data_type === 'total_readout') {
-          if (readoutResponse && readoutResponse.total_readout !== null && readoutResponse.total_readout !== undefined) {
-            value = parseFloat(readoutResponse.total_readout) || 0
-          }
-        }
+        // 提取值
+        const value = extractValue(readoutResponse, config.data_type)
 
         // 获取设备信息并提取单位
         const device = await getDeviceInfo(config.device_name, deviceInfoCache)
-        if (device) {
-          unit = getDeviceUnit(device.device_name, device.driver_name)
-        }
+        const unit = device ? getUnit(device.device_name || device.driver_name) : ''
 
-        // 使用配置的label作为显示标签
-        realtimeList.push({
-          label: config.label || config.device_name,
-          value: value,
-          unit: unit || getUnitForItem(config.label || config.device_name)
-        })
+        realtimeList.push(createDataItem(config, value, unit))
       } catch (error) {
         console.warn(`获取设备 ${config.device_name} 实时数据失败:`, error)
-        // 即使失败也添加配置项，但值为0
-        realtimeList.push({
-          label: config.label || config.device_name,
-          value: 0,
-          unit: getUnitForItem(config.label || config.device_name)
-        })
+        realtimeList.push(createDataItem(config, 0, ''))
       }
     }
 
     realtimeDataList.value = realtimeList
-    if (realtimeList.length > 0) {
-      lastUpdateTime.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
-    } else {
-      lastUpdateTime.value = '--:--:--'
-    }
+    lastUpdateTime.value = realtimeList.length > 0
+      ? new Date().toLocaleTimeString('zh-CN', { hour12: false })
+      : '--:--:--'
   } catch (error) {
     console.error('加载实时数据失败:', error)
-    realtimeDataList.value = []
-    lastUpdateTime.value = '--:--:--'
+    clearData()
   }
 }
 
