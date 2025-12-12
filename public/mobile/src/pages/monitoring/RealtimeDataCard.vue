@@ -1,5 +1,5 @@
 <template>
-  <fui-card :padding="[0, 0]" :margin="[0, 0, 32, 0]" :radius="32" class="premium-card">
+  <fui-card :padding="[0, 0]" :margin="[0, 0, 32, 0]" radius="32" class="premium-card">
     <view class="card-header-wrapper">
       <view class="header-row">
         <fui-text text="实时数据" :size="32" :fontWeight="600" color="#303133"></fui-text>

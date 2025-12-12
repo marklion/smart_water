@@ -20,6 +20,16 @@
                         <!-- 设备基本信息 -->
                         <view class="device-header">
                             <view class="device-name-row">
+                                <view class="device-icon-container">
+                                    <image 
+                                        :src="getDeviceIconPath(device.device_type, device.device_name)" 
+                                        class="device-icon" 
+                                        mode="aspectFit"
+                                        @error="handleImageError"
+                                        @load="handleImageLoad"
+                                        :lazy-load="false"
+                                    />
+                                </view>
                                 <view class="device-name-info">
                                     <fui-text :text="device.device_name" :size="32" :fontWeight="600"
                                         color="#303133"></fui-text>
@@ -131,6 +141,7 @@ import call_remote from '../../../../lib/call_remote.js'
 import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
+import { getDeviceIcon, getDeviceTypeFromName } from '../../config/mapConfig.js'
 
 const deviceList = ref([])
 const loading = ref(false)
@@ -312,7 +323,43 @@ const getDeviceTypeName = (type) => {
     return deviceTypeMap[type] || type || '未知'
 }
 
-// 设备类型图标映射
+// 获取设备图标路径（使用英文文件名，与天气图标一致）
+const getDeviceIconPath = (deviceType, deviceName = '') => {
+  // 如果 device_type 不准确，尝试从设备名称推断类型
+  let actualType = deviceType
+  if (!actualType || actualType === 'valve') {
+    const inferredType = getDeviceTypeFromName(deviceName)
+    if (inferredType) {
+      actualType = inferredType
+    }
+  }
+  
+  if (!actualType) {
+    return `/static/deviceIcon/valve.png`
+  }
+  
+  try {
+    const iconName = getDeviceIcon(actualType)
+    // 直接使用英文文件名，与天气图标的方式一致
+    const iconPath = `/static/deviceIcon/${iconName}.png`
+    return iconPath
+  } catch (error) {
+    return `/static/deviceIcon/valve.png`
+  }
+}
+
+// 处理图片加载成功
+const handleImageLoad = (e) => {
+  // 图片加载成功
+}
+
+// 处理图片加载错误
+const handleImageError = (e) => {
+  // 设置默认图标（使用英文文件名）
+  if (e.target) {
+    e.target.src = '/static/deviceIcon/valve.png'
+  }
+}
 
 // 检查设备是否有某个能力
 const hasCapability = (device, capability) => {
@@ -353,16 +400,7 @@ const loadDeviceList = async () => {
         }, token)
 
         deviceList.value = result.devices || []
-        console.log('设备列表加载完成，数量:', deviceList.value.length)
-        if (deviceList.value.length > 0) {
-            console.log('第一个设备信息:', {
-                name: deviceList.value[0].device_name,
-                type: deviceList.value[0].device_type,
-                capability: deviceList.value[0].capability
-            })
-        }
     } catch (error) {
-        console.error('加载设备列表失败:', error)
         uni.showToast({
             title: '加载设备列表失败',
             icon: 'none'
@@ -384,7 +422,7 @@ const onRefresh = async () => {
         }
         await loadDeviceList()
     } catch (error) {
-        console.error('刷新失败:', error)
+        // 刷新失败
     } finally {
         refreshing.value = false
     }
@@ -444,7 +482,6 @@ const executeDeviceAction = async (action, deviceName) => {
             loadDeviceList()
         }, 500)
     } catch (error) {
-        console.error('设备操作失败:', error)
         uni.showToast({
             title: error.err_msg || '操作失败',
             icon: 'none',
@@ -480,7 +517,7 @@ onShow(async () => {
         }
         await loadDeviceList()
     } catch (error) {
-        console.error('加载数据失败:', error)
+        // 加载数据失败
     } finally {
         if (pageLoading.value) {
             // 延迟一下再隐藏加载，确保数据已经渲染
@@ -584,6 +621,34 @@ onShow(async () => {
     flex-wrap: wrap;
 }
 
+.device-icon-container {
+    width: 64rpx;
+    height: 64rpx;
+    min-width: 64rpx;
+    min-height: 64rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #f0f4f8 0%, #e8edf2 100%);
+    border-radius: 16rpx;
+    padding: 8rpx;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+    overflow: visible;
+    position: relative;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.device-icon {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+    flex-shrink: 0;
+    background: transparent;
+}
 
 .device-name-info {
     flex: 1;
