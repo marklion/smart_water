@@ -10,20 +10,37 @@
         <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="content">
                 <WeatherCard />
-
                 <view class="section-title-row">
                     <fui-text :text="'轮灌组运行状态'" :size="30" :fontWeight="600" color="#303133"></fui-text>
+                </view>
+
+                <!-- 灌溉组搜索过滤 -->
+                <view class="filter-bar">
+                    <view class="filter-input">
+                        <text class="search-icon">🔍</text>
+                        <input v-model="groupSearch" placeholder="搜索: 灌溉名称" />
+                        <view v-if="groupSearch" class="reset-btn" @click="groupSearch = ''">重置</view>
+                    </view>
+                    <view class="filter-status">
+                        <view v-if="loading" class="mini-loading">
+                            <view class="dot"></view>
+                            <view class="dot"></view>
+                            <view class="dot"></view>
+                            <text>加载中</text>
+                        </view>
+                        <fui-text v-else :text="`共 ${filteredGroups.length} 组`" :size="22" color="#909399"></fui-text>
+                    </view>
                 </view>
 
                 <view v-if="loading" class="loading-block">
                     <fui-text :text="'加载中...'" :size="28" color="#606266"></fui-text>
                 </view>
-                <view v-else-if="groups.length === 0" class="empty-block">
+                <view v-else-if="filteredGroups.length === 0" class="empty-block">
                     <image class="empty-icon" src="/static/tabbar/Irrigation.png" mode="widthFix" />
                     <fui-text :text="'暂无轮灌组，请先新增或在PC配置后刷新'" :size="26" color="#909399"></fui-text>
                 </view>
                 <view v-else class="group-list">
-                    <view v-for="group in groups" :key="group.name" class="group-card">
+                    <view v-for="group in filteredGroups" :key="group.name" class="group-card">
                         <view class="group-header">
                             <view class="group-title">
                                 <fui-text :text="group.name" :size="32" :fontWeight="600" color="#303133"></fui-text>
@@ -406,7 +423,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import fuiDialog from 'firstui-uni/firstui/fui-dialog/fui-dialog.vue'
@@ -421,6 +438,7 @@ const pageHeaderRef = ref(null)
 const pageLoading = ref(false)
 const loading = ref(false)
 const currentFarmName = ref('')
+const groupSearch = ref('')
 const groups = ref([])
 const waterOnlyMode = ref({}) // 跟踪每个轮灌组的"只浇水"状态
 const waterOnlyLoading = ref({}) // 跟踪"只浇水"按钮的加载状态
@@ -488,6 +506,12 @@ const resetForm = () => {
     wizardStep.value = 1
     startTime.value = '08:00'
 }
+
+const filteredGroups = computed(() => {
+    const keyword = groupSearch.value.trim().toLowerCase()
+    if (!keyword) return groups.value
+    return groups.value.filter(g => (g.name || '').toLowerCase().includes(keyword))
+})
 
 const formatNumber = (val) => {
     if (val === undefined || val === null || val === '-') return '-'
@@ -1257,6 +1281,79 @@ onShow(async () => {
     box-sizing: border-box;
     padding-bottom: 32rpx;
     /* 底部留出一些间距即可，不需要为 tabBar 留空间，因为 scroll-view 已经限制了底部 */
+}
+
+.filter-bar {
+    margin: 8rpx 0 16rpx;
+}
+
+.filter-input {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    background: #ffffff;
+    border-radius: 999rpx;
+    padding: 16rpx 24rpx;
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.reset-btn {
+    padding: 10rpx 18rpx;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e9ecf3 100%);
+    border-radius: 999rpx;
+    font-size: 24rpx;
+    color: #606266;
+    border: 1px solid #e0e6ed;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+.filter-status {
+    margin-top: 8rpx;
+    min-height: 36rpx;
+    display: flex;
+    align-items: center;
+    gap: 8rpx;
+}
+
+.mini-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8rpx;
+    font-size: 24rpx;
+    color: #606266;
+}
+
+.mini-loading .dot {
+    width: 12rpx;
+    height: 12rpx;
+    border-radius: 50%;
+    background: #409eff;
+    animation: pulse 1s infinite ease-in-out;
+}
+
+.mini-loading .dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.mini-loading .dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1.2); }
+}
+
+.filter-input input {
+    flex: 1;
+    font-size: 28rpx;
+    color: #303133;
+}
+
+.search-icon {
+    font-size: 28rpx;
+    color: #909399;
 }
 
 .top-add-btn {
