@@ -2,7 +2,7 @@
     <view class="page">
         <PageHeader ref="pageHeaderRef" :show-farm-selector="true" @farm-change="onFarmChange" />
 
-        <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
+        <view class="content-scroll">
             <view class="content">
                 <view class="header-row">
                     <view class="title">策略程序设定向导</view>
@@ -276,7 +276,7 @@
                     </view>
                 </view>
             </view>
-        </scroll-view>
+        </view>
 
         <Loading :show="pageLoading" text="加载中..." />
 
@@ -1588,26 +1588,19 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .page {
-    height: 100vh;
+    min-height: 100vh;
     width: 100vw;
     background: linear-gradient(180deg, #f0f4f8 0%, #e8edf2 50%, #dde5ec 100%);
     display: flex;
     flex-direction: column;
     position: relative;
-    overflow: hidden;
 }
 
 .content-scroll {
-    position: fixed;
-    /* PageHeader 总高度 = min-height(120rpx) + padding-top(24rpx + safe-area) + padding-bottom(24rpx) = 168rpx + env(safe-area-inset-top) */
-    top: calc(168rpx + env(safe-area-inset-top));
-    /* 底部 tabBar 高度 + 安全区 */
-    bottom: calc(120rpx + env(safe-area-inset-bottom));
-    left: 0;
-    right: 0;
+    flex: 1;
     width: 100%;
-    height: calc(100vh - 168rpx - 120rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     box-sizing: border-box;
+    padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
 }
 
 .content {
@@ -1638,10 +1631,8 @@ onMounted(async () => {
     padding: 32rpx;
     box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
     border: 1px solid rgba(0, 0, 0, 0.06);
-    flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0;
 }
 
 .step-indicator {
@@ -1685,9 +1676,6 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
     gap: 24rpx;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
 }
 
 .watering-groups-config {
@@ -1960,10 +1948,8 @@ onMounted(async () => {
     padding: 32rpx;
     box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
     border: 1px solid rgba(0, 0, 0, 0.06);
-    flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0;
 }
 
 .group-switcher {
@@ -2101,7 +2087,7 @@ onMounted(async () => {
 
 .valve-list-content {
     flex: 1;
-    overflow-y: auto;
+    max-height: 800rpx;
 }
 
 .valve-list-item {

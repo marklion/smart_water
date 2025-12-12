@@ -91,45 +91,101 @@ const loadTodayWeather = async () => {
   }
 }
 
-// 获取天气图标
-const getWeatherIcon = () => {
-  if (!todayWeather.value) return '/weatherIcon/PNG/Weather_sun.png'
-  
-  const weatherIconMap = {
-    'qing': 'Weather_sun.png',
-    'yin': 'Weather_cloudy_dark.png',
-    'yu': 'Weather_raining.png',
-    'yun': 'Weather_cloudy.png',
-    'xue': 'Weather_snowing.png',
-    '晴': 'Weather_sun.png',
-    '多云': 'Weather_cloudy.png',
-    '阴': 'Weather_cloudy_dark.png',
-    '小雨': 'Weather_raining_day.png',
-    '中雨': 'Weather_raining.png',
-    '大雨': 'Weather_raining_dark_cloud.png',
-    '雪': 'Weather_snowing.png',
-    'default': 'Weather_sun.png'
-  }
-  
-  const weaImg = todayWeather.value.wea_img || todayWeather.value.wea || ''
-  const iconFile = weatherIconMap[weaImg] || weatherIconMap[todayWeather.value.wea] || weatherIconMap.default
-  return `/weatherIcon/PNG/${iconFile}`
+// 天气图标映射 - 支持中文描述和英文代码（与PC端保持一致）
+const weatherIconMap = {
+  // 英文代码映射
+  'qing': 'Weather_sun.png',
+  'yin': 'Weather_cloudy_dark.png',
+  'yu': 'Weather_raining.png',
+  'yun': 'Weather_cloudy.png',
+  'bingbao': 'Weather_snow.png',
+  'wu': 'Weather_clouds.png',
+  'shachen': 'Weather_wind.png',
+  'lei': 'Weather_lightning.png',
+  'xue': 'Weather_snowing.png',
+  'xiayu': 'Weather_raining_day.png',
+  'zhongyu': 'Weather_raining.png',
+  'dayu': 'Weather_raining_dark_cloud.png',
+  'xiaoyu': 'Weather_raining_day.png',
+  'zhenyu': 'Weather_cloudy_raining_day.png',
+  'leizhenyu': 'Weather_thunderstorm.png',
+
+  // 中文描述映射
+  '晴': 'Weather_sun.png',
+  '多云': 'Weather_cloudy.png',
+  '阴': 'Weather_cloudy_dark.png',
+  '小雨': 'Weather_raining_day.png',
+  '中雨': 'Weather_raining.png',
+  '大雨': 'Weather_raining_dark_cloud.png',
+  '阵雨': 'Weather_cloudy_raining_day.png',
+  '雷阵雨': 'Weather_thunderstorm.png',
+  '雪': 'Weather_snowing.png',
+  '小雪': 'Weather_snowing_day.png',
+  '中雪': 'Weather_snowing.png',
+  '大雪': 'Weather_snowing_dark_cloud.png',
+  '雾': 'Weather_clouds.png',
+  '雷电': 'Weather_lightning.png',
+  '冰雹': 'Weather_snow.png',
+  '沙尘暴': 'Weather_wind.png',
+
+  'default': 'Weather_sun.png'
 }
 
-// 获取天气主题样式类
-const getWeatherThemeClass = () => {
-  if (!todayWeather.value) return ''
+// 获取天气图标
+const getWeatherIcon = () => {
+  if (!todayWeather.value) return `/static/weatherIcon/PNG/${weatherIconMap.default}`
   
-  const wea = todayWeather.value.wea || ''
-  if (wea.includes('雨') || wea.includes('雷')) {
-    return 'weather-rainy'
-  } else if (wea.includes('雪')) {
-    return 'weather-snowy'
-  } else if (wea.includes('晴')) {
-    return 'weather-sunny'
-  } else if (wea.includes('云') || wea.includes('阴')) {
-    return 'weather-cloudy'
+  const weaImg = todayWeather.value.wea_img || ''
+  const weaDesc = todayWeather.value.wea || ''
+  
+  // 优先使用英文代码，如果没有则使用中文描述
+  let iconFile = weatherIconMap[weaImg]
+  if (!iconFile && weaDesc) {
+    iconFile = weatherIconMap[weaDesc]
   }
+  iconFile = iconFile || weatherIconMap.default
+  
+  return `/static/weatherIcon/PNG/${iconFile}`
+}
+
+// 获取天气主题样式类（与PC端保持一致）
+const getWeatherThemeClass = () => {
+  if (!todayWeather.value) return 'weather-default'
+  
+  const weatherDesc = todayWeather.value.wea || ''
+  const weatherCode = todayWeather.value.wea_img || ''
+  
+  // 优先根据中文描述判断
+  if (weatherDesc) {
+    if (weatherDesc.includes('雨') || weatherDesc.includes('雷')) {
+      return 'weather-rainy'
+    } else if (weatherDesc.includes('雪') || weatherDesc.includes('冰')) {
+      return 'weather-snowy'
+    } else if (weatherDesc.includes('阴') || weatherDesc.includes('雾')) {
+      return 'weather-cloudy'
+    } else if (weatherDesc.includes('晴')) {
+      return 'weather-sunny'
+    } else if (weatherDesc.includes('多云')) {
+      return 'weather-partly-cloudy'
+    }
+  }
+  
+  // 备用：根据英文代码判断
+  if (weatherCode) {
+    if (['yu', 'lei', 'leizhenyu', 'xiayu', 'zhongyu', 'dayu', 'zhenyu'].includes(weatherCode)) {
+      return 'weather-rainy'
+    } else if (['xue', 'bingbao'].includes(weatherCode)) {
+      return 'weather-snowy'
+    } else if (['yin', 'wu'].includes(weatherCode)) {
+      return 'weather-cloudy'
+    } else if (['qing'].includes(weatherCode)) {
+      return 'weather-sunny'
+    } else if (['yun'].includes(weatherCode)) {
+      return 'weather-partly-cloudy'
+    }
+  }
+  
+  // 默认主题
   return 'weather-default'
 }
 
@@ -186,19 +242,27 @@ onMounted(() => {
 }
 
 .weather-card.weather-sunny {
-  background: linear-gradient(135deg, #ff9a56 0%, #ffad56 50%, #ffc356 100%);
+  background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
 }
 
-.weather-card.weather-cloudy {
+.weather-card.weather-partly-cloudy {
   background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
 }
 
+.weather-card.weather-cloudy {
+  background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+}
+
 .weather-card.weather-rainy {
-  background: linear-gradient(135deg, #6c5ce7 0%, #5f3dc4 100%);
+  background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
 }
 
 .weather-card.weather-snowy {
-  background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+  background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+}
+
+.weather-card.weather-default {
+  background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
 }
 
 .weather-header {
