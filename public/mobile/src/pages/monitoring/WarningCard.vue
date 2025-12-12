@@ -11,7 +11,7 @@
     <view class="card-body warning-body">
       <view v-if="warningList.length > 0" class="warning-list">
         <view 
-          v-for="(warning, index) in warningList.slice(0, 3)" 
+          v-for="(warning, index) in warningList" 
           :key="index" 
           class="warning-item"
         >
@@ -98,6 +98,11 @@ const getWarningColor = (level) => {
 
 onMounted(() => {
   loadWarningData()
+})
+
+// 暴露刷新方法给父组件
+defineExpose({
+  refresh: loadWarningData
 })
 </script>
 

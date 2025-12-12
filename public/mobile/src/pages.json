@@ -43,6 +43,12 @@
 			}
 		},
 		{
+			"path": "pages/warning/index",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/profile/index",
 			"style": {
 				"navigationStyle": "custom"
@@ -82,6 +88,12 @@
 				"text": "灌溉",
 				"iconPath": "static/tabbar/Irrigation.png",
 				"selectedIconPath": "static/tabbar/Irrigation-active.png"
+			},
+			{
+				"pagePath": "pages/warning/index",
+				"text": "告警",
+				"iconPath": "static/tabbar/warning.png",
+				"selectedIconPath": "static/tabbar/warning-active.png"
 			},
 			{
 				"pagePath": "pages/profile/index",

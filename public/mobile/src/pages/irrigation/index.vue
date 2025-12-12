@@ -10,7 +10,6 @@
         <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="content">
                 <WeatherCard />
-                <WarningCard />
 
                 <view class="section-title-row">
                     <fui-text :text="'轮灌组运行状态'" :size="30" :fontWeight="600" color="#303133"></fui-text>
@@ -414,7 +413,6 @@ import fuiDialog from 'firstui-uni/firstui/fui-dialog/fui-dialog.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
 import WeatherCard from '../monitoring/WeatherCard.vue'
-import WarningCard from '../monitoring/WarningCard.vue'
 import call_remote from '../../../../lib/call_remote.js'
 
 
