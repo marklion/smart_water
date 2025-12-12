@@ -19,6 +19,23 @@ export const mapConfig = {
   // 地图样式配置
   mapStyles: {
     normal: 'amap://styles/normal'
+  },
+  
+  // 设备标记配置
+  deviceMarkers: {
+    // 设备类型图标映射（使用英文文件名）
+    iconMap: {
+      'valve': 'valve',
+      'flowmeter': 'flowmeter', 
+      'fertilizer': 'fertilizer',
+      'sensor': 'flowmeter',  // 传感器使用流量计图标
+      'pump': 'pump',
+      'temperature': 'flowmeter',  // 温度传感器使用流量计图标
+      'humidity': 'flowmeter',     // 湿度传感器使用流量计图标
+      'pressure': 'pressure',     // 压力传感器使用压力计图标
+      'levelmeter': 'levelmeter',   // 液位计使用液位计图标
+      '液位计': 'levelmeter'
+    }
   }
 }
 
@@ -69,6 +86,35 @@ export const loadAMapScript = () => {
   })
 }
 
+// 根据设备类型获取图标文件名（返回英文文件名）
+export const getDeviceIcon = (deviceType) => {
+  return mapConfig.deviceMarkers.iconMap[deviceType] || 'valve'
+}
+
+// 根据设备名称判断设备类型（如果 device_type 不准确，可以从名称推断）
+export const getDeviceTypeFromName = (deviceName) => {
+  if (!deviceName) return null
+  
+  const name = deviceName.toLowerCase()
+  
+  // 根据设备名称中的关键词判断类型
+  if (name.includes('流量计') || name.includes('flowmeter') || name.includes('流量')) {
+    return 'flowmeter'
+  } else if (name.includes('泵') || name.includes('pump') || name.includes('搅拌泵') || name.includes('施肥泵') || name.includes('主泵')) {
+    return 'pump'
+  } else if (name.includes('压力计') || name.includes('pressure') || name.includes('压力')) {
+    return 'pressure'
+  } else if (name.includes('液位计') || name.includes('levelmeter') || name.includes('液位')) {
+    return 'levelmeter'
+  } else if (name.includes('施肥机') || name.includes('fertilizer') || name.includes('施肥')) {
+    return 'fertilizer'
+  } else if (name.includes('阀门') || name.includes('valve') || name.includes('阀')) {
+    return 'valve'
+  }
+  
+  return null
+}
+
 // 通过城市名获取坐标（调用高德地图API）
 export const getCityLocation = async (cityName) => {
   try {
@@ -88,7 +134,6 @@ export const getCityLocation = async (cityName) => {
       throw new Error(`未找到城市"${cityName}"的坐标信息`)
     }
   } catch (error) {
-    console.error('获取城市坐标失败:', error)
     throw error
   }
 }
