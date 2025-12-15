@@ -1260,16 +1260,17 @@ onShow(async () => {
 
 /* 内容滚动区域 - scroll-view 需要明确高度 */
 .content-scroll {
-    position: fixed;
-    /* PageHeader 总高度 = min-height(120rpx) + padding-top(24rpx + safe-area) + padding-bottom(24rpx) = 168rpx + env(safe-area-inset-top) */
-    top: calc(168rpx + env(safe-area-inset-top));
-    /* 底部 tabBar 高度 + 安全区 */
-    bottom: calc(120rpx + env(safe-area-inset-bottom));
-    left: 0;
-    right: 0;
-    width: 100%;
-    height: calc(100vh - 168rpx - 120rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    flex: 1;
+    position: relative;
+    margin-top: calc(168rpx + env(safe-area-inset-top));
+    padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+    overflow-y: auto;
     box-sizing: border-box;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
 }
 
 /* 内容区域 */
