@@ -185,6 +185,9 @@ export default async function (config) {
             const sec = moment().second();
             return !(sec >= 20 && sec <= 40);
         },
+        set_key_const_value: async function (value) {
+            console.log(value + ' was set');
+        },
     }
     return ret;
 }

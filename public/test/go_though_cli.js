@@ -249,7 +249,7 @@ function convert_param(cmd, param) {
             cmd: 'do crossAssignment',
             param: 'is_constant',
             values: ['true', 'false']
-        },         {
+        }, {
             cmd: 'exit crossAssignment',
             param: 'is_constant',
             values: ['true', 'false']
@@ -300,10 +300,10 @@ function convert_param(cmd, param) {
             cmd: 'match farm',
             param: 'farm_name',
             values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
-        },{
-            cmd:'statistic',
-            param:'is_increment',
-            values:['true','false']
+        }, {
+            cmd: 'statistic',
+            param: 'is_increment',
+            values: ['true', 'false']
         }, {
             cmd: 'set area params',
             param: 'farm_name',
@@ -324,13 +324,13 @@ function convert_param(cmd, param) {
             cmd: 'set area params',
             param: 'dripper_flow',
             values: ['2', '5', '10']
-        },         {
+        }, {
             cmd: 'set area params',
             param: 'coefficient',
             values: ['0.8', '0.9', '1.0']
-        }, 
+        },
         {
-            cmd:'del quick action',
+            cmd: 'del quick action',
             param: 'action_name',
             values: ['a']
         },
@@ -794,14 +794,18 @@ export default {
                 cmd: 'mock total readout'
             },
             {
+                prompt: 'device',
+                cmd: 'set key const value'
+            },
+            {
                 prompt: 'policy',
                 cmd: 'do quick action'
             },
             {
-                cmd:'paste',
+                cmd: 'paste',
             },
             {
-                cmd:'config',
+                cmd: 'config',
             },
         ];
         for (let item of whitelist) {

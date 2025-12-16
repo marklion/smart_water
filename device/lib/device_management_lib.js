@@ -39,6 +39,9 @@ export default{
     open_device: async function (device_name, token) {
         return await call_remote('/device_management/open_device', { device_name }, token);
     },
+    set_key_const_value: async function (device_name, value, token) {
+        return await call_remote('/device_management/set_key_const_value', { device_name, value }, token);
+    },
     close_device: async function (device_name, token) {
         return await call_remote('/device_management/close_device', { device_name }, token);
     },

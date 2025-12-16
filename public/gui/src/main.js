@@ -36,7 +36,7 @@ inject_err_handler((err_msg) => {
   // 检查是否是认证相关的错误
   const authErrorKeywords = ['缺少token', 'Token无效', 'Token过期', '请先登录', '身份验证失败', 'Token验证失败'];
   const isAuthError = authErrorKeywords.some(keyword => err_msg.includes(keyword));
-  
+
   if (isAuthError) {
     console.log('检测到认证错误，准备清除 token:', err_msg)
     console.log('当前路由:', router.currentRoute.value.path)
@@ -65,7 +65,7 @@ const deviceCapabilityButtonMapping = {
     description: '打开设备阀门或开关'
   },
   close: {
-    buttonText: '关闭设备', 
+    buttonText: '关闭设备',
     buttonType: 'danger',
     buttonSize: 'small',
     buttonClass: 'half-width-button',
@@ -76,7 +76,7 @@ const deviceCapabilityButtonMapping = {
   readout: {
     buttonText: '读取设备读数',
     buttonType: 'primary',
-    buttonSize: 'small', 
+    buttonSize: 'small',
     buttonClass: 'full-width-button',
     icon: 'Monitor',
     action: 'readDeviceStatus',
@@ -86,12 +86,21 @@ const deviceCapabilityButtonMapping = {
     buttonText: '紧急关闭设备',
     buttonType: 'warning',
     buttonSize: 'small',
-    buttonClass: 'full-width-button', 
+    buttonClass: 'full-width-button',
     icon: 'Close',
     action: 'shutdownDevice',
     description: '紧急停止设备运行'
   },
-} 
+  set_key_const_value: {
+    buttonText: '设置关键参数',
+    buttonType: 'info',
+    buttonSize: 'small',
+    buttonClass: 'full-width-button',
+    icon: 'Edit',
+    action: 'setDeviceKeyValue',
+    description: '设置设备的关键参数值'
+  },
+}
 
 // 设备能力集组合配置
 const deviceCapabilityGroups = {
@@ -103,9 +112,9 @@ const deviceCapabilityGroups = {
   },
   // 流量计类设备 - 主要支持读数
   flowmeter: {
-    capabilities: ['readout', 'shutdown'],
+    capabilities: ['readout', 'shutdown', 'set_key_const_value'],
     layout: 'column',
-    priority: ['readout', 'shutdown']
+    priority: ['readout', 'shutdown', 'set_key_const_value']
   },
   // 施肥机类设备 - 支持完整控制
   fertilizer: {
@@ -131,12 +140,12 @@ const getDeviceButtonConfig = (deviceCapabilities, deviceType = 'valve') => {
       return []
     }
   }
-  
+
   const groupConfig = deviceCapabilityGroups[deviceType] || deviceCapabilityGroups.valve
-  const availableCapabilities = groupConfig.capabilities.filter(cap => 
+  const availableCapabilities = groupConfig.capabilities.filter(cap =>
     deviceCapabilities.includes(cap)
   )
-  
+
   return availableCapabilities
     .sort((a, b) => {
       const aIndex = groupConfig.priority.indexOf(a)
@@ -153,7 +162,7 @@ const getDeviceButtonConfig = (deviceCapabilities, deviceType = 'valve') => {
 // 检查设备是否支持特定能力
 const hasDeviceCapability = (device, capability) => {
   if (!device) return false
-  
+
   let capabilities = []
   if (device.capability) {
     if (Array.isArray(device.capability)) {
@@ -166,14 +175,14 @@ const hasDeviceCapability = (device, capability) => {
       }
     }
   }
-  
+
   return capabilities.includes(capability)
 }
 
 // 检查设备是否具有任何操作能力
 const hasAnyDeviceCapability = (device) => {
   if (!device) return false
-  
+
   const allCapabilities = Object.keys(deviceCapabilityButtonMapping)
   return allCapabilities.some(capability => hasDeviceCapability(device, capability))
 }

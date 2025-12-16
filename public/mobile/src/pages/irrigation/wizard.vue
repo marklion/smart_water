@@ -2,7 +2,7 @@
     <view class="page">
         <PageHeader ref="pageHeaderRef" :show-farm-selector="true" @farm-change="onFarmChange" />
 
-        <view class="content-scroll">
+        <scroll-view class="content-scroll" scroll-y :enable-flex="true">
             <view class="content">
                 <view class="header-row">
                     <view class="title">策略程序设定向导</view>
@@ -276,7 +276,7 @@
                     </view>
                 </view>
             </view>
-        </view>
+        </scroll-view>
 
         <Loading :show="pageLoading" text="加载中..." />
 
@@ -311,26 +311,31 @@
                         <fui-text :text="'系统流量：'" :size="28" color="#303133" :fontWeight="500"></fui-text>
                         <input class="param-input" v-model.number="tempAreaParams.system_flow" type="number"
                             placeholder="请输入" step="0.01" />
+                        <text class="param-unit">m3/h</text>
                     </view>
                     <view class="param-row">
                         <fui-text :text="'铺设间距：'" :size="28" color="#303133" :fontWeight="500"></fui-text>
                         <input class="param-input" v-model.number="tempAreaParams.laying_spacing" type="number"
                             placeholder="请输入" step="0.01" />
+                        <text class="param-unit">m</text>
                     </view>
                     <view class="param-row">
                         <fui-text :text="'滴头间距：'" :size="28" color="#303133" :fontWeight="500"></fui-text>
                         <input class="param-input" v-model.number="tempAreaParams.dripper_spacing" type="number"
                             placeholder="请输入" step="0.01" />
+                        <text class="param-unit">m</text>
                     </view>
                     <view class="param-row">
                         <fui-text :text="'滴头流量：'" :size="28" color="#303133" :fontWeight="500"></fui-text>
                         <input class="param-input" v-model.number="tempAreaParams.dripper_flow" type="number"
                             placeholder="请输入" step="0.01" />
+                        <text class="param-unit">L/h</text>
                     </view>
                     <view class="param-row">
                         <fui-text :text="'系数：'" :size="28" color="#303133" :fontWeight="500"></fui-text>
                         <input class="param-input" v-model.number="tempAreaParams.coefficient" type="number"
                             placeholder="请输入" step="0.01" />
+                        <text class="param-unit">系统默认</text>
                     </view>
                 </view>
 
@@ -1600,6 +1605,7 @@ onMounted(async () => {
     flex: 1;
     width: 100%;
     box-sizing: border-box;
+    padding-top: calc(160rpx + env(safe-area-inset-top));
     padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
 }
 
@@ -2402,6 +2408,14 @@ onMounted(async () => {
     font-size: 28rpx;
     background: #f8fafc;
     transition: all 0.3s;
+}
+
+.param-unit {
+    min-width: 120rpx;
+    text-align: right;
+    color: #909399;
+    font-size: 24rpx;
+    white-space: nowrap;
 }
 
 .param-input:focus {

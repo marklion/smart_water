@@ -101,7 +101,7 @@ export function getDeviceButtonGroups(device, getCurrentInstance) {
     console.warn('$getDeviceButtonConfig 全局函数未找到')
     return []
   }
-  
+
   const buttonConfigs = instance.appContext.config.globalProperties.$getDeviceButtonConfig(capabilities, deviceType)
 
   // 将按钮分组：开启和关闭按钮放在同一行，其他按钮各自一行
@@ -190,7 +190,7 @@ export async function closeDevice(deviceName) {
 export async function readDeviceStatus(deviceName) {
   try {
     const response = await call_remote('/device_management/readout_device', { device_name: deviceName })
-    
+
     ElMessage.success(`设备状态: ${response.readout !== null && response.readout !== undefined ? response.readout : '无读数'}`)
     return response.readout
   } catch (error) {
@@ -212,6 +212,18 @@ export async function shutdownDevice(deviceName) {
   } catch (error) {
     console.error('设备关机失败:', error)
     ElMessage.error(`设备关机失败: ${error.message || error}`)
+  }
+}
+
+export async function setDeviceKeyValue(deviceName, value) {
+  try {
+    const response = await call_remote('/device_management/set_key_const_value', { device_name: deviceName, value })
+    if (response.result) {
+      ElMessage.success(`设备 ${deviceName} 关键参数设置成功`)
+    }
+  } catch (error) {
+    console.error('设置设备关键参数失败:', error)
+    ElMessage.error(`设置设备关键参数失败: ${error.message || error}`)
   }
 }
 
@@ -285,7 +297,7 @@ export function createRuntimeInfoAutoRefresh(selectedDevice, refreshRuntimeInfoF
 /**
  * 处理设备操作（统一处理逻辑）
  */
-export async function handleDeviceAction(action, deviceName, refreshRuntimeInfoFn) {
+export async function handleDeviceAction(action, deviceName, refreshRuntimeInfoFn, numericValue) {
   try {
     switch (action) {
       case 'openDevice':
@@ -299,6 +311,9 @@ export async function handleDeviceAction(action, deviceName, refreshRuntimeInfoF
         break
       case 'shutdownDevice':
         await shutdownDevice(deviceName)
+        break
+      case 'setDeviceKeyValue':
+        await setDeviceKeyValue(deviceName, numericValue)
         break
       default:
         console.warn('未知的设备操作:', action)
