@@ -89,7 +89,7 @@ export default {
             await device_management_lib.close_device(args.device_name, this.token);
             return `设备 ${args.device_name} 关闭成功`;
         })
-        cli_utils.make_common_cmd(vorpal, 'set const value <device_name> <value>', '设置设备关键参数值', async (cmd_this, args) => {
+        cli_utils.make_common_cmd(vorpal, 'set key const value <device_name> <value>', '设置设备关键参数值', async (cmd_this, args) => {
             await device_management_lib.set_key_const_value(args.device_name, Number.parseFloat(args.value), this.token);
             return `设备 ${args.device_name} 参数值设置为: ${args.value}`;
         });
