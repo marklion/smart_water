@@ -10,7 +10,7 @@ const driver_array = [
         name: 'virtualDevice',
         config_method: '[log_file]',
         capability: [
-            'open', 'close', 'readout', 'mock_readout','ava_readout','battery_voltage',
+            'open', 'close', 'readout', 'mock_readout','ava_readout','battery_voltage','set_key_const_value',
             'is_opened', 'status_map', 'shutdown', 'total_readout', 'mock_total_readout'],
         driver: virtual_driver,
     }, {
@@ -31,7 +31,7 @@ const driver_array = [
         name: 'FertFlowMeter',
         config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
         capability: [
-            'readout', 'status_map', 'shutdown', 'ava_readout'],
+            'readout', 'status_map', 'shutdown', 'ava_readout', 'set_key_const_value'],
         driver: dijiang,
     },{
         name:'WaterFlowMeter',
@@ -523,6 +523,26 @@ export default {
                     };
                 }
             }
-        }
+        },
+        set_key_const_value:{
+            name: '设置关键参数值',
+            description: '设置设备的关键参数值',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' },
+                value: { type: Number, have_to: true, mean: '关键参数值', example: 123.45 }
+            },
+            result: {
+                result: { type: Boolean, mean: '设置结果', example: true }
+            },
+            func: async function (body, token) {
+                let driver = await get_driver(body.device_name, 'set_key_const_value');
+                if (driver) {
+                    await driver.set_key_const_value(body.value);
+                }
+                return { result: true };
+            }
+        },
     }
 }

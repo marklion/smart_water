@@ -1,4 +1,4 @@
-import ModbusRTU from "modbus-serial";
+import modbus_wrapper from "./modbus_wrapper.js";
 
 export default async function (config_string) {
     let config = JSON.parse(config_string);
@@ -7,17 +7,14 @@ export default async function (config_string) {
             online: true,
             flow: 0,
         }
-        const client = new ModbusRTU();
-        await client.connectTCP(config.ip, { port: config.port });
+        const client = await modbus_wrapper.fetchConnection(config.ip, config.port, config.device_id);
         try {
-            client.setID(config.device_id);
             let resp = await client.readHoldingRegisters(9, 3);
             ret.flow = resp.data[0] * 65536 + resp.data[1] + resp.data[2] / 100;
         } catch (error) {
             console.log(`get flow via modbus error =:${JSON.stringify(error)}`);
             ret.online = false;
         }
-        client.close();
         return ret;
     };
     let ret = {
@@ -36,6 +33,20 @@ export default async function (config_string) {
                     sum += val;
                 }
                 return sum / this.m_readout_array.length;
+            }
+        },
+        set_key_const_value: async function (value) {
+            value = Number(value).toFixed(2);
+            const [integerPart, decimalPart] = value.split('.');
+            const buffer = Buffer.alloc(6);
+            buffer.writeUInt32BE(parseInt(integerPart), 0);
+            buffer.writeUInt16BE(parseInt(decimalPart), 4);
+            let client = await modbus_wrapper.fetchConnection(config.ip, config.port, config.device_id);
+            try {
+                await client.writeRegisters(6, buffer);
+            } catch (error) {
+                console.log(error);
+                this.m_info.online = false;
             }
         },
         status_map: function () {

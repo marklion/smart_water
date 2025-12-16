@@ -489,7 +489,24 @@ const handleDeviceAction = async (action, deviceName) => {
         await openDeviceWrapper(deviceName)
     } else if (action === 'closeDevice') {
         await closeDeviceWrapper(deviceName)
-    } else {
+    }
+    else if (action == 'setDeviceKeyValue') {
+        const { value } = await ElMessageBox.prompt('请输入关键参数值:', '设置关键参数', {
+            confirmButtonText: '设置',
+            cancelButtonText: '取消',
+            inputPattern: /^-?\d+(\.\d+)?$/,
+            inputErrorMessage: '请输入有效的数字值'
+        })
+
+        const numericValue = Number.parseFloat(value)
+        if (isNaN(numericValue)) {
+            ElMessage.error('无效的数字值，操作已取消')
+            return
+        }
+
+        await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo, numericValue)
+    }
+    else {
 
         await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo)
     }
