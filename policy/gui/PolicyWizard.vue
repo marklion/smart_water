@@ -176,30 +176,35 @@
                                                 <el-input-number v-model="farmAreaParams.system_flow" :min="0"
                                                     :precision="2" size="small" style="width: 120px;"
                                                     @change="updateAreaParam('system_flow', $event)" />
+                                                    <span class="param-unit">m3/h</span>
                                             </div>
                                             <div class="param-item">
                                                 <span class="param-label">铺设间距：</span>
                                                 <el-input-number v-model="farmAreaParams.laying_spacing" :min="0"
                                                     :precision="2" size="small" style="width: 120px;"
                                                     @change="updateAreaParam('laying_spacing', $event)" />
+                                                    <span class="param-unit">m</span>
                                             </div>
                                             <div class="param-item">
                                                 <span class="param-label">滴头间距：</span>
                                                 <el-input-number v-model="farmAreaParams.dripper_spacing" :min="0"
                                                     :precision="2" size="small" style="width: 120px;"
                                                     @change="updateAreaParam('dripper_spacing', $event)" />
+                                                    <span class="param-unit">m</span>
                                             </div>
                                             <div class="param-item">
                                                 <span class="param-label">滴头流量：</span>
                                                 <el-input-number v-model="farmAreaParams.dripper_flow" :min="0"
                                                     :precision="2" size="small" style="width: 120px;"
                                                     @change="updateAreaParam('dripper_flow', $event)" />
+                                                    <span class="param-unit">L/h</span>
                                             </div>
                                             <div class="param-item">
                                                 <span class="param-label">系数：</span>
                                                 <el-input-number v-model="farmAreaParams.coefficient" :min="0"
                                                     :precision="2" size="small" style="width: 120px;"
                                                     @change="updateAreaParam('coefficient', $event)" />
+                                                    <span class="param-unit">系统默认</span>
                                             </div>
                                         </div>
                                         <div class="params-result">
@@ -2139,6 +2144,13 @@ onMounted(async () => {
     font-weight: 500;
     color: #606266;
     min-width: 100px;
+}
+
+.param-unit {
+    color: #909399;
+    min-width: 70px;
+    font-size: 13px;
+    text-align: left;
 }
 
 .wizard-actions {
