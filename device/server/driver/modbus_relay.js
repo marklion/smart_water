@@ -1,18 +1,15 @@
-import ModbusRTU from "modbus-serial";
+import modbus_wrapper from "./modbus_wrapper.js";
 export default async function (config_string) {
     let config = JSON.parse(config_string);
     let set_relay = async function (is_on) {
         let ret = true;
-        const client = new ModbusRTU();
-        await client.connectTCP(config.ip, { port: config.port });
+        let client = await modbus_wrapper.fetchConnection(config.ip, config.port, config.device_id);
         try {
-            client.setID(config.device_id);
             await client.writeCoil(config.relay_address, is_on);
         } catch (error) {
             console.log(`set coil error =:${JSON.stringify(error)}`);
             ret = false;
         }
-        client.close();
         return ret;
     };
     let ret = {
