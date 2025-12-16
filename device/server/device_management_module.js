@@ -10,14 +10,14 @@ const driver_array = [
         name: 'virtualDevice',
         config_method: '[log_file]',
         capability: [
-            'open', 'close', 'readout', 'mock_readout','ava_readout',
+            'open', 'close', 'readout', 'mock_readout','ava_readout','battery_voltage',
             'is_opened', 'status_map', 'shutdown', 'total_readout', 'mock_total_readout'],
         driver: virtual_driver,
     }, {
         name: 'WaterGroupValve',
         config_method: '{device_sn:<设备序列号>, is_left:<是否左阀>, poll_interval:<轮询间隔(ms)>, token:<鉴权token>}',
         capability: [
-            'open', 'close', 'readout',
+            'open', 'close', 'readout', 'battery_voltage',
             'is_opened', 'status_map', 'shutdown'],
         driver: DZ005,
     }, {

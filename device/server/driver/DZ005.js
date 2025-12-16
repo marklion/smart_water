@@ -47,9 +47,15 @@ export default async function (config_string) {
         let pressure_str = device_data[pressure_key];
         let is_online = pressure_str !== '' && pressure_str !== null && pressure_str !== undefined;
         let pressure = is_online ? parseFloat(pressure_str) : null;
+        let basic_info = await gdac.get('/openapi/device/query', { deviceSN: deviceSN });
+        let bv = 0;
+        if (basic_info.list.length == 1) {
+            bv = basic_info.list[0].detail?.batteryVoltage || 0;
+        }
         let ret = {
             online: is_online,
-            pressure: pressure
+            pressure: pressure,
+            batteryVoltage: bv,
         }
         return ret;
     };
@@ -90,6 +96,7 @@ export default async function (config_string) {
             let ret = [];
             ret.push({ text: '阀门是否打开', func: 'is_opened' });
             ret.push({ text: '当前压力值', func: 'readout' });
+            ret.push({ text: '电池电压', func: 'battery_voltage' })
             return ret;
         },
         shutdown: async function () {
@@ -97,6 +104,9 @@ export default async function (config_string) {
         },
         is_online: async function () {
             return this.m_info.online;
+        },
+        battery_voltage: async function () {
+            return this.m_info.batteryVoltage;
         },
         destroy: async function () {
             clearInterval(this.m_timer);

@@ -137,6 +137,10 @@ export default async function (config) {
             // 虚拟驱动程序统一返回"虚拟设备"
             return '虚拟设备';
         },
+        battery_voltage: async function() {
+            // 虚拟设备始终返回3.7V
+            return 3.7;
+        },
         getUnit: function() {
             // 根据设备类型返回对应的单位
             const unitMap = {
@@ -170,6 +174,7 @@ export default async function (config) {
             ret.push({text:'开关是否打开', func:'is_opened'});
             ret.push({text:'当前仪表读数', func:'readout'});
             ret.push({text:'当前仪表累计读数', func:'total_readout'});
+            ret.push({text:'电池电压', func:'battery_voltage'});
             return ret;
         },
         shutdown:async function() {
