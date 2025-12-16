@@ -659,14 +659,17 @@ onShow(async () => {
 
 /* 设备列表滚动区域 - scroll-view 需要明确高度 */
 .device-list-scroll {
-    position: fixed;
-    top: calc(168rpx + env(safe-area-inset-top));
-    bottom: calc(120rpx + env(safe-area-inset-bottom));
-    left: 0;
-    right: 0;
-    width: 100%;
-    height: calc(100vh - 168rpx - 120rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    flex: 1;
+    position: relative;
+    margin-top: calc(168rpx + env(safe-area-inset-top));
+    padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+    overflow-y: auto;
     box-sizing: border-box;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
 }
 
 /* 设备列表 */

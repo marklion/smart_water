@@ -13,7 +13,7 @@
     <view class="login-container">
       <!-- Logo和标题 -->
       <view class="logo-section">
-        <image src="@/static/logo.png" class="logo-img" mode="aspectFit" />
+        <image src="/static/logo.png" class="logo-img" mode="aspectFit" />
         <text class="system-title">{{ systemName }}</text>
       </view>
 
@@ -191,31 +191,29 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .login-page {
-  position: fixed;
-  top: 0;
-  left: 0;
+  position: relative;
   width: 100%;
-  height: 100%;
   min-height: 100vh;
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 30%, #74b9ff 60%, #2a5298 75%, #1e3c72 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  overflow: hidden;
-  z-index: 9999;
+  padding: calc(40rpx + env(safe-area-inset-top)) 32rpx calc(80rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
+  overflow-y: auto; /* 小屏可滚动，避免内容被遮挡 */
+  overflow-x: hidden;
 }
 
 /* 背景装饰 */
 .background-decoration {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
   pointer-events: none;
+  z-index: 0;
 }
 
 .water-drop {
@@ -306,7 +304,7 @@ onMounted(() => {
 
 .login-container {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   width: 100%;
   max-width: 400px;
   margin: 0;
