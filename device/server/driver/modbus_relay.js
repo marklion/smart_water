@@ -1,4 +1,4 @@
-import modbus_wrapper from "./modbus_wrapper";
+import modbus_wrapper from "./modbus_wrapper.js";
 export default async function (config_string) {
     let config = JSON.parse(config_string);
     let set_relay = async function (is_on) {
