@@ -100,8 +100,8 @@
                   </div>
                 </el-tab-pane>
 
-                <!-- 策略运行时状态 Tab -->
-                <el-tab-pane label="策略运行时状态" name="runtime">
+                <!-- 策略运行时状态 Tab（仅 engineer 角色可见） -->
+                <el-tab-pane v-if="userRole !== 'farmer'" label="策略运行时状态" name="runtime">
                   <div class="tab-content-with-actions">
                     <div class="tab-actions">
                       <el-button type="primary" size="small" @click="refreshIrrigationData" :icon="Refresh">
@@ -262,6 +262,7 @@ import {
 } from '../utils/deviceUtils.js'
 
 const route = useRoute()
+const userRole = ref(localStorage.getItem('user_role') || 'farmer')
 // 注入城市变化数据
 const cityChangeData = inject('cityChangeData', ref({ city: '', location: null, timestamp: null }))
 

@@ -6,6 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'smart_water_secret_key_2024';
 const JWT_EXPIRES_IN = '7d';
 
 let users = [];
+const ALLOWED_ROLES = ['farmer', 'engineer'];
 
 
 
@@ -49,6 +50,7 @@ export default {
             result: {
                 token: { type: String, mean: 'JWT令牌', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
                 username: { type: String, mean: '用户名', example: 'admin' },
+                role: { type: String, mean: '角色', example: 'farmer' },
                 expires_in: { type: String, mean: '过期时间', example: '7d' }
             },
             func: async function(params) {
@@ -66,10 +68,12 @@ export default {
                 if (!verifyPassword(passwordStr, user.password)) {
                     throw { err_msg: '密码错误' };
                 }
+                const roleVal = user.role || 'farmer';
                 const token = generateToken(usernameStr);
                 return {
                     token: token,
                     username: usernameStr,
+                    role: roleVal,
                     expires_in: JWT_EXPIRES_IN
                 };
             },
@@ -81,18 +85,21 @@ export default {
             description: '添加新用户',
             params: {
                 username: { type: String, have_to: true, mean: '用户名', example: 'admin' },
-                password: { type: String, have_to: true, mean: '密码', example: 'password123' }
+                password: { type: String, have_to: true, mean: '密码', example: 'password123' },
+                role: { type: String, have_to: true, mean: '角色', example: 'farmer' }
             },
             result: {
                 success: { type: Boolean, mean: '是否成功', example: true },
-                username: { type: String, mean: '用户名', example: 'admin' }
+                username: { type: String, mean: '用户名', example: 'admin' },
+                role: { type: String, mean: '角色', example: 'farmer' }
             },
             func: async function(params) {
-                const { username, password } = params;
+                const { username, password, role } = params;
                 const usernameStr = String(username || '');
                 const passwordStr = String(password || '');
-                if (!usernameStr || !passwordStr) {
-                    throw { err_msg: '用户名和密码不能为空' };
+                const roleStr = String(role || '');
+                if (!usernameStr || !passwordStr || !roleStr) {
+                    throw { err_msg: '用户名、密码和角色不能为空' };
                 }
                 if (usernameStr.length < 3) {
                     throw { err_msg: '用户名长度不能少于3位' };
@@ -100,18 +107,23 @@ export default {
                 if (passwordStr.length < 3) {
                     throw { err_msg: '密码长度不能少于3位' };
                 }
+                if (!ALLOWED_ROLES.includes(roleStr)) {
+                    throw { err_msg: 'role参数必须是 farmer 或 engineer' };
+                }
                 if (users.find(u => u.username === usernameStr)) {
                     throw { err_msg: '用户已存在' };
                 }
                 users.push({
                     username: usernameStr,
                     password: passwordStr,
+                    role: roleStr,
                     created_at: new Date().toISOString()
                 });
 
                 return {
                     success: true,
-                    username: usernameStr
+                    username: usernameStr,
+                    role: roleStr
                 };
             }
         },
@@ -160,6 +172,7 @@ export default {
                     explain: {
                         username: { type: String, mean: '用户名', example: 'admin' },
                         password: { type: String, mean: '密码', example: 'aaa' },
+                        role: { type: String, mean: '角色', example: 'farmer' },
                         created_at: { type: String, mean: '创建时间', example: '2024-01-01T00:00:00.000Z' }
                     }
                 },
@@ -169,6 +182,7 @@ export default {
                 const userList = users.map(user => ({
                     username: user.username,
                     password: user.password,
+                    role: user.role,
                     created_at: user.created_at
                 }));
 
