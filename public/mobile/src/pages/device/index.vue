@@ -150,6 +150,107 @@
             </view>
         </scroll-view>
 
+        <!-- 悬浮添加设备按钮（移动端） -->
+        <view class="add-device-fab" @click="onAddDevice">
+            <text class="fab-icon">＋</text>
+            <text class="fab-text">添加设备</text>
+        </view>
+
+        <!-- 添加轮灌阀门弹窗 -->
+        <view v-if="showAddValveDialog" class="add-valve-mask">
+            <view class="add-valve-modal">
+                <view class="add-valve-header">
+                    <text class="add-valve-title">添加轮灌组阀门</text>
+                    <text class="add-valve-close" @click="closeAddValve">×</text>
+                </view>
+                <view class="add-valve-body">
+                    <view class="form-item">
+                        <text class="form-label">所属农场</text>
+                        <text class="form-value readonly">{{ addValveForm.farm_name || currentFarmName }}</text>
+                    </view>
+                    <view class="form-item">
+                        <text class="form-label">所属区块</text>
+                        <picker mode="selector" :range="blocks" range-key="name" @change="onBlockChange">
+                            <view class="picker-field">
+                                <text class="picker-text">
+                                    {{ addValveForm.block_name || (blocks[0] && blocks[0].name) || '请选择区块' }}
+                                </text>
+                                <text class="picker-arrow">▼</text>
+                            </view>
+                        </picker>
+                    </view>
+                    <view class="form-item">
+                        <text class="form-label">设备名称</text>
+                        <input class="input-field" v-model="addValveForm.valve_name" placeholder="请输入设备名称" />
+                    </view>
+                    <view class="form-item">
+                        <text class="form-label">驱动类型</text>
+                        <picker mode="selector" :range="driverOptions" range-key="label" @change="onDriverChange">
+                            <view class="picker-field">
+                                <text class="picker-text">{{ addValveForm.driver_name }}</text>
+                                <text class="picker-arrow">▼</text>
+                            </view>
+                        </picker>
+                    </view>
+                    <view class="form-item">
+                        <text class="form-label">token</text>
+                        <input class="input-field" v-model="valveConfigForm.token" placeholder="请输入 token" />
+                    </view>
+                    <view class="form-item">
+                        <text class="form-label">device_sn</text>
+                        <input class="input-field" v-model="valveConfigForm.device_sn" placeholder="请输入设备序列号" />
+                    </view>
+                    <view class="form-item switch-item">
+                        <text class="form-label">阀门位置</text>
+                        <switch :checked="valveConfigForm.is_left" @change="(e) => valveConfigForm.is_left = e.detail.value" />
+                        <text class="switch-text">{{ valveConfigForm.is_left ? '左侧阀门' : '右侧阀门' }}</text>
+                    </view>
+                    <view class="form-item">
+                        <text class="form-label">轮询间隔(ms)</text>
+                        <input class="input-field" type="number" v-model.number="valveConfigForm.poll_interval"
+                            placeholder="例如 5000" />
+                    </view>
+                    <view class="form-row">
+                        <view class="form-item half">
+                            <text class="form-label">经度</text>
+                            <input class="input-field" type="number" v-model.number="addValveForm.longitude"
+                                placeholder="经度" />
+                        </view>
+                        <view class="form-item half">
+                            <text class="form-label">纬度</text>
+                            <input class="input-field" type="number" v-model.number="addValveForm.latitude"
+                                placeholder="纬度" />
+                        </view>
+                    </view>
+                    <view class="form-row">
+                        <view class="form-item half">
+                            <text class="form-label">开阀压力下限</text>
+                            <input class="input-field" type="number"
+                                v-model.number="addValveForm.open_pressure_low_limit" placeholder="例如 0.1" />
+                        </view>
+                        <view class="form-item half">
+                            <text class="form-label">关阀压力上限</text>
+                            <input class="input-field" type="number"
+                                v-model.number="addValveForm.close_pressure_high_limit" placeholder="例如 0.25" />
+                        </view>
+                    </view>
+                    <view class="form-item">
+                        <text class="form-label">压力检查周期(秒)</text>
+                        <input class="input-field" type="number"
+                            v-model.number="addValveForm.pressure_check_interval" placeholder="例如 3" />
+                    </view>
+                </view>
+                <view class="add-valve-footer">
+                    <view class="footer-btn cancel" @click="closeAddValve">
+                        <text>取消</text>
+                    </view>
+                    <view class="footer-btn confirm" @click="submitAddValve">
+                        <text>确定</text>
+                    </view>
+                </view>
+            </view>
+        </view>
+
         <!-- 加载组件 -->
         <Loading :show="pageLoading" text="加载中..." />
     </view>
@@ -173,6 +274,29 @@ const currentFarmName = ref('')
 const pageHeaderRef = ref(null)
 const pageLoading = ref(false)
 const isFirstLoad = ref(true) // 标记是否是首次加载
+
+// 添加轮灌阀门相关状态（与 Web 端接口一致）
+const showAddValveDialog = ref(false)
+const blocks = ref([])
+const addValveForm = ref({
+    farm_name: '',
+    block_name: '',
+    valve_name: '',
+    driver_name: 'WaterGroupValve',
+    valve_config_key: '',
+    latitude: null,
+    longitude: null,
+    open_pressure_low_limit: 0.1,
+    close_pressure_high_limit: 0.25,
+    pressure_check_interval: 3
+})
+
+const valveConfigForm = ref({
+    token: '',
+    device_sn: '',
+    is_left: false,
+    poll_interval: 5000
+})
 
 // 设备能力按钮映射配置
 const deviceCapabilityButtonMapping = {
@@ -412,6 +536,115 @@ const onTypeChange = (e) => {
     deviceTypeFilter.value = opt.value
 }
 
+// 加载区块列表
+const loadBlocks = async () => {
+    if (!currentFarmName.value) {
+        blocks.value = []
+        return
+    }
+    try {
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const result = await call_remote('/resource/list_block', {
+            farm_name: currentFarmName.value,
+            pageNo: 0
+        }, token)
+        blocks.value = result?.blocks || []
+    } catch (error) {
+        blocks.value = []
+    }
+}
+
+// 选择区块
+const onBlockChange = (e) => {
+    const idx = Number(e.detail.value || 0)
+    const block = blocks.value[idx]
+    if (block) {
+        addValveForm.value.block_name = block.name
+    }
+}
+
+// 选择驱动
+const driverOptions = [
+    { label: 'WaterGroupValve', value: 'WaterGroupValve' },
+    { label: 'WaterGroupValve_v2', value: 'WaterGroupValve_v2' }
+]
+
+const onDriverChange = (e) => {
+    const idx = Number(e.detail.value || 0)
+    const opt = driverOptions[idx] || driverOptions[0]
+    addValveForm.value.driver_name = opt.value
+}
+
+// 跳转到添加轮灌阀门页面
+const onAddDevice = () => {
+    if (!currentFarmName.value) {
+        uni.showToast({
+            title: '请先选择农场',
+            icon: 'none'
+        })
+        return
+    }
+    const farmName = encodeURIComponent(currentFarmName.value)
+    uni.navigateTo({
+        url: `/pages/device/add-valve?farmName=${farmName}`
+    })
+}
+
+// 提交添加轮灌阀门
+const submitAddValve = async () => {
+    if (!addValveForm.value.block_name) {
+        uni.showToast({ title: '请选择所属区块', icon: 'none' })
+        return
+    }
+    if (!addValveForm.value.valve_name) {
+        uni.showToast({ title: '请输入设备名称', icon: 'none' })
+        return
+    }
+    if (!valveConfigForm.value.token || !valveConfigForm.value.device_sn) {
+        uni.showToast({ title: '请填写 token 和 device_sn', icon: 'none' })
+        return
+    }
+    try {
+        addValveForm.value.valve_config_key = JSON.stringify({
+            token: valveConfigForm.value.token,
+            device_sn: valveConfigForm.value.device_sn,
+            is_left: !!valveConfigForm.value.is_left,
+            poll_interval: Number(valveConfigForm.value.poll_interval) || 5000
+        })
+
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const payload = {
+            farm_name: addValveForm.value.farm_name,
+            block_name: addValveForm.value.block_name,
+            valve_name: addValveForm.value.valve_name,
+            driver_name: addValveForm.value.driver_name,
+            valve_config_key: addValveForm.value.valve_config_key,
+            latitude: addValveForm.value.latitude,
+            longitude: addValveForm.value.longitude,
+            open_pressure_low_limit: addValveForm.value.open_pressure_low_limit,
+            close_pressure_high_limit: addValveForm.value.close_pressure_high_limit,
+            pressure_check_interval: addValveForm.value.pressure_check_interval
+        }
+        const result = await call_remote('/config/add_water_group_valve', payload, token)
+        if (result && result.result) {
+            uni.showToast({ title: '添加成功', icon: 'success' })
+            showAddValveDialog.value = false
+            await loadDeviceList()
+        } else {
+            uni.showToast({ title: '添加失败', icon: 'none' })
+        }
+    } catch (error) {
+        uni.showToast({
+            title: error.err_msg || '添加失败',
+            icon: 'none'
+        })
+    }
+}
+
+const closeAddValve = () => {
+    showAddValveDialog.value = false
+}
+
 // 获取设备图标路径（使用英文文件名，与天气图标一致）
 const getDeviceIconPath = (deviceType, deviceName = '') => {
     // 如果 device_type 不准确，尝试从设备名称推断类型
@@ -618,6 +851,169 @@ onShow(async () => {
     flex-direction: column;
     overflow: hidden;
     position: relative;
+}
+
+/* 悬浮添加设备按钮 */
+.add-device-fab {
+    position: fixed;
+    right: 32rpx;
+    bottom: calc(140rpx + env(safe-area-inset-bottom));
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    padding: 16rpx 28rpx;
+    border-radius: 999rpx;
+    background: linear-gradient(135deg, #409eff, #67c23a);
+    box-shadow: 0 8rpx 20rpx rgba(64, 158, 255, 0.4);
+}
+
+.fab-icon {
+    font-size: 32rpx;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.fab-text {
+    font-size: 26rpx;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+/* 添加轮灌阀门弹窗样式 */
+.add-valve-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.add-valve-modal {
+    width: 90vw;
+    max-width: 700rpx;
+    max-height: 90vh;
+    background: #ffffff;
+    border-radius: 24rpx;
+    box-shadow: 0 12rpx 32rpx rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.add-valve-header {
+    padding: 24rpx 32rpx;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #ebeef5;
+}
+
+.add-valve-title {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: #303133;
+}
+
+.add-valve-close {
+    font-size: 32rpx;
+    color: #909399;
+    padding: 8rpx 16rpx;
+}
+
+.add-valve-body {
+    padding: 24rpx 32rpx 16rpx;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.add-valve-footer {
+    padding: 16rpx 24rpx 24rpx;
+    display: flex;
+    justify-content: flex-end;
+    gap: 16rpx;
+    border-top: 1px solid #ebeef5;
+    background: #fafafa;
+}
+
+.footer-btn {
+    min-width: 160rpx;
+    padding: 18rpx 32rpx;
+    border-radius: 999rpx;
+    text-align: center;
+}
+
+.footer-btn.cancel {
+    background: #ffffff;
+    border: 1px solid #dcdfe6;
+    color: #606266;
+}
+
+.footer-btn.confirm {
+    background: #409eff;
+    color: #ffffff;
+}
+
+.form-item {
+    margin-bottom: 18rpx;
+}
+
+.form-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16rpx;
+}
+
+.form-item.half {
+    flex: 1;
+}
+
+.form-label {
+    font-size: 24rpx;
+    color: #606266;
+    margin-bottom: 8rpx;
+    display: block;
+}
+
+.form-value.readonly {
+    font-size: 26rpx;
+    color: #303133;
+}
+
+.input-field {
+    width: 100%;
+    padding: 16rpx 20rpx;
+    border-radius: 12rpx;
+    border: 1px solid #dcdfe6;
+    font-size: 26rpx;
+    box-sizing: border-box;
+}
+
+.picker-field {
+    width: 100%;
+    padding: 16rpx 20rpx;
+    border-radius: 12rpx;
+    border: 1px solid #dcdfe6;
+    display: flex;
+    align-items: center;
+}
+
+.picker-text {
+    font-size: 26rpx;
+    color: #303133;
+}
+
+.switch-item {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+}
+
+.switch-text {
+    font-size: 24rpx;
+    color: #606266;
 }
 
 .filter-bar {

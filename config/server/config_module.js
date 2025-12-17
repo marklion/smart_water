@@ -332,6 +332,8 @@ export default {
                 await policy_lib.add_quick_action(body.valve_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
                 await policy_lib.add_quick_action(body.valve_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
                 await policy_lib.add_quick_action(body.valve_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
+                // 保存配置到文件
+                await cli_runtime_lib.save_config();
                 return { result: true };
             }
         },
