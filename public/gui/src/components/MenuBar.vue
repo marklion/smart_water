@@ -81,12 +81,18 @@ watch(() => route.path, (newPath) => {
 // 计算菜单项
 const menuItems = computed(() => {
   const routes = router.getRoutes()
+  const role = localStorage.getItem('user_role') || 'farmer'
   const menuMap = new Map()
   const topLevelItems = []
 
   // 处理所有路由
   routes.forEach(route => {
     if (!route.name || route.meta.hidden) return
+
+    // 角色过滤：如果路由限定角色且当前角色不在允许列表中，则不显示在菜单中
+    if (route.meta && Array.isArray(route.meta.allowedRoles) && !route.meta.allowedRoles.includes(role)) {
+      return
+    }
 
     const parent = route.meta?.parent
     const icon = route.meta?.icon
@@ -116,8 +122,11 @@ const menuItems = computed(() => {
     }
   })
 
+  // 过滤掉没有可见子项的父级菜单（例如 farmer 看不到配置中心）
+  const groupedMenus = Array.from(menuMap.values()).filter(group => group.children.length > 0)
+
   // 合并顶级菜单和父级菜单
-  const result = [...topLevelItems, ...Array.from(menuMap.values())]
+  const result = [...topLevelItems, ...groupedMenus]
 
   // 排序：首页在前，其他按字母排序
   return result.sort((a, b) => {

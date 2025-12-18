@@ -209,7 +209,7 @@ export default {
                         this.log(result);
                     }
                 } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
+                    this.log('Error:', err.err_msg || err.message || '未知错误');
                 }
             });
         return ret;
@@ -227,7 +227,7 @@ export default {
                         this.log(result);
                     }
                 } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
+                    this.log('Error:', err.err_msg || err.message || '未知错误');
                 }
             });
         let undo_cmd_string = 'undo ' + cmd.split(/[<[]/)[0].trim();
@@ -243,7 +243,7 @@ export default {
                         this.log(result);
                     }
                 } catch (err) {
-                    this.log('Error:', err.err_msg || '未知错误');
+                    this.log('Error:', err.err_msg || err.message || '未知错误');
                 }
             });
         if (vorpal.undo_cmd_array == undefined) {

@@ -11,10 +11,14 @@ export default {
         const vorpal = cli_utils.create_vorpal();
         this._vorpalInstance = vorpal;
 
-        cli_utils.make_undo_cmd(vorpal, 'user <name> <password>', '新增一个用户', '删除所有用户',
+        cli_utils.make_undo_cmd(vorpal, 'user <name> <password> <role>', '新增一个用户', '删除所有用户',
             async (cmd_this, args) => {
-                const result = await web_lib.add_user(args.name, args.password);
-                return `用户 "${args.name}" 创建成功`;
+                // 验证role参数
+                if (args.role !== 'farmer' && args.role !== 'engineer') {
+                    throw new Error('role参数必须是 farmer 或 engineer');
+                }
+                const result = await web_lib.add_user(args.name, args.password, args.role);
+                return `用户 "${args.name}" (角色: ${args.role}) 创建成功`;
             },
             async (cmd_this, args) => {
                 const result = await web_lib.list_users();
@@ -44,7 +48,7 @@ export default {
             let commands = [];
             if (result && result.users && Array.isArray(result.users)) {
                 result.users.forEach(user => {
-                    commands.push(`user '${user.username}' '${user.password}'`);
+                    commands.push(`user '${user.username}' '${user.password}' '${user.role || 'farmer'}'`);
                 });
             } else {
                 console.log('list_users返回结果异常:', result);

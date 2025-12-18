@@ -222,6 +222,11 @@ function convert_param(cmd, param) {
             values: ['abcd', 'LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa']
         },
         {
+            cmd: 'user',
+            param: 'role',
+            values: ['farmer', 'engineer']
+        },
+        {
             cmd: 'init assignment',
             param: 'is_constant',
             values: ['true', 'false']
@@ -615,8 +620,8 @@ function cmds_depend_prepare(cmd, parent) {
         }, {
             cmd: 'del user',
             depends: [
-                'user abcd 12345',
-                'user LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa 12345',
+                'user abcd 12345 farmer',
+                'user LONG_param_aaaaaaaaaaaaaaaaaaaaaaaaa 12345 engineer',
             ],
             teardown: [
                 'undo user'
