@@ -866,8 +866,12 @@ const submitAddWaterGroupValve = () => {
       }
       const result = await config_lib.add_water_group_valve(payload)
       if (result && result.result) {
+        // 保存配置到文件
+        await call_remote('/config/save_config', {})
         ElMessage.success('轮灌组阀门添加成功')
       } else if (result === true) {
+        // 保存配置到文件
+        await call_remote('/config/save_config', {})
         ElMessage.success('轮灌组阀门添加成功')
       } else {
         ElMessage.error('轮灌组阀门添加失败')

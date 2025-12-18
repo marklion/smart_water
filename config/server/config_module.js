@@ -332,8 +332,6 @@ export default {
                 await policy_lib.add_quick_action(body.valve_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
                 await policy_lib.add_quick_action(body.valve_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
                 await policy_lib.add_quick_action(body.valve_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
-                // 保存配置到文件
-                await cli_runtime_lib.save_config();
                 return { result: true };
             }
         },
@@ -569,6 +567,20 @@ export default {
                 await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
                 return { result: true };
             },
+        },
+        save_config: {
+            name: '保存配置',
+            description: '将当前配置保存到文件',
+            is_write: true,
+            is_get_api: false,
+            params: {},
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                await cli_runtime_lib.save_config();
+                return { result: true };
+            }
         },
     }
 };

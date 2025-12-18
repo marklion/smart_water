@@ -236,6 +236,8 @@ const submitAddValve = async () => {
             pressure_check_interval: addValveForm.value.pressure_check_interval
         }
         await call_remote('/config/add_water_group_valve', payload, token)
+        // 保存配置到文件
+        await call_remote('/config/save_config', {}, token)
         
         uni.showToast({ 
             title: '添加成功', 

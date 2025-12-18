@@ -627,6 +627,8 @@ const submitAddValve = async () => {
         }
         const result = await call_remote('/config/add_water_group_valve', payload, token)
         if (result && result.result) {
+            // 保存配置到文件
+            await call_remote('/config/save_config', {}, token)
             uni.showToast({ title: '添加成功', icon: 'success' })
             showAddValveDialog.value = false
             await loadDeviceList()
