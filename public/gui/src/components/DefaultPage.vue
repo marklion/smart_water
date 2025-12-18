@@ -95,8 +95,48 @@
                 <!-- 农场地图 Tab -->
                 <el-tab-pane label="农场地图" name="map">
                   <div class="map-container">
+                    <!-- 地图组件 -->
                     <InteractiveMapComponent :devices="mapMarkers" :center="mapCenter" :zoom="mapZoom"
                       @device-toggle="onDeviceToggle" />
+
+                    <!-- 右侧浮动搅拌策略面板 -->
+                    <div class="mixing-strategy-panel" v-if="selectedFarm">
+                      <div class="panel-header">
+                        <el-icon class="panel-icon">
+                          <Monitor />
+                        </el-icon>
+                        <span class="panel-title">搅拌策略</span>
+                      </div>
+                      <div class="panel-body">
+                        <el-form label-position="top" size="small">
+                          <el-form-item label="启动间隔（分钟）">
+                            <el-input-number v-model="mixingStartInterval" :min="1" :step="5" :max="1440"
+                              controls-position="right" style="width: 100%;" />
+                          </el-form-item>
+                          <el-form-item label="期望运行时间（分钟）">
+                            <el-input-number v-model="mixingDuration" :min="1" :step="1" :max="1440"
+                              controls-position="right" style="width: 100%;" />
+                          </el-form-item>
+                        </el-form>
+
+                        <div class="panel-actions">
+                          <el-space wrap>
+                            <el-button type="primary" size="small" :loading="mixingStartLoading" @click="startMixing"
+                               :icon="VideoPlay" round>
+                              启动
+                            </el-button>
+                            <el-button type="danger" size="small" :loading="mixingStopLoading" @click="stopMixing"
+                               :icon="VideoPause" round>
+                              停止
+                            </el-button>
+                            <el-button type="success" size="small" :loading="mixingSaving" @click="applyMixingPolicy"
+                               :icon="Setting" round class="mixing-apply-btn">
+                              保存
+                            </el-button>
+                          </el-space>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </el-tab-pane>
 
@@ -176,48 +216,47 @@
         </div>
 
         <!-- 运行时信息区域 -->
-        <div v-if="(selectedDeviceDetail.runtime_info && selectedDeviceDetail.runtime_info.length > 0) || selectedDeviceDetail.is_online !== undefined"
-            class="runtime-info-section" :class="{ loading: refreshingRuntimeInfo }">
+        <div
+          v-if="(selectedDeviceDetail.runtime_info && selectedDeviceDetail.runtime_info.length > 0) || selectedDeviceDetail.is_online !== undefined"
+          class="runtime-info-section" :class="{ loading: refreshingRuntimeInfo }">
           <div class="section-title">
             <span>运行时信息</span>
             <el-button size="small" type="primary" :icon="Refresh" @click="refreshRuntimeInfo"
-                :loading="refreshingRuntimeInfo" circle />
+              :loading="refreshingRuntimeInfo" circle />
           </div>
           <div class="runtime-info-list">
             <!-- 设备在线状态 -->
             <div v-if="selectedDeviceDetail.is_online !== undefined" class="runtime-info-item online-status-item">
               <div class="info-label">
                 <el-icon class="status-icon"
-                    :class="{ 'online': selectedDeviceDetail.is_online, 'offline': !selectedDeviceDetail.is_online }">
+                  :class="{ 'online': selectedDeviceDetail.is_online, 'offline': !selectedDeviceDetail.is_online }">
                   <CircleCheck v-if="selectedDeviceDetail.is_online" />
                   <CircleClose v-else />
                 </el-icon>
                 设备在线状态：
               </div>
               <div class="info-value"
-                  :class="{ 'online': selectedDeviceDetail.is_online, 'offline': !selectedDeviceDetail.is_online }">
+                :class="{ 'online': selectedDeviceDetail.is_online, 'offline': !selectedDeviceDetail.is_online }">
                 {{ selectedDeviceDetail.is_online ? '在线' : '离线' }}
               </div>
             </div>
             <!-- 其他运行时信息 -->
-            <div v-for="(info, index) in selectedDeviceDetail.runtime_info" :key="index"
-                class="runtime-info-item">
+            <div v-for="(info, index) in selectedDeviceDetail.runtime_info" :key="index" class="runtime-info-item">
               <div class="info-label">{{ info.title }}：</div>
               <div class="info-value">{{ info.text }}</div>
             </div>
           </div>
         </div>
 
-         <!-- 设备操作按钮 -->
-         <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDeviceDetail)">
-           <div class="device-controls-container">
-             <!-- 动态生成的设备操作按钮 -->
-             <div v-for="buttonGroup in getDeviceButtonGroupsWrapperLocal(selectedDeviceDetail)" :key="buttonGroup.key"
-                :class="buttonGroup.containerClass">
+        <!-- 设备操作按钮 -->
+        <div class="device-actions" v-if="hasAnyDeviceCapability(selectedDeviceDetail)">
+          <div class="device-controls-container">
+            <!-- 动态生成的设备操作按钮 -->
+            <div v-for="buttonGroup in getDeviceButtonGroupsWrapperLocal(selectedDeviceDetail)" :key="buttonGroup.key"
+              :class="buttonGroup.containerClass">
               <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
-                  :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize"
-                  :class="buttonConfig.buttonClass"
-                  @click="handleDeviceAction(buttonConfig.action, selectedDeviceDetail.deviceName || selectedDeviceDetail.device_name)">
+                :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize" :class="buttonConfig.buttonClass"
+                @click="handleDeviceAction(buttonConfig.action, selectedDeviceDetail.deviceName || selectedDeviceDetail.device_name)">
                 <el-icon v-if="buttonConfig.icon" class="mr-1">
                   <VideoPlay v-if="buttonConfig.icon === 'VideoPlay'" />
                   <VideoPause v-else-if="buttonConfig.icon === 'VideoPause'" />
@@ -240,7 +279,7 @@
 <script setup>
 import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
-import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
@@ -251,10 +290,10 @@ import RealtimeDataCard from '../../../../monitoring/gui/RealtimeDataCard.vue'
 import WarningCard from '../../../../monitoring/gui/WarningCard.vue'
 import call_remote from '../../../lib/call_remote.js'
 import { fetchMapConfig } from '../config/mapConfig.js'
-import { 
-  getDeviceType, 
-  hasDeviceCapability, 
-  hasAnyDeviceCapability, 
+import {
+  getDeviceType,
+  hasDeviceCapability,
+  hasAnyDeviceCapability,
   refreshRuntimeInfo as refreshRuntimeInfoUtil,
   createRuntimeInfoAutoRefresh,
   handleDeviceAction as handleDeviceActionUtil,
@@ -316,6 +355,15 @@ const mapZoom = ref(15)
 
 // 地图标记点 - 使用shallowRef优化性能，从真实设备数据获取
 const mapMarkers = shallowRef([])
+// 保存当前农场的所有设备（用于统计和列表展示）
+const allDevices = ref([])
+
+// 搅拌策略配置（单位：分钟）
+const mixingStartInterval = ref(60) // 启动间隔，默认60分钟
+const mixingDuration = ref(6) // 期望运行时间，默认6分钟
+const mixingSaving = ref(false)
+const mixingStartLoading = ref(false)
+const mixingStopLoading = ref(false)
 
 
 // Tab切换相关
@@ -541,16 +589,10 @@ const loadRealDeviceData = async (farmId) => {
 
     if (deviceResponse && deviceResponse.devices) {
 
-      // 转换设备数据为地图标记格式
+      // 转换设备数据为地图标记格式（完整设备列表）
       const devices = deviceResponse.devices.map((device, index) => {
-        // 根据设备类型确定标记类型
-        let deviceType = 'valve' // 默认类型
-        if (device.driver_name && device.driver_name.includes('流量计')) {
-          deviceType = 'flowmeter'
-        } else if (device.driver_name && device.driver_name.includes('施肥机')) {
-          deviceType = 'fertilizer'
-        }
-        // 电磁阀类型保持默认值 'valve'
+        // 使用通用函数根据设备名称/类型判断类型代码（valve / pump / flowmeter / sensor 等）
+        const deviceTypeCode = getDeviceType(device)
 
         // 如果有经纬度坐标，不设置x,y（让地图组件直接使用经纬度）；否则使用默认坐标
         let x, y
@@ -568,7 +610,7 @@ const loadRealDeviceData = async (farmId) => {
           id: device.id || index + 1,
           x: x,
           y: y,
-          type: deviceType,
+          type: deviceTypeCode,
           label: device.device_name || `设备${index + 1}`,
           deviceName: device.device_name,
           deviceType: device.driver_name || '未知设备',
@@ -588,19 +630,19 @@ const loadRealDeviceData = async (farmId) => {
           runtime_info: device.runtime_info
         }
       })
+      allDevices.value = devices
+      const filteredDevices = devices.filter(d => {
+        const name = d.deviceName || ''
+        // type === 'valve' 表示阀门；type === 'pump' 且名称包含“搅拌泵”的视为搅拌泵
+        return d.type === 'valve' || (d.type === 'pump' && name.includes('搅拌泵'))
+      })
 
-      mapMarkers.value = devices
+      mapMarkers.value = filteredDevices
 
-      // 获取设备实际状态并更新统计
+      // 获取设备实际状态（使用完整设备列表）
       await updateDeviceStatuses(devices)
-
-      // 更新基本信息中的设备数量 - 根据在线状态计算
-      basicInfo.totalDevices = devices.length
-      basicInfo.onlineDevices = devices.filter(d => d.is_online === true).length
-      // 离线设备：明确为 false 或 undefined/null 的都算离线
-      basicInfo.offlineDevices = devices.filter(d => d.is_online !== true).length
-
-      // 更新设备列表
+      // 更新基本信息统计和设备列表（使用完整设备列表）
+      updateBasicInfoStats()
       updateDeviceList()
 
 
@@ -627,7 +669,7 @@ const onDeviceClick = (device) => {
 
   selectedDeviceDetail.value = device
   deviceDetailDialogVisible.value = true
-  
+
   // 启动自动刷新定时器
   startRuntimeInfoAutoRefresh()
 }
@@ -676,19 +718,18 @@ const onDeviceToggle = (device) => {
   updateBasicInfoStats()
 }
 
-// 更新基本信息统计
+// 更新基本信息统计（基于完整设备列表）
 const updateBasicInfoStats = () => {
-  if (mapMarkers.value && mapMarkers.value.length > 0) {
-    basicInfo.totalDevices = mapMarkers.value.length
+  if (allDevices.value && allDevices.value.length > 0) {
+    basicInfo.totalDevices = allDevices.value.length
 
     // 根据设备的在线状态计算在线和离线设备数量
-    const onlineDevices = mapMarkers.value.filter(d => d.is_online === true).length
+    const onlineDevices = allDevices.value.filter(d => d.is_online === true).length
     // 离线设备：明确为 false 或 undefined/null 的都算离线
-    const offlineDevices = mapMarkers.value.filter(d => d.is_online !== true).length
+    const offlineDevices = allDevices.value.filter(d => d.is_online !== true).length
 
     basicInfo.onlineDevices = onlineDevices
     basicInfo.offlineDevices = offlineDevices
-
   }
 }
 
@@ -749,9 +790,9 @@ const refreshIrrigationData = async () => {
 
 // 更新设备列表
 const updateDeviceList = () => {
-  // 从 mapMarkers 获取设备数据并转换为列表格式
+  // 从完整设备列表 allDevices 获取设备数据并转换为列表格式
   // 确保只显示当前选中农场的设备（双重保险）
-  const currentFarmDevices = mapMarkers.value.filter(marker =>
+  const currentFarmDevices = allDevices.value.filter(marker =>
     !selectedFarm.value || marker.farmName === selectedFarm.value
   )
 
@@ -780,6 +821,85 @@ const refreshDeviceList = async () => {
     } finally {
       deviceListLoading.value = false
     }
+  }
+}
+
+// 应用搅拌策略（调用后端快速搅拌策略接口）
+const applyMixingPolicy = async () => {
+  if (!selectedFarm.value) {
+    ElMessage.warning('请先选择农场')
+    return
+  }
+  try {
+    mixingSaving.value = true
+    const payload = {
+      farm_name: selectedFarm.value,
+      start_interval: mixingStartInterval.value,
+      duration: mixingDuration.value
+    }
+    const resp = await call_remote('/config/init_fert_mixing_policy', payload)
+    if (resp && resp.result) {
+      ElMessage.success('搅拌策略已更新')
+    } else {
+      ElMessage.error('搅拌策略更新失败')
+    }
+  } catch (error) {
+    console.error('应用搅拌策略失败:', error)
+    ElMessage.error(error.err_msg || '应用搅拌策略失败')
+  } finally {
+    mixingSaving.value = false
+  }
+}
+
+// 启动搅拌（快速操作：开始）
+const startMixing = async () => {
+  if (!selectedFarm.value) {
+    ElMessage.warning('请先选择农场')
+    return
+  }
+  const policyName = `${selectedFarm.value}-搅拌`
+  try {
+    mixingStartLoading.value = true
+    const resp = await call_remote('/policy/do_quick_action', {
+      policy_name: policyName,
+      action_name: '开始'
+    })
+    if (resp && resp.result) {
+      ElMessage.success('搅拌已启动')
+    } else {
+      ElMessage.error(resp?.err_msg || '启动搅拌失败')
+    }
+  } catch (error) {
+    console.error('启动搅拌失败:', error)
+    ElMessage.error(error.err_msg || '启动搅拌失败')
+  } finally {
+    mixingStartLoading.value = false
+  }
+}
+
+// 停止搅拌（快速操作：停止）
+const stopMixing = async () => {
+  if (!selectedFarm.value) {
+    ElMessage.warning('请先选择农场')
+    return
+  }
+  const policyName = `${selectedFarm.value}-搅拌`
+  try {
+    mixingStopLoading.value = true
+    const resp = await call_remote('/policy/do_quick_action', {
+      policy_name: policyName,
+      action_name: '停止'
+    })
+    if (resp && resp.result) {
+      ElMessage.success('搅拌已停止')
+    } else {
+      ElMessage.error(resp?.err_msg || '停止搅拌失败')
+    }
+  } catch (error) {
+    console.error('停止搅拌失败:', error)
+    ElMessage.error(error.err_msg || '停止搅拌失败')
+  } finally {
+    mixingStopLoading.value = false
   }
 }
 
@@ -1330,6 +1450,63 @@ html {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* 右侧浮动搅拌策略面板 */
+.mixing-strategy-panel {
+  position: absolute;
+  top: 200px;
+  right: 16px;
+  width: 280px;
+  background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  padding: 14px 16px 16px 16px;
+  box-sizing: border-box;
+  z-index: 20;
+}
+
+.mixing-strategy-panel .panel-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mixing-strategy-panel .panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  letter-spacing: 0.5px;
+}
+
+.mixing-strategy-panel .panel-icon {
+  font-size: 16px;
+  color: #409EFF;
+  margin-right: 6px;
+}
+
+.mixing-strategy-panel .panel-body {
+  font-size: 12px;
+}
+
+.mixing-strategy-panel .panel-actions {
+  margin-top: 4px;
+}
+
+.mixing-apply-btn {
+  padding: 0 18px;
+}
+
+.mixing-strategy-panel .panel-tips {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
 }
 
 /* 确保 el-card 的 body 填满剩余空间 */
