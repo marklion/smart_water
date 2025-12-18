@@ -44,25 +44,25 @@ describe('Web CLI 用户管理测试', () => {
     test('应该能创建用户', async () => {
         // 确保在web视图中，如果不在则重新进入
         const helpResult = await cli.run_cmd('help');
-        if (!helpResult.includes('user <name> <password>')) {
+        if (!helpResult.includes('user <name> <password> <role>')) {
             await cli.run_cmd('return');
             await cli.run_cmd('web');
         }
 
-        const result = await cli.run_cmd('user testuser testpass123');
-        expect(result).toContain('用户 "testuser" 创建成功');
+        const result = await cli.run_cmd('user testuser testpass123 farmer');
+        expect(result).toContain('用户 "testuser" (角色: farmer) 创建成功');
     });
 
     test('应该能删除单个用户', async () => {
-        await cli.run_cmd('user testuser testpass123');
+        await cli.run_cmd('user testuser testpass123 engineer');
         const result = await cli.run_cmd('del user testuser');
         expect(result).toContain('用户 "testuser" 删除成功');
     });
 
     test('应该能使用undo命令删除所有用户', async () => {
         // 创建几个用户
-        await cli.run_cmd('user user1 pass123456');
-        await cli.run_cmd('user user2 pass123456');
+        await cli.run_cmd('user user1 pass123456 farmer');
+        await cli.run_cmd('user user2 pass123456 engineer');
 
         // 使用undo命令删除所有用户
         const result = await cli.run_cmd('undo user');
@@ -74,8 +74,13 @@ describe('Web CLI 用户管理测试', () => {
     });
 
     test('密码太短应该返回错误', async () => {
-        const result = await cli.run_cmd('user shortpass st');
+        const result = await cli.run_cmd('user shortpass st farmer');
         expect(result).toContain('密码长度不能少于3位');
+    });
+
+    test('角色非法时应提示错误', async () => {
+        const result = await cli.run_cmd('user badroleuser pass123456 teacher');
+        expect(result).toContain('role参数必须是 farmer 或 engineer');
     });
 
     test.skip('应该能保存和恢复配置 (暂时跳过 - 异步问题)', async () => {

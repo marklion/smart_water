@@ -7,7 +7,8 @@ const CONFIG = {
     API_BASE: '/api/v1',
     TEST_USER: {
         username: process.env.TEST_USERNAME || 'testuser',
-        password: process.env.TEST_PASSWORD || 'testpass123456'
+        password: process.env.TEST_PASSWORD || 'testpass123456',
+        role: 'farmer'
     }
 };
 
@@ -94,6 +95,7 @@ describe('Web Token 验证测试', () => {
         expect(result.success).toBe(true);
         expect(result.data.result).toBeDefined();
         expect(result.data.result.token).toBeDefined();
+        expect(result.data.result.role).toBe(CONFIG.TEST_USER.role);
         
         authToken = result.data.result.token;
         expect(typeof authToken).toBe('string');

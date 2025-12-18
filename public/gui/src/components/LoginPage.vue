@@ -129,9 +129,15 @@ const handleLogin = async () => {
     console.log('登录响应:', response) // 调试信息
 
     if (response && response.token) {
-      // 保存 token 和用户名
+      // 保存 token、用户名和角色
       localStorage.setItem('auth_token', response.token)
       localStorage.setItem('username', loginForm.username)
+      if (response.role) {
+        localStorage.setItem('user_role', response.role)
+      } else {
+        // 没有返回角色时，默认按 farmer 处理
+        localStorage.setItem('user_role', 'farmer')
+      }
       
       // 立即设置 axios 的默认 headers，确保后续请求都带上 token
       const axios = (await import('axios')).default
