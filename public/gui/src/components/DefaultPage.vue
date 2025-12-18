@@ -48,15 +48,27 @@
                 <el-tab-pane label="所有设备" name="devices">
                   <div class="tab-content-with-actions">
                     <div class="tab-actions">
-                      <span class="farm-name-display" v-if="selectedFarm">
-                        <el-icon>
-                          <House />
-                        </el-icon>
-                        当前农场：{{ selectedFarm }}
-                      </span>
-                      <el-button type="primary" size="small" @click="refreshDeviceList" :icon="Refresh">
-                        刷新
-                      </el-button>
+                      <div class="tab-actions-left">
+                        <span class="farm-name-display" v-if="selectedFarm">
+                          <el-icon>
+                            <House />
+                          </el-icon>
+                          当前农场：{{ selectedFarm }}
+                        </span>
+                      </div>
+                      <div class="tab-actions-right">
+                        <el-button
+                          type="success"
+                          size="small"
+                          :icon="Plus"
+                          @click="openAddWaterGroupValveDialog"
+                        >
+                          添加设备
+                        </el-button>
+                        <el-button type="primary" size="small" @click="refreshDeviceList" :icon="Refresh">
+                          刷新
+                        </el-button>
+                      </div>
                     </div>
                     <div class="tab-content-scroll">
                       <el-table :data="deviceList" stripe border :loading="deviceListLoading"
@@ -188,6 +200,125 @@
       </el-card>
     </div>
 
+    <!-- 添加轮灌阀门对话框 -->
+    <el-dialog
+      v-model="addWaterGroupValveDialogVisible"
+      title="添加轮灌组阀门设备"
+      width="640px"
+      :close-on-click-modal="false"
+      :append-to-body="true"
+      class="add-wgv-dialog"
+    >
+      <el-form
+        ref="addWaterGroupValveFormRef"
+        :model="addWaterGroupValveForm"
+        :rules="addWaterGroupValveRules"
+        label-width="140px"
+      >
+        <el-form-item label="所属农场" prop="farm_name">
+          <el-input v-model="addWaterGroupValveForm.farm_name" disabled />
+        </el-form-item>
+        <el-form-item label="所属区块" prop="block_name">
+          <el-select
+            v-model="addWaterGroupValveForm.block_name"
+            placeholder="请选择所属区块"
+            filterable
+            clearable
+          >
+            <el-option
+              v-for="block in blocks"
+              :key="block.name"
+              :label="block.name"
+              :value="block.name"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="设备名称" prop="valve_name">
+          <el-input v-model="addWaterGroupValveForm.valve_name" placeholder="例如：农场1-阀门1" />
+        </el-form-item>
+        <el-form-item label="驱动名称" prop="driver_name">
+          <el-select v-model="addWaterGroupValveForm.driver_name" placeholder="请选择驱动类型">
+            <el-option label="WaterGroupValve" value="WaterGroupValve" />
+            <el-option label="WaterGroupValve_v2" value="WaterGroupValve_v2" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="阀门配置" prop="">
+          <div class="valve-config-fields">
+            <el-input
+              v-model="valveConfigForm.token"
+              placeholder="token，例如：9CrLOUBhedObQjLTmhZJbQ=="
+            />
+            <el-input
+              v-model="valveConfigForm.device_sn"
+              placeholder="device_sn，例如：DZ005JSJ25180162"
+            />
+            <el-switch
+              v-model="valveConfigForm.is_left"
+              active-text="左侧阀门"
+              inactive-text="右侧阀门"
+            />
+            <el-input-number
+              v-model="valveConfigForm.poll_interval"
+              :min="1000"
+              :step="1000"
+              style="width: 100%;"
+              placeholder="poll_interval 轮询间隔（毫秒）"
+            />
+          </div>
+        </el-form-item>
+        <el-form-item label="经度（-180~180）" prop="longitude">
+          <el-input-number
+            v-model="addWaterGroupValveForm.longitude"
+            :precision="6"
+            :step="0.000001"
+            :min="-180"
+            :max="180"
+            placeholder="例如 111.670801"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item label="纬度（-90~90）" prop="latitude">
+          <el-input-number
+            v-model="addWaterGroupValveForm.latitude"
+            :precision="6"
+            :step="0.000001"
+            :min="-90"
+            :max="90"
+            placeholder="例如 40.818311"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item label="开阀压力下限" prop="open_pressure_low_limit">
+          <el-input-number
+            v-model="addWaterGroupValveForm.open_pressure_low_limit"
+            :min="0"
+            :step="0.01"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item label="关阀压力上限" prop="close_pressure_high_limit">
+          <el-input-number
+            v-model="addWaterGroupValveForm.close_pressure_high_limit"
+            :min="0"
+            :step="0.01"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item label="压力检查周期(秒)" prop="pressure_check_interval">
+          <el-input-number
+            v-model="addWaterGroupValveForm.pressure_check_interval"
+            :min="1"
+            :step="1"
+            style="width: 100%;"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="addWaterGroupValveDialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="submitAddWaterGroupValve">确 定</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 设备详情对话框 -->
     <el-dialog v-model="deviceDetailDialogVisible" title="设备详情" width="800px" :close-on-click-modal="false">
       <div v-if="selectedDeviceDetail" class="device-detail-content">
@@ -279,7 +410,7 @@
 <script setup>
 import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
-import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Setting } from '@element-plus/icons-vue'
+import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Plus, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
@@ -290,6 +421,8 @@ import RealtimeDataCard from '../../../../monitoring/gui/RealtimeDataCard.vue'
 import WarningCard from '../../../../monitoring/gui/WarningCard.vue'
 import call_remote from '../../../lib/call_remote.js'
 import { fetchMapConfig } from '../config/mapConfig.js'
+import config_lib from '../../../../config/lib/config_lib.js'
+import resource_lib from '../../../../resource/lib/resource_lib.js'
 import {
   getDeviceType,
   hasDeviceCapability,
@@ -325,6 +458,7 @@ const pageDescription = computed(() => {
 // 监控中心数据
 const selectedFarm = ref('')
 const weatherRef = ref(null) // 天气组件引用
+const blocks = ref([])
 
 // 基本信息数据
 const basicInfo = reactive({
@@ -380,6 +514,42 @@ const selectedDeviceDetail = ref(null)
 const refreshingRuntimeInfo = ref(false)
 const deviceStatuses = ref({}) // 跟踪设备状态
 
+// 添加轮灌阀门对话框
+const addWaterGroupValveDialogVisible = ref(false)
+const addWaterGroupValveFormRef = ref(null)
+const addWaterGroupValveForm = ref({
+  farm_name: '',
+  block_name: '',
+  valve_name: '',
+  driver_name: 'WaterGroupValve',
+  valve_config_key: '',
+  latitude: null,
+  longitude: null,
+  open_pressure_low_limit: 0.1,
+  close_pressure_high_limit: 0.25,
+  pressure_check_interval: 3
+})
+
+const valveConfigForm = ref({
+  token: '',
+  device_sn: '',
+  is_left: false,
+  poll_interval: 5000
+})
+
+const addWaterGroupValveRules = {
+  farm_name: [{ required: true, message: '所属农场不能为空', trigger: 'blur' }],
+  block_name: [{ required: true, message: '所属区块不能为空', trigger: 'blur' }],
+  valve_name: [{ required: true, message: '设备名称不能为空', trigger: 'blur' }],
+  driver_name: [{ required: true, message: '请选择驱动类型', trigger: 'change' }],
+  valve_config_key: [{ required: true, message: '阀门配置键不能为空', trigger: 'blur' }],
+  longitude: [{ required: true, message: '经度不能为空', trigger: 'change' }],
+  latitude: [{ required: true, message: '纬度不能为空', trigger: 'change' }],
+  open_pressure_low_limit: [{ required: true, message: '开阀压力下限不能为空', trigger: 'change' }],
+  close_pressure_high_limit: [{ required: true, message: '关阀压力上限不能为空', trigger: 'change' }],
+  pressure_check_interval: [{ required: true, message: '压力检查周期不能为空', trigger: 'change' }]
+}
+
 // 创建自动刷新定时器管理器
 const runtimeInfoAutoRefresh = createRuntimeInfoAutoRefresh(
   () => selectedDeviceDetail,
@@ -396,7 +566,19 @@ const warningCardRef = ref(null)
 
 
 // API接口方法
-
+const loadBlocks = async (farmId) => {
+  if (!farmId) {
+    blocks.value = []
+    return
+  }
+  try {
+    const result = await resource_lib.list_block(farmId, 0)
+    blocks.value = result?.blocks || []
+  } catch (error) {
+    console.error('加载区块列表失败:', error)
+    blocks.value = []
+  }
+}
 
 const loadFarmData = async (farmId) => {
   try {
@@ -498,6 +680,7 @@ const updateMapCenterForFarm = async (farmId) => {
 // 处理农场切换事件
 const handleFarmChange = async (farmId) => {
   selectedFarm.value = farmId
+  await loadBlocks(farmId)
   await loadFarmData(farmId)
 }
 
@@ -683,6 +866,67 @@ const handleDeviceAction = async (action, deviceName) => {
 const refreshRuntimeInfo = async () => {
   if (!selectedDeviceDetail.value) return
   await refreshRuntimeInfoUtil(selectedDeviceDetail.value, refreshingRuntimeInfo)
+}
+
+// 打开添加轮灌阀门对话框
+const openAddWaterGroupValveDialog = () => {
+  if (!selectedFarm.value) {
+    ElMessage.warning('请先选择农场')
+    return
+  }
+  addWaterGroupValveForm.value.farm_name = selectedFarm.value
+  // 重置阀门配置表单
+  valveConfigForm.value = {
+    token: '',
+    device_sn: '',
+    is_left: false,
+    poll_interval: 5000
+  }
+  if (blocks.value.length === 0) {
+    loadBlocks(selectedFarm.value)
+  }
+  addWaterGroupValveDialogVisible.value = true
+}
+
+// 提交添加轮灌阀门
+const submitAddWaterGroupValve = () => {
+  if (!addWaterGroupValveFormRef.value) return
+  addWaterGroupValveFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    if (!valveConfigForm.value.token || !valveConfigForm.value.device_sn) {
+      ElMessage.warning('请填写完整的阀门配置（token 和 device_sn 必填）')
+      return
+    }
+    try {
+      addWaterGroupValveForm.value.valve_config_key = JSON.stringify({
+        token: valveConfigForm.value.token,
+        device_sn: valveConfigForm.value.device_sn,
+        is_left: !!valveConfigForm.value.is_left,
+        poll_interval: Number(valveConfigForm.value.poll_interval) || 5000
+      })
+      const payload = {
+        ...addWaterGroupValveForm.value
+      }
+      const result = await config_lib.add_water_group_valve(payload)
+      if (result && result.result) {
+        // 保存配置到文件
+        await call_remote('/config/save_config', {})
+        ElMessage.success('轮灌组阀门添加成功')
+      } else if (result === true) {
+        // 保存配置到文件
+        await call_remote('/config/save_config', {})
+        ElMessage.success('轮灌组阀门添加成功')
+      } else {
+        ElMessage.error('轮灌组阀门添加失败')
+      }
+      addWaterGroupValveDialogVisible.value = false
+      await refreshDeviceList()
+    } catch (error) {
+      console.error('添加轮灌组阀门失败:', error)
+      const msg = error?.err_msg || error?.message || '轮灌组阀门添加失败'
+      ElMessage.error(msg)
+    }
+  })
 }
 
 // 获取设备按钮分组（使用共享函数）
@@ -920,6 +1164,7 @@ onMounted(async () => {
     const savedFarm = localStorage.getItem('selectedFarm')
     if (savedFarm) {
       selectedFarm.value = savedFarm
+      await loadBlocks(savedFarm)
       await loadFarmData(savedFarm)
     } else {
       // 如果没有保存的农场，等待 MainLayout 触发事件
@@ -950,6 +1195,7 @@ watch(() => route.name, async (newRouteName, oldRouteName) => {
     const currentFarm = localStorage.getItem('selectedFarm')
     if (currentFarm) {
       selectedFarm.value = currentFarm
+      await loadBlocks(currentFarm)
       await loadFarmData(currentFarm)
     } else {
       // 如果没有保存的农场，等待 MainLayout 触发事件
@@ -2489,10 +2735,22 @@ html {
   padding: 12px 16px;
   border-bottom: 1px solid #f0f0f0;
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.tab-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-actions-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .farm-name-display {
@@ -2748,5 +3006,23 @@ html {
 
 .mr-1 {
   margin-right: 4px;
+}
+
+/* 添加轮灌阀门对话框样式 */
+.add-wgv-dialog :deep(.el-dialog__body) {
+  padding: 16px 24px 24px;
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  max-height: none;
+  overflow-y: visible;
+}
+
+.add-wgv-dialog :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.valve-config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 </style>

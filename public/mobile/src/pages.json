@@ -25,6 +25,12 @@
 			}
 		},
 		{
+			"path": "pages/device/add-valve",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/irrigation/index",
 			"style": {
 				"navigationStyle": "custom"

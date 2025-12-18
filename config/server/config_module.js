@@ -568,6 +568,20 @@ export default {
                 return { result: true };
             },
         },
+        save_config: {
+            name: '保存配置',
+            description: '将当前配置保存到文件',
+            is_write: true,
+            is_get_api: false,
+            params: {},
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true }
+            },
+            func: async function (body, token) {
+                await cli_runtime_lib.save_config();
+                return { result: true };
+            }
+        },
     }
 };
 
