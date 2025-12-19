@@ -791,6 +791,40 @@ const parseTimeValue = (expression) => {
     return value
 }
 
+// 辅助函数：处理时间变量
+const handleTimeVariable = (varName, expression, fertConfig) => {
+    if (varName === 'fert_time' || varName === '施肥时间') {
+        fertConfig.fert_time = parseTimeValue(expression)
+        return true
+    }
+    if (varName === 'pre_ms' || varName === '肥前时间') {
+        if (fertConfig.pre_fert_time === undefined) {
+            fertConfig.pre_fert_time = parseTimeValue(expression)
+        }
+        return true
+    }
+    if (varName === 'post_ms' || varName === '肥后时间') {
+        if (fertConfig.post_fert_time === undefined) {
+            fertConfig.post_fert_time = parseTimeValue(expression)
+        }
+        return true
+    }
+    return false
+}
+
+// 辅助函数：处理施肥量变量
+const handleFertAmountVariable = (varName, expression, fertConfig) => {
+    if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
+        fertConfig.AB_fert = parseFloat(expression) || 0
+        return true
+    }
+    if (varName === '期望施肥总量') {
+        fertConfig.total_fert = parseFloat(expression) || 0
+        return true
+    }
+    return false
+}
+
 const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
     for (const initVar of initVariables) {
         const varName = initVar.variable_name
@@ -798,22 +832,10 @@ const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
 
         if (varName === 'method' || varName === '施肥策略') {
             fertConfig.method = parseFertMethod(expression)
-        } else if (varName === 'fert_time' || varName === '施肥时间') {
-            fertConfig.fert_time = parseTimeValue(expression)
-        } else if (varName === 'pre_ms' || varName === '肥前时间') {
-            // 只有在当前值未设置时才设置，避免覆盖已读取的值（0也是有效值）
-            if (fertConfig.pre_fert_time === undefined) {
-                fertConfig.pre_fert_time = parseTimeValue(expression)
-            }
-        } else if (varName === 'post_ms' || varName === '肥后时间') {
-            // 只有在当前值未设置时才设置，避免覆盖已读取的值（0也是有效值）
-            if (fertConfig.post_fert_time === undefined) {
-                fertConfig.post_fert_time = parseTimeValue(expression)
-            }
-        } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
-            fertConfig.AB_fert = parseFloat(expression) || 0
-        } else if (varName === '期望施肥总量') {
-            fertConfig.total_fert = parseFloat(expression) || 0
+        } else if (handleTimeVariable(varName, expression, fertConfig)) {
+            // 已处理时间变量
+        } else if (handleFertAmountVariable(varName, expression, fertConfig)) {
+            // 已处理施肥量变量
         }
     }
 
@@ -854,6 +876,130 @@ const parseValvesFromGroup = (group) => {
     return matches ? matches.map(m => m.replace(/"/g, '')) : []
 }
 
+// 辅助函数：解析基础信息（面积和阀门）
+const parseBasicGroupInfo = (policyContent) => {
+    let area = 0
+    let valves = []
+
+    const areaMatch = policyContent.match(/init assignment\s+'false'\s+'面积'\s+'([^']+)'/)
+    if (areaMatch) {
+        area = parseFloat(areaMatch[1]) || 0
+    }
+
+    const valveMatch = policyContent.match(/init assignment\s+'false'\s+'组内阀门'\s+'"([^"]+)"'/)
+    if (valveMatch) {
+        valves = valveMatch[1].split(',').map(v => v.trim()).filter(v => v)
+    }
+
+    return { area, valves }
+}
+
+// 辅助函数：解析只浇水模式配置
+const parseWaterOnlyConfig = (policyContent) => {
+    const fertConfig = {
+        method: 'WaterOnly',
+        AB_fert: 0,
+        total_fert: 0,
+        fert_time: 0,
+        pre_fert_time: 0,
+        post_fert_time: 0,
+        total_time: 0,
+        water_only: true,
+    }
+
+    const totalTimeMatch = policyContent.match(/init assignment\s+'false'\s+'总灌溉时间'\s+'([^']+)'/)
+    if (totalTimeMatch) {
+        fertConfig.total_time = parseFloat(totalTimeMatch[1]) / 60000 || 0
+    }
+
+    return fertConfig
+}
+
+// 辅助函数：解析施肥策略（从方案内容）
+const parseFertMethodFromContent = (policyContent) => {
+    const fertMethodMatch = policyContent.match(/init assignment\s+'false'\s+'施肥策略'\s+'([^']+)'/)
+    if (!fertMethodMatch) return null
+
+    const method = fertMethodMatch[1]
+    if (method === '定量') {
+        const perMuMatch = policyContent.match(/init assignment\s+'false'\s+'期望每亩施肥量'\s+'([^']+)'/)
+        const totalMatch = policyContent.match(/init assignment\s+'false'\s+'期望施肥总量'\s+'([^']+)'/)
+        if (perMuMatch) {
+            return {
+                method: 'AreaBased',
+                AB_fert: parseFloat(perMuMatch[1]) || 0,
+                total_fert: 0
+            }
+        }
+        if (totalMatch) {
+            return {
+                method: 'Total',
+                AB_fert: 0,
+                total_fert: parseFloat(totalMatch[1]) || 0
+            }
+        }
+    } else if (method === '定时') {
+        const timeMatch = policyContent.match(/init assignment\s+'false'\s+'施肥时间'\s+'([^']+)'/)
+        return {
+            method: 'Time',
+            AB_fert: 0,
+            total_fert: 0,
+            fert_time: timeMatch ? parseFloat(timeMatch[1]) / 60000 || 0 : 0
+        }
+    }
+    return null
+}
+
+// 辅助函数：解析时间参数
+const parseTimeParams = (policyContent, fertMethod) => {
+    const preTimeMatch = policyContent.match(/init assignment\s+'false'\s+'肥前时间'\s+'([^']+)'/)
+    const fertTimeMatch = policyContent.match(/init assignment\s+'false'\s+'施肥时间'\s+'([^']+)'/)
+    const postTimeMatch = policyContent.match(/init assignment\s+'false'\s+'肥后时间'\s+'([^']+)'/)
+    const totalTimeMatch = policyContent.match(/init assignment\s+'false'\s+'总灌溉时间'\s+'([^']+)'/)
+
+    const preTimeMs = preTimeMatch ? parseFloat(preTimeMatch[1]) || 0 : 0
+    const fertTimeMs = fertTimeMatch ? parseFloat(fertTimeMatch[1]) || 0 : 0
+    const postTimeMs = postTimeMatch ? parseFloat(postTimeMatch[1]) || 0 : 0
+
+    const pre_fert_time = preTimeMs / 60000
+    const post_fert_time = postTimeMs / 60000
+    const fert_time = fertMethod === 'Time' ? fertTimeMs / 60000 : 0
+    const total_time = totalTimeMatch 
+        ? parseFloat(totalTimeMatch[1]) / 60000 || 0
+        : (preTimeMs + fertTimeMs + postTimeMs) / 60000
+
+    return { pre_fert_time, fert_time, post_fert_time, total_time }
+}
+
+// 辅助函数：解析非只浇水模式的施肥配置
+const parseFertConfig = (policyContent) => {
+    const fertConfig = {
+        method: 'AreaBased',
+        AB_fert: 0,
+        total_fert: 0,
+        fert_time: 0,
+        pre_fert_time: 0,
+        post_fert_time: 0,
+        total_time: 0,
+        water_only: false,
+    }
+
+    const methodInfo = parseFertMethodFromContent(policyContent)
+    if (methodInfo) {
+        fertConfig.method = methodInfo.method
+        fertConfig.AB_fert = methodInfo.AB_fert || 0
+        fertConfig.total_fert = methodInfo.total_fert || 0
+        if (methodInfo.fert_time !== undefined) {
+            fertConfig.fert_time = methodInfo.fert_time
+        }
+    }
+
+    const timeParams = parseTimeParams(policyContent, fertConfig.method)
+    Object.assign(fertConfig, timeParams)
+
+    return fertConfig
+}
+
 // 从方案内容解析轮灌组详细信息
 const parseGroupsFromSchemeContent = (content) => {
     const groups = []
@@ -870,90 +1016,15 @@ const parseGroupsFromSchemeContent = (content) => {
             continue
         }
 
-        let area = 0
-        let valves = []
-        let fertConfig = {
-            method: 'AreaBased',
-            AB_fert: 0,
-            total_fert: 0,
-            fert_time: 0,
-            pre_fert_time: 0,
-            post_fert_time: 0,
-            total_time: 0,
-            water_only: false,
-        }
+        const { area, valves } = parseBasicGroupInfo(policyContent)
 
-        // 解析面积
-        const areaMatch = policyContent.match(/init assignment\s+'false'\s+'面积'\s+'([^']+)'/)
-        if (areaMatch) {
-            area = parseFloat(areaMatch[1]) || 0
-        }
-
-        // 解析阀门
-        const valveMatch = policyContent.match(/init assignment\s+'false'\s+'组内阀门'\s+'"([^"]+)"'/)
-        if (valveMatch) {
-            valves = valveMatch[1].split(',').map(v => v.trim()).filter(v => v)
-        }
-
-        // 先检查"是否只浇水"变量
+        // 检查"是否只浇水"变量
         const waterOnlyMatch = policyContent.match(/init assignment\s+'false'\s+'是否只浇水'\s+'([^']+)'/)
         const isWaterOnly = waterOnlyMatch && (waterOnlyMatch[1] === 'true' || waterOnlyMatch[1] === true)
 
-        if (isWaterOnly) {
-            fertConfig.method = 'WaterOnly'
-            fertConfig.water_only = true
-            // 只浇水模式，读取总灌溉时间
-            const totalTimeMatch = policyContent.match(/init assignment\s+'false'\s+'总灌溉时间'\s+'([^']+)'/)
-            if (totalTimeMatch) {
-                fertConfig.total_time = parseFloat(totalTimeMatch[1]) / 60000 || 0
-            }
-        } else {
-            // 解析施肥策略
-            const fertMethodMatch = policyContent.match(/init assignment\s+'false'\s+'施肥策略'\s+'([^']+)'/)
-            if (fertMethodMatch) {
-                const method = fertMethodMatch[1]
-                if (method === '定量') {
-                    const perMuMatch = policyContent.match(/init assignment\s+'false'\s+'期望每亩施肥量'\s+'([^']+)'/)
-                    const totalMatch = policyContent.match(/init assignment\s+'false'\s+'期望施肥总量'\s+'([^']+)'/)
-                    if (perMuMatch) {
-                        fertConfig.method = 'AreaBased'
-                        fertConfig.AB_fert = parseFloat(perMuMatch[1]) || 0
-                    } else if (totalMatch) {
-                        fertConfig.method = 'Total'
-                        fertConfig.total_fert = parseFloat(totalMatch[1]) || 0
-                    }
-                } else if (method === '定时') {
-                    fertConfig.method = 'Time'
-                    const timeMatch = policyContent.match(/init assignment\s+'false'\s+'施肥时间'\s+'([^']+)'/)
-                    if (timeMatch) {
-                        fertConfig.fert_time = parseFloat(timeMatch[1]) / 60000 || 0
-                    }
-                }
-            }
-
-            // 解析时间参数（非只浇水模式）
-            const preTimeMatch = policyContent.match(/init assignment\s+'false'\s+'肥前时间'\s+'([^']+)'/)
-            const fertTimeMatch = policyContent.match(/init assignment\s+'false'\s+'施肥时间'\s+'([^']+)'/)
-            const postTimeMatch = policyContent.match(/init assignment\s+'false'\s+'肥后时间'\s+'([^']+)'/)
-            const totalTimeMatch = policyContent.match(/init assignment\s+'false'\s+'总灌溉时间'\s+'([^']+)'/)
-
-            const preTimeMs = preTimeMatch ? parseFloat(preTimeMatch[1]) || 0 : 0
-            const fertTimeMs = fertTimeMatch ? parseFloat(fertTimeMatch[1]) || 0 : 0
-            const postTimeMs = postTimeMatch ? parseFloat(postTimeMatch[1]) || 0 : 0
-
-            // 将毫秒转换为分钟
-            fertConfig.pre_fert_time = preTimeMs / 60000
-            if (fertConfig.method === 'Time') {
-                fertConfig.fert_time = fertTimeMs / 60000
-            }
-            fertConfig.post_fert_time = postTimeMs / 60000
-
-            if (totalTimeMatch) {
-                fertConfig.total_time = parseFloat(totalTimeMatch[1]) / 60000 || 0
-            } else {
-                fertConfig.total_time = (preTimeMs + fertTimeMs + postTimeMs) / 60000
-            }
-        }
+        const fertConfig = isWaterOnly 
+            ? parseWaterOnlyConfig(policyContent)
+            : parseFertConfig(policyContent)
 
         groups.push({
             name: groupName,
@@ -2374,62 +2445,51 @@ const createScheme = async () => {
     }
 }
 
-onMounted(async () => {
-    // 1. 先加载基础元数据
-    await loadSchemes()
-    await loadValveDevices()
+// 辅助函数：加载方案数据
+const loadSchemeData = async (schemeNameParam) => {
+    const targetScheme = schemes.value.find(s => s.name === schemeNameParam)
+    if (!targetScheme) return
 
-    // 2. 根据进入方式加载数据
-    if (route.query.scheme_name) {
-        // 【模式A：编辑现有方案】直接解析方案文件，确保数据属于该方案
-        const schemeNameParam = route.query.scheme_name
-        const targetScheme = schemes.value.find(s => s.name === schemeNameParam)
+    selectedSchemeId.value = targetScheme.id
+    schemeName.value = schemeNameParam
 
-        if (targetScheme) {
-            selectedSchemeId.value = targetScheme.id
-            schemeName.value = schemeNameParam
+    try {
+        const token = localStorage.getItem('auth_token')
+        const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeNameParam }, token)
 
-            try {
-                const token = localStorage.getItem('auth_token')
-                const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeNameParam }, token)
+        if (response && response.content) {
+            const parsedGroups = parseGroupsFromSchemeContent(response.content)
 
-                if (response && response.content) {
-                    const parsedGroups = parseGroupsFromSchemeContent(response.content)
+            // 彻底清空，防止被运行时数据污染
+            wateringGroups.value = []
+            fertConfigs.value = {}
+            selectedValveDevices.value = {}
 
-                    // 彻底清空，防止被运行时数据污染
-                    wateringGroups.value = []
-                    fertConfigs.value = {}
-                    selectedValveDevices.value = {}
+            // 填充方案数据
+            parsedGroups.forEach(group => {
+                const groupName = group.name
+                wateringGroups.value.push({
+                    name: groupName,
+                    area: group.area || 0,
+                    isCopied: false,
+                    configKey: groupName
+                })
+                fertConfigs.value[groupName] = group.fertConfig
+                selectedValveDevices.value[groupName] = group.valves || []
+            })
 
-                    // 填充方案数据
-                    parsedGroups.forEach(group => {
-                        const groupName = group.name
-                        wateringGroups.value.push({
-                            name: groupName,
-                            area: group.area || 0,
-                            isCopied: false,
-                            configKey: groupName
-                        })
-                        fertConfigs.value[groupName] = group.fertConfig
-                        selectedValveDevices.value[groupName] = group.valves || []
-                    })
-
-                    wizardStep.value = 2
-                    // 立即保存快照
-                    saveInitialFertConfigs()
-                    ElMessage.success(`已加载方案 "${schemeNameParam}" 的配置`)
-                }
-            } catch (error) {
-                console.error('解析方案内容失败:', error)
-                ElMessage.error('加载方案内容失败')
-            }
+            wizardStep.value = 2
+            saveInitialFertConfigs()
+            ElMessage.success(`已加载方案 "${schemeNameParam}" 的配置`)
         }
-    } else {
-        // 【模式B：常规向导】加载当前正在运行的所有轮灌组
-        await loadExistingGroups()
+    } catch (error) {
+        console.error('解析方案内容失败:', error)
+        ElMessage.error('加载方案内容失败')
     }
+}
 
-    // 3. 加载农场参数
+// 辅助函数：加载农场参数
+const loadFarmParams = async () => {
     try {
         const currentFarm = localStorage.getItem('selectedFarm') || '默认农场'
         const paramsResponse = await call_remote('/resource/get_farm_area_params', {
@@ -2447,6 +2507,22 @@ onMounted(async () => {
     } catch (error) {
         console.error('获取农场参数失败:', error)
     }
+}
+
+onMounted(async () => {
+    // 1. 先加载基础元数据
+    await loadSchemes()
+    await loadValveDevices()
+
+    // 2. 根据进入方式加载数据
+    if (route.query.scheme_name) {
+        await loadSchemeData(route.query.scheme_name)
+    } else {
+        await loadExistingGroups()
+    }
+
+    // 3. 加载农场参数
+    await loadFarmParams()
 })
 </script>
 

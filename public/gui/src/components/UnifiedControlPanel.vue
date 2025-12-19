@@ -241,7 +241,8 @@ const parseWateringGroups = (content) => {
     const groups = new Set()
     // 优先查找 "所有轮灌组" 的初始化（这是最准确的来源）
     // 匹配格式：init assignment 'false' '所有轮灌组' '["轮灌组1","轮灌组2"]'
-    const allGroupsMatch = content.match(/所有轮灌组.*?\[(.*?)\]/s)
+    // 使用 [^\]]+ 避免回溯，限制匹配到第一个 ] 为止
+    const allGroupsMatch = content.match(/所有轮灌组[^[]*\[([^\]]+)\]/)
     if (allGroupsMatch) {
         const groupsStr = allGroupsMatch[1]
         const groupNames = groupsStr.match(/"([^"]+)"/g)
@@ -397,44 +398,51 @@ const saveSelectedSchemeToStorage = (schemeId) => {
     }
 }
 
+// 辅助函数：恢复保存的方案选择
+const restoreSavedScheme = (schemeList) => {
+    const savedSchemeId = loadSelectedSchemeFromStorage()
+    if (savedSchemeId && schemeList.find(s => s.name === savedSchemeId)) {
+        selectedSchemeId.value = savedSchemeId
+        currentSchemeName.value = savedSchemeId
+        return true
+    }
+    return false
+}
+
+// 辅助函数：设置默认方案
+const setDefaultScheme = (schemeList) => {
+    if (schemeList.length === 0) return
+    
+    if (!selectedSchemeId.value) {
+        selectedSchemeId.value = schemeList[0].name
+        currentSchemeName.value = schemeList[0].name
+        saveSelectedSchemeToStorage(schemeList[0].name)
+    } else {
+        const currentScheme = schemeList.find(s => s.name === selectedSchemeId.value)
+        if (currentScheme) {
+            currentSchemeName.value = currentScheme.name
+            saveSelectedSchemeToStorage(selectedSchemeId.value)
+        } else {
+            selectedSchemeId.value = schemeList[0].name
+            currentSchemeName.value = schemeList[0].name
+            saveSelectedSchemeToStorage(schemeList[0].name)
+        }
+    }
+}
+
 // 加载方案列表
 const loadSchemeList = async () => {
     try {
         const response = await call_remote('/policy/list_schemes', {})
-        if (response && response.schemes) {
-            schemeList.value = response.schemes.map(scheme => ({
-                ...scheme,
-                wateringGroups: [] // 初始化为空，稍后加载
-            }))
+        if (!response?.schemes) return
 
-            // 优先从本地存储恢复选中的方案
-            const savedSchemeId = loadSelectedSchemeFromStorage()
-            if (savedSchemeId && schemeList.value.find(s => s.name === savedSchemeId)) {
-                // 如果保存的方案仍然存在，使用保存的方案
-                selectedSchemeId.value = savedSchemeId
-                currentSchemeName.value = savedSchemeId
-            } else if (schemeList.value.length > 0) {
-                // 如果保存的方案不存在或没有保存的方案，使用第一个方案
-                if (!selectedSchemeId.value) {
-                    selectedSchemeId.value = schemeList.value[0].name
-                    currentSchemeName.value = schemeList.value[0].name
-                    // 保存默认选中的方案
-                    saveSelectedSchemeToStorage(schemeList.value[0].name)
-                } else {
-                    // 如果已有选中的方案，验证它是否仍然存在
-                    const currentScheme = schemeList.value.find(s => s.name === selectedSchemeId.value)
-                    if (currentScheme) {
-                        currentSchemeName.value = currentScheme.name
-                        // 保存当前选中的方案
-                        saveSelectedSchemeToStorage(selectedSchemeId.value)
-                    } else {
-                        // 如果当前选中的方案不存在，使用第一个方案
-                        selectedSchemeId.value = schemeList.value[0].name
-                        currentSchemeName.value = schemeList.value[0].name
-                        saveSelectedSchemeToStorage(schemeList.value[0].name)
-                    }
-                }
-            }
+        schemeList.value = response.schemes.map(scheme => ({
+            ...scheme,
+            wateringGroups: []
+        }))
+
+        if (!restoreSavedScheme(schemeList.value)) {
+            setDefaultScheme(schemeList.value)
         }
     } catch (error) {
         console.error('加载方案列表失败:', error)

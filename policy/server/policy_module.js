@@ -34,6 +34,318 @@ async function getDeviceStatus() {
     return {};
 }
 
+// 辅助函数：解析常量表达式
+function parseConstantExpression(expression) {
+    if (expression === 'true') {
+        return true;
+    }
+    if (expression === 'false') {
+        return false;
+    }
+    const numericValue = parseFloat(expression);
+    if (!isNaN(numericValue)) {
+        return numericValue;
+    }
+    return expression;
+}
+
+// 辅助函数：解析动态表达式
+async function parseDynamicExpression(expression, runtimeState) {
+    // 检查是否是简单的字符串字面量
+    if (expression.startsWith('"') && expression.endsWith('"') && expression.length > 2) {
+        return expression.slice(1, -1);
+    }
+    
+    // 如果包含赋值符号或空格，作为字符串处理
+    if (expression.includes('=') || expression.includes(' ')) {
+        return expression;
+    }
+    
+    // 使用表达式求值器
+    try {
+        const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+        const context = {
+            ...Object.fromEntries(runtimeState.variables),
+            sensors: await getSensorData(),
+            devices: await getDeviceStatus(),
+            Date: Date,
+            Math: Math,
+            abs: Math.abs,
+            max: Math.max,
+            min: Math.min,
+            round: Math.round,
+            floor: Math.floor,
+            ceil: Math.ceil
+        };
+        return await evaluator.evaluate(expression, context);
+    } catch (evalError) {
+        console.error(`表达式求值失败: ${expression}`, evalError);
+        throw { err_msg: `表达式求值失败: ${evalError.message}` };
+    }
+}
+
+// 辅助函数：获取现有轮灌组列表
+function getExistingGroups(schemeId) {
+    return new Set(
+        policy_array
+            .filter(p => {
+                if (!p.watering_group_matrix || p.watering_group_matrix.length === 0) {
+                    return false;
+                }
+                if (schemeId) {
+                    return p.scheme_id === schemeId;
+                }
+                return true;
+            })
+            .map(p => p.name)
+    );
+}
+
+// 辅助函数：删除单个组
+function deleteSingleGroup(groupName, schemeId) {
+    if (schemeId) {
+        const policyToDelete = policy_array.find(p => p.name === groupName && p.scheme_id === schemeId);
+        if (!policyToDelete) {
+            return false;
+        }
+        const removed = findAndRemoveFromArray(policy_array, p => p.name === groupName && p.scheme_id === schemeId);
+        if (removed) {
+            policy_runtime_states.delete(groupName);
+            return true;
+        }
+    } else {
+        const removed = findAndRemoveByName(policy_array, groupName);
+        if (removed) {
+            policy_runtime_states.delete(groupName);
+            return true;
+        }
+    }
+    return false;
+}
+
+// 辅助函数：验证并确保删除成功
+function verifyAndEnsureDeletion(groupName, schemeId) {
+    const stillExists = schemeId 
+        ? policy_array.find(p => p.name === groupName && p.scheme_id === schemeId)
+        : policy_array.find(p => p.name === groupName);
+    
+    if (stillExists) {
+        const removedAgain = schemeId
+            ? findAndRemoveFromArray(policy_array, p => p.name === groupName && p.scheme_id === schemeId)
+            : findAndRemoveByName(policy_array, groupName);
+        if (removedAgain) {
+            policy_runtime_states.delete(groupName);
+        }
+    }
+}
+
+// 辅助函数：删除不需要的组
+async function deleteUnusedGroups(body, newGroupNames, existingGroups) {
+    const deletedGroups = [];
+    const groupsToCheck = body.scheme_id
+        ? policy_array
+            .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0 && p.scheme_id === body.scheme_id)
+            .map(p => p.name)
+        : policy_array
+            .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
+            .map(p => p.name);
+
+    for (const oldGroupName of groupsToCheck) {
+        if (newGroupNames.has(oldGroupName)) {
+            continue;
+        }
+
+        let deleteSuccess = false;
+        try {
+            deleteSuccess = deleteSingleGroup(oldGroupName, body.scheme_id);
+            if (deleteSuccess) {
+                deletedGroups.push(oldGroupName);
+            }
+        } catch (e) {
+            console.error(`删除轮灌组 ${oldGroupName} 失败:`, e);
+            deleteSuccess = deleteSingleGroup(oldGroupName, body.scheme_id);
+            if (deleteSuccess) {
+                deletedGroups.push(oldGroupName);
+            }
+        }
+
+        if (deleteSuccess) {
+            verifyAndEnsureDeletion(oldGroupName, body.scheme_id);
+        }
+    }
+
+    return deletedGroups;
+}
+
+// 辅助函数：清理已删除的组（保存前验证）
+function cleanupDeletedGroups(deletedGroups, schemeId) {
+    if (!schemeId || deletedGroups.length === 0) {
+        return;
+    }
+
+    const stillExists = deletedGroups.filter(name => {
+        return policy_array.some(p => p.name === name && p.scheme_id === schemeId);
+    });
+
+    for (const name of stillExists) {
+        const removed = findAndRemoveFromArray(policy_array, p => p.name === name && p.scheme_id === schemeId);
+        if (removed) {
+            policy_runtime_states.delete(name);
+        }
+    }
+
+    const schemeGroups = policy_array
+        .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0 && p.scheme_id === schemeId)
+        .map(p => p.name);
+
+    const stillInScheme = deletedGroups.filter(name => schemeGroups.includes(name));
+    for (const name of stillInScheme) {
+        const removed = findAndRemoveFromArray(policy_array, p => p.name === name && p.scheme_id === schemeId);
+        if (removed) {
+            policy_runtime_states.delete(name);
+        }
+    }
+}
+
+// 辅助函数：查找总策略
+function findTotalPolicy(originalPolicyArray, farmName) {
+    let totalPolicyName = null;
+    let totalPolicy = null;
+
+    if (farmName) {
+        totalPolicyName = `${farmName}-总策略`;
+        totalPolicy = originalPolicyArray.find(p => p.name === totalPolicyName);
+    }
+
+    if (!totalPolicy) {
+        totalPolicy = originalPolicyArray.find(p => p.name && p.name.includes('总策略'));
+        if (totalPolicy) {
+            totalPolicyName = totalPolicy.name;
+        }
+    }
+
+    return { totalPolicy, totalPolicyName };
+}
+
+// 辅助函数：更新总策略的"所有轮灌组"变量
+function updateTotalPolicyGroups(policy, groupNamesArray) {
+    if (!policy) return;
+
+    if (!policy.init_variables) {
+        policy.init_variables = [];
+    }
+
+    let allGroupsVar = policy.init_variables.find(v => v.variable_name === '所有轮灌组');
+    if (allGroupsVar) {
+        allGroupsVar.expression = `[${groupNamesArray}]`;
+    } else {
+        policy.init_variables.push({
+            is_constant: 'false',
+            variable_name: '所有轮灌组',
+            expression: `[${groupNamesArray}]`
+        });
+    }
+}
+
+// 辅助函数：过滤方案策略
+function filterSchemePolicies(expectedGroupNames) {
+    return policy_array.filter(p => {
+        if (p.watering_group_matrix && p.watering_group_matrix.length > 0) {
+            return expectedGroupNames.has(p.name);
+        }
+        return true;
+    });
+}
+
+// 辅助函数：处理更新操作
+async function handleGroupUpdate(groupName, schemeId, token) {
+    if (schemeId) {
+        const policyToUpdate = policy_array.find(p => p.name === groupName && p.scheme_id === schemeId);
+        if (!policyToUpdate) {
+            return;
+        }
+        const removed = findAndRemoveFromArray(policy_array, p => p.name === groupName && p.scheme_id === schemeId);
+        if (removed) {
+            policy_runtime_states.delete(groupName);
+        }
+    } else {
+        try {
+            await policy_lib.del_policy(groupName, token);
+        } catch (e) {
+            const removed = findAndRemoveByName(policy_array, groupName);
+            if (removed) {
+                policy_runtime_states.delete(groupName);
+            }
+        }
+    }
+}
+
+// 辅助函数：验证并修复总策略变量
+function verifyTotalPolicyVariable(totalPolicyInArray, groupNamesArray) {
+    if (!totalPolicyInArray) return;
+
+    const verifyVar = totalPolicyInArray.init_variables?.find(v => v.variable_name === '所有轮灌组');
+    if (verifyVar) {
+        if (verifyVar.expression !== `[${groupNamesArray}]`) {
+            verifyVar.expression = `[${groupNamesArray}]`;
+        }
+    } else {
+        if (!totalPolicyInArray.init_variables) {
+            totalPolicyInArray.init_variables = [];
+        }
+        totalPolicyInArray.init_variables.push({
+            is_constant: 'false',
+            variable_name: '所有轮灌组',
+            expression: `[${groupNamesArray}]`
+        });
+    }
+}
+
+// 辅助函数：保存方案文件
+async function saveSchemeFile(body, expectedGroupNames, deletedGroups) {
+    const filename = body.farm_name
+        ? `${body.farm_name}_plan_${body.scheme_name}.txt`
+        : `plan_${body.scheme_name}.txt`;
+
+    const originalPolicyArray = [...policy_array];
+
+    try {
+        cleanupDeletedGroups(deletedGroups, body.scheme_id);
+
+        const schemePolicies = filterSchemePolicies(expectedGroupNames);
+        const { totalPolicy, totalPolicyName } = findTotalPolicy(originalPolicyArray, body.farm_name);
+
+        const groupNamesArray = Array.from(expectedGroupNames).map(name => `"${name}"`).join(',');
+
+        if (totalPolicy) {
+            updateTotalPolicyGroups(totalPolicy, groupNamesArray);
+        }
+
+        const totalPolicyInScheme = totalPolicyName
+            ? schemePolicies.find(p => p.name === totalPolicyName)
+            : schemePolicies.find(p => p.name === totalPolicy?.name);
+
+        if (totalPolicyInScheme) {
+            updateTotalPolicyGroups(totalPolicyInScheme, groupNamesArray);
+        }
+
+        policy_array.length = 0;
+        policy_array.push(...schemePolicies);
+
+        const totalPolicyInArray = policy_array.find(p => 
+            (totalPolicyName && p.name === totalPolicyName) || 
+            (totalPolicy && p.name === totalPolicy.name) ||
+            (p.name && p.name.includes('总策略'))
+        );
+
+        verifyTotalPolicyVariable(totalPolicyInArray, groupNamesArray);
+        await cli_runtime_lib.save_config(filename);
+    } finally {
+        policy_array.length = 0;
+        policy_array.push(...originalPolicyArray);
+    }
+}
+
 // 扫描周期配置，默认为0（不扫描）
 let scan_period_ms = 0
 // 扫描定时器
@@ -1339,55 +1651,9 @@ export default {
                     }
 
                     // 计算表达式的值
-                    let value;
-                    if (body.is_constant) {
-                        // 如果是常量表达式，直接解析
-                        // 先检查是否是布尔值字符串
-                        if (body.expression === 'true') {
-                            value = true;
-                        } else if (body.expression === 'false') {
-                            value = false;
-                        } else {
-                            const numericValue = parseFloat(body.expression);
-                            if (!isNaN(numericValue)) {
-                                value = numericValue;
-                            } else {
-                                // 如果不是数字，尝试作为字符串处理
-                                value = body.expression;
-                            }
-                        }
-                    } else {
-                        // 如果是动态表达式，先检查是否是简单的字符串字面量
-                        if (body.expression.startsWith('"') && body.expression.endsWith('"') && body.expression.length > 2) {
-                            // 如果是字符串字面量，直接使用
-                            value = body.expression.slice(1, -1);
-                        } else if (body.expression.includes('=') || body.expression.includes(' ')) {
-                            // 如果包含赋值符号或空格，作为字符串处理（避免求值失败）
-                            value = body.expression;
-                        } else {
-                            // 否则使用表达式求值器
-                            try {
-                                const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
-                                const context = {
-                                    ...Object.fromEntries(runtimeState.variables),
-                                    sensors: await getSensorData(),
-                                    devices: await getDeviceStatus(),
-                                    Date: Date,
-                                    Math: Math,
-                                    abs: Math.abs,
-                                    max: Math.max,
-                                    min: Math.min,
-                                    round: Math.round,
-                                    floor: Math.floor,
-                                    ceil: Math.ceil
-                                };
-                                value = await evaluator.evaluate(body.expression, context);
-                            } catch (evalError) {
-                                console.error(`表达式求值失败: ${body.expression}`, evalError);
-                                throw { err_msg: `表达式求值失败: ${evalError.message}` };
-                            }
-                        }
-                    }
+                    const value = body.is_constant 
+                        ? parseConstantExpression(body.expression)
+                        : await parseDynamicExpression(body.expression, runtimeState);
 
                     // 设置变量值
                     runtimeState.variables.set(body.variable_name, value);
@@ -1566,131 +1832,70 @@ export default {
                 result: { type: Boolean, mean: '是否成功', example: true }
             },
             func: async function (body, token) {
-                const existingGroups = new Set(
-                    policy_array
-                        .filter(p => {
-                            if (!p.watering_group_matrix || p.watering_group_matrix.length === 0) {
-                                return false;
-                            }
-                            // 如果指定了方案ID，只考虑属于该方案的组
-                            if (body.scheme_id) {
-                                return p.scheme_id === body.scheme_id;
-                            }
-                            return true;
-                        })
-                        .map(p => p.name)
-                );
-                
+                // 获取现有组和新建组列表
+                const existingGroups = getExistingGroups(body.scheme_id);
+                const newGroupNames = new Set(body.groups.map(g => g.name));
                 const updatedGroups = [];
                 const createdGroups = [];
-                const deletedGroups = [];
-                const newGroupNames = new Set(body.groups.map(g => g.name));
                 
-                // 确定要检查的组列表
-                let groupsToCheck = [];
-                if (body.scheme_id) {
-                    groupsToCheck = policy_array
-                        .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0 && p.scheme_id === body.scheme_id)
-                        .map(p => p.name);
-                } else {
-                    groupsToCheck = policy_array
-                        .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
-                        .map(p => p.name);
-                }
-                for (const oldGroupName of groupsToCheck) {
-                    if (!newGroupNames.has(oldGroupName)) {
-                        let deleteSuccess = false;
-                        try {
-                            if (body.scheme_id) {
-                                const policyToDelete = policy_array.find(p => p.name === oldGroupName && p.scheme_id === body.scheme_id);
-                                if (!policyToDelete) {
-                                    console.warn(`警告：轮灌组 ${oldGroupName} 不属于方案 ${body.scheme_id}，跳过删除`);
-                                    continue;
-                                }
-                                const removed = findAndRemoveFromArray(policy_array, p => p.name === oldGroupName && p.scheme_id === body.scheme_id);
-                                if (removed) {
-                                    policy_runtime_states.delete(oldGroupName);
-                                    deleteSuccess = true;
-                                    deletedGroups.push(oldGroupName);
-                                }
-                            } else {
-                                // 如果没有指定方案ID，删除所有同名策略（向后兼容，但可能影响其他方案）
-                                const removed = findAndRemoveByName(policy_array, oldGroupName);
-                                if (removed) {
-                                    policy_runtime_states.delete(oldGroupName);
-                                    deleteSuccess = true;
-                                    deletedGroups.push(oldGroupName);
-                                }
-                            }
-                        } catch (e) {
-                            console.error(`删除轮灌组 ${oldGroupName} 失败:`, e);
-                            // 尝试兜底处理
-                            if (body.scheme_id) {
-                                const removed = findAndRemoveFromArray(policy_array, p => p.name === oldGroupName && p.scheme_id === body.scheme_id);
-                                if (removed) {
-                                    policy_runtime_states.delete(oldGroupName);
-                                    deleteSuccess = true;
-                                    deletedGroups.push(oldGroupName);
-                                }
-                            } else {
-                                const removed = findAndRemoveByName(policy_array, oldGroupName);
-                                if (removed) {
-                                    policy_runtime_states.delete(oldGroupName);
-                                    deleteSuccess = true;
-                                    deletedGroups.push(oldGroupName);
-                                }
-                            }
-                        }
-                        
-                        // 验证删除是否真的成功
-                        if (deleteSuccess) {
-                            const stillExists = body.scheme_id 
-                                ? policy_array.find(p => p.name === oldGroupName && p.scheme_id === body.scheme_id)
-                                : policy_array.find(p => p.name === oldGroupName);
-                            if (stillExists) {
-                                const removedAgain = body.scheme_id
-                                    ? findAndRemoveFromArray(policy_array, p => p.name === oldGroupName && p.scheme_id === body.scheme_id)
-                                    : findAndRemoveByName(policy_array, oldGroupName);
-                                if (removedAgain) {
-                                    policy_runtime_states.delete(oldGroupName);
-                                }
-                            }
-                        }
-                    }
-                }
+                // 删除不需要的组
+                const deletedGroups = await deleteUnusedGroups(body, newGroupNames, existingGroups);
                 
-                // 处理更新操作的辅助函数（只更新属于当前方案的组）
-                const handleUpdate = async (groupName) => {
-                    // 如果指定了方案ID，确保只删除属于当前方案的组
-                    if (body.scheme_id) {
-                        const policyToUpdate = policy_array.find(p => p.name === groupName && p.scheme_id === body.scheme_id);
-                        if (!policyToUpdate) {
+                // 辅助函数：设置策略的方案ID
+                const setPolicySchemeId = async (groupConfig, targetSchemeId) => {
+                    let policy = null;
+                    for (let i = 0; i < 20; i++) {
+                        policy = policy_array.find(p => p.name === groupConfig.name);
+                        if (policy) {
+                            policy.scheme_id = targetSchemeId;
                             return;
                         }
-                        
-                        // 只删除属于当前方案的实例
-                        const removed = findAndRemoveFromArray(policy_array, p => p.name === groupName && p.scheme_id === body.scheme_id);
-                        if (removed) {
-                            policy_runtime_states.delete(groupName);
-                        }
-                    } else {
-                        // 如果没有指定方案ID，使用原来的逻辑（删除所有同名策略）
-                        try {
-                            await policy_lib.del_policy(groupName, token);
-                        } catch (e) {
-                            // 兜底处理，避免残留
-                            const removed = findAndRemoveByName(policy_array, groupName);
-                            if (removed) {
-                                policy_runtime_states.delete(groupName);
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    // 如果找不到，尝试通过 policy_lib 查找
+                    try {
+                        const foundPolicy = await policy_lib.find_policy(groupConfig.name, token);
+                        if (foundPolicy) {
+                            for (let i = 0; i < 10; i++) {
+                                await new Promise(resolve => setTimeout(resolve, 200));
+                                policy = policy_array.find(p => p.name === groupConfig.name);
+                                if (policy) {
+                                    policy.scheme_id = targetSchemeId;
+                                    break;
+                                }
                             }
                         }
+                    } catch (e) {
+                        console.error(`无法为策略 ${groupConfig.name} 设置 scheme_id:`, e);
                     }
-                    updatedGroups.push(groupName);
                 };
-                
+
+                // 辅助函数：设置只浇水模式变量
+                const setWaterOnlyVariable = async (groupConfig) => {
+                    try {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        let runtimeState = policy_runtime_states.get(groupConfig.name);
+                        if (!runtimeState) {
+                            runtimeState = {
+                                current_state: null,
+                                variables: new Map(),
+                                last_execution_time: Date.now(),
+                                start_time: Date.now(),
+                                execution_count: 0,
+                                is_first_execution: true
+                            };
+                            policy_runtime_states.set(groupConfig.name, runtimeState);
+                        }
+                        runtimeState.variables.set('是否只浇水', true);
+                        console.log(`已为轮灌组 ${groupConfig.name} 设置"只浇水"模式`);
+                    } catch (e) {
+                        console.warn(`设置"是否只浇水"变量失败:`, e);
+                    }
+                };
+
                 // 创建策略的辅助函数
                 const createGroupPolicy = async (groupConfig) => {
-                    // 将小时转换为分钟
                     const pre_fert_time_hours = groupConfig.pre_fert_time || 0;
                     const fert_time_hours = groupConfig.fert_time || 0;
                     const post_fert_time_hours = groupConfig.post_fert_time || 0;
@@ -1706,85 +1911,31 @@ export default {
                         total_time: groupConfig.water_only ? (groupConfig.total_time || 0) : undefined,
                     };
                     
-                    // 非只浇水模式，添加时间参数
                     if (!groupConfig.water_only) {
-                        addGroupPolicyParams.pre_fert_time = pre_fert_time_hours * 60; // 转换为分钟
-                        addGroupPolicyParams.fert_time = fert_time_hours * 60; // 转换为分钟
-                        addGroupPolicyParams.post_fert_time = post_fert_time_hours * 60; // 转换为分钟
+                        addGroupPolicyParams.pre_fert_time = pre_fert_time_hours * 60;
+                        addGroupPolicyParams.fert_time = fert_time_hours * 60;
+                        addGroupPolicyParams.post_fert_time = post_fert_time_hours * 60;
                     }
                     
                     await config_lib.add_group_policy(addGroupPolicyParams, token);
                     
-                    // 如果指定了方案ID或方案名称，设置策略的方案ID
                     const targetSchemeId = body.scheme_id || body.scheme_name;
                     if (targetSchemeId) {
-                        // 使用轮询方式查找策略，最多尝试20次，每次等待100ms
-                        let policy = null;
-                        for (let i = 0; i < 20; i++) {
-                            policy = policy_array.find(p => p.name === groupConfig.name);
-                            if (policy) {
-                                break;
-                            }
-                            await new Promise(resolve => setTimeout(resolve, 100));
-                        }
-                        
-                        if (policy) {
-                            policy.scheme_id = targetSchemeId;
-                        } else {
-                            // 即使找不到，也尝试通过 policy_lib 查找
-                            try {
-                                const foundPolicy = await policy_lib.find_policy(groupConfig.name, token);
-                                if (foundPolicy) {
-                                    // 如果通过 API 找到了，说明策略存在但可能还没同步到 policy_array
-                                    // 再次尝试在 policy_array 中查找，等待更长时间
-                                    for (let i = 0; i < 10; i++) {
-                                        await new Promise(resolve => setTimeout(resolve, 200));
-                                        policy = policy_array.find(p => p.name === groupConfig.name);
-                                        if (policy) {
-                                            policy.scheme_id = targetSchemeId;
-                                            break;
-                                        }
-                                    }
-                                }
-                            } catch (e) {
-                                console.error(`无法为策略 ${groupConfig.name} 设置 scheme_id:`, e);
-                            }
-                        }
+                        await setPolicySchemeId(groupConfig, targetSchemeId);
                     }
                     
-                    // 如果设置了"只浇水"模式，设置"是否只浇水"变量为true
                     if (groupConfig.water_only === true) {
-                        try {
-                            // 等待策略完全创建后再设置变量
-                            await new Promise(resolve => setTimeout(resolve, 300));
-                            // 获取策略的运行时状态并设置变量
-                            let runtimeState = policy_runtime_states.get(groupConfig.name);
-                            if (!runtimeState) {
-                                runtimeState = {
-                                    current_state: null,
-                                    variables: new Map(),
-                                    last_execution_time: Date.now(),
-                                    start_time: Date.now(),
-                                    execution_count: 0,
-                                    is_first_execution: true
-                                };
-                                policy_runtime_states.set(groupConfig.name, runtimeState);
-                            }
-                            runtimeState.variables.set('是否只浇水', true);
-                            console.log(`已为轮灌组 ${groupConfig.name} 设置"只浇水"模式`);
-                        } catch (e) {
-                            console.warn(`设置"是否只浇水"变量失败:`, e);
-                            // 不抛出错误，因为策略已经创建成功
-                        }
+                        await setWaterOnlyVariable(groupConfig);
                     }
                 };
-                const policyModule = this;
                 
+                // 处理每个轮灌组配置
                 for (const groupConfig of body.groups) {
                     const isUpdate = existingGroups.has(groupConfig.name);
                     
                     if (isUpdate) {
-                        await handleUpdate(groupConfig.name);
+                        await handleGroupUpdate(groupConfig.name, body.scheme_id, token);
+                        updatedGroups.push(groupConfig.name);
                     } else {
                         createdGroups.push(groupConfig.name);
                     }
@@ -1797,185 +1948,11 @@ export default {
                     }
                 }
                 
-                // 如果指定了方案名称，保存配置文件（自动加plan_前缀）
+                // 如果指定了方案名称，保存配置文件
                 if (body.scheme_name) {
                     try {
-                        // 保存前再次验证：确保已删除的组不在 policy_array 中
-                        // 注意：只验证属于当前方案的已删除组，不影响其他方案
-                        if (body.scheme_id && deletedGroups.length > 0) {
-                            // 检查属于当前方案的已删除组是否还在 policy_array 中
-                            const stillExists = deletedGroups.filter(name => {
-                                return policy_array.some(p => p.name === name && p.scheme_id === body.scheme_id);
-                            });
-                            
-                            if (stillExists.length > 0) {
-                                // 强制从内存中移除所有残留的已删除组（只移除属于当前方案的）
-                                for (const name of stillExists) {
-                                    const removed = findAndRemoveFromArray(policy_array, p => p.name === name && p.scheme_id === body.scheme_id);
-                                    if (removed) {
-                                        policy_runtime_states.delete(name);
-                                    }
-                                }
-                            }
-                            
-                            // 最终验证：确保该方案中不应该有已删除的组
-                            const schemeGroups = policy_array
-                                .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0 && p.scheme_id === body.scheme_id)
-                                .map(p => p.name);
-                            
-                            const stillInScheme = deletedGroups.filter(name => schemeGroups.includes(name));
-                            if (stillInScheme.length > 0) {
-                                // 再次强制移除（只移除属于当前方案的）
-                                for (const name of stillInScheme) {
-                                    const removed = findAndRemoveFromArray(policy_array, p => p.name === name && p.scheme_id === body.scheme_id);
-                                    if (removed) {
-                                        policy_runtime_states.delete(name);
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // 保存方案配置：只保存属于该方案的策略
-                        // 优先使用农场前缀，形成"农场X_plan_方案名称.txt"格式，便于按农场匹配
-                        const filename = body.farm_name
-                            ? `${body.farm_name}_plan_${body.scheme_name}.txt`
-                            : `plan_${body.scheme_name}.txt`; // 兼容旧格式
-                        
-                        // 始终进行过滤，确保只保存属于该方案的轮灌组策略
-                        // 临时备份原始 policy_array
-                        const originalPolicyArray = [...policy_array];
-                        
-                        try {
-                            // 确定应该保留的轮灌组名称列表（从 body.groups 中获取）
-                            const expectedGroupNames = new Set(body.groups.map(g => g.name));
-                            
-                            // 确定用于过滤的 scheme_id（如果未提供，使用方案名称）
-                            const filterSchemeId = body.scheme_id || body.scheme_name;
-                            
-                            // 只保留属于该方案的策略（包括轮灌组策略）
-                            const schemePolicies = policy_array.filter(p => {
-                                // 如果是轮灌组策略（有 watering_group_matrix），必须属于该方案
-                                if (p.watering_group_matrix && p.watering_group_matrix.length > 0) {
-                                    // 首先检查是否在应该保留的列表中（这是最可靠的方法）
-                                    if (!expectedGroupNames.has(p.name)) {
-                                        return false;
-                                    }
-                                    // 即使 scheme_id 不匹配，如果在保留列表中，也保留（因为可能是 scheme_id 未正确设置）
-                                    return true;
-                                }
-                                // 其他策略保留（如总策略等）
-                                return true;
-                            });
-                            
-                            // 更新总策略的"所有轮灌组"变量
-                            // 尝试多种方式找到总策略（在原始 policy_array 中查找，因为 schemePolicies 是引用）
-                            let totalPolicyInOriginal = null;
-                            let totalPolicyName = null;
-                            if (body.farm_name) {
-                                totalPolicyName = `${body.farm_name}-总策略`;
-                                totalPolicyInOriginal = originalPolicyArray.find(p => p.name === totalPolicyName);
-                            }
-                            // 如果没有找到，尝试查找所有包含"总策略"的策略
-                            if (!totalPolicyInOriginal) {
-                                totalPolicyInOriginal = originalPolicyArray.find(p => p.name && p.name.includes('总策略'));
-                                if (totalPolicyInOriginal) {
-                                    totalPolicyName = totalPolicyInOriginal.name;
-                                }
-                            }
-                            
-                            // 在 schemePolicies 中找到对应的总策略（用于保存）
-                            let totalPolicyInScheme = null;
-                            if (totalPolicyName) {
-                                totalPolicyInScheme = schemePolicies.find(p => p.name === totalPolicyName);
-                            } else if (totalPolicyInOriginal) {
-                                totalPolicyInScheme = schemePolicies.find(p => p.name === totalPolicyInOriginal.name);
-                            }
-                            
-                            const groupNamesArray = Array.from(expectedGroupNames).map(name => `"${name}"`).join(',');
-                            
-                            // 同时更新原始 policy_array 和 schemePolicies 中的总策略
-                            if (totalPolicyInOriginal) {
-                                // 确保有 init_variables 数组
-                                if (!totalPolicyInOriginal.init_variables) {
-                                    totalPolicyInOriginal.init_variables = [];
-                                }
-                                
-                                // 找到"所有轮灌组"变量并更新
-                                let allGroupsVar = totalPolicyInOriginal.init_variables.find(v => v.variable_name === '所有轮灌组');
-                                
-                                if (allGroupsVar) {
-                                    // 更新现有变量
-                                    allGroupsVar.expression = `[${groupNamesArray}]`;
-                                } else {
-                                    // 如果不存在，添加这个变量
-                                    totalPolicyInOriginal.init_variables.push({
-                                        is_constant: 'false',
-                                        variable_name: '所有轮灌组',
-                                        expression: `[${groupNamesArray}]`
-                                    });
-                                }
-                            }
-                            
-                            // 如果 schemePolicies 中有总策略，也更新它（保持同步）
-                            // 注意：如果 totalPolicyInScheme 和 totalPolicyInOriginal 是同一个对象引用，上面的更新已经生效
-                            // 但如果它们是不同的对象（虽然不应该），需要单独更新
-                            if (totalPolicyInScheme) {
-                                // 确保有 init_variables 数组
-                                if (!totalPolicyInScheme.init_variables) {
-                                    totalPolicyInScheme.init_variables = [];
-                                }
-                                
-                                let allGroupsVar = totalPolicyInScheme.init_variables.find(v => v.variable_name === '所有轮灌组');
-                                
-                                if (allGroupsVar) {
-                                    // 更新现有变量
-                                    allGroupsVar.expression = `[${groupNamesArray}]`;
-                                } else {
-                                    // 如果不存在，添加这个变量
-                                    totalPolicyInScheme.init_variables.push({
-                                        is_constant: 'false',
-                                        variable_name: '所有轮灌组',
-                                        expression: `[${groupNamesArray}]`
-                                    });
-                                }
-                            }
-                            
-                            // 临时替换 policy_array
-                            policy_array.length = 0;
-                            policy_array.push(...schemePolicies);
-                            
-                            // 验证并修复总策略的"所有轮灌组"变量
-                            const totalPolicyInArray = policy_array.find(p => 
-                                (totalPolicyName && p.name === totalPolicyName) || 
-                                (totalPolicyInOriginal && p.name === totalPolicyInOriginal.name) ||
-                                (p.name && p.name.includes('总策略'))
-                            );
-                            
-                            if (totalPolicyInArray) {
-                                const verifyVar = totalPolicyInArray.init_variables?.find(v => v.variable_name === '所有轮灌组');
-                                if (verifyVar) {
-                                    if (verifyVar.expression !== `[${groupNamesArray}]`) {
-                                        verifyVar.expression = `[${groupNamesArray}]`;
-                                    }
-                                } else {
-                                    if (!totalPolicyInArray.init_variables) {
-                                        totalPolicyInArray.init_variables = [];
-                                    }
-                                    totalPolicyInArray.init_variables.push({
-                                        is_constant: 'false',
-                                        variable_name: '所有轮灌组',
-                                        expression: `[${groupNamesArray}]`
-                                    });
-                                }
-                            }
-                            
-                            // 保存配置
-                            await cli_runtime_lib.save_config(filename);
-                        } finally {
-                            // 恢复原始 policy_array
-                            policy_array.length = 0;
-                            policy_array.push(...originalPolicyArray);
-                        }
+                        const expectedGroupNames = new Set(body.groups.map(g => g.name));
+                        await saveSchemeFile(body, expectedGroupNames, deletedGroups);
                     } catch (error) {
                         console.error('保存方案文件失败:', error);
                         throw { err_msg: `保存方案文件失败: ${error.message || String(error)}` };
@@ -2390,70 +2367,17 @@ export default {
                     const fs = await import('fs');
                     const files = fs.readdirSync('.');
 
-                    // 1. 优先匹配新格式：农场名称_plan_方案名称.txt
-                    // 2. 兼容旧格式：plan_方案名称.txt
-                    let filename = null;
-                    if (farmName) {
-                        const preferred = `${farmName}_plan_${schemeId}.txt`;
-                        if (files.includes(preferred)) {
-                            filename = preferred;
-                        }
-                    }
-
-                    if (!filename) {
-                        filename = files.find(f => {
-                            if (!f.endsWith('.txt')) return false;
-                            if (f === 'sw_cli_config.txt' || f === 'tmp_config_for_restore.txt') return false;
-
-                            const withoutExt = f.replace(/\.txt$/, '');
-                            if (withoutExt.startsWith('plan_')) {
-                                return withoutExt === `plan_${schemeId}`;
-                            }
-
-                            const idx = withoutExt.lastIndexOf('_plan_');
-                            if (idx === -1) return false;
-                            const farmPart = withoutExt.substring(0, idx);
-                            const namePart = withoutExt.substring(idx + '_plan_'.length);
-                            if (namePart !== schemeId) return false;
-                            if (farmName && farmPart !== farmName) return false;
-                            return true;
-                        });
-                    }
-
+                    // 查找方案文件
+                    const filename = findSchemeFile(files, schemeId, farmName);
                     if (!filename) {
                         throw { err_msg: `方案文件 不存在，无法恢复（方案: ${schemeId}${farmName ? `, 农场: ${farmName}` : ''}）` };
                     }
 
                     await cli_runtime_lib.restore_config(filename);
-                    
-                    // 等待一小段时间，确保策略已加载到 policy_array
                     await new Promise(resolve => setTimeout(resolve, 500));
                     
-                    // 从配置文件中读取应该属于该方案的轮灌组列表
-                    try {
-                        if (fs.existsSync(filename)) {
-                            const content = fs.readFileSync(filename, 'utf-8');
-                            // 解析"所有轮灌组"变量，获取轮灌组名称列表
-                            const allGroupsMatch = content.match(/所有轮灌组.*?\[(.*?)\]/s);
-                            if (allGroupsMatch) {
-                                const groupsStr = allGroupsMatch[1];
-                                const groupNames = groupsStr.match(/"([^"]+)"/g);
-                                if (groupNames) {
-                                    const groupNameList = groupNames.map(name => name.replace(/"/g, ''));
-                                    
-                                    // 为这些轮灌组策略设置 scheme_id
-                                    for (const groupName of groupNameList) {
-                                        const policy = policy_array.find(p => p.name === groupName);
-                                        if (policy) {
-                                            policy.scheme_id = schemeId;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (parseError) {
-                        console.warn(`解析方案文件失败，无法自动设置 scheme_id:`, parseError);
-                    }
+                    // 设置轮灌组的 scheme_id
+                    await setGroupsSchemeIdFromFile(filename, schemeId, fs);
                     
                     return { result: true };
                 } catch (error) {

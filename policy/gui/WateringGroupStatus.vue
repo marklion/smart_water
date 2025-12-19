@@ -117,7 +117,8 @@ const parseWateringGroups = (content) => {
     // 查找 "所有轮灌组" 的初始化，支持多种格式
     // 格式1: init assignment 'false' '所有轮灌组' '["轮灌组1"]'
     // 格式2: init assignment 'false' '所有轮灌组' '["轮灌组1", "轮灌组2"]'
-    const allGroupsMatch = content.match(/所有轮灌组.*?\[(.*?)\]/s)
+    // 使用 [^\]]+ 避免回溯，限制匹配到第一个 ] 为止
+    const allGroupsMatch = content.match(/所有轮灌组[^[]*\[([^\]]+)\]/)
     if (allGroupsMatch) {
         const groupsStr = allGroupsMatch[1]
         // 匹配引号内的字符串
@@ -240,18 +241,83 @@ const handleStopScheme = async () => {
     }
 }
 
+// 辅助函数：按方案过滤轮灌组
+const filterGroupsByScheme = (groups, responseGroups) => {
+    if (!selectedSchemeId.value || schemeWateringGroups.value.length === 0) {
+        return groups
+    }
+
+    const schemeGroupNames = new Set(schemeWateringGroups.value)
+    const filtered = groups.filter(group => schemeGroupNames.has(group.name))
+
+    if (filtered.length === 0 && responseGroups.length > 0) {
+        console.warn(`方案 ${selectedSchemeId.value} 中的轮灌组名称与API返回的不匹配，使用API返回的数据`)
+        return responseGroups
+    }
+
+    return filtered
+}
+
+// 辅助函数：按农场过滤轮灌组
+const filterGroupsByFarm = async (groups, responseGroups) => {
+    if (!props.farmName) {
+        return groups
+    }
+
+    const policyFarmMatches = await Promise.all(
+        groups.map(async (group) => {
+            try {
+                const farmMatch = await call_remote('/policy/get_matched_farm', {
+                    policy_name: group.name
+                })
+                return { group, farmName: farmMatch.farm_name }
+            } catch (error) {
+                return { group, farmName: null }
+            }
+        })
+    )
+
+    let filtered = policyFarmMatches
+        .filter(item => item.farmName === props.farmName)
+        .map(item => item.group)
+
+    if (filtered.length === 0) {
+        filtered = responseGroups
+        if (selectedSchemeId.value && schemeWateringGroups.value.length > 0) {
+            filtered = filtered.filter(group =>
+                schemeWateringGroups.value.includes(group.name)
+            )
+        }
+    }
+
+    return filtered
+}
+
+// 辅助函数：转换轮灌组数据格式
+const transformGroups = (groups) => {
+    return groups.map(group => ({
+        name: group.name || '未命名',
+        area: group.area ?? '-',
+        method: group.method || '-',
+        fert_rate: group.fert_rate ?? '-',
+        total_water: group.total_water ?? '-',
+        total_fert: group.total_fert ?? '-',
+        minute_left: group.minute_left ?? '-',
+        cur_state: group.cur_state || '未知',
+        valves: group.valves || '-'
+    }))
+}
+
 // 加载轮灌组数据
 const loadWateringGroups = async () => {
     loading.value = true
     try {
-        // 如果选择了方案，先加载方案中的轮灌组列表
         if (selectedSchemeId.value) {
             await loadSchemeWateringGroups()
         } else {
             schemeWateringGroups.value = []
         }
 
-        // 获取轮灌组：如果选择了方案，传递 scheme_id 进行过滤
         const params = { pageNo: 0 }
         if (selectedSchemeId.value) {
             params.scheme_id = selectedSchemeId.value
@@ -259,87 +325,24 @@ const loadWateringGroups = async () => {
 
         const response = await call_remote('/policy/list_watering_groups', params)
 
-        if (response && response.groups) {
-            let filteredGroups = response.groups
-
-            // 如果选择了方案且有轮灌组列表，根据方案中的轮灌组名称进行二次过滤（作为兜底）
-            if (selectedSchemeId.value && schemeWateringGroups.value.length > 0) {
-                const schemeGroupNames = new Set(schemeWateringGroups.value)
-                filteredGroups = filteredGroups.filter(group =>
-                    schemeGroupNames.has(group.name)
-                )
-
-                // 如果过滤后为空，但API有数据，说明名称不匹配，使用API返回的数据
-                if (filteredGroups.length === 0 && response.groups.length > 0) {
-                    console.warn(`方案 ${selectedSchemeId.value} 中的轮灌组名称与API返回的不匹配，使用API返回的数据`)
-                    filteredGroups = response.groups
-                }
-            }
-
-            // 如果有农场参数，则按农场筛选轮灌组
-            if (props.farmName) {
-                // 获取所有策略的农场匹配信息
-                const policyFarmMatches = await Promise.all(
-                    filteredGroups.map(async (group) => {
-                        try {
-                            const farmMatch = await call_remote('/policy/get_matched_farm', {
-                                policy_name: group.name
-                            })
-                            return {
-                                group,
-                                farmName: farmMatch.farm_name
-                            }
-                        } catch (error) {
-                            return {
-                                group,
-                                farmName: null
-                            }
-                        }
-                    })
-                )
-
-                // 筛选出匹配指定农场的轮灌组
-                filteredGroups = policyFarmMatches
-                    .filter(item => item.farmName === props.farmName)
-                    .map(item => item.group)
-
-                // 若按农场过滤后为空，则回退展示全部轮灌组，避免列表空白
-                if (filteredGroups.length === 0) {
-                    filteredGroups = response.groups
-                    // 如果选择了方案，再次根据方案过滤
-                    if (selectedSchemeId.value && schemeWateringGroups.value.length > 0) {
-                        filteredGroups = filteredGroups.filter(group =>
-                            schemeWateringGroups.value.includes(group.name)
-                        )
-                    }
-                }
-            }
-
-            // 如果过滤后为空，但方案中有轮灌组，提示用户
-            if (filteredGroups.length === 0 && selectedSchemeId.value && schemeWateringGroups.value.length > 0) {
-                ElMessage.warning({
-                    message: `方案"${selectedSchemeId.value}"中包含 ${schemeWateringGroups.value.length} 个轮灌组，但当前没有加载的轮灌组数据。请先应用方案。`,
-                    duration: 5000
-                })
-            }
-
-            irrigationGroups.value = filteredGroups.map(group => ({
-                name: group.name || '未命名',
-                area: group.area ?? '-',
-                method: group.method || '-',
-                fert_rate: group.fert_rate ?? '-',
-                total_water: group.total_water ?? '-',
-                total_fert: group.total_fert ?? '-',
-                minute_left: group.minute_left ?? '-',
-                cur_state: group.cur_state || '未知',
-                valves: group.valves || '-'
-            }))
-
-            // 加载每个轮灌组的\"是否只浇水\"状态，用于初始化展示
-            await loadWaterOnlyStates()
-        } else {
+        if (!response?.groups) {
             irrigationGroups.value = []
+            return
         }
+
+        let filteredGroups = response.groups
+        filteredGroups = filterGroupsByScheme(filteredGroups, response.groups)
+        filteredGroups = await filterGroupsByFarm(filteredGroups, response.groups)
+
+        if (filteredGroups.length === 0 && selectedSchemeId.value && schemeWateringGroups.value.length > 0) {
+            ElMessage.warning({
+                message: `方案"${selectedSchemeId.value}"中包含 ${schemeWateringGroups.value.length} 个轮灌组，但当前没有加载的轮灌组数据。请先应用方案。`,
+                duration: 5000
+            })
+        }
+
+        irrigationGroups.value = transformGroups(filteredGroups)
+        await loadWaterOnlyStates()
     } catch (error) {
         ElMessage.error('加载轮灌组数据失败')
         irrigationGroups.value = []
