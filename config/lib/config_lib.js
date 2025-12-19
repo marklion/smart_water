@@ -68,11 +68,13 @@ export default {
             farm_name: group_policy_config.farm_name,
             wgv_array: group_policy_config.wgv_array,
             total_time: parseFloat(group_policy_config.total_time),
+            pre_fert_time: parseFloat(group_policy_config.pre_fert_time),
             post_fert_time: parseFloat(group_policy_config.post_fert_time),
             method: group_policy_config.method,
             fert_time: parseFloat(group_policy_config.fert_time),
             area_based_amount: parseFloat(group_policy_config.area_based_amount),
             area: parseFloat(group_policy_config.area),
+            water_only: group_policy_config.water_only,
         };
         return await call_remote('/config/add_group_policy', req, token);
     },

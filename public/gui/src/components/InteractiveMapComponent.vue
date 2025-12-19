@@ -3,72 +3,17 @@
 
         <div id="amap-container" class="amap-container"></div>
 
-
-        <div class="unified-control-panel">
-
-            <div class="emergency-section">
-                <div class="section-header">
-                    <el-icon class="section-icon">
-                        <Warning />
-                    </el-icon>
-                    <span class="section-title">紧急控制</span>
-                </div>
-                <el-button type="danger" @click="showEmergencyStopDialog" class="emergency-stop-btn"
-                    :loading="emergencyStopLoading">
-                    <el-icon>
-                        <Warning />
-                    </el-icon>
-                    设备紧急停止
-                </el-button>
+        <!-- 轮灌组进度卡片（左下角） -->
+        <div v-if="schemeProgress.total > 0" class="scheme-progress-card">
+            <div class="progress-header">
+                <span class="progress-title">当前方案进度</span>
+                <span class="progress-text">{{ schemeProgress.completed }} / {{ schemeProgress.total }}</span>
             </div>
-
-
-            <div class="control-divider"></div>
-
-
-            <div class="policy-section">
-                <div class="section-header">
-                    <el-icon class="section-icon">
-                        <Monitor />
-                    </el-icon>
-                    <span class="section-title">策略控制</span>
-                </div>
-
-                <div class="policy-controls">
-                    <div class="period-input-wrapper">
-                        <span class="input-label">扫描周期</span>
-                        <el-input-number v-model="scanPeriod" :min="100" :max="10000" :step="100" size="small"
-                            class="period-input" />
-                        <span class="input-unit">毫秒</span>
-                    </div>
-
-                    <div class="control-buttons">
-                        <el-button type="primary" size="small" @click="startScan" :loading="scanLoading"
-                            :disabled="isScanning" :icon="VideoPlay" round>
-                            运行策略
-                        </el-button>
-                        <el-button type="danger" size="small" @click="stopScan" :loading="scanLoading"
-                            :disabled="!isScanning" :icon="VideoPause" round>
-                            停止运行
-                        </el-button>
-                        <el-button type="success" size="small" @click="showPolicyConfigWizard" :icon="Setting" round>
-                            策略程序设定
-                        </el-button>
-                    </div>
-
-                    <div class="status-indicator">
-                        <div v-if="isScanning" class="status-running">
-                            <span class="status-dot running"></span>
-                            <span class="status-text">运行中</span>
-                        </div>
-                        <div v-else class="status-stopped">
-                            <span class="status-dot stopped"></span>
-                            <span class="status-text">已停止</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <el-progress :percentage="schemeProgress.percent" :stroke-width="10" status="success" />
         </div>
+
+        <UnifiedControlPanel :devices="devices" @open-wizard="showPolicyConfigWizard"
+            @device-click="handleDeviceClick" />
 
 
         <div class="map-controls">
@@ -229,42 +174,18 @@
         </div>
 
 
-        <el-dialog v-model="emergencyStopDialogVisible" title="紧急停止" width="600px" :close-on-click-modal="false"
-            :close-on-press-escape="false">
-            <div class="emergency-stop-content">
-                <div class="emergency-warning">
-                    <el-icon size="24" color="#f56c6c">
-                        <Warning />
-                    </el-icon>
-                    <span>请选择需要执行急停的地块：</span>
-                </div>
-
-                <el-checkbox-group v-model="selectedBlocks" class="block-selection">
-                    <el-checkbox v-for="block in availableBlocks" :key="block.id" :label="block.id"
-                        class="block-checkbox">
-                        {{ block.name }}
-                    </el-checkbox>
-                </el-checkbox-group>
-
-                <div class="emergency-actions">
-                    <el-button @click="cancelEmergencyStop">取消</el-button>
-                    <el-button type="danger" @click="executeEmergencyStop" :loading="emergencyStopLoading">
-                        执行急停
-                    </el-button>
-                </div>
-            </div>
-        </el-dialog>
 
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch, getCurrentInstance } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, getCurrentInstance, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning, CircleCheck, CircleClose, Setting, Plus, Delete, CopyDocument, ArrowLeft, ArrowRight, FullScreen, Check, View } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
+import UnifiedControlPanel from './UnifiedControlPanel.vue'
 import {
     getDeviceType,
     hasDeviceCapability,
@@ -279,6 +200,10 @@ import {
 
 
 const router = useRouter()
+
+// 从上层布局注入当前选中的方案
+const injectedSelectedSchemeId = inject('selectedSchemeId', null)
+const injectedCurrentSchemeName = inject('currentSchemeName', null)
 
 const props = defineProps({
     devices: {
@@ -298,6 +223,68 @@ const props = defineProps({
 
 const emit = defineEmits(['device-click'])
 
+// 轮灌组进度
+const schemeProgress = ref({
+    completed: 0,
+    total: 0,
+    percent: 0
+})
+
+const currentSchemeId = computed(() => {
+    if (injectedSelectedSchemeId && injectedSelectedSchemeId.value) return injectedSelectedSchemeId.value
+    if (injectedCurrentSchemeName && injectedCurrentSchemeName.value) return injectedCurrentSchemeName.value
+    if (typeof window !== 'undefined') {
+        try {
+            return localStorage.getItem('selectedSchemeId') || ''
+        } catch (e) {
+            return ''
+        }
+    }
+    return ''
+})
+
+const loadSchemeProgress = async () => {
+    const schemeId = currentSchemeId.value
+    if (!schemeId) {
+        schemeProgress.value = { completed: 0, total: 0, percent: 0 }
+        return
+    }
+    try {
+        const response = await call_remote('/policy/list_watering_groups', {
+            pageNo: 0,
+            scheme_id: schemeId
+        })
+        if (response && response.groups) {
+            const groups = response.groups
+            const total = response.total || groups.length
+            let completed = 0
+            groups.forEach(group => {
+                const status = (group.cur_state || '').toLowerCase()
+                const hasWater = group.total_water && group.total_water !== '-' && group.total_water !== 0 && group.total_water !== '0'
+                const hasFert = group.total_fert && group.total_fert !== '-' && group.total_fert !== 0 && group.total_fert !== '0'
+                if (status.includes('完成') || status.includes('finished') || status.includes('done') || hasWater || hasFert) {
+                    completed += 1
+                }
+            })
+            const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+            schemeProgress.value = { completed, total, percent }
+        } else {
+            schemeProgress.value = { completed: 0, total: 0, percent: 0 }
+        }
+    } catch (error) {
+        console.warn('加载方案进度失败:', error)
+        schemeProgress.value = { completed: 0, total: 0, percent: 0 }
+    }
+}
+
+watch(currentSchemeId, async (newVal, oldVal) => {
+    if (newVal && newVal !== oldVal) {
+        await loadSchemeProgress()
+    } else if (!newVal) {
+        schemeProgress.value = { completed: 0, total: 0, percent: 0 }
+    }
+})
+
 
 const selectedDevice = ref(null)
 const loading = ref(true)
@@ -313,10 +300,6 @@ const runtimeInfoAutoRefresh = createRuntimeInfoAutoRefresh(
 )
 
 
-const emergencyStopDialogVisible = ref(false)
-const selectedBlocks = ref([])
-const availableBlocks = ref([])
-const emergencyStopLoading = ref(false)
 
 
 const scanPeriod = ref(200)
@@ -794,84 +777,9 @@ const stopRuntimeInfoAutoRefresh = () => {
 }
 
 
-const showEmergencyStopDialog = async () => {
-    try {
-
-        await loadAvailableBlocks()
-        emergencyStopDialogVisible.value = true
-        selectedBlocks.value = []
-    } catch (error) {
-        console.error('加载地块列表失败:', error)
-        ElMessage.error('加载地块列表失败')
-    }
-}
-
-const loadAvailableBlocks = async () => {
-    try {
-
-        const blockSet = new Set()
-        props.devices.forEach(device => {
-            if (device.blockName || device.block_name) {
-                blockSet.add(device.blockName || device.block_name)
-            }
-        })
-
-        availableBlocks.value = Array.from(blockSet).map(blockName => ({
-            id: blockName,
-            name: blockName
-        }))
-    } catch (error) {
-        console.error('加载地块列表失败:', error)
-        availableBlocks.value = []
-    }
-}
-
-const cancelEmergencyStop = () => {
-    emergencyStopDialogVisible.value = false
-    selectedBlocks.value = []
-}
-
-const executeEmergencyStop = async () => {
-    if (selectedBlocks.value.length === 0) {
-        ElMessage.warning('请选择至少一个地块')
-        return
-    }
-
-    emergencyStopLoading.value = true
-    try {
-
-        const currentFarm = props.devices.length > 0 ? (props.devices[0].farmName || props.devices[0].farm_name) : '默认农场'
-
-
-        const response = await call_remote('/device_management/emergency_stop', {
-            farm_name: currentFarm,
-            block_names: selectedBlocks.value
-        })
-
-        if (response.result) {
-            const stoppedCount = response.stopped_devices ? response.stopped_devices.length : 0
-            const failedCount = response.failed_devices ? response.failed_devices.length : 0
-
-            if (failedCount === 0) {
-                ElMessage.success(`急停操作执行成功，共急停 ${stoppedCount} 个设备`)
-            } else {
-                ElMessage.warning(`急停操作部分成功：成功 ${stoppedCount} 个，失败 ${failedCount} 个设备`)
-            }
-
-            emergencyStopDialogVisible.value = false
-            selectedBlocks.value = []
-
-
-            emit('device-click', null)
-        } else {
-            ElMessage.error('急停操作执行失败')
-        }
-    } catch (error) {
-        console.error('急停操作失败:', error)
-        ElMessage.error(`急停操作失败: ${error.message || error}`)
-    } finally {
-        emergencyStopLoading.value = false
-    }
+// 处理设备点击事件（从 UnifiedControlPanel 组件触发）
+const handleDeviceClick = (device) => {
+    emit('device-click', device)
 }
 
 
@@ -948,12 +856,13 @@ watch(() => props.center, (newCenter) => {
 })
 
 
-onMounted(() => {
+onMounted(async () => {
     nextTick(() => {
         initMap()
     })
 
     checkScanStatus()
+    await loadSchemeProgress()
 })
 
 
@@ -983,7 +892,7 @@ onUnmounted(() => {
 .interactive-map-container {
     position: relative;
     width: 100%;
-    height: 718px;
+    height: 730px;
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
@@ -991,7 +900,7 @@ onUnmounted(() => {
 
 .amap-container {
     width: 100%;
-    height: 718px;
+    height: 730px;
 }
 
 
@@ -1226,6 +1135,57 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.scheme-progress-card {
+    position: absolute;
+    left: 20px;
+    bottom: 20px;
+    z-index: 10000;
+    min-width: 260px;
+    max-width: 320px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.12),
+        0 2px 8px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    color: #303133;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.scheme-progress-card .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+
+.scheme-progress-card .progress-title {
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.scheme-progress-card .progress-text {
+    font-size: 12px;
+    color: #909399;
+}
+
+.scheme-progress-card :deep(.el-progress-bar__outer) {
+    background-color: rgba(144, 147, 153, 0.18);
+}
+
+.scheme-progress-card :deep(.el-progress-bar__inner) {
+    background-image: linear-gradient(90deg, #22c55e, #4ade80);
+}
+
+.scheme-progress-card :deep(.el-progress__text) {
+    color: #303133;
 }
 
 .map-type-tag {

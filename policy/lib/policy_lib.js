@@ -232,10 +232,37 @@ export default {
             action_name
         }, token);
     },
-    apply_wizard_groups: async function (groups, farm_name, token) {
+    apply_wizard_groups: async function (groups, farm_name, scheme_id, scheme_name, token) {
         return await call_remote('/policy/apply_wizard_groups', {
             groups,
-            farm_name
+            farm_name,
+            scheme_id,
+            scheme_name
+        }, token);
+    },
+    restore_scheme: async function (scheme_id, token) {
+        return await call_remote('/policy/restore_scheme', {
+            scheme_id
+        }, token);
+    },
+    // 方案管理API
+    add_scheme: async function (name, description, token) {
+        return await call_remote('/policy/add_scheme', {
+            name,
+            description
+        }, token);
+    },
+    list_schemes: async function (token) {
+        return await call_remote('/policy/list_schemes', {}, token);
+    },
+    del_scheme: async function (scheme_id, token) {
+        return await call_remote('/policy/del_scheme', {
+            scheme_id
+        }, token);
+    },
+    get_scheme: async function (scheme_id, token) {
+        return await call_remote('/policy/get_scheme', {
+            scheme_id
         }, token);
     }
 }
