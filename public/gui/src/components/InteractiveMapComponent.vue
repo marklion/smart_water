@@ -474,16 +474,36 @@ const handleDeviceAction = async (action, deviceName) => {
         await closeDeviceWrapper(deviceName)
     }
     else if (action == 'setDeviceKeyValue') {
-        const { value } = await ElMessageBox.prompt('请输入关键参数值:', '设置关键参数', {
-            confirmButtonText: '设置',
-            cancelButtonText: '取消',
-            inputPattern: /^-?\d+(\.\d+)?$/,
-            inputErrorMessage: '请输入有效的数字值'
-        })
+        let numericValue = undefined
+        try {
+            const result = await ElMessageBox.prompt('请输入关键参数值:', '设置关键参数', {
+                confirmButtonText: '设置',
+                cancelButtonText: '取消',
+                inputPattern: /^-?\d+(\.\d+)?$/,
+                inputErrorMessage: '请输入有效的数字值'
+            })
 
-        const numericValue = Number.parseFloat(value)
-        if (isNaN(numericValue)) {
-            ElMessage.error('无效的数字值，操作已取消')
+            const value = result?.value
+            if (!value || (typeof value === 'string' && value.trim() === '')) {
+                ElMessage.error('参数值不能为空，操作已取消')
+                return
+            }
+
+            numericValue = Number.parseFloat(value)
+            if (isNaN(numericValue)) {
+                ElMessage.error('无效的数字值，操作已取消')
+                return
+            }
+        } catch (error) {
+            if (error && error !== 'cancel' && error.toString().indexOf('cancel') === -1) {
+                console.error('设置关键参数时出错:', error)
+            }
+            return // 用户取消，直接返回
+        }
+
+        // 确保 numericValue 有效后再调用
+        if (numericValue === undefined || numericValue === null || isNaN(numericValue)) {
+            ElMessage.error('参数值无效，操作已取消')
             return
         }
 

@@ -400,10 +400,10 @@ const saveSelectedSchemeToStorage = (schemeId) => {
 
 // 辅助函数：恢复保存的方案选择
 const restoreSavedScheme = (schemeList) => {
-    const savedSchemeId = loadSelectedSchemeFromStorage()
+            const savedSchemeId = loadSelectedSchemeFromStorage()
     if (savedSchemeId && schemeList.find(s => s.name === savedSchemeId)) {
-        selectedSchemeId.value = savedSchemeId
-        currentSchemeName.value = savedSchemeId
+                selectedSchemeId.value = savedSchemeId
+                currentSchemeName.value = savedSchemeId
         return true
     }
     return false
@@ -413,22 +413,22 @@ const restoreSavedScheme = (schemeList) => {
 const setDefaultScheme = (schemeList) => {
     if (schemeList.length === 0) return
     
-    if (!selectedSchemeId.value) {
+                if (!selectedSchemeId.value) {
         selectedSchemeId.value = schemeList[0].name
         currentSchemeName.value = schemeList[0].name
         saveSelectedSchemeToStorage(schemeList[0].name)
-    } else {
+                } else {
         const currentScheme = schemeList.find(s => s.name === selectedSchemeId.value)
-        if (currentScheme) {
-            currentSchemeName.value = currentScheme.name
-            saveSelectedSchemeToStorage(selectedSchemeId.value)
-        } else {
+                    if (currentScheme) {
+                        currentSchemeName.value = currentScheme.name
+                        saveSelectedSchemeToStorage(selectedSchemeId.value)
+                    } else {
             selectedSchemeId.value = schemeList[0].name
             currentSchemeName.value = schemeList[0].name
             saveSelectedSchemeToStorage(schemeList[0].name)
-        }
-    }
-}
+                    }
+                }
+            }
 
 // 加载方案列表
 const loadSchemeList = async () => {

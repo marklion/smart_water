@@ -338,7 +338,7 @@
 import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Plus, Setting } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import WateringGroupStatus from '../../../../policy/gui/WateringGroupStatus.vue'
@@ -795,7 +795,48 @@ const onDeviceClick = (device) => {
 
 // 处理设备操作
 const handleDeviceAction = async (action, deviceName) => {
-  await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo)
+  // 设置关键参数需要特殊处理，需要用户输入值
+  if (action === 'setDeviceKeyValue') {
+    let numericValue = undefined
+    try {
+      const result = await ElMessageBox.prompt('请输入关键参数值:', '设置关键参数', {
+        confirmButtonText: '设置',
+        cancelButtonText: '取消',
+        inputPattern: /^-?\d+(\.\d+)?$/,
+        inputErrorMessage: '请输入有效的数字值'
+      })
+
+      const value = result?.value
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        ElMessage.error('参数值不能为空，操作已取消')
+        return
+      }
+
+      numericValue = Number.parseFloat(value)
+      if (isNaN(numericValue)) {
+        ElMessage.error('无效的数字值，操作已取消')
+        return
+      }
+    } catch (error) {
+      // 用户取消输入时，ElMessageBox.prompt 会 reject，这是正常行为，不需要显示错误
+      // 只有当错误不是取消操作时才记录
+      if (error && error !== 'cancel' && error.toString().indexOf('cancel') === -1) {
+        console.error('设置关键参数时出错:', error)
+      }
+      return // 用户取消，直接返回
+    }
+
+    // 确保 numericValue 有效后再调用
+    if (numericValue === undefined || numericValue === null || isNaN(numericValue)) {
+      ElMessage.error('参数值无效，操作已取消')
+      return
+    }
+
+    await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo, numericValue)
+  } else {
+    // 其他操作直接调用
+    await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo)
+  }
 }
 
 // 刷新运行时信息

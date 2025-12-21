@@ -346,6 +346,61 @@ async function saveSchemeFile(body, expectedGroupNames, deletedGroups) {
     }
 }
 
+// 辅助函数：查找方案文件
+function findSchemeFile(files, schemeId, farmName) {
+    // 先尝试新格式：农场名称_plan_方案名称.txt
+    if (farmName) {
+        const preferred = `${farmName}_plan_${schemeId}.txt`;
+        if (files.includes(preferred)) {
+            return preferred;
+        }
+    }
+
+    // 兼容旧格式：plan_方案名称.txt
+    return files.find(f => {
+        if (!f.endsWith('.txt')) return false;
+        if (f === 'sw_cli_config.txt' || f === 'tmp_config_for_restore.txt') return false;
+
+        const withoutExt = f.replace(/\.txt$/, '');
+        if (withoutExt.startsWith('plan_')) {
+            return withoutExt === `plan_${schemeId}`;
+        }
+
+        const idx = withoutExt.lastIndexOf('_plan_');
+        if (idx === -1) return false;
+        const farmPart = withoutExt.substring(0, idx);
+        const namePart = withoutExt.substring(idx + '_plan_'.length);
+        if (namePart !== schemeId) return false;
+        if (farmName && farmPart !== farmName) return false;
+        return true;
+    });
+}
+
+// 辅助函数：从文件设置轮灌组的 scheme_id
+async function setGroupsSchemeIdFromFile(filename, schemeId, fs) {
+    try {
+        if (!fs.existsSync(filename)) return;
+        
+        const content = fs.readFileSync(filename, 'utf-8');
+        const allGroupsMatch = content.match(/所有轮灌组[^[]*\[([^\]]+)\]/);
+        if (!allGroupsMatch) return;
+
+        const groupsStr = allGroupsMatch[1];
+        const groupNames = groupsStr.match(/"([^"]+)"/g);
+        if (!groupNames) return;
+
+        const groupNameList = groupNames.map(name => name.replace(/"/g, ''));
+        for (const groupName of groupNameList) {
+            const policy = policy_array.find(p => p.name === groupName);
+            if (policy) {
+                policy.scheme_id = schemeId;
+            }
+        }
+    } catch (parseError) {
+        console.warn(`解析方案文件失败，无法自动设置 scheme_id:`, parseError);
+    }
+}
+
 // 扫描周期配置，默认为0（不扫描）
 let scan_period_ms = 0
 // 扫描定时器

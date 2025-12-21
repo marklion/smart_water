@@ -334,15 +334,15 @@ const loadWateringGroups = async () => {
         filteredGroups = filterGroupsByScheme(filteredGroups, response.groups)
         filteredGroups = await filterGroupsByFarm(filteredGroups, response.groups)
 
-        if (filteredGroups.length === 0 && selectedSchemeId.value && schemeWateringGroups.value.length > 0) {
-            ElMessage.warning({
-                message: `方案"${selectedSchemeId.value}"中包含 ${schemeWateringGroups.value.length} 个轮灌组，但当前没有加载的轮灌组数据。请先应用方案。`,
-                duration: 5000
-            })
-        }
+            if (filteredGroups.length === 0 && selectedSchemeId.value && schemeWateringGroups.value.length > 0) {
+                ElMessage.warning({
+                    message: `方案"${selectedSchemeId.value}"中包含 ${schemeWateringGroups.value.length} 个轮灌组，但当前没有加载的轮灌组数据。请先应用方案。`,
+                    duration: 5000
+                })
+            }
 
         irrigationGroups.value = transformGroups(filteredGroups)
-        await loadWaterOnlyStates()
+            await loadWaterOnlyStates()
     } catch (error) {
         ElMessage.error('加载轮灌组数据失败')
         irrigationGroups.value = []
