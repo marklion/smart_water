@@ -5,13 +5,11 @@
 
     <!-- 主要内容区域 - 使用 scroll-view 支持滚动 -->
     <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
-      <!-- 用户欢迎信息 -->
-      <view class="user-welcome">
-        <fui-text :text="userInfo + ', 欢迎您'" :size="28" color="#606266"></fui-text>
-      </view>
-
       <!-- 内容区域 -->
       <view class="content">
+        <!-- 天气卡片 - 第一个位置 -->
+        <WeatherCard />
+
         <!-- 基本信息卡片 -->
         <BasicInfoCard ref="basicInfoCardRef" :farmName="currentFarmName" />
 
@@ -32,14 +30,13 @@
 import { ref, nextTick } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import call_remote from '../../../lib/call_remote.js'
-import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import PageHeader from '../components/PageHeader.vue'
 import Loading from '../components/Loading.vue'
 import BasicInfoCard from './monitoring/BasicInfoCard.vue'
 import RealtimeDataCard from './monitoring/RealtimeDataCard.vue'
 import DataPanelCard from './monitoring/DataPanelCard.vue'
+import WeatherCard from './monitoring/WeatherCard.vue'
 
-const userInfo = ref('')
 const refreshing = ref(false)
 const pageLoading = ref(false)
 const isFirstLoad = ref(true) // 标记是否是首次加载
@@ -53,13 +50,6 @@ const dataPanelCardRef = ref(null)
 // 农场相关
 const currentFarmName = ref('')
 
-// 加载用户信息
-const loadUserInfo = () => {
-  const username = uni.getStorageSync('username') || (typeof localStorage !== 'undefined' ? localStorage.getItem('username') : '')
-  const userEmail = uni.getStorageSync('userEmail') || (typeof localStorage !== 'undefined' ? localStorage.getItem('userEmail') : '')
-  userInfo.value = userEmail || username || '用户'
-}
-
 // 农场切换事件
 const onFarmChange = (farmName) => {
   currentFarmName.value = farmName
@@ -70,9 +60,6 @@ const onFarmChange = (farmName) => {
 const onRefresh = async () => {
   refreshing.value = true
   try {
-    // 刷新用户信息
-    loadUserInfo()
-
     // 并行刷新所有组件
     const refreshTasks = []
 
@@ -148,7 +135,6 @@ onShow(async () => {
   }
 
   try {
-    loadUserInfo()
     // 等待顶部组件加载完成，获取当前农场名称
     await nextTick()
     if (pageHeaderRef.value) {
@@ -195,13 +181,6 @@ onShow(async () => {
   margin-right: 0;
   padding-left: 0;
   padding-right: 0;
-}
-
-/* 用户欢迎信息 */
-.user-welcome {
-  padding: 24rpx 40rpx;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 /* 内容区域 */
