@@ -18,13 +18,31 @@
             <div class="policy-wizard">
                 <!-- 步骤指示器 -->
                 <el-steps :active="wizardStep - 1" finish-status="success" align-center class="wizard-steps">
+                    <el-step title="创建方案" description="输入方案名称" />
                     <el-step title="创建轮灌组" description="设置轮灌组名称和面积" />
                     <el-step title="分配设备" description="为轮灌组分配阀门设备" />
                     <el-step title="施肥配置" description="设置施肥方式和参数" />
                 </el-steps>
 
-                <!-- 步骤1：创建轮灌组 -->
+                <!-- 步骤1：创建方案 -->
                 <div v-if="wizardStep === 1" class="wizard-step-content">
+                    <div class="scheme-name-input">
+                        <div class="input-section">
+                            <label class="input-label">方案名称：</label>
+                            <el-input v-model="schemeName" placeholder="请输入方案名称（用于保存配置文件）" style="width: 400px;"
+                                maxlength="50" show-word-limit />
+                            <div class="input-hint">
+                                <el-icon>
+                                    <InfoFilled />
+                                </el-icon>
+                                <span>配置将保存为：plan_{{ schemeName || '方案名称' }}.txt</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步骤2：创建轮灌组 -->
+                <div v-if="wizardStep === 2" class="wizard-step-content">
                 
                     <div class="watering-groups-config">
                         <div class="groups-header">
@@ -39,113 +57,6 @@
                             </div>
                         </div>
 
-                        <!-- 已配置的轮灌组 -->
-                        <div v-if="existingGroups.length > 0" class="existing-groups-section">
-                            <div class="existing-groups-header">
-                                <span>已配置的轮灌组（点击复制新增）</span>
-                                <span class="groups-count">共 {{ existingGroups.length }} 个</span>
-                            </div>
-                            <div class="existing-groups-list">
-                                <div v-for="existingGroup in existingGroups" :key="existingGroup.name"
-                                    class="existing-group-item">
-                                    <el-button type="primary" size="small" @click="copyExistingGroup(existingGroup)"
-                                        :icon="CopyDocument" class="existing-group-btn">
-                                        <span class="btn-text">复制 {{ existingGroup.name }}</span>
-                                    </el-button>
-                                    <el-popover :width="600" placement="right" trigger="click"
-                                        popper-class="group-detail-popover">
-                                        <template #reference>
-                                            <el-button type="info" size="small" :icon="View" class="view-group-btn">
-                                                查看
-                                            </el-button>
-                                        </template>
-                                        <template #default>
-                                            <div class="group-detail-popover-content">
-                                                <div class="popover-header">
-                                                    <h4 class="popover-title">{{ existingGroup.name }} - 配置详情</h4>
-                                                </div>
-                                                <div style="padding: 20px 24px;">
-                                                    <div class="detail-section">
-                                                        <h5 class="section-title">基本信息</h5>
-                                                        <div class="detail-row">
-                                                            <span class="detail-label">轮灌组名称：</span>
-                                                            <span class="detail-value">{{ existingGroup.name }}</span>
-                                                        </div>
-                                                        <div class="detail-row">
-                                                            <span class="detail-label">面积：</span>
-                                                            <span class="detail-value">{{ existingGroup.area }} 亩</span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="detail-section">
-                                                        <h5 class="section-title">阀门配置</h5>
-                                                        <div v-if="existingGroup.valves && existingGroup.valves.length > 0"
-                                                            class="valves-list">
-                                                            <el-tag v-for="(valve, index) in existingGroup.valves"
-                                                                :key="index" type="primary" class="valve-tag">
-                                                                {{ valve }}
-                                                            </el-tag>
-                                                        </div>
-                                                        <div v-else class="no-data">未配置阀门</div>
-                                                        <div class="detail-row">
-                                                            <span class="detail-label">阀门数量：</span>
-                                                            <span class="detail-value">{{ existingGroup.valves?.length
-                                                                || 0
-                                                                }} 个</span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="detail-section">
-                                                        <h5 class="section-title">施肥配置</h5>
-                                                        <div class="detail-row">
-                                                            <span class="detail-label">施肥方式：</span>
-                                                            <span class="detail-value">
-                                                                {{ existingGroup.fertConfig?.method === 'AreaBased' ?
-                                                                    '亩定量'
-                                                                    :
-                                                                    existingGroup.fertConfig?.method === 'Total' ? '总定量' :
-                                                                existingGroup.fertConfig?.method === 'Time' ? '定时' :
-                                                                '未知' }}
-                                                            </span>
-                                                        </div>
-                                                        <div v-if="existingGroup.fertConfig?.method === 'AreaBased'"
-                                                            class="detail-row">
-                                                            <span class="detail-label">亩定量：</span>
-                                                            <span class="detail-value">{{
-                                                                existingGroup.fertConfig?.AB_fert
-                                                                || 0 }} L/亩</span>
-                                                        </div>
-                                                        <div v-if="existingGroup.fertConfig?.method === 'Total'"
-                                                            class="detail-row">
-                                                            <span class="detail-label">总定量：</span>
-                                                            <span class="detail-value">{{
-                                                                existingGroup.fertConfig?.total_fert || 0 }} L</span>
-                                                        </div>
-                                                        <div v-if="existingGroup.fertConfig?.method === 'Time'"
-                                                            class="detail-row">
-                                                            <span class="detail-label">施肥时间：</span>
-                                                            <span class="detail-value">{{
-                                                                existingGroup.fertConfig?.fert_time || 0 }} 分钟</span>
-                                                        </div>
-                                                        <div class="detail-row">
-                                                            <span class="detail-label">肥后时间：</span>
-                                                            <span class="detail-value">{{
-                                                                existingGroup.fertConfig?.post_fert_time || 0 }}
-                                                                分钟</span>
-                                                        </div>
-                                                        <div class="detail-row">
-                                                            <span class="detail-label">总灌溉时间：</span>
-                                                            <span class="detail-value">{{
-                                                                existingGroup.fertConfig?.total_time || 0 }} 分钟</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </el-popover>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- 轮灌组列表 -->
                         <div v-for="(group, index) in wateringGroups" :key="index" class="group-item">
@@ -213,15 +124,126 @@
                                     </div>
                                 </el-popover>
                             </div>
-                            <el-button type="danger" size="small" @click="removeWateringGroup(index)" :icon="Delete">
-                                删除
-                            </el-button>
+                            <div class="group-actions">
+                                <el-button v-if="group.area > 0" type="primary" size="small" :icon="CopyDocument"
+                                    @click="copyWateringGroup(group, index)" class="copy-group-btn">
+                                    复制
+                                </el-button>
+                                <el-popover v-if="group.area > 0" :width="600" placement="left" trigger="click"
+                                    popper-class="group-detail-popover">
+                                    <template #reference>
+                                        <el-button type="info" size="small" :icon="View" class="view-group-btn">
+                                            查看
+                                        </el-button>
+                                    </template>
+                                    <template #default>
+                                        <div class="group-detail-popover-content">
+                                            <div class="popover-header">
+                                                <h4 class="popover-title">{{ group.name }} - 配置详情</h4>
+                                            </div>
+                                            <div style="padding: 20px 24px;">
+                                                <div class="detail-section">
+                                                    <h5 class="section-title">基本信息</h5>
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">轮灌组名称：</span>
+                                                        <span class="detail-value">{{ group.name }}</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">面积：</span>
+                                                        <span class="detail-value">{{ group.area }} 亩</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="detail-section">
+                                                    <h5 class="section-title">阀门配置</h5>
+                                                    <div v-if="selectedValveDevices[group.configKey || group.name] && selectedValveDevices[group.configKey || group.name].length > 0"
+                                                        class="valves-list">
+                                                        <el-tag
+                                                            v-for="(valve, idx) in selectedValveDevices[group.configKey || group.name]"
+                                                            :key="idx" type="primary" class="valve-tag">
+                                                            {{ valve }}
+                                                        </el-tag>
+                                                    </div>
+                                                    <div v-else class="no-data">未配置阀门</div>
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">阀门数量：</span>
+                                                        <span class="detail-value">{{
+                                                            selectedValveDevices[group.configKey || group.name]?.length
+                                                            || 0 }} 个</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="detail-section">
+                                                    <h5 class="section-title">施肥配置</h5>
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">施肥方式：</span>
+                                                        <span class="detail-value">
+                                                            {{ fertConfigs[group.configKey || group.name]?.method ===
+                                                                'WaterOnly' ? '只浇水' :
+                                                                fertConfigs[group.configKey || group.name]?.method ===
+                                                                    'AreaBased' ? '亩定量' :
+                                                                    fertConfigs[group.configKey || group.name]?.method ===
+                                                            'Total' ? '总定量' :
+                                                            fertConfigs[group.configKey || group.name]?.method ===
+                                                            'Time' ? '定时' : '未配置' }}
+                                                        </span>
+                                                    </div>
+                                                    <!-- 只浇水模式 -->
+                                                    <template
+                                                        v-if="fertConfigs[group.configKey || group.name]?.method === 'WaterOnly'">
+                                                        <div class="detail-row">
+                                                            <span class="detail-label">总灌溉时间：</span>
+                                                            <span class="detail-value">{{ fertConfigs[group.configKey ||
+                                                                group.name]?.total_time || 0 }} 分钟</span>
+                                                        </div>
+                                                    </template>
+                                                    <!-- 非只浇水模式 -->
+                                                    <template v-else>
+                                                    <div v-if="fertConfigs[group.configKey || group.name]?.method === 'AreaBased'"
+                                                        class="detail-row">
+                                                        <span class="detail-label">亩定量：</span>
+                                                            <span class="detail-value">{{ fertConfigs[group.configKey ||
+                                                                group.name]?.AB_fert || 0 }} L/亩</span>
+                                                    </div>
+                                                    <div v-if="fertConfigs[group.configKey || group.name]?.method === 'Total'"
+                                                        class="detail-row">
+                                                        <span class="detail-label">总定量：</span>
+                                                            <span class="detail-value">{{ fertConfigs[group.configKey ||
+                                                                group.name]?.total_fert || 0 }} L</span>
+                                                    </div>
+                                                    <div v-if="fertConfigs[group.configKey || group.name]?.method === 'Time'"
+                                                        class="detail-row">
+                                                        <span class="detail-label">施肥时间：</span>
+                                                            <span class="detail-value">{{ fertConfigs[group.configKey ||
+                                                                group.name]?.fert_time || 0 }} 分钟</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                            <span class="detail-label">肥前时间：</span>
+                                                            <span class="detail-value">{{ fertConfigs[group.configKey ||
+                                                                group.name]?.pre_fert_time || 0 }} 分钟</span>
+                                                    </div>
+                                                    <div class="detail-row">
+                                                            <span class="detail-label">肥后时间：</span>
+                                                            <span class="detail-value">{{ fertConfigs[group.configKey ||
+                                                                group.name]?.post_fert_time || 0 }} 分钟</span>
+                                                    </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </el-popover>
+                                <el-button type="danger" size="small" @click="removeWateringGroup(index)"
+                                    :icon="Delete">
+                                    删除
+                                </el-button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 步骤2：分配设备 -->
-                <div v-if="wizardStep === 2" class="wizard-step-content">
+                <!-- 步骤3：分配设备 -->
+                <div v-if="wizardStep === 3" class="wizard-step-content">
                     <div class="step-header">
                         <div v-if="availableValveDevices.length === 0" class="no-devices-warning">
                             <el-alert title="未找到WaterGroupValve设备" type="warning"
@@ -330,61 +352,67 @@
                     </div>
                 </div>
 
-                <!-- 步骤3：施肥配置 -->
-                <div v-if="wizardStep === 3" class="wizard-step-content">
+                <!-- 步骤4：施肥配置 -->
+                <div v-if="wizardStep === 4" class="wizard-step-content">
 
                     <div class="fert-config">
-                        <div v-for="group in wateringGroups.filter(g => g.isCopied !== true)" :key="group.name"
-                            class="group-fert-config">
+                        <div v-for="group in wateringGroups" :key="group.name" class="group-fert-config">
                             <h4>{{ group.name }}</h4>
 
                             <div class="fert-method">
                                 <label>施肥方式：</label>
-                                <el-radio-group v-model="fertConfigs[group.configKey || group.name].method">
+                                <el-radio-group v-model="getFertConfig(group).method">
+                                    <el-radio value="WaterOnly">只浇水</el-radio>
                                     <el-radio value="AreaBased">亩定量</el-radio>
                                     <el-radio value="Total">总定量</el-radio>
                                     <el-radio value="Time">定时</el-radio>
                                 </el-radio-group>
                             </div>
 
-                            <div class="fert-params">
-                                <div v-if="fertConfigs[group.configKey || group.name].method === 'AreaBased'"
-                                    class="param-item">
+                            <div v-if="getFertConfig(group).method !== 'WaterOnly'" class="fert-params">
+                                <div v-if="getFertConfig(group).method === 'AreaBased'" class="param-item">
                                     <label>每亩施肥量：</label>
-                                    <el-input-number v-model="fertConfigs[group.configKey || group.name].AB_fert"
-                                        :min="0" :precision="2" placeholder="施肥量" />
+                                    <el-input-number v-model="getFertConfig(group).AB_fert" :min="0" :precision="2"
+                                        placeholder="施肥量" />
                                     <span class="unit">L/亩</span>
                                 </div>
 
-                                <div v-if="fertConfigs[group.configKey || group.name].method === 'Total'"
-                                    class="param-item">
+                                <div v-if="getFertConfig(group).method === 'Total'" class="param-item">
                                     <label>施肥总量：</label>
-                                    <el-input-number v-model="fertConfigs[group.configKey || group.name].total_fert"
-                                        :min="0" :precision="2" placeholder="总量" />
+                                    <el-input-number v-model="getFertConfig(group).total_fert" :min="0" :precision="2"
+                                        placeholder="总量" />
                                     <span class="unit">L</span>
                                 </div>
 
-                                <div v-if="fertConfigs[group.configKey || group.name].method === 'Time'"
-                                    class="param-item">
+                                <div v-if="getFertConfig(group).method === 'Time'" class="param-item">
                                     <label>施肥时间：</label>
-                                    <el-input-number v-model="fertConfigs[group.configKey || group.name].fert_time"
-                                        :min="0" :precision="1" placeholder="施肥时间" />
+                                    <el-input-number v-model="getFertConfig(group).fert_time" :min="0" :precision="1"
+                                        placeholder="施肥时间" />
                                     <span class="unit">分钟</span>
                                 </div>
                             </div>
 
-                            <div class="time-params">
+                            <div v-if="getFertConfig(group).method === 'WaterOnly'" class="time-params">
                                 <div class="param-item">
-                                    <label>灌溉总时间：</label>
-                                    <el-input-number v-model="fertConfigs[group.configKey || group.name].total_time"
-                                        :min="0" :precision="1" placeholder="灌溉总时间" />
+                                    <label>总灌溉时间：</label>
+                                    <el-input-number v-model="getFertConfig(group).total_time" :min="0" :precision="1"
+                                        placeholder="总灌溉时间" />
+                                    <span class="unit">分钟</span>
+                                </div>
+                            </div>
+
+                            <div v-else class="time-params">
+                                <div class="param-item">
+                                    <label>肥前时间：</label>
+                                    <el-input-number v-model="getFertConfig(group).pre_fert_time" :min="0"
+                                        :precision="1" placeholder="肥前时间" />
                                     <span class="unit">分钟</span>
                                 </div>
 
                                 <div class="param-item">
                                     <label>肥后时间：</label>
-                                    <el-input-number v-model="fertConfigs[group.configKey || group.name].post_fert_time"
-                                        :min="0" :precision="1" placeholder="肥后时间" />
+                                    <el-input-number v-model="getFertConfig(group).post_fert_time" :min="0"
+                                        :precision="1" placeholder="肥后时间" />
                                     <span class="unit">分钟</span>
                                 </div>
                             </div>
@@ -396,18 +424,23 @@
                 <div class="wizard-actions">
                     <el-button v-if="wizardStep > 1" @click="prevStep">上一步</el-button>
 
-                    <el-button v-if="wizardStep === 2 && allGroupsAreCopied" type="success" @click="finishWizard">
-                        完成配置
+                    <el-button v-if="wizardStep === 1" type="primary" @click="nextStep"
+                        :disabled="!schemeName || schemeName.trim() === ''">
+                        下一步
+                    </el-button>
+
+                    <el-button v-if="wizardStep === 2 && allGroupsAreCopied" type="primary" @click="nextStep">
+                        下一步
                     </el-button>
                     <el-button v-else-if="wizardStep === 2" type="primary" @click="nextStep">
                         下一步
                     </el-button>
 
-                    <el-button v-else-if="wizardStep === 1" type="primary" @click="nextStep">
+                    <el-button v-if="wizardStep === 3" type="primary" @click="nextStep">
                         下一步
                     </el-button>
 
-                    <el-button v-if="wizardStep === 3" type="success" @click="finishWizard">
+                    <el-button v-if="wizardStep === 4" type="success" @click="finishWizard">
                         完成配置
                     </el-button>
                 </div>
@@ -428,16 +461,32 @@
                 </div>
             </div>
         </el-dialog>
+
+        <!-- 创建方案对话框 -->
+        <el-dialog v-model="createSchemeDialogVisible" title="创建新方案" width="500px">
+            <el-form :model="{ name: newSchemeName, description: newSchemeDescription }" label-width="80px">
+                <el-form-item label="方案名称" required>
+                    <el-input v-model="newSchemeName" placeholder="请输入方案名称" />
+                </el-form-item>
+                <el-form-item label="方案描述">
+                    <el-input v-model="newSchemeDescription" type="textarea" :rows="3" placeholder="请输入方案描述（可选）" />
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="createSchemeDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="createScheme">创建</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
     Document, Close, Refresh, Plus, Delete, CopyDocument,
-    ArrowLeft, ArrowRight, Check, View, FullScreen
+    ArrowLeft, ArrowRight, Check, View, FullScreen, InfoFilled
 } from '@element-plus/icons-vue'
 import call_remote from '../../public/lib/call_remote.js'
 import policy_lib from '../lib/policy_lib.js'
@@ -445,9 +494,18 @@ import device_management_lib from '../../device/lib/device_management_lib.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon } from '../../public/gui/src/config/mapConfig.js'
 
 const router = useRouter()
+const route = useRoute()
 
 // 向导步骤
 const wizardStep = ref(1)
+
+// 方案数据
+const schemes = ref([])
+const selectedSchemeId = ref(null)
+const createSchemeDialogVisible = ref(false)
+const newSchemeName = ref('')
+const newSchemeDescription = ref('')
+const schemeName = ref('') // 方案名称（用于保存配置文件）
 
 // 轮灌组数据
 const wateringGroups = ref([])
@@ -467,6 +525,112 @@ const fullscreenMapMarkers = ref([])
 
 // 施肥配置
 const fertConfigs = ref({})
+// 存储初始配置快照，用于对比变更
+const initialFertConfigs = ref({})
+// 存储初始面积快照
+const initialAreas = ref({})
+// 存储变更的轮灌组配置
+const changedFertConfigs = ref({})
+// 存储变更的面积
+const changedAreas = ref({})
+
+// 获取轮灌组的施肥配置，如果不存在则初始化
+const getFertConfig = (group) => {
+    const key = group.configKey || group.name
+    if (!fertConfigs.value[key]) {
+        fertConfigs.value[key] = {
+            method: 'AreaBased',
+            AB_fert: 0,
+            total_fert: 0,
+            fert_time: 0,
+            pre_fert_time: 0,
+            post_fert_time: 0,
+            total_time: 0,
+        }
+    }
+    return fertConfigs.value[key]
+}
+
+// 保存初始配置快照
+const saveInitialFertConfigs = () => {
+    initialFertConfigs.value = JSON.parse(JSON.stringify(fertConfigs.value))
+    initialAreas.value = {}
+    wateringGroups.value.forEach(group => {
+        const key = group.configKey || group.name
+        initialAreas.value[key] = group.area || 0
+    })
+    changedFertConfigs.value = {}
+    changedAreas.value = {}
+}
+
+// 监听面积变化
+watch(() => wateringGroups.value.map(g => ({ key: g.configKey || g.name, area: g.area })), (newAreas) => {
+    if (!initialAreas.value || Object.keys(initialAreas.value).length === 0) {
+        return
+    }
+    
+    newAreas.forEach(({ key, area }) => {
+        const oldArea = initialAreas.value[key] || 0
+        if (area !== oldArea) {
+            changedAreas.value[key] = area
+        } else {
+            delete changedAreas.value[key]
+        }
+    })
+}, { deep: true })
+
+// 监听 fertConfigs 的变化，只记录变更的配置
+// 监听方案变化，自动刷新已配置的轮灌组列表
+watch(selectedSchemeId, async (newSchemeId, oldSchemeId) => {
+    if (newSchemeId !== oldSchemeId && wizardStep >= 2) {
+        // 如果已经在步骤2或之后，且方案发生了变化，重新加载已配置的轮灌组
+        console.log(`方案变化: ${oldSchemeId} -> ${newSchemeId}，重新加载轮灌组列表`)
+        await loadExistingGroups()
+    }
+}, { immediate: false })
+
+watch(fertConfigs, (newConfigs, oldConfigs) => {
+    if (!initialFertConfigs.value || Object.keys(initialFertConfigs.value).length === 0) {
+        return
+    }
+    
+    // 检查每个轮灌组的配置是否有变更
+    Object.keys(newConfigs).forEach(key => {
+        const newConfig = newConfigs[key]
+        const oldConfig = initialFertConfigs.value[key]
+        
+        if (!oldConfig) {
+            // 新添加的配置，记录全部
+            changedFertConfigs.value[key] = JSON.parse(JSON.stringify(newConfig))
+            return
+        }
+        
+        // 检查是否有变更
+        const hasChanged = 
+            newConfig.method !== oldConfig.method ||
+            newConfig.AB_fert !== oldConfig.AB_fert ||
+            newConfig.total_fert !== oldConfig.total_fert ||
+            newConfig.fert_time !== oldConfig.fert_time ||
+            newConfig.total_time !== oldConfig.total_time ||
+            newConfig.post_fert_time !== oldConfig.post_fert_time
+        
+        if (hasChanged) {
+            // 只记录变更的字段
+            const changed = {}
+            if (newConfig.method !== oldConfig.method) changed.method = newConfig.method
+            if (newConfig.AB_fert !== oldConfig.AB_fert) changed.AB_fert = newConfig.AB_fert
+            if (newConfig.total_fert !== oldConfig.total_fert) changed.total_fert = newConfig.total_fert
+            if (newConfig.fert_time !== oldConfig.fert_time) changed.fert_time = newConfig.fert_time
+            if (newConfig.total_time !== oldConfig.total_time) changed.total_time = newConfig.total_time
+            if (newConfig.post_fert_time !== oldConfig.post_fert_time) changed.post_fert_time = newConfig.post_fert_time
+            
+            changedFertConfigs.value[key] = { ...oldConfig, ...changed }
+        } else {
+            // 如果没有变更，从变更列表中移除
+            delete changedFertConfigs.value[key]
+        }
+    })
+}, { deep: true })
 
 // 面积参数
 const farmAreaParams = ref({
@@ -540,8 +704,9 @@ const addWateringGroup = async () => {
             AB_fert: 0,
             total_fert: 0,
             fert_time: 0,
-            total_time: 0,
+            pre_fert_time: 0,
             post_fert_time: 0,
+            total_time: 0,
         }
         areaParamsPopoverVisible.value[index] = false
     } catch (error) {
@@ -626,6 +791,40 @@ const parseTimeValue = (expression) => {
     return value
 }
 
+// 辅助函数：处理时间变量
+const handleTimeVariable = (varName, expression, fertConfig) => {
+    if (varName === 'fert_time' || varName === '施肥时间') {
+        fertConfig.fert_time = parseTimeValue(expression)
+        return true
+    }
+    if (varName === 'pre_ms' || varName === '肥前时间') {
+        if (fertConfig.pre_fert_time === undefined) {
+            fertConfig.pre_fert_time = parseTimeValue(expression)
+        }
+        return true
+    }
+    if (varName === 'post_ms' || varName === '肥后时间') {
+        if (fertConfig.post_fert_time === undefined) {
+            fertConfig.post_fert_time = parseTimeValue(expression)
+        }
+        return true
+    }
+    return false
+}
+
+// 辅助函数：处理施肥量变量
+const handleFertAmountVariable = (varName, expression, fertConfig) => {
+    if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
+        fertConfig.AB_fert = parseFloat(expression) || 0
+        return true
+    }
+    if (varName === '期望施肥总量') {
+        fertConfig.total_fert = parseFloat(expression) || 0
+        return true
+    }
+    return false
+}
+
 const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
     for (const initVar of initVariables) {
         const varName = initVar.variable_name
@@ -633,14 +832,10 @@ const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
 
         if (varName === 'method' || varName === '施肥策略') {
             fertConfig.method = parseFertMethod(expression)
-        } else if (varName === 'fert_time' || varName === '施肥时间') {
-            fertConfig.fert_time = parseTimeValue(expression)
-        } else if (varName === 'post_ms' || varName === '肥后时间') {
-            fertConfig.post_fert_time = parseTimeValue(expression)
-        } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
-            fertConfig.AB_fert = parseFloat(expression) || 0
-        } else if (varName === '期望施肥总量') {
-            fertConfig.total_fert = parseFloat(expression) || 0
+        } else if (handleTimeVariable(varName, expression, fertConfig)) {
+            // 已处理时间变量
+        } else if (handleFertAmountVariable(varName, expression, fertConfig)) {
+            // 已处理施肥量变量
         }
     }
 
@@ -681,13 +876,180 @@ const parseValvesFromGroup = (group) => {
     return matches ? matches.map(m => m.replace(/"/g, '')) : []
 }
 
+// 辅助函数：解析基础信息（面积和阀门）
+const parseBasicGroupInfo = (policyContent) => {
+    let area = 0
+    let valves = []
+
+    const areaMatch = policyContent.match(/init assignment\s+'false'\s+'面积'\s+'([^']+)'/)
+    if (areaMatch) {
+        area = parseFloat(areaMatch[1]) || 0
+    }
+
+    const valveMatch = policyContent.match(/init assignment\s+'false'\s+'组内阀门'\s+'"([^"]+)"'/)
+    if (valveMatch) {
+        valves = valveMatch[1].split(',').map(v => v.trim()).filter(v => v)
+    }
+
+    return { area, valves }
+}
+
+// 辅助函数：解析只浇水模式配置
+const parseWaterOnlyConfig = (policyContent) => {
+    const fertConfig = {
+        method: 'WaterOnly',
+            AB_fert: 0,
+            total_fert: 0,
+            fert_time: 0,
+        pre_fert_time: 0,
+            post_fert_time: 0,
+            total_time: 0,
+        water_only: true,
+        }
+        
+    const totalTimeMatch = policyContent.match(/init assignment\s+'false'\s+'总灌溉时间'\s+'([^']+)'/)
+    if (totalTimeMatch) {
+        fertConfig.total_time = parseFloat(totalTimeMatch[1]) / 60000 || 0
+    }
+
+    return fertConfig
+        }
+        
+// 辅助函数：解析施肥策略（从方案内容）
+const parseFertMethodFromContent = (policyContent) => {
+        const fertMethodMatch = policyContent.match(/init assignment\s+'false'\s+'施肥策略'\s+'([^']+)'/)
+    if (!fertMethodMatch) return null
+
+            const method = fertMethodMatch[1]
+            if (method === '定量') {
+                const perMuMatch = policyContent.match(/init assignment\s+'false'\s+'期望每亩施肥量'\s+'([^']+)'/)
+                const totalMatch = policyContent.match(/init assignment\s+'false'\s+'期望施肥总量'\s+'([^']+)'/)
+                if (perMuMatch) {
+            return {
+                method: 'AreaBased',
+                AB_fert: parseFloat(perMuMatch[1]) || 0,
+                total_fert: 0
+            }
+        }
+        if (totalMatch) {
+            return {
+                method: 'Total',
+                AB_fert: 0,
+                total_fert: parseFloat(totalMatch[1]) || 0
+            }
+                }
+            } else if (method === '定时') {
+                const timeMatch = policyContent.match(/init assignment\s+'false'\s+'施肥时间'\s+'([^']+)'/)
+        return {
+            method: 'Time',
+            AB_fert: 0,
+            total_fert: 0,
+            fert_time: timeMatch ? parseFloat(timeMatch[1]) / 60000 || 0 : 0
+                }
+            }
+    return null
+        }
+        
+// 辅助函数：解析时间参数
+const parseTimeParams = (policyContent, fertMethod) => {
+        const preTimeMatch = policyContent.match(/init assignment\s+'false'\s+'肥前时间'\s+'([^']+)'/)
+        const fertTimeMatch = policyContent.match(/init assignment\s+'false'\s+'施肥时间'\s+'([^']+)'/)
+        const postTimeMatch = policyContent.match(/init assignment\s+'false'\s+'肥后时间'\s+'([^']+)'/)
+        const totalTimeMatch = policyContent.match(/init assignment\s+'false'\s+'总灌溉时间'\s+'([^']+)'/)
+        
+        const preTimeMs = preTimeMatch ? parseFloat(preTimeMatch[1]) || 0 : 0
+        const fertTimeMs = fertTimeMatch ? parseFloat(fertTimeMatch[1]) || 0 : 0
+        const postTimeMs = postTimeMatch ? parseFloat(postTimeMatch[1]) || 0 : 0
+        
+    const pre_fert_time = preTimeMs / 60000
+    const post_fert_time = postTimeMs / 60000
+    const fert_time = fertMethod === 'Time' ? fertTimeMs / 60000 : 0
+    const total_time = totalTimeMatch 
+        ? parseFloat(totalTimeMatch[1]) / 60000 || 0
+        : (preTimeMs + fertTimeMs + postTimeMs) / 60000
+
+    return { pre_fert_time, fert_time, post_fert_time, total_time }
+}
+
+// 辅助函数：解析非只浇水模式的施肥配置
+const parseFertConfig = (policyContent) => {
+    const fertConfig = {
+        method: 'AreaBased',
+        AB_fert: 0,
+        total_fert: 0,
+        fert_time: 0,
+        pre_fert_time: 0,
+        post_fert_time: 0,
+        total_time: 0,
+        water_only: false,
+    }
+
+    const methodInfo = parseFertMethodFromContent(policyContent)
+    if (methodInfo) {
+        fertConfig.method = methodInfo.method
+        fertConfig.AB_fert = methodInfo.AB_fert || 0
+        fertConfig.total_fert = methodInfo.total_fert || 0
+        if (methodInfo.fert_time !== undefined) {
+            fertConfig.fert_time = methodInfo.fert_time
+        }
+    }
+
+    const timeParams = parseTimeParams(policyContent, fertConfig.method)
+    Object.assign(fertConfig, timeParams)
+
+    return fertConfig
+}
+
+// 从方案内容解析轮灌组详细信息
+const parseGroupsFromSchemeContent = (content) => {
+    const groups = []
+    // 匹配所有 policy 块
+    const policyRegex = /policy\s+'([^']+)'([\s\S]*?)(?=policy\s+'|return\s+web|return\s+warning|return\s+statistic|return\s+config|$)/g
+    let match
+
+    while ((match = policyRegex.exec(content)) !== null) {
+        const groupName = match[1]
+        const policyContent = match[2]
+
+        // 关键过滤：只有包含 "watering group matrix" 的才是轮灌组策略
+        if (!policyContent.includes('watering group matrix')) {
+            continue
+        }
+
+        const { area, valves } = parseBasicGroupInfo(policyContent)
+
+        // 检查"是否只浇水"变量
+        const waterOnlyMatch = policyContent.match(/init assignment\s+'false'\s+'是否只浇水'\s+'([^']+)'/)
+        const isWaterOnly = waterOnlyMatch && (waterOnlyMatch[1] === 'true' || waterOnlyMatch[1] === true)
+
+        const fertConfig = isWaterOnly 
+            ? parseWaterOnlyConfig(policyContent)
+            : parseFertConfig(policyContent)
+        
+        groups.push({
+            name: groupName,
+            area,
+            valves,
+            fertConfig
+        })
+    }
+    
+    return groups
+}
+
 // 加载已配置的轮灌组
 const loadExistingGroups = async () => {
     try {
         const currentFarm = localStorage.getItem('selectedFarm') || '默认农场'
         const token = localStorage.getItem('auth_token')
 
-        const response = await call_remote('/policy/list_watering_groups', { pageNo: 0 }, token)
+        // 如果选择了方案，只加载属于该方案的轮灌组
+        const params = { pageNo: 0 }
+        if (selectedSchemeId.value) {
+            params.scheme_id = selectedSchemeId.value
+        }
+
+        const response = await call_remote('/policy/list_watering_groups', params, token)
         if (response && response.groups) {
             let filteredGroups = response.groups
             if (currentFarm && currentFarm !== '默认农场') {
@@ -727,6 +1089,7 @@ const loadExistingGroups = async () => {
                     AB_fert: 0,
                     total_fert: 0,
                     fert_time: 0,
+                    pre_fert_time: 0,
                     post_fert_time: 0,
                     total_time: group.total_time || 0,
                 }
@@ -745,15 +1108,39 @@ const loadExistingGroups = async () => {
                         }
                     }
 
-                    // 解析施肥配置，传入面积用于计算
-                    parseFertConfigFromVariables(policy.init_variables, fertConfig, area)
-
                     // 计算总灌溉时间：肥前时间 + 施肥时间 + 肥后时间
                     // 从策略变量中读取时间值（都是毫秒）
                     let preTimeMs = 0
                     let fertTimeMs = 0
                     let postTimeMs = 0
 
+                    // 检查"是否只浇水"变量（优先从 init_variables 读取）
+                    let isWaterOnly = false
+                    for (const initVar of policy.init_variables) {
+                        const varName = initVar.variable_name
+                        const expression = initVar.expression || ''
+                        if (varName === '是否只浇水') {
+                            isWaterOnly = expression === 'true' || expression === true
+                            if (isWaterOnly) {
+                                fertConfig.method = 'WaterOnly'
+                                fertConfig.water_only = true
+                            }
+                        }
+                    }
+
+                    // 如果只浇水模式，读取总灌溉时间
+                    if (isWaterOnly) {
+                        for (const initVar of policy.init_variables) {
+                            const varName = initVar.variable_name
+                            const expression = initVar.expression || ''
+                            if (varName === '总灌溉时间') {
+                                const totalTimeMs = parseFloat(expression) || 0
+                                fertConfig.total_time = totalTimeMs / 60000 // 转换为分钟
+                                break
+                            }
+                        }
+                    } else {
+                        // 非只浇水模式，读取三个独立时间参数
                     for (const initVar of policy.init_variables) {
                         const varName = initVar.variable_name
                         const expression = initVar.expression || ''
@@ -763,12 +1150,55 @@ const loadExistingGroups = async () => {
                             fertTimeMs = parseFloat(expression) || 0
                         } else if (varName === '肥后时间') {
                             postTimeMs = parseFloat(expression) || 0
+                            } else if (varName === '总灌溉时间') {
+                                const totalTimeMs = parseFloat(expression) || 0
+                                fertConfig.total_time = totalTimeMs / 60000 // 转换为分钟
+                            }
                         }
+
+                        // 将毫秒转换为分钟（从 init_variables 读取的值）
+                        fertConfig.pre_fert_time = preTimeMs / 60000
+                        if (fertConfig.method === 'Time') {
+                            fertConfig.fert_time = fertTimeMs / 60000
+                        }
+                        fertConfig.post_fert_time = postTimeMs / 60000
                     }
 
-                    // 如果从策略变量中读取到了时间值，计算总时间（转换为分钟）
-                    if (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0) {
+                    // 解析施肥配置，传入面积用于计算（在读取时间参数之后，避免覆盖）
+                    parseFertConfigFromVariables(policy.init_variables, fertConfig, area)
+
+                    // 如果从策略变量中读取到了时间值，但总时间未设置，则计算总时间
+                    if (!fertConfig.total_time && (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0)) {
                         fertConfig.total_time = (preTimeMs + fertTimeMs + postTimeMs) / 60000
+                    }
+                }
+
+                // 如果 init_variables 中没有"是否只浇水"，尝试从运行时状态读取
+                if (!fertConfig.water_only) {
+                try {
+                    const runtimeResponse = await call_remote('/policy/get_policy_runtime', {
+                        policy_name: group.name
+                    }, token)
+                    if (runtimeResponse && runtimeResponse.variables) {
+                        const variables = JSON.parse(runtimeResponse.variables)
+                        if (variables['是否只浇水'] === true) {
+                            fertConfig.method = 'WaterOnly'
+                            fertConfig.water_only = true
+                                // 如果运行时状态是只浇水，尝试从 init_variables 读取总灌溉时间
+                                if (policy?.init_variables) {
+                                    for (const initVar of policy.init_variables) {
+                                        if (initVar.variable_name === '总灌溉时间') {
+                                            const totalTimeMs = parseFloat(initVar.expression) || 0
+                                            fertConfig.total_time = totalTimeMs / 60000
+                                            break
+                                        }
+                                    }
+                                }
+                        }
+                    }
+                } catch (error) {
+                    // 如果获取运行时状态失败，忽略错误
+                    console.warn(`获取轮灌组 ${group.name} 运行时状态失败:`, error)
                     }
                 }
 
@@ -785,7 +1215,33 @@ const loadExistingGroups = async () => {
             }))
 
             if (existingGroups.value.length > 0) {
-                ElMessage.success(`已加载 ${existingGroups.value.length} 个已配置的轮灌组`)
+                // 自动将已配置的轮灌组添加到当前列表中
+                existingGroups.value.forEach(existingGroup => {
+                    const groupName = existingGroup.name
+                    // 检查是否已存在
+                    if (!wateringGroups.value.some(g => g.name === groupName)) {
+                        wateringGroups.value.push({
+                            name: groupName,
+                            area: existingGroup.area || 0,
+                            isCopied: false,
+                            configKey: groupName
+                        })
+                        // 设置施肥配置
+                        fertConfigs.value[groupName] = {
+                            method: existingGroup.fertConfig?.method || 'AreaBased',
+                            AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
+                            total_fert: existingGroup.fertConfig?.total_fert ?? 0,
+                            fert_time: existingGroup.fertConfig?.fert_time ?? 0,
+                            pre_fert_time: existingGroup.fertConfig?.pre_fert_time ?? 0,
+                            post_fert_time: existingGroup.fertConfig?.post_fert_time ?? 0,
+                            total_time: existingGroup.fertConfig?.total_time ?? 0,
+                            water_only: existingGroup.fertConfig?.water_only ?? false,
+                        }
+                        // 设置阀门配置
+                        selectedValveDevices.value[groupName] = existingGroup.valves || []
+                    }
+                })
+                ElMessage.success(`已自动加载 ${existingGroups.value.length} 个已配置的轮灌组`)
             } else {
                 ElMessage.info('当前没有已配置的轮灌组')
             }
@@ -912,8 +1368,10 @@ const copyExistingGroup = async (existingGroup) => {
             AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
             total_fert: existingGroup.fertConfig?.total_fert ?? 0,
             fert_time: existingGroup.fertConfig?.fert_time ?? 0,
-            total_time: existingGroup.fertConfig?.total_time ?? 0,
+            pre_fert_time: existingGroup.fertConfig?.pre_fert_time ?? 0,
             post_fert_time: existingGroup.fertConfig?.post_fert_time ?? 0,
+            total_time: existingGroup.fertConfig?.total_time ?? 0,
+            water_only: existingGroup.fertConfig?.water_only ?? false,
         }
 
         // 复制时清空阀门选择，要求用户重新选择（参数可以一样，但阀门必须重新选择）
@@ -926,6 +1384,90 @@ const copyExistingGroup = async (existingGroup) => {
         }
 
         ElMessage.success(`已将轮灌组 ${existingGroup.name} 的配置复制到 ${trimmedName}`)
+    } catch (error) {
+        if (error === 'cancel') {
+            return
+        }
+        console.error('复制轮灌组失败:', error)
+    }
+}
+
+// 复制当前列表中的轮灌组
+const copyWateringGroup = async (group, index) => {
+    const groupName = group.name?.trim()
+    if (!groupName) {
+        ElMessage.warning('轮灌组名称不能为空')
+        return
+    }
+
+    const baseName = extractBaseName(groupName)
+    if (!baseName) return
+
+    const defaultName = generateDefaultName(baseName)
+    if (!defaultName) return
+
+    try {
+        const { value: newName } = await ElMessageBox.prompt(
+            `请输入新轮灌组的名称（复制自：${groupName}）`,
+            '复制轮灌组',
+            {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                inputValue: defaultName,
+                inputPlaceholder: '请输入轮灌组名称',
+                inputValidator: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '轮灌组名称不能为空'
+                    }
+                    if (isGroupNameDuplicate(value.trim())) {
+                        return '该轮灌组名称已存在，请使用其他名称'
+                    }
+                    return true
+                },
+                inputErrorMessage: '请输入有效的轮灌组名称'
+            }
+        )
+
+        const trimmedName = newName?.trim()
+        if (!trimmedName || isGroupNameDuplicate(trimmedName)) {
+            if (!trimmedName) {
+                ElMessage.warning('轮灌组名称不能为空')
+            } else {
+                ElMessage.error('该轮灌组名称已存在，请使用其他名称')
+            }
+            return
+        }
+
+        const newGroup = {
+            name: trimmedName,
+            area: group.area || 0,
+            isCopied: true,
+            configKey: trimmedName
+        }
+        wateringGroups.value.push(newGroup)
+
+        // 复制施肥配置
+        const originalConfigKey = group.configKey || group.name
+        fertConfigs.value[trimmedName] = {
+            method: fertConfigs.value[originalConfigKey]?.method || 'AreaBased',
+            AB_fert: fertConfigs.value[originalConfigKey]?.AB_fert ?? 0,
+            total_fert: fertConfigs.value[originalConfigKey]?.total_fert ?? 0,
+            fert_time: fertConfigs.value[originalConfigKey]?.fert_time ?? 0,
+            pre_fert_time: fertConfigs.value[originalConfigKey]?.pre_fert_time ?? 0,
+            post_fert_time: fertConfigs.value[originalConfigKey]?.post_fert_time ?? 0,
+            total_time: fertConfigs.value[originalConfigKey]?.total_time ?? 0,
+        }
+
+        // 复制时清空阀门选择，要求用户重新选择（参数可以一样，但阀门必须重新选择）
+        selectedValveDevices.value[trimmedName] = []
+
+        // 如果当前在第二步且是地图模式，需要初始化地图（阀门选择为空）
+        if (wizardStep.value === 2 && valveDisplayMode.value === 'map') {
+            await nextTick()
+            await initValveSelectionMap(trimmedName)
+        }
+
+        ElMessage.success(`已将轮灌组 ${groupName} 的配置复制到 ${trimmedName}`)
     } catch (error) {
         if (error === 'cancel') {
             return
@@ -1430,6 +1972,13 @@ const initFullscreenMap = async (groupName) => {
 // 步骤导航
 const nextStep = async () => {
     if (wizardStep.value === 1) {
+        // 验证方案名称
+        if (!schemeName.value || schemeName.value.trim() === '') {
+            ElMessage.warning('请输入方案名称')
+            return
+        }
+        wizardStep.value = 2
+    } else if (wizardStep.value === 2) {
         // 验证轮灌组
         if (wateringGroups.value.length === 0) {
             ElMessage.warning('请至少创建一个轮灌组')
@@ -1441,7 +1990,7 @@ const nextStep = async () => {
                 return
             }
         }
-        wizardStep.value = 2
+        wizardStep.value = 3
         await loadValveDevices()
 
         await nextTick()
@@ -1450,7 +1999,7 @@ const nextStep = async () => {
                 initValveSelectionMap(group.name)
             }
         })
-    } else if (wizardStep.value === 2) {
+    } else if (wizardStep.value === 3) {
         // 验证设备分配
         for (const group of wateringGroups.value) {
             const configKey = group.configKey || group.name
@@ -1459,13 +2008,8 @@ const nextStep = async () => {
                 return
             }
         }
-
-        if (allGroupsAreCopied.value) {
-            await finishWizard()
-            return
-        } else {
-            wizardStep.value = 3
-        }
+        // 验证通过后，进入步骤4
+        wizardStep.value = 4
     }
 }
 
@@ -1501,47 +2045,128 @@ const finishWizard = async () => {
             ElMessage.warning(`请为${group.name}设置施肥配置`)
             return
         }
-        if (config.method === 'AreaBased' && config.AB_fert <= 0) {
-            ElMessage.warning(`请为${group.name}设置有效的亩定量施肥参数`)
-            return
-        }
-        if (config.method === 'Total' && config.total_fert <= 0) {
-            ElMessage.warning(`请为${group.name}设置有效的总定量施肥参数`)
-            return
-        }
-        if (config.method === 'Time' && config.fert_time <= 0) {
-            ElMessage.warning(`请为${group.name}设置有效的定时施肥参数`)
-            return
-        }
-        if (config.total_time <= 0) {
-            ElMessage.warning(`请为${group.name}设置有效的总灌溉时间参数`)
-            return
+        // 如果选择"只浇水"，只需要验证总灌溉时间
+        if (config.method === 'WaterOnly') {
+            if (!config.total_time || config.total_time <= 0) {
+                ElMessage.warning(`请为${group.name}设置有效的总灌溉时间参数`)
+                return
+            }
+            // "只浇水"模式下，不需要验证施肥参数
+        } else {
+            // 验证三个独立时间参数
+            const pre_fert_time = config.pre_fert_time || 0;
+            const fert_time = config.method === 'Time' ? (config.fert_time || 0) : 0;
+            const post_fert_time = config.post_fert_time || 0;
+            const total_time = pre_fert_time + fert_time + post_fert_time;
+
+            if (total_time <= 0) {
+                ElMessage.warning(`请为${group.name}设置有效的灌溉时间参数（肥前时间、施肥时间、肥后时间）`)
+                return
+            }
+            if (config.method === 'AreaBased' && config.AB_fert <= 0) {
+                ElMessage.warning(`请为${group.name}设置有效的亩定量施肥参数`)
+                return
+            }
+            if (config.method === 'Total' && config.total_fert <= 0) {
+                ElMessage.warning(`请为${group.name}设置有效的总定量施肥参数`)
+                return
+            }
+            if (config.method === 'Time' && fert_time <= 0) {
+                ElMessage.warning(`请为${group.name}设置有效的定时施肥参数`)
+                return
+            }
+            if (total_time <= 0) {
+                ElMessage.warning(`请为${group.name}设置有效的灌溉时间参数（肥前时间、施肥时间、肥后时间）`)
+                return
+            }
         }
     }
 
+    // 检查是否有任何变更（包括数量变化、面积变化或配置变化）
+    const initialGroupCount = Object.keys(initialAreas.value).length
+    const isCountChanged = wateringGroups.value.length !== initialGroupCount
+
+    // 只处理有变更的轮灌组（包括新增的）
+    const groupsToUpdate = wateringGroups.value.filter(group => {
+        if (!group || !group.name) return false
+        const configKey = group.configKey || group.name
+        // 如果是新增的轮灌组（不在初始快照中），需要更新
+        const isNewGroup = initialAreas.value[configKey] === undefined
+        // 如果面积有变更，或者配置有变更，或者是新增的，则需要更新
+        return isNewGroup || changedAreas.value[configKey] !== undefined || changedFertConfigs.value[configKey] !== undefined
+    })
+
+    if (!isCountChanged && groupsToUpdate.length === 0) {
+        ElMessage.info('没有需要更新的配置')
+        return
+    }
+
+    // 如果有任何变更，我们需要下发当前方案中所有的轮灌组配置，因为后端通常是全量覆盖
     const finalConfig = wateringGroups.value.map(group => {
         if (!group || !group.name) {
             return null
         }
 
         const configKey = group.configKey || group.name
-        const config = fertConfigs.value[configKey]
+        // 使用变更后的配置，如果没有变更则使用当前配置
+        const config = changedFertConfigs.value[configKey] || fertConfigs.value[configKey]
         if (!config) {
             return null
         }
-        let AB_fert = config.AB_fert;
-        if (config.method == 'Total') {
-            AB_fert = config.total_fert / group.area;
+        
+        // 使用变更后的面积，如果没有变更则使用当前面积
+        const area = changedAreas.value[configKey] !== undefined ? changedAreas.value[configKey] : group.area
+        
+        // 如果选择"只浇水"，设置特殊标记
+        let AB_fert = config.AB_fert || 0;
+        if (config.method === 'Total') {
+            AB_fert = config.total_fert / area;
         }
+        // "只浇水"模式下，施肥量设为0
+        if (config.method === 'WaterOnly') {
+            AB_fert = 0;
+        }
+        // 只浇水模式下，使用总灌溉时间；否则使用三个独立时间参数
+        let total_time_minutes = 0;
+        let pre_fert_time_hours = 0;
+        let fert_time_hours = 0;
+        let post_fert_time_hours = 0;
+
+        if (config.method === 'WaterOnly') {
+            // 只浇水模式：直接使用总灌溉时间
+            total_time_minutes = config.total_time || 0;
+        } else {
+            // 正常模式：使用三个独立时间参数
+            const pre_fert_time_minutes = config.pre_fert_time || 0;
+            const fert_time_minutes = config.method === 'Time' ? (config.fert_time || 0) : 0;
+            const post_fert_time_minutes = config.post_fert_time || 0;
+            pre_fert_time_hours = pre_fert_time_minutes / 60;
+            fert_time_hours = fert_time_minutes / 60;
+            post_fert_time_hours = post_fert_time_minutes / 60;
+
+            // 调试日志
+            console.log(`轮灌组 ${group.name} 的时间参数:`, {
+                'config.pre_fert_time': config.pre_fert_time,
+                'config.post_fert_time': config.post_fert_time,
+                'pre_fert_time_minutes': pre_fert_time_minutes,
+                'post_fert_time_minutes': post_fert_time_minutes,
+                'pre_fert_time_hours': pre_fert_time_hours,
+                'post_fert_time_hours': post_fert_time_hours
+            });
+        }
+
         return {
             name: group.name,
-            area: group.area,
+            area: area,
             valves: selectedValveDevices.value[group.name] || [],
-            method: config.method,
+            method: config.method === 'WaterOnly' ? 'AreaBased' : config.method,
             AB_fert: parseFloat(AB_fert.toFixed(2)),
-            fert_time: config.method === 'Time' ? config.fert_time : 0,
-            total_time: config.total_time,
-            post_fert_time: config.post_fert_time || 0,
+            total_fert: config.method === 'Total' ? (config.total_fert || 0) : 0,
+            fert_time: fert_time_hours,
+            pre_fert_time: pre_fert_time_hours,
+            post_fert_time: post_fert_time_hours,
+            total_time: total_time_minutes,
+            water_only: config.method === 'WaterOnly'
         }
     }).filter(Boolean)
 
@@ -1568,7 +2193,12 @@ const finishWizard = async () => {
             return
         }
 
-        const resp = await call_remote('/policy/apply_wizard_groups', { groups: finalConfig, farm_name }, token)
+        const resp = await call_remote('/policy/apply_wizard_groups', { 
+            groups: finalConfig, 
+            farm_name, 
+            scheme_id: selectedSchemeId.value,
+            scheme_name: schemeName.value.trim()
+        }, token)
 
         if (resp && resp.result) {
             ElMessage.success('轮灌组策略已下发并生效')
@@ -1765,13 +2395,101 @@ const updateAreaParam = async (paramName, value) => {
 }
 
 // 初始化
-onMounted(async () => {
-    await loadValveDevices()
+// 加载方案列表
+const loadSchemes = async () => {
+    try {
+        const token = localStorage.getItem('auth_token')
+        const response = await policy_lib.list_schemes(token)
+        if (response && response.schemes) {
+            schemes.value = response.schemes
+            // 如果没有选择方案且有方案，默认选择第一个
+            if (!selectedSchemeId.value && schemes.value.length > 0) {
+                selectedSchemeId.value = schemes.value[0].id
+            }
+        }
+    } catch (error) {
+        console.error('加载方案列表失败:', error)
+        ElMessage.error('加载方案列表失败')
+    }
+}
 
-    // 自动加载已配置的轮灌组
-    await loadExistingGroups()
+// 显示创建方案对话框
+const showCreateSchemeDialog = () => {
+    newSchemeName.value = ''
+    newSchemeDescription.value = ''
+    createSchemeDialogVisible.value = true
+}
 
-    // 加载农场面积参数
+// 创建方案
+const createScheme = async () => {
+    if (!newSchemeName.value || !newSchemeName.value.trim()) {
+        ElMessage.warning('请输入方案名称')
+        return
+    }
+
+    try {
+        const token = localStorage.getItem('auth_token')
+        const response = await policy_lib.add_scheme(newSchemeName.value.trim(), newSchemeDescription.value.trim(), token)
+        if (response && response.result) {
+            ElMessage.success('方案创建成功')
+            createSchemeDialogVisible.value = false
+            await loadSchemes()
+            // 选择新创建的方案
+            if (response.scheme_id) {
+                selectedSchemeId.value = response.scheme_id
+            }
+        }
+    } catch (error) {
+        console.error('创建方案失败:', error)
+        ElMessage.error(error.err_msg || '创建方案失败')
+    }
+}
+
+// 辅助函数：加载方案数据
+const loadSchemeData = async (schemeNameParam) => {
+        const targetScheme = schemes.value.find(s => s.name === schemeNameParam)
+    if (!targetScheme) return
+        
+            selectedSchemeId.value = targetScheme.id
+            schemeName.value = schemeNameParam
+            
+            try {
+                const token = localStorage.getItem('auth_token')
+                const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeNameParam }, token)
+                
+                if (response && response.content) {
+                    const parsedGroups = parseGroupsFromSchemeContent(response.content)
+                    
+                    // 彻底清空，防止被运行时数据污染
+                    wateringGroups.value = []
+                    fertConfigs.value = {}
+                    selectedValveDevices.value = {}
+                    
+                    // 填充方案数据
+                    parsedGroups.forEach(group => {
+                        const groupName = group.name
+                        wateringGroups.value.push({
+                            name: groupName,
+                            area: group.area || 0,
+                            isCopied: false,
+                            configKey: groupName
+                        })
+                        fertConfigs.value[groupName] = group.fertConfig
+                        selectedValveDevices.value[groupName] = group.valves || []
+                    })
+                    
+                    wizardStep.value = 2
+                    saveInitialFertConfigs()
+                    ElMessage.success(`已加载方案 "${schemeNameParam}" 的配置`)
+                }
+            } catch (error) {
+                console.error('解析方案内容失败:', error)
+                ElMessage.error('加载方案内容失败')
+            }
+    }
+
+// 辅助函数：加载农场参数
+const loadFarmParams = async () => {
     try {
         const currentFarm = localStorage.getItem('selectedFarm') || '默认农场'
         const paramsResponse = await call_remote('/resource/get_farm_area_params', {
@@ -1789,6 +2507,22 @@ onMounted(async () => {
     } catch (error) {
         console.error('获取农场参数失败:', error)
     }
+}
+
+onMounted(async () => {
+    // 1. 先加载基础元数据
+    await loadSchemes()
+    await loadValveDevices()
+
+    // 2. 根据进入方式加载数据
+    if (route.query.scheme_name) {
+        await loadSchemeData(route.query.scheme_name)
+    } else {
+        await loadExistingGroups()
+    }
+
+    // 3. 加载农场参数
+    await loadFarmParams()
 })
 </script>
 
@@ -1874,6 +2608,83 @@ onMounted(async () => {
     min-height: 0;
 }
 
+.fert-config {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 10px;
+    max-height: calc(100vh - 400px);
+}
+
+.group-fert-config {
+    margin-bottom: 24px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e4e7ed;
+}
+
+.scheme-selection {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.scheme-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.scheme-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.scheme-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.scheme-radio-item {
+    width: 100%;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid #e4e7ed;
+    border-radius: 6px;
+    transition: all 0.3s;
+}
+
+.scheme-radio-item:hover {
+    border-color: #409eff;
+    background-color: #f0f9ff;
+}
+
+.scheme-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.scheme-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: #303133;
+}
+
+.scheme-description {
+    font-size: 13px;
+    color: #909399;
+}
+
+.no-schemes {
+    padding: 40px 0;
+    text-align: center;
+}
+
 
 
 
@@ -1948,6 +2759,12 @@ onMounted(async () => {
     align-items: center;
     padding: 12px;
     background: white;
+}
+
+.group-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     border-radius: 6px;
     margin-bottom: 12px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);

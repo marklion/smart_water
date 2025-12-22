@@ -327,7 +327,7 @@ export default {
                 if (found_policy) {
                     await policy_lib.del_policy(body.valve_name, token);
                 }
-                await cli_runtime_lib.do_config_batch(quick_config_template.water_group_config(body));
+                await cli_runtime_lib.do_config_batch(quick_config_template.water_group_config(body), true);
                 // 添加快速操作: 启动、停止、重置
                 await policy_lib.add_quick_action(body.valve_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
                 await policy_lib.add_quick_action(body.valve_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
@@ -370,7 +370,7 @@ export default {
                     await policy_lib.del_policy(policy_name, token);
                 }
                 body.policy_name = policy_name;
-                await cli_runtime_lib.do_config_batch(quick_config_template.init_water_policy_config(body));
+                await cli_runtime_lib.do_config_batch(quick_config_template.init_water_policy_config(body), true);
                 // 添加快速操作: 启动、停止、重置
                 await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
                 await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
@@ -405,13 +405,13 @@ export default {
                         }
                     }
                 }
-                let policy_name = `${body.farm_name}-施肥`
+                let policy_name = `${body.farm_name}-施肥`;
                 let found_policy = await policy_lib.find_policy(policy_name, token);
                 if (found_policy) {
                     await policy_lib.del_policy(policy_name, token);
                 }
                 body.policy_name = policy_name;
-                await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_policy_config(body));
+                await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_policy_config(body), true);
                 // 添加快速操作: 启动、停止、重置
                 await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
                 await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
@@ -449,7 +449,7 @@ export default {
                     await policy_lib.del_policy(policy_name, token);
                 }
                 body.policy_name = policy_name;
-                await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_mixing_policy_config(body));
+                await cli_runtime_lib.do_config_batch(quick_config_template.init_fert_mixing_policy_config(body), true);
                 // 添加快速操作: start, stop, reset
                 await policy_lib.add_quick_action(policy_name, '开始', 'prs.variables.set("需要启动", true)', false, token);
                 await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
@@ -470,12 +470,14 @@ export default {
                         name: { type: String, mean: '阀门名称', example: '轮灌阀门1', have_to: true },
                     }
                 },
-                post_fert_time: { type: Number, mean: '肥后时间（分钟）', example: 30, have_to: true },
                 method: { type: String, mean: '施肥方式', example: '定时', have_to: true },
-                fert_time: { type: Number, mean: '施肥时间(分钟)', example: 30, have_to: true },
-                area_based_amount: { type: Number, mean: '基于面积施肥量(升/亩)', example: 5, have_to: true },
+                area_based_amount: { type: Number, mean: '基于面积施肥量(升/亩)', example: 5, have_to: false },
                 area: { type: Number, mean: '轮灌面积(亩)', example: 10, have_to: true },
-                total_time: { type: Number, mean: '总灌溉时间(分钟)', example: 120, have_to: true },
+                water_only: { type: Boolean, mean: '是否只浇水', example: false, have_to: false },
+                total_time: { type: Number, mean: '总灌溉时间(分钟，仅用于只浇水模式)', example: 120, have_to: false },
+                pre_fert_time: { type: Number, mean: '肥前时间(分钟)', example: 10, have_to: false },
+                fert_time: { type: Number, mean: '施肥时间(分钟)', example: 30, have_to: false },
+                post_fert_time: { type: Number, mean: '肥后时间(分钟)', example: 10, have_to: false },
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -527,10 +529,10 @@ export default {
                 if (found_policy) {
                     await policy_lib.del_policy(body.policy_name, token);
                 }
-                await cli_runtime_lib.do_config_batch(quick_config_template.add_group_policy(body));
+                await cli_runtime_lib.do_config_batch(quick_config_template.add_group_policy(body), true);
                 let assignment_config = (await policy_lib.find_policy(`${body.farm_name}-总策略`, token)).init_variables.find(item => item.variable_name === '所有轮灌组');
                 let original_array = [];
-                if (assignment_config.expression.length > 2) {
+                if (assignment_config && assignment_config.expression && assignment_config.expression.length > 2) {
                     original_array = assignment_config.expression.substr(1, assignment_config.expression.length - 2).split(',').map(item => item.trim().replace(/"/g, ''));
                 }
                 original_array.push(body.policy_name);
@@ -560,7 +562,7 @@ export default {
                 if (found_policy) {
                     await policy_lib.del_policy(policy_name, token);
                 }
-                await cli_runtime_lib.do_config_batch(quick_config_template.init_global_policy(body));
+                await cli_runtime_lib.do_config_batch(quick_config_template.init_global_policy(body), true);
                 // 添加快速操作: 启动、停止、重置
                 await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
                 await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);

@@ -163,7 +163,8 @@ export async function openDevice(deviceName) {
     }
   } catch (error) {
     console.error('打开设备失败:', error)
-    ElMessage.error(`打开设备失败: ${error.message || error}`)
+    const errorMessage = error?.err_msg || error?.message || (typeof error === 'string' ? error : '未知错误')
+    ElMessage.error(`打开设备失败: ${errorMessage}`)
     throw error
   }
 }
@@ -179,7 +180,8 @@ export async function closeDevice(deviceName) {
     }
   } catch (error) {
     console.error('关闭设备失败:', error)
-    ElMessage.error(`关闭设备失败: ${error.message || error}`)
+    const errorMessage = error?.err_msg || error?.message || (typeof error === 'string' ? error : '未知错误')
+    ElMessage.error(`关闭设备失败: ${errorMessage}`)
     throw error
   }
 }
@@ -211,19 +213,26 @@ export async function shutdownDevice(deviceName) {
     }
   } catch (error) {
     console.error('设备关机失败:', error)
-    ElMessage.error(`设备关机失败: ${error.message || error}`)
+    const errorMessage = error?.err_msg || error?.message || (typeof error === 'string' ? error : '未知错误')
+    ElMessage.error(`设备关机失败: ${errorMessage}`)
   }
 }
 
 export async function setDeviceKeyValue(deviceName, value) {
   try {
+    // 验证参数
+    if (value === undefined || value === null || (typeof value === 'number' && isNaN(value))) {
+      throw { err_msg: '参数错误: value param missed' }
+    }
+
     const response = await call_remote('/device_management/set_key_const_value', { device_name: deviceName, value })
     if (response.result) {
       ElMessage.success(`设备 ${deviceName} 关键参数设置成功`)
     }
   } catch (error) {
     console.error('设置设备关键参数失败:', error)
-    ElMessage.error(`设置设备关键参数失败: ${error.message || error}`)
+    const errorMessage = error?.err_msg || error?.message || (typeof error === 'string' ? error : '未知错误')
+    ElMessage.error(`设置设备关键参数失败: ${errorMessage}`)
   }
 }
 
@@ -324,7 +333,8 @@ export async function handleDeviceAction(action, deviceName, refreshRuntimeInfoF
     }
   } catch (error) {
     console.error('设备操作失败:', error)
-    ElMessage.error(`设备操作失败: ${error.message || error}`)
+    const errorMessage = error?.err_msg || error?.message || (typeof error === 'string' ? error : '未知错误')
+    ElMessage.error(`设备操作失败: ${errorMessage}`)
   }
 }
 

@@ -16,6 +16,12 @@ export default {
                     mean: '农场名称',
                     example: '智慧农场',
                     required: true
+                },
+                scheme_id: {
+                    type: String,
+                    mean: '方案ID（可选，用于筛选轮灌组）',
+                    example: '方案1',
+                    required: false
                 }
             },
             result: {
@@ -51,7 +57,7 @@ export default {
                 }
             },
             func: async function (body, token) {
-                const { farmName } = body;
+                const { farmName, scheme_id } = body;
                 
                 try {
                     // 1. 从资源模块获取农场和地块数据
@@ -137,7 +143,11 @@ export default {
                     // 计算轮灌组数量 - 从策略模块获取
                     try {
                         const policyModule = (await import('../../policy/server/policy_module.js')).default;
-                        const wateringGroupsResult = await policyModule.methods.list_watering_groups.func({ pageNo: 0 }, token);
+                        // 如果指定了方案ID，只统计该方案的轮灌组；否则统计所有方案的轮灌组
+                        const wateringGroupsResult = await policyModule.methods.list_watering_groups.func({ 
+                            pageNo: 0,
+                            scheme_id: scheme_id || undefined
+                        }, token);
                         if (wateringGroupsResult && wateringGroupsResult.groups) {
                             // 筛选出匹配当前农场的轮灌组
                             const matchedGroups = await Promise.all(

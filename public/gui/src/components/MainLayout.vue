@@ -65,6 +65,13 @@
                             </el-select>
                         </div>
 
+                        <!-- 当前运行方案 -->
+                        <div class="current-scheme-container"
+                            v-if="showFarmSelector && currentSchemeName && currentSchemeName !== ''">
+                            <span class="scheme-label">当前运行方案：</span>
+                            <span class="scheme-name">{{ currentSchemeName }}</span>
+                        </div>
+
                         <div class="date-info">
                             <div class="date-display">{{ currentDate }} {{ currentSolarTerm }}</div>
                         </div>
@@ -94,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, shallowRef, provide } from 'vue'
+import { ref, onMounted, computed, shallowRef, provide, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -122,6 +129,32 @@ const selectedFarm = ref('')
 const farmList = shallowRef([])
 const showFarmSelector = computed(() => route.name === '监控中心')
 
+// 当前运行方案
+const currentSchemeName = ref('')
+const selectedSchemeId = ref('')
+
+// 加载方案列表
+const loadSchemeList = async () => {
+    try {
+        const response = await call_remote('/policy/list_schemes', {})
+        if (response && response.schemes) {
+            // 如果有方案且未选中，默认选中第一个
+            if (response.schemes.length > 0 && !selectedSchemeId.value) {
+                selectedSchemeId.value = response.schemes[0].name
+                currentSchemeName.value = response.schemes[0].name
+            } else if (selectedSchemeId.value) {
+                // 更新当前方案名称
+                const currentScheme = response.schemes.find(s => s.name === selectedSchemeId.value)
+                if (currentScheme) {
+                    currentSchemeName.value = currentScheme.name
+                }
+            }
+        }
+    } catch (error) {
+        console.error('加载方案列表失败:', error)
+    }
+}
+
 // 城市切换相关
 const cityInput = ref('')
 const cityChanging = ref(false)
@@ -137,6 +170,10 @@ const cityChangeData = ref({
 
 // 提供城市变化数据给子组件
 provide('cityChangeData', cityChangeData)
+
+// 提供方案状态给子组件，让子组件可以更新
+provide('currentSchemeName', currentSchemeName)
+provide('selectedSchemeId', selectedSchemeId)
 
 // 24节气数据
 const solarTerms = [
@@ -355,6 +392,11 @@ onMounted(() => {
     // 加载农场列表
     loadFarmList()
 
+    // 如果是监控中心页面，加载方案信息
+    if (showFarmSelector.value) {
+        loadSchemeList()
+    }
+
     // 加载保存的城市
     const savedCity = localStorage.getItem('weather_selected_city')
     if (savedCity) {
@@ -367,6 +409,13 @@ onMounted(() => {
     // 每分钟更新一次日期信息
     setInterval(updateDateInfo, 60000)
 })
+
+// 监听路由变化，在监控中心页面时加载方案信息
+watch(() => route.name, (newName) => {
+    if (newName === '监控中心') {
+        loadSchemeList()
+    }
+}, { immediate: false })
 
 const handleCommand = (command) => {
     switch (command) {
@@ -712,7 +761,8 @@ const logout = () => {
 
 /* 农场选择器和城市切换器样式 */
 .farm-selector-container,
-.city-switcher-container {
+.city-switcher-container,
+.current-scheme-container {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -730,7 +780,8 @@ const logout = () => {
 }
 
 .farm-selector-container:hover,
-.city-switcher-container:hover {
+.city-switcher-container:hover,
+.current-scheme-container:hover {
     transform: translateY(-1px);
     box-shadow:
         0 4px 12px rgba(64, 158, 255, 0.15),
@@ -742,6 +793,23 @@ const logout = () => {
     font-size: 14px;
     font-weight: 600;
     color: #409eff;
+    white-space: nowrap;
+}
+
+.scheme-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #409eff;
+    white-space: nowrap;
+}
+
+.scheme-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #303133;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 

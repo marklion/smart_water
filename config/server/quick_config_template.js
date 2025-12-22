@@ -252,21 +252,21 @@ policy
   return
   policy '${params.policy_name}'
     init assignment 'false' '组内阀门' '"${params.wgv_array.map((item) => item.name).join(",")}"'
-    init assignment 'false' '肥前时间' '${(params.total_time - params.fert_time - params.post_fert_time) * 1000 * 60}'
-    init assignment 'false' '施肥时间' '${params.fert_time * 1000 * 60}'
-    init assignment 'false' '肥后时间' '${params.post_fert_time * 1000 * 60}'
+    ${params.water_only ? '' : `init assignment 'false' '肥前时间' '${(params.pre_fert_time || 0) * 1000 * 60}'
+    init assignment 'false' '施肥时间' '${(params.fert_time || 0) * 1000 * 60}'
+    init assignment 'false' '肥后时间' '${(params.post_fert_time || 0) * 1000 * 60}'`}
     init assignment 'false' '施肥策略' '${params.method}'
-    init assignment 'false' '期望每亩施肥量' '${params.area_based_amount}'
+    ${params.water_only ? '' : `init assignment 'false' '期望每亩施肥量' '${params.area_based_amount || 0}'
     init assignment 'false' '期望施肥速率' '0'
+    init assignment 'false' '期望施肥总量' '${(params.area_based_amount || 0) * params.area}'`}
     init assignment 'false' '面积' '${params.area}'
-    init assignment 'false' '期望施肥总量' '${params.area_based_amount * params.area}'
     init assignment 'false' '需要启动' 'false'
     init assignment 'false' '需要跳过' 'false'
-    init assignment 'false' '是否只浇水' 'false'
+    init assignment 'false' '是否只浇水' '${params.water_only ? 'true' : 'false'}'
     init assignment 'false' '当前施肥量' '0'
     init assignment 'false' '当前浇水量' '0'
     init assignment 'false' '阶段剩余时间' '0'
-    init assignment 'false' '总灌溉时间' '${params.total_time * 1000 * 60}'
+    init assignment 'false' '总灌溉时间' '${params.water_only ? ((params.total_time || 0) * 1000 * 60) : (((params.pre_fert_time || 0) + (params.fert_time || 0) + (params.post_fert_time || 0)) * 1000 * 60)}'
     watering group matrix 'area' '面积'
     watering group matrix 'method' '施肥策略'
     watering group matrix 'fert_rate' '期望施肥速率'
@@ -285,7 +285,7 @@ policy
       exit assignment 'false' '主管道流量累计值' 'await prs.getSource("供水流量累计读数")'
       transformer 'next'
         rule 'false' '浇水' 'prs.variables.get("需要启动") == true && prs.variables.get("是否只浇水") == true'
-        rule 'false' '肥前' 'prs.variables.get("需要启动") == true'
+        rule 'false' '肥前' 'prs.variables.get("需要启动") == true && prs.variables.get("是否只浇水") != true'
       return
     return
     state '浇水'
@@ -306,7 +306,7 @@ policy
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '阶段剩余时间' '0'
       do assignment 'false' '期望施肥速率' 'await prs.getSource("施肥平均流量")'
-      do assignment 'false' '肥前时间' '(prs.variables.get("施肥策略") == "定时"?prs.variables.get("肥前时间"):(${params.total_time} - ${params.post_fert_time} - prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率"))*60 * 1000)'
+      do assignment 'false' '肥前时间' '(prs.variables.get("施肥策略") == "定时"?prs.variables.get("肥前时间"):(((${params.pre_fert_time || 0}) + (${params.fert_time || 0}) + (${params.post_fert_time || 0})) - (${params.post_fert_time || 0}) - prs.variables.get("期望施肥总量") / prs.variables.get("期望施肥速率"))*60 * 1000)'
       do assignment 'false' '阶段剩余时间' 'prs.variables.get("肥前时间") / 1000 / 60 - (Date.now() - prs.variables.get("进入时间"))/1000/60'
       do assignment 'false' '当前浇水量' 'await prs.getSource("供水流量累计读数") - prs.variables.get("主管道流量累计值")'
       transformer 'timeup'
@@ -356,10 +356,11 @@ return`;
   init_global_policy: function (params) {
     let config_string = `
 policy
-policy '${params.farm_name}-总策略'
+  policy '${params.farm_name}-总策略'
     init assignment 'false' '需要启动' 'false'
     init assignment 'false' '需要重置' 'false'
     init assignment 'false' '启动时间' '${params.start_hour}'
+    init assignment 'false' '下次启动时间' '""'
     init assignment 'false' '今天日期' '0'
     init assignment 'false' '今天已经自动启动过了' 'false'
     init assignment 'false' '当前轮灌组索引' '0'
@@ -377,6 +378,7 @@ policy '${params.farm_name}-总策略'
       enter assignment 'false' '当前轮灌组索引' '0-1'
       do assignment 'false' '今天已经自动启动过了' '(new Date().getDate() != prs.variables.get("今天日期"))?false:(prs.variables.get("今天已经自动启动过了"))'
       do assignment 'false' '今天日期' 'new Date().getDate()'
+      do assignment 'false' '需要启动' '(prs.variables.get("下次启动时间") != "" ? (new Date(prs.variables.get("下次启动时间")).getTime() <= Date.now() ? true : prs.variables.get("需要启动")) : prs.variables.get("需要启动"))'
       transformer 'next'
         rule 'false' '准备' 'prs.variables.get("需要启动") == true'
         rule 'false' '准备' 'prs.variables.get("启动时间") == new Date().getHours() && prs.variables.get("今天已经自动启动过了") == false'
@@ -385,6 +387,7 @@ policy '${params.farm_name}-总策略'
     state '准备'
       enter assignment 'false' '需要启动' 'false'
       enter assignment 'false' '今天已经自动启动过了' 'true'
+      enter assignment 'false' '下次启动时间' '""'
       enter assignment 'false' '上一个轮灌组名称' 'prs.variables.get("当前轮灌组索引")>=prs.variables.get("所有轮灌组").length?"":(prs.variables.get("所有轮灌组")[prs.variables.get("当前轮灌组索引")])'
       enter assignment 'false' '当前轮灌组索引' 'prs.variables.get("当前轮灌组索引") + 1'
       enter assignment 'false' '当前轮灌组名称' 'prs.variables.get("当前轮灌组索引")>=prs.variables.get("所有轮灌组").length?"":(prs.variables.get("所有轮灌组")[prs.variables.get("当前轮灌组索引")])'
@@ -418,9 +421,8 @@ policy '${params.farm_name}-总策略'
       return
     return
     init state '空闲'
-    match farm '农场1'
+    match farm '${params.farm_name}'
   return
-
 return
     `;
     return config_string;

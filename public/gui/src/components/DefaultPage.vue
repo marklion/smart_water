@@ -32,15 +32,8 @@
               <el-tabs v-model="activeMainTab" class="main-tabs" @tab-change="handleMainTabChange">
                 <!-- 轮灌组状态 Tab -->
                 <el-tab-pane label="轮灌组状态" name="watering">
-                  <div class="tab-content-with-actions">
-                    <div class="tab-actions">
-                      <el-button type="primary" size="small" @click="refreshWateringGroup" :icon="Refresh">
-                        刷新
-                      </el-button>
-                    </div>
-                    <div class="tab-content-scroll">
-                      <WateringGroupStatus ref="wateringGroupRef" :farm-name="selectedFarm" />
-                    </div>
+                  <div class="tab-content-scroll">
+                    <WateringGroupStatus ref="wateringGroupRef" :farm-name="selectedFarm" />
                   </div>
                 </el-tab-pane>
 
@@ -57,12 +50,7 @@
                         </span>
                       </div>
                       <div class="tab-actions-right">
-                        <el-button
-                          type="success"
-                          size="small"
-                          :icon="Plus"
-                          @click="openAddWaterGroupValveDialog"
-                        >
+                        <el-button type="success" size="small" :icon="Plus" @click="openAddWaterGroupValveDialog">
                           添加设备
                         </el-button>
                         <el-button type="primary" size="small" @click="refreshDeviceList" :icon="Refresh">
@@ -134,15 +122,15 @@
                         <div class="panel-actions">
                           <el-space wrap>
                             <el-button type="primary" size="small" :loading="mixingStartLoading" @click="startMixing"
-                               :icon="VideoPlay" round>
+                              :icon="VideoPlay" round>
                               启动
                             </el-button>
                             <el-button type="danger" size="small" :loading="mixingStopLoading" @click="stopMixing"
-                               :icon="VideoPause" round>
+                              :icon="VideoPause" round>
                               停止
                             </el-button>
                             <el-button type="success" size="small" :loading="mixingSaving" @click="applyMixingPolicy"
-                               :icon="Setting" round class="mixing-apply-btn">
+                              :icon="Setting" round class="mixing-apply-btn">
                               保存
                             </el-button>
                           </el-space>
@@ -201,36 +189,16 @@
     </div>
 
     <!-- 添加轮灌阀门对话框 -->
-    <el-dialog
-      v-model="addWaterGroupValveDialogVisible"
-      title="添加轮灌组阀门设备"
-      width="640px"
-      :close-on-click-modal="false"
-      :append-to-body="true"
-      class="add-wgv-dialog"
-    >
-      <el-form
-        ref="addWaterGroupValveFormRef"
-        :model="addWaterGroupValveForm"
-        :rules="addWaterGroupValveRules"
-        label-width="140px"
-      >
+    <el-dialog v-model="addWaterGroupValveDialogVisible" title="添加轮灌组阀门设备" width="640px" :close-on-click-modal="false"
+      :append-to-body="true" class="add-wgv-dialog">
+      <el-form ref="addWaterGroupValveFormRef" :model="addWaterGroupValveForm" :rules="addWaterGroupValveRules"
+        label-width="140px">
         <el-form-item label="所属农场" prop="farm_name">
           <el-input v-model="addWaterGroupValveForm.farm_name" disabled />
         </el-form-item>
         <el-form-item label="所属区块" prop="block_name">
-          <el-select
-            v-model="addWaterGroupValveForm.block_name"
-            placeholder="请选择所属区块"
-            filterable
-            clearable
-          >
-            <el-option
-              v-for="block in blocks"
-              :key="block.name"
-              :label="block.name"
-              :value="block.name"
-            />
+          <el-select v-model="addWaterGroupValveForm.block_name" placeholder="请选择所属区块" filterable clearable>
+            <el-option v-for="block in blocks" :key="block.name" :label="block.name" :value="block.name" />
           </el-select>
         </el-form-item>
         <el-form-item label="设备名称" prop="valve_name">
@@ -244,73 +212,32 @@
         </el-form-item>
         <el-form-item label="阀门配置" prop="">
           <div class="valve-config-fields">
-            <el-input
-              v-model="valveConfigForm.token"
-              placeholder="token，例如：9CrLOUBhedObQjLTmhZJbQ=="
-            />
-            <el-input
-              v-model="valveConfigForm.device_sn"
-              placeholder="device_sn，例如：DZ005JSJ25180162"
-            />
-            <el-switch
-              v-model="valveConfigForm.is_left"
-              active-text="左侧阀门"
-              inactive-text="右侧阀门"
-            />
-            <el-input-number
-              v-model="valveConfigForm.poll_interval"
-              :min="1000"
-              :step="1000"
-              style="width: 100%;"
-              placeholder="poll_interval 轮询间隔（毫秒）"
-            />
+            <el-input v-model="valveConfigForm.token" placeholder="token，例如：9CrLOUBhedObQjLTmhZJbQ==" />
+            <el-input v-model="valveConfigForm.device_sn" placeholder="device_sn，例如：DZ005JSJ25180162" />
+            <el-switch v-model="valveConfigForm.is_left" active-text="左侧阀门" inactive-text="右侧阀门" />
+            <el-input-number v-model="valveConfigForm.poll_interval" :min="1000" :step="1000" style="width: 100%;"
+              placeholder="poll_interval 轮询间隔（毫秒）" />
           </div>
         </el-form-item>
         <el-form-item label="经度（-180~180）" prop="longitude">
-          <el-input-number
-            v-model="addWaterGroupValveForm.longitude"
-            :precision="6"
-            :step="0.000001"
-            :min="-180"
-            :max="180"
-            placeholder="例如 111.670801"
-            style="width: 100%;"
-          />
+          <el-input-number v-model="addWaterGroupValveForm.longitude" :precision="6" :step="0.000001" :min="-180"
+            :max="180" placeholder="例如 111.670801" style="width: 100%;" />
         </el-form-item>
         <el-form-item label="纬度（-90~90）" prop="latitude">
-          <el-input-number
-            v-model="addWaterGroupValveForm.latitude"
-            :precision="6"
-            :step="0.000001"
-            :min="-90"
-            :max="90"
-            placeholder="例如 40.818311"
-            style="width: 100%;"
-          />
+          <el-input-number v-model="addWaterGroupValveForm.latitude" :precision="6" :step="0.000001" :min="-90"
+            :max="90" placeholder="例如 40.818311" style="width: 100%;" />
         </el-form-item>
         <el-form-item label="开阀压力下限" prop="open_pressure_low_limit">
-          <el-input-number
-            v-model="addWaterGroupValveForm.open_pressure_low_limit"
-            :min="0"
-            :step="0.01"
-            style="width: 100%;"
-          />
+          <el-input-number v-model="addWaterGroupValveForm.open_pressure_low_limit" :min="0" :step="0.01"
+            style="width: 100%;" />
         </el-form-item>
         <el-form-item label="关阀压力上限" prop="close_pressure_high_limit">
-          <el-input-number
-            v-model="addWaterGroupValveForm.close_pressure_high_limit"
-            :min="0"
-            :step="0.01"
-            style="width: 100%;"
-          />
+          <el-input-number v-model="addWaterGroupValveForm.close_pressure_high_limit" :min="0" :step="0.01"
+            style="width: 100%;" />
         </el-form-item>
         <el-form-item label="压力检查周期(秒)" prop="pressure_check_interval">
-          <el-input-number
-            v-model="addWaterGroupValveForm.pressure_check_interval"
-            :min="1"
-            :step="1"
-            style="width: 100%;"
-          />
+          <el-input-number v-model="addWaterGroupValveForm.pressure_check_interval" :min="1" :step="1"
+            style="width: 100%;" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -411,7 +338,7 @@
 import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Plus, Setting } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
 import WateringGroupStatus from '../../../../policy/gui/WateringGroupStatus.vue'
@@ -437,6 +364,9 @@ const route = useRoute()
 const userRole = ref(localStorage.getItem('user_role') || 'farmer')
 // 注入城市变化数据
 const cityChangeData = inject('cityChangeData', ref({ city: '', location: null, timestamp: null }))
+// 注入方案相关数据
+const injectedSelectedSchemeId = inject('selectedSchemeId', null)
+const injectedCurrentSchemeName = inject('currentSchemeName', null)
 
 const pageTitle = computed(() => {
   return route.name || '页面'
@@ -586,8 +516,14 @@ const loadFarmData = async (farmId) => {
     // 更新地图中心点 - 根据农场位置信息
     await updateMapCenterForFarm(farmId)
 
+    // 获取当前选中的方案ID
+    const currentSchemeId = injectedSelectedSchemeId?.value || injectedCurrentSchemeName?.value || localStorage.getItem('selectedSchemeId') || null
+
     // 加载基本信息 - 使用监控中心模块
-    const basicResponse = await call_remote('/monitoring/getBasicInfo', { farmName: farmId })
+    const basicResponse = await call_remote('/monitoring/getBasicInfo', {
+      farmName: farmId,
+      scheme_id: currentSchemeId
+    })
 
     if (basicResponse) {
       // 直接从后端API获取所有基础信息，包括轮灌组数量
@@ -859,7 +795,48 @@ const onDeviceClick = (device) => {
 
 // 处理设备操作
 const handleDeviceAction = async (action, deviceName) => {
-  await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo)
+  // 设置关键参数需要特殊处理，需要用户输入值
+  if (action === 'setDeviceKeyValue') {
+    let numericValue = undefined
+    try {
+      const result = await ElMessageBox.prompt('请输入关键参数值:', '设置关键参数', {
+        confirmButtonText: '设置',
+        cancelButtonText: '取消',
+        inputPattern: /^-?\d+(\.\d+)?$/,
+        inputErrorMessage: '请输入有效的数字值'
+      })
+
+      const value = result?.value
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        ElMessage.error('参数值不能为空，操作已取消')
+        return
+      }
+
+      numericValue = Number.parseFloat(value)
+      if (isNaN(numericValue)) {
+        ElMessage.error('无效的数字值，操作已取消')
+        return
+      }
+    } catch (error) {
+      // 用户取消输入时，ElMessageBox.prompt 会 reject，这是正常行为，不需要显示错误
+      // 只有当错误不是取消操作时才记录
+      if (error && error !== 'cancel' && error.toString().indexOf('cancel') === -1) {
+        console.error('设置关键参数时出错:', error)
+      }
+      return // 用户取消，直接返回
+    }
+
+    // 确保 numericValue 有效后再调用
+    if (numericValue === undefined || numericValue === null || isNaN(numericValue)) {
+      ElMessage.error('参数值无效，操作已取消')
+      return
+    }
+
+    await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo, numericValue)
+  } else {
+    // 其他操作直接调用
+    await handleDeviceActionUtil(action, deviceName, refreshRuntimeInfo)
+  }
 }
 
 // 刷新运行时信息
@@ -1202,6 +1179,33 @@ watch(() => route.name, async (newRouteName, oldRouteName) => {
     }
   }
 })
+
+// 监听方案切换，自动刷新基本信息
+if (injectedSelectedSchemeId) {
+  watch(injectedSelectedSchemeId, async (newSchemeId, oldSchemeId) => {
+    // 当方案切换时，如果当前在监控中心页面且有选中的农场，重新加载基本信息
+    if (route.name === '监控中心' && selectedFarm.value && newSchemeId && newSchemeId !== oldSchemeId) {
+      try {
+        console.log('方案切换，刷新基本信息:', newSchemeId)
+        await loadFarmData(selectedFarm.value)
+      } catch (error) {
+        console.error('刷新基本信息失败:', error)
+      }
+    }
+  })
+} else if (injectedCurrentSchemeName) {
+  watch(injectedCurrentSchemeName, async (newSchemeName, oldSchemeName) => {
+    // 当方案切换时，如果当前在监控中心页面且有选中的农场，重新加载基本信息
+    if (route.name === '监控中心' && selectedFarm.value && newSchemeName && newSchemeName !== oldSchemeName) {
+      try {
+        console.log('方案切换，刷新基本信息:', newSchemeName)
+        await loadFarmData(selectedFarm.value)
+      } catch (error) {
+        console.error('刷新基本信息失败:', error)
+      }
+    }
+  })
+}
 
 // 监听城市变化数据
 watch(cityChangeData, (newCityData, oldCityData) => {
@@ -2772,6 +2776,8 @@ html {
   padding: 0;
   display: flex;
   flex-direction: column;
+  /* 与“农场地图”Tab 中地图区域的可视高度保持一致 */
+  min-height: 730px;
 }
 
 .tab-content-scroll::-webkit-scrollbar {
