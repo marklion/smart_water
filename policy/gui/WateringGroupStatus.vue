@@ -7,9 +7,9 @@
                 </el-icon>
                 轮灌组运行状态
             </h3>
-            <el-button type="primary" size="small" :icon="Refresh" @click="refresh">
+            <UnifiedButton variant="refresh" size="small" :icon="Refresh" @click="refresh">
                 刷新
-            </el-button>
+            </UnifiedButton>
         </div>
 
         <div class="watering-groups-table">
@@ -58,19 +58,19 @@
                     <template #default="{ row }">
                         <div class="action-buttons">
                             <div class="action-buttons-row">
-                                <el-button size="small" type="success" @click="handleQuickAction(row.name, '启动')"
+                                <UnifiedButton size="small" variant="success" @click="handleQuickAction(row.name, '启动')"
                                     :loading="quickActionLoading[`${row.name}-启动`]">
                                     启动
-                                </el-button>
-                                <el-button size="small" type="warning" @click="handleQuickAction(row.name, '跳过')"
+                                </UnifiedButton>
+                                <UnifiedButton size="small" variant="warning" @click="handleQuickAction(row.name, '跳过')"
                                     :loading="quickActionLoading[`${row.name}-跳过`]">
                                     跳过
-                                </el-button>
+                                </UnifiedButton>
                             </div>
-                            <el-button size="small" type="danger" @click="handleQuickAction(row.name, '停止')"
+                            <UnifiedButton size="small" variant="danger" @click="handleQuickAction(row.name, '停止')"
                                 :loading="quickActionLoading[`${row.name}-停止`]" class="stop-button">
                                 停止
-                            </el-button>
+                            </UnifiedButton>
                         </div>
                     </template>
                 </el-table-column>
@@ -83,6 +83,7 @@
 import { ref, onMounted, watch, inject, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DataLine, Refresh } from '@element-plus/icons-vue'
+import UnifiedButton from '../../public/gui/src/components/UnifiedButton.vue'
 import call_remote from '../../public/lib/call_remote.js'
 
 // 接收父组件传递的农场参数
@@ -691,7 +692,7 @@ onMounted(async () => {
     width: 100%;
 }
 
-.action-buttons-row .el-button {
+.action-buttons-row :deep(.unified-btn) {
     flex: 1;
 }
 

@@ -50,12 +50,12 @@
                         </span>
                       </div>
                       <div class="tab-actions-right">
-                        <el-button type="success" size="small" :icon="Plus" @click="openAddWaterGroupValveDialog">
+                        <UnifiedButton variant="success" size="small" :icon="Plus" @click="openAddWaterGroupValveDialog">
                           添加设备
-                        </el-button>
-                        <el-button type="primary" size="small" @click="refreshDeviceList" :icon="Refresh">
+                        </UnifiedButton>
+                        <UnifiedButton variant="refresh" size="small" @click="refreshDeviceList" :icon="Refresh">
                           刷新
-                        </el-button>
+                        </UnifiedButton>
                       </div>
                     </div>
                     <div class="tab-content-scroll">
@@ -67,9 +67,9 @@
                         <el-table-column prop="blockName" label="所属区块" width="120" align="center" />
                         <el-table-column prop="status" label="状态" width="100" align="center">
                           <template #default="{ row }">
-                            <el-button type="primary" size="small" @click="onDeviceClick(row)">
+                            <UnifiedButton variant="primary" size="small" @click="onDeviceClick(row)">
                               查看
-                            </el-button>
+                            </UnifiedButton>
                           </template>
                         </el-table-column>
                         <el-table-column prop="is_online" label="在线状态" width="100" align="center">
@@ -121,18 +121,18 @@
 
                         <div class="panel-actions">
                           <el-space wrap>
-                            <el-button type="primary" size="small" :loading="mixingStartLoading" @click="startMixing"
+                            <UnifiedButton variant="primary" size="small" :loading="mixingStartLoading" @click="startMixing"
                               :icon="VideoPlay" round>
                               启动
-                            </el-button>
-                            <el-button type="danger" size="small" :loading="mixingStopLoading" @click="stopMixing"
+                            </UnifiedButton>
+                            <UnifiedButton variant="danger" size="small" :loading="mixingStopLoading" @click="stopMixing"
                               :icon="VideoPause" round>
                               停止
-                            </el-button>
-                            <el-button type="success" size="small" :loading="mixingSaving" @click="applyMixingPolicy"
+                            </UnifiedButton>
+                            <UnifiedButton variant="success" size="small" :loading="mixingSaving" @click="applyMixingPolicy"
                               :icon="Setting" round class="mixing-apply-btn">
                               保存
-                            </el-button>
+                            </UnifiedButton>
                           </el-space>
                         </div>
                       </div>
@@ -144,9 +144,9 @@
                 <el-tab-pane v-if="userRole !== 'farmer'" label="策略运行时状态" name="runtime">
                   <div class="tab-content-with-actions">
                     <div class="tab-actions">
-                      <el-button type="primary" size="small" @click="refreshIrrigationData" :icon="Refresh">
+                      <UnifiedButton variant="refresh" size="small" @click="refreshIrrigationData" :icon="Refresh">
                         刷新
-                      </el-button>
+                      </UnifiedButton>
                     </div>
                     <div class="tab-content-scroll">
                       <PolicyRuntimeStatus ref="policyRuntimeRef" :farm-name="selectedFarm" />
@@ -182,7 +182,7 @@
 
         <div class="page-content">
           <el-empty :description="pageDescription" :image-size="200">
-            <el-button type="primary">开始使用</el-button>
+            <UnifiedButton variant="primary">开始使用</UnifiedButton>
           </el-empty>
         </div>
       </el-card>
@@ -241,8 +241,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="addWaterGroupValveDialogVisible = false">取 消</el-button>
-        <el-button type="primary" @click="submitAddWaterGroupValve">确 定</el-button>
+        <UnifiedButton variant="default" @click="addWaterGroupValveDialogVisible = false">取 消</UnifiedButton>
+        <UnifiedButton variant="primary" @click="submitAddWaterGroupValve">确 定</UnifiedButton>
       </template>
     </el-dialog>
 
@@ -279,7 +279,7 @@
           class="runtime-info-section" :class="{ loading: refreshingRuntimeInfo }">
           <div class="section-title">
             <span>运行时信息</span>
-            <el-button size="small" type="primary" :icon="Refresh" @click="refreshRuntimeInfo"
+            <UnifiedButton size="small" variant="primary" :icon="Refresh" @click="refreshRuntimeInfo"
               :loading="refreshingRuntimeInfo" circle />
           </div>
           <div class="runtime-info-list">
@@ -312,23 +312,18 @@
             <!-- 动态生成的设备操作按钮 -->
             <div v-for="buttonGroup in getDeviceButtonGroupsWrapperLocal(selectedDeviceDetail)" :key="buttonGroup.key"
               :class="buttonGroup.containerClass">
-              <el-button v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
-                :type="buttonConfig.buttonType" :size="buttonConfig.buttonSize" :class="buttonConfig.buttonClass"
+              <UnifiedButton v-for="buttonConfig in buttonGroup.buttons" :key="buttonConfig.key"
+                :variant="buttonConfig.buttonType" :size="buttonConfig.buttonSize" :class="buttonConfig.buttonClass"
+                :icon="getIconComponent(buttonConfig.icon)"
                 @click="handleDeviceAction(buttonConfig.action, selectedDeviceDetail.deviceName || selectedDeviceDetail.device_name)">
-                <el-icon v-if="buttonConfig.icon" class="mr-1">
-                  <VideoPlay v-if="buttonConfig.icon === 'VideoPlay'" />
-                  <VideoPause v-else-if="buttonConfig.icon === 'VideoPause'" />
-                  <Monitor v-else-if="buttonConfig.icon === 'Monitor'" />
-                  <Close v-else-if="buttonConfig.icon === 'Close'" />
-                </el-icon>
                 {{ buttonConfig.buttonText }}
-              </el-button>
+              </UnifiedButton>
             </div>
           </div>
         </div>
       </div>
       <template #footer>
-        <el-button @click="closeDeviceDetailDialog">关闭</el-button>
+        <UnifiedButton variant="default" @click="closeDeviceDetailDialog">关闭</UnifiedButton>
       </template>
     </el-dialog>
   </div>
@@ -346,6 +341,7 @@ import PolicyRuntimeStatus from '../../../../policy/gui/PolicyRuntimeStatus.vue'
 import BasicInfoCard from '../../../../monitoring/gui/BasicInfoCard.vue'
 import RealtimeDataCard from '../../../../monitoring/gui/RealtimeDataCard.vue'
 import WarningCard from '../../../../monitoring/gui/WarningCard.vue'
+import UnifiedButton from './UnifiedButton.vue'
 import call_remote from '../../../lib/call_remote.js'
 import { fetchMapConfig } from '../config/mapConfig.js'
 import config_lib from '../../../../config/lib/config_lib.js'
@@ -909,6 +905,18 @@ const submitAddWaterGroupValve = () => {
 // 获取设备按钮分组（使用共享函数）
 const getDeviceButtonGroupsWrapperLocal = (device) => {
   return getDeviceButtonGroupsWrapper(device, getCurrentInstance)
+}
+
+// 获取图标组件
+const getIconComponent = (iconName) => {
+  if (!iconName) return null
+  const iconMap = {
+    'VideoPlay': VideoPlay,
+    'VideoPause': VideoPause,
+    'Monitor': Monitor,
+    'Close': Close
+  }
+  return iconMap[iconName] || null
 }
 
 // 启动自动刷新定时器

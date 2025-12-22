@@ -20,9 +20,9 @@
                     <span class="selector-label">切换城市：</span>
                     <el-input v-model="cityInput" placeholder="输入城市名，如：北京" class="city-input" size="default" clearable
                         @keyup.enter="handleCityChange" style="width: 150px;" />
-                    <el-button type="primary" size="default" @click="handleCityChange" :loading="cityChanging">
+                    <UnifiedButton variant="primary" size="default" @click="handleCityChange" :loading="cityChanging">
                         切换
-                    </el-button>
+                    </UnifiedButton>
                 </div>
 
                 <!-- 用户信息 -->
@@ -111,6 +111,7 @@ import {
     ArrowDown
 } from '@element-plus/icons-vue'
 import MenuBar from './MenuBar.vue'
+import UnifiedButton from './UnifiedButton.vue'
 import call_remote from '../../../lib/call_remote.js'
 import { getCityLocation, saveMapCenterToStorage } from '../config/mapConfig.js'
 

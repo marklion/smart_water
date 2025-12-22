@@ -8,13 +8,10 @@
                 </el-icon>
                 <span class="section-title">设备控制</span>
             </div>
-            <el-button type="danger" @click="showEmergencyStopDialog" class="unified-btn emergency-stop-btn"
-                :loading="emergencyStopLoading">
-                <el-icon>
-                    <Warning />
-                </el-icon>
+            <UnifiedButton variant="danger" @click="showEmergencyStopDialog" class="emergency-stop-btn"
+                :loading="emergencyStopLoading" :icon="Warning">
                 紧急停止
-            </el-button>
+            </UnifiedButton>
         </div>
 
         <div class="control-divider"></div>
@@ -31,39 +28,24 @@
             <div class="policy-controls">
                 <!-- 控制按钮组 -->
                 <div class="control-buttons-group">
-                    <el-button type="success" @click="showPolicyConfigWizard" class="unified-btn">
-                        <el-icon>
-                            <Setting />
-                        </el-icon>
+                    <UnifiedButton variant="success" @click="showPolicyConfigWizard" :icon="Setting">
                         策略程序设定
-                    </el-button>
-                    <el-button type="info" @click="showSchemeDialog" plain class="unified-btn">
-                        <el-icon>
-                            <Setting />
-                        </el-icon>
+                    </UnifiedButton>
+                    <UnifiedButton variant="info" @click="showSchemeDialog" plain :icon="Setting">
                         查看所有方案
-                    </el-button>
-                    <el-button type="primary" @click="runSchemeNow" :loading="runNowLoading"
-                        :disabled="!selectedSchemeId || isRunning" class="unified-btn">
-                        <el-icon>
-                            <VideoPlay />
-                        </el-icon>
+                    </UnifiedButton>
+                    <UnifiedButton variant="primary" @click="runSchemeNow" :loading="runNowLoading"
+                        :disabled="!selectedSchemeId || isRunning" :icon="VideoPlay">
                         立即运行
-                    </el-button>
-                    <el-button type="warning" @click="showScheduleDialog" :disabled="!selectedSchemeId || isRunning"
-                        class="unified-btn">
-                        <el-icon>
-                            <Clock />
-                        </el-icon>
+                    </UnifiedButton>
+                    <UnifiedButton variant="warning" @click="showScheduleDialog" :disabled="!selectedSchemeId || isRunning"
+                        :icon="Clock">
                         定时运行
-                    </el-button>
-                    <el-button type="danger" @click="stopScheme" :loading="stopSchemeLoading"
-                        :disabled="!selectedSchemeId" class="unified-btn">
-                        <el-icon>
-                            <VideoPause />
-                        </el-icon>
+                    </UnifiedButton>
+                    <UnifiedButton variant="danger" @click="stopScheme" :loading="stopSchemeLoading"
+                        :disabled="!selectedSchemeId" :icon="VideoPause">
                         停止
-                    </el-button>
+                    </UnifiedButton>
                 </div>
             </div>
         </div>
@@ -87,13 +69,13 @@
                 </el-checkbox-group>
 
                 <div class="emergency-actions">
-                    <el-button class="unified-btn" @click="cancelEmergencyStop">
+                    <UnifiedButton variant="default" @click="cancelEmergencyStop">
                         取消
-                    </el-button>
-                    <el-button type="danger" class="unified-btn" @click="executeEmergencyStop"
+                    </UnifiedButton>
+                    <UnifiedButton variant="danger" @click="executeEmergencyStop"
                         :loading="emergencyStopLoading">
                         执行急停
-                    </el-button>
+                    </UnifiedButton>
                 </div>
             </div>
         </el-dialog>
@@ -114,13 +96,10 @@
                                     <span class="scheme-name">{{ scheme.name }}</span>
                                 </div>
                                 <div class="scheme-actions">
-                                    <el-button size="small" type="primary" plain @click.stop="editSchemeGroups(scheme)"
-                                        class="edit-groups-btn">
-                                        <el-icon>
-                                            <Edit />
-                                        </el-icon>
+                                    <UnifiedButton size="small" variant="primary" plain @click.stop="editSchemeGroups(scheme)"
+                                        class="edit-groups-btn" :icon="Edit">
                                         编辑轮灌组
-                                    </el-button>
+                                    </UnifiedButton>
                                     <el-icon v-if="String(tempSelectedSchemeId) === String(scheme.name)"
                                         class="check-icon">
                                         <CircleCheck />
@@ -149,13 +128,13 @@
             </div>
             <template #footer>
                 <div class="dialog-footer">
-                    <el-button class="unified-btn" @click="schemeDialogVisible = false">
+                    <UnifiedButton variant="default" @click="schemeDialogVisible = false">
                         取消
-                    </el-button>
-                    <el-button type="primary" class="unified-btn" @click="applyScheme" :disabled="!tempSelectedSchemeId"
+                    </UnifiedButton>
+                    <UnifiedButton variant="primary" @click="applyScheme" :disabled="!tempSelectedSchemeId"
                         :loading="applySchemeLoading">
                         应用
-                    </el-button>
+                    </UnifiedButton>
                 </div>
             </template>
         </el-dialog>
@@ -171,12 +150,12 @@
                 </el-form>
             </div>
             <template #footer>
-                <el-button class="unified-btn" @click="scheduleDialogVisible = false">
+                <UnifiedButton variant="default" @click="scheduleDialogVisible = false">
                     取消
-                </el-button>
-                <el-button type="primary" class="unified-btn" @click="setScheduledRun" :loading="scheduleLoading">
+                </UnifiedButton>
+                <UnifiedButton variant="primary" @click="setScheduledRun" :loading="scheduleLoading">
                     确定
-                </el-button>
+                </UnifiedButton>
             </template>
         </el-dialog>
     </div>
@@ -187,6 +166,7 @@ import { ref, onMounted, computed, inject, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Monitor, VideoPlay, VideoPause, Clock, Setting, Warning, CircleCheck, Edit } from '@element-plus/icons-vue'
+import UnifiedButton from './UnifiedButton.vue'
 import call_remote from '../../../lib/call_remote.js'
 
 const router = useRouter()
@@ -797,7 +777,7 @@ onMounted(async () => {
     align-items: center;
 }
 
-.control-buttons-group .unified-btn {
+.control-buttons-group :deep(.unified-btn) {
     width: auto;
     min-width: 100px;
     white-space: nowrap;

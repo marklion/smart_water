@@ -28,11 +28,12 @@
         </div>
         <!-- 快速操作按钮 -->
         <div v-if="policy.quick_actions && policy.quick_actions.length > 0" class="quick-actions" @click.stop>
-          <el-button v-for="action in policy.quick_actions" :key="action.action_name" size="small" type="primary"
+          <UnifiedButton v-for="action in policy.quick_actions" :key="action.action_name" size="small" 
+            :variant="getActionVariant(action.action_name)"
             @click="handleQuickAction(policy.name, action.action_name)"
             :loading="quickActionLoading[`${policy.name}-${action.action_name}`]">
             {{ action.action_name }}
-          </el-button>
+          </UnifiedButton>
         </div>
       </div>
     </div>
@@ -42,9 +43,9 @@
       <div class="subsection-header">
         <h4 class="subsection-title">策略运行时状态 - {{ selectedPolicy.name }}</h4>
         <div class="refresh-controls">
-          <el-button size="small" @click="handleManualRefresh" :loading="isAutoRefreshing">
+          <UnifiedButton variant="refresh" size="small" @click="handleManualRefresh" :loading="isAutoRefreshing">
             手动刷新
-          </el-button>
+          </UnifiedButton>
           <div class="refresh-status">
             <el-icon v-if="isAutoRefreshing" class="is-loading">
               <Loading />
@@ -86,10 +87,10 @@
                   {{ value }}
                 </div>
                 <div class="variable-actions">
-                  <el-button v-if="editingVariable === key" type="primary" size="small" @click="saveVariable(key)"
-                    :loading="assignmentLoading" icon="Check" />
-                  <el-button v-if="editingVariable === key" size="small" @click="cancelEdit" icon="Close" />
-                  <el-button v-else type="text" size="small" @click="startEdit(key, value)" icon="Edit" />
+                  <UnifiedButton v-if="editingVariable === key" variant="primary" size="small" @click="saveVariable(key)"
+                    :loading="assignmentLoading" :icon="Check" />
+                  <UnifiedButton v-if="editingVariable === key" variant="default" size="small" @click="cancelEdit" :icon="Close" />
+                  <UnifiedButton v-else variant="default" size="small" @click="startEdit(key, value)" :icon="Edit" plain />
                 </div>
               </div>
             </el-descriptions-item>
@@ -107,7 +108,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Monitor, Loading } from '@element-plus/icons-vue'
+import { Monitor, Loading, Check, Close, Edit } from '@element-plus/icons-vue'
+import UnifiedButton from '../../public/gui/src/components/UnifiedButton.vue'
 import call_remote from '../../public/lib/call_remote.js'
 
 // 接收父组件传递的农场参数
@@ -506,6 +508,18 @@ const handleManualRefresh = () => {
     loadPolicyRuntime(selectedPolicy.value.name)
   }
 }
+
+// 根据操作名称获取按钮变体
+const getActionVariant = (actionName) => {
+  if (actionName === '启动' || actionName === '开始') {
+    return 'primary'
+  } else if (actionName === '停止' || actionName === '暂停') {
+    return 'danger'
+  } else if (actionName === '重置' || actionName === '复位') {
+    return 'reset'
+  }
+  return 'primary' // 默认使用 primary
+}
 </script>
 
 <style scoped>
@@ -706,7 +720,7 @@ const handleManualRefresh = () => {
   gap: 4px;
 }
 
-.variable-actions .el-button {
+.variable-actions .unified-btn {
   padding: 4px 8px;
   min-width: auto;
 }
