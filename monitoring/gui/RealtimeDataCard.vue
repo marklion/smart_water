@@ -7,9 +7,9 @@
           <el-tab-pane label="数据面板" name="dashboard"></el-tab-pane>
         </el-tabs>
         <div class="header-actions">
-          <el-button type="primary" size="small" :icon="Refresh" @click="refreshData" :loading="loading">
+          <UnifiedButton variant="refresh" size="small" :icon="Refresh" @click="refreshData" :loading="loading">
             刷新
-          </el-button>
+          </UnifiedButton>
         </div>
       </div>
     </template>
@@ -49,7 +49,7 @@
             <div class="data-value" :class="item.valueClass">
               {{ item.value }}
             </div>
-            <el-button type="primary" :icon="View" circle size="small" class="history-btn-center"
+            <UnifiedButton variant="primary" :icon="View" circle size="small" class="history-btn-center"
               @click.stop="openHistoryDialog(item)" title="查看历史数据" />
             <div class="data-unit">{{ item.unit }}</div>
           </div>
@@ -88,12 +88,12 @@
           end-placeholder="结束日期" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" size="default"
           class="date-picker-input" />
         <div class="filter-actions">
-          <el-button type="primary" :icon="Search" @click="applyDateFilter" :loading="historyLoading" class="query-btn">
+          <UnifiedButton variant="query" :icon="Search" @click="applyDateFilter" :loading="historyLoading">
             查询
-          </el-button>
-          <el-button :icon="RefreshLeft" @click="resetDateFilter" class="reset-btn">
+          </UnifiedButton>
+          <UnifiedButton variant="reset" :icon="RefreshLeft" @click="resetDateFilter">
             重置
-          </el-button>
+          </UnifiedButton>
         </div>
       </div>
     </div>
@@ -105,10 +105,9 @@
           </el-icon>
           <span>共 {{ filteredHistoryData.length }} 条记录</span>
         </div>
-        <el-button type="success" :icon="Download" @click="exportToExcel" :loading="exporting" size="small"
-          class="export-btn">
+        <UnifiedButton variant="export" :icon="Download" @click="exportToExcel" :loading="exporting" size="small">
           导出Excel
-        </el-button>
+        </UnifiedButton>
       </div>
       <el-table :data="filteredHistoryData" stripe max-height="400" class="history-table"
         :row-class-name="tableRowClassName">
@@ -137,7 +136,7 @@
     </div>
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="historyDialogVisible = false" size="default">关闭</el-button>
+        <UnifiedButton variant="default" @click="historyDialogVisible = false" size="default">关闭</UnifiedButton>
       </div>
     </template>
   </el-dialog>
@@ -148,6 +147,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Clock, View, Calendar, Search, RefreshLeft, Download } from '@element-plus/icons-vue'
 import call_remote from '../../public/lib/call_remote.js'
+import UnifiedButton from '../../public/gui/src/components/UnifiedButton.vue'
 
 // 定义props
 const props = defineProps({
@@ -1180,30 +1180,6 @@ defineExpose({
   gap: 8px;
 }
 
-.query-btn {
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
-  transition: all 0.3s ease;
-}
-
-.query-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
-}
-
-.reset-btn {
-  border-radius: 8px;
-  padding: 10px 20px;
-  transition: all 0.3s ease;
-}
-
-.reset-btn:hover {
-  transform: translateY(-2px);
-  background-color: #f5f7fa;
-}
-
 .history-content {
   min-height: 200px;
   background: #ffffff;
@@ -1230,16 +1206,6 @@ defineExpose({
   font-weight: 500;
 }
 
-.export-btn {
-  border-radius: 6px;
-  box-shadow: 0 2px 6px rgba(103, 194, 58, 0.3);
-  transition: all 0.3s ease;
-}
-
-.export-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.4);
-}
 
 .data-count .el-icon {
   color: #409eff;

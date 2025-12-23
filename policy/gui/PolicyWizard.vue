@@ -9,9 +9,9 @@
                         </el-icon>
                         <span class="title">策略程序设定向导</span>
                     </div>
-                    <el-button type="info" @click="handleCancel" :icon="Close">
+                    <UnifiedButton variant="info" @click="handleCancel" :icon="Close">
                         取消
-                    </el-button>
+                    </UnifiedButton>
                 </div>
             </template>
 
@@ -48,12 +48,12 @@
                         <div class="groups-header">
                             <span>轮灌组列表</span>
                             <div class="header-buttons">
-                                <el-button type="info" size="small" @click="loadExistingGroups" :icon="Refresh">
+                                <UnifiedButton variant="info" size="small" @click="loadExistingGroups" :icon="Refresh">
                                     加载已配置
-                                </el-button>
-                                <el-button type="primary" size="small" @click="addWateringGroup" :icon="Plus">
+                                </UnifiedButton>
+                                <UnifiedButton variant="primary" size="small" @click="addWateringGroup" :icon="Plus">
                                     添加轮灌组
-                                </el-button>
+                                </UnifiedButton>
                             </div>
                         </div>
 
@@ -125,16 +125,16 @@
                                 </el-popover>
                             </div>
                             <div class="group-actions">
-                                <el-button v-if="group.area > 0" type="primary" size="small" :icon="CopyDocument"
+                                <UnifiedButton v-if="group.area > 0" variant="primary" size="small" :icon="CopyDocument"
                                     @click="copyWateringGroup(group, index)" class="copy-group-btn">
                                     复制
-                                </el-button>
+                                </UnifiedButton>
                                 <el-popover v-if="group.area > 0" :width="600" placement="left" trigger="click"
                                     popper-class="group-detail-popover">
                                     <template #reference>
-                                        <el-button type="info" size="small" :icon="View" class="view-group-btn">
+                                        <UnifiedButton variant="info" size="small" :icon="View" class="view-group-btn">
                                             查看
-                                        </el-button>
+                                        </UnifiedButton>
                                     </template>
                                     <template #default>
                                         <div class="group-detail-popover-content">
@@ -233,14 +233,14 @@
                                         </div>
                                     </template>
                                 </el-popover>
-                                <el-button v-if="group.area > 0" type="success" size="small" @click="editGroupValves(index)"
+                                <UnifiedButton v-if="group.area > 0" variant="success" size="small" @click="editGroupValves(index)"
                                     :icon="Edit">
                                     编辑阀门
-                                </el-button>
-                                <el-button type="danger" size="small" @click="removeWateringGroup(index)"
+                                </UnifiedButton>
+                                <UnifiedButton variant="danger" size="small" @click="removeWateringGroup(index)"
                                     :icon="Delete">
                                     删除
-                                </el-button>
+                                </UnifiedButton>
                             </div>
                         </div>
                     </div>
@@ -258,17 +258,17 @@
                     <div class="device-allocation">
                         <!-- 组切换器 -->
                         <div v-if="wateringGroups.length > 1" class="group-switcher">
-                            <el-button :disabled="currentGroupIndex === 0" @click="switchToPreviousGroup"
-                                :icon="ArrowLeft" size="small">
+                            <UnifiedButton :disabled="currentGroupIndex === 0" @click="switchToPreviousGroup"
+                                :icon="ArrowLeft" size="small" variant="default">
                                 上一个
-                            </el-button>
+                            </UnifiedButton>
                             <span class="group-counter">
                                 {{ currentGroupIndex + 1 }} / {{ wateringGroups.length }}
                             </span>
-                            <el-button :disabled="currentGroupIndex === wateringGroups.length - 1"
-                                @click="switchToNextGroup" :icon="ArrowRight" size="small">
+                            <UnifiedButton :disabled="currentGroupIndex === wateringGroups.length - 1"
+                                @click="switchToNextGroup" :icon="ArrowRight" size="small" variant="default">
                                 下一个
-                            </el-button>
+                            </UnifiedButton>
                         </div>
 
                         <!-- 设备选择列表 -->
@@ -282,10 +282,10 @@
                                         <el-tab-pane label="地图显示" name="map"></el-tab-pane>
                                         <el-tab-pane label="列表显示" name="list"></el-tab-pane>
                                     </el-tabs>
-                                    <el-button v-if="valveDisplayMode === 'map'" type="primary" size="small"
+                                    <UnifiedButton v-if="valveDisplayMode === 'map'" variant="primary" size="small"
                                         @click="enterFullscreenMap(group.name)" :icon="FullScreen">
                                         全屏查看
-                                    </el-button>
+                                    </UnifiedButton>
                                 </div>
                             </div>
 
@@ -297,11 +297,11 @@
                                     <span class="info-text">已选择 {{ selectedValveDevices[group.configKey ||
                                         group.name]?.length
                                         || 0 }} 个阀门（共 {{ availableValveDevices.length }} 个可用）</span>
-                                    <el-button v-if="selectedValveDevices[group.configKey || group.name]?.length > 0"
-                                        type="danger" size="small"
+                                    <UnifiedButton v-if="selectedValveDevices[group.configKey || group.name]?.length > 0"
+                                        variant="danger" size="small"
                                         @click="clearSelectedValves(group.configKey || group.name)" :icon="Delete">
                                         清空选择
-                                    </el-button>
+                                    </UnifiedButton>
                                 </div>
                             </div>
 
@@ -312,18 +312,18 @@
                                         group.name]?.length
                                         || 0 }} 个阀门（共 {{ availableValveDevices.length }} 个可用）</span>
                                     <div class="list-actions">
-                                        <el-button
+                                        <UnifiedButton
                                             v-if="selectedValveDevices[group.configKey || group.name]?.length > 0"
-                                            type="danger" size="small"
+                                            variant="danger" size="small"
                                             @click="clearSelectedValves(group.configKey || group.name)" :icon="Delete">
                                             清空选择
-                                        </el-button>
-                                        <el-button
+                                        </UnifiedButton>
+                                        <UnifiedButton
                                             v-if="selectedValveDevices[group.configKey || group.name]?.length < availableValveDevices.length"
-                                            type="primary" size="small"
+                                            variant="primary" size="small"
                                             @click="selectAllValves(group.configKey || group.name)" :icon="Check">
                                             全选
-                                        </el-button>
+                                        </UnifiedButton>
                                     </div>
                                 </div>
                                 <div class="valve-list-content">
@@ -426,27 +426,27 @@
 
                 <!-- 操作按钮 -->
                 <div class="wizard-actions">
-                    <el-button v-if="wizardStep > 1" @click="prevStep">上一步</el-button>
+                    <UnifiedButton v-if="wizardStep > 1" variant="default" @click="prevStep">上一步</UnifiedButton>
 
-                    <el-button v-if="wizardStep === 1" type="primary" @click="nextStep"
+                    <UnifiedButton v-if="wizardStep === 1" variant="primary" @click="nextStep"
                         :disabled="!schemeName || schemeName.trim() === ''">
                         下一步
-                    </el-button>
+                    </UnifiedButton>
 
-                    <el-button v-if="wizardStep === 2 && allGroupsAreCopied" type="primary" @click="nextStep">
+                    <UnifiedButton v-if="wizardStep === 2 && allGroupsAreCopied" variant="primary" @click="nextStep">
                         下一步
-                    </el-button>
-                    <el-button v-else-if="wizardStep === 2" type="primary" @click="nextStep">
+                    </UnifiedButton>
+                    <UnifiedButton v-else-if="wizardStep === 2" variant="primary" @click="nextStep">
                         下一步
-                    </el-button>
+                    </UnifiedButton>
 
-                    <el-button v-if="wizardStep === 3" type="primary" @click="nextStep">
+                    <UnifiedButton v-if="wizardStep === 3" variant="primary" @click="nextStep">
                         下一步
-                    </el-button>
+                    </UnifiedButton>
 
-                    <el-button v-if="wizardStep === 4" type="success" @click="finishWizard">
+                    <UnifiedButton v-if="wizardStep === 4" variant="success" @click="finishWizard">
                         完成配置
-                    </el-button>
+                    </UnifiedButton>
                 </div>
             </div>
         </el-card>
@@ -477,8 +477,8 @@
                 </el-form-item>
             </el-form>
             <template #footer>
-                <el-button @click="createSchemeDialogVisible = false">取消</el-button>
-                <el-button type="primary" @click="createScheme">创建</el-button>
+                <UnifiedButton variant="default" @click="createSchemeDialogVisible = false">取消</UnifiedButton>
+                <UnifiedButton variant="primary" @click="createScheme">创建</UnifiedButton>
             </template>
         </el-dialog>
     </div>
@@ -492,6 +492,7 @@ import {
     Document, Close, Refresh, Plus, Delete, CopyDocument,
     ArrowLeft, ArrowRight, Check, View, FullScreen, InfoFilled, Edit
 } from '@element-plus/icons-vue'
+import UnifiedButton from '../../public/gui/src/components/UnifiedButton.vue'
 import call_remote from '../../public/lib/call_remote.js'
 import policy_lib from '../lib/policy_lib.js'
 import device_management_lib from '../../device/lib/device_management_lib.js'
