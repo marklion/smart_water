@@ -9,7 +9,6 @@
         <!-- 主要内容区域 - 使用 scroll-view 支持滚动 -->
         <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="content">
-                <WeatherCard />
                 <view class="section-title-row">
                     <fui-text :text="'轮灌组运行状态'" :size="30" :fontWeight="600" color="#303133"></fui-text>
                 </view>
@@ -429,7 +428,6 @@ import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import fuiDialog from 'firstui-uni/firstui/fui-dialog/fui-dialog.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
-import WeatherCard from '../monitoring/WeatherCard.vue'
 import call_remote from '../../../../lib/call_remote.js'
 
 
@@ -631,11 +629,15 @@ const getMethodLabel = (val) => {
 }
 
 const openCreateForm = (isCopy, group = null) => {
+    // 清除之前的编辑方案名称（如果有）
+    uni.removeStorageSync('edit_scheme_name')
+    
     if (isCopy && group) {
         uni.setStorageSync('irrigation_copy_group', group)
         uni.navigateTo({ url: '/pages/irrigation/wizard?mode=copy' })
         return
     }
+    // 跳转到方案创建向导（4步流程）
     uni.navigateTo({ url: '/pages/irrigation/wizard?mode=create' })
 }
 
