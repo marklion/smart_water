@@ -233,6 +233,10 @@
                                         </div>
                                     </template>
                                 </el-popover>
+                                <UnifiedButton v-if="group.area > 0" variant="success" size="small" @click="editGroupValves(index)"
+                                    :icon="Edit">
+                                    编辑阀门
+                                </UnifiedButton>
                                 <UnifiedButton variant="danger" size="small" @click="removeWateringGroup(index)"
                                     :icon="Delete">
                                     删除
@@ -486,7 +490,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
     Document, Close, Refresh, Plus, Delete, CopyDocument,
-    ArrowLeft, ArrowRight, Check, View, FullScreen, InfoFilled
+    ArrowLeft, ArrowRight, Check, View, FullScreen, InfoFilled, Edit
 } from '@element-plus/icons-vue'
 import UnifiedButton from '../../public/gui/src/components/UnifiedButton.vue'
 import call_remote from '../../public/lib/call_remote.js'
@@ -715,6 +719,34 @@ const addWateringGroup = async () => {
             return
         }
         console.error('新增轮灌组失败:', error)
+    }
+}
+
+// 编辑轮灌组阀门
+const editGroupValves = async (index) => {
+    // 设置当前组索引
+    currentGroupIndex.value = index
+    
+    // 确保该组的阀门选择数据存在
+    const groupName = wateringGroups.value[index].name
+    const configKey = wateringGroups.value[index].configKey || groupName
+    if (!selectedValveDevices.value[configKey]) {
+        selectedValveDevices.value[configKey] = []
+    }
+    
+    // 加载阀门设备（如果还没有加载）
+    if (availableValveDevices.value.length === 0) {
+        await loadValveDevices()
+    }
+    
+    // 跳转到步骤3（分配设备）
+    wizardStep.value = 3
+    
+    // 等待DOM更新后初始化地图（如果当前显示模式是地图）
+    await nextTick()
+    if (valveDisplayMode.value === 'map') {
+        await new Promise(resolve => setTimeout(resolve, 150))
+        await initValveSelectionMap(groupName)
     }
 }
 
@@ -2083,24 +2115,6 @@ const finishWizard = async () => {
         }
     }
 
-    // 检查是否有任何变更（包括数量变化、面积变化或配置变化）
-    const initialGroupCount = Object.keys(initialAreas.value).length
-    const isCountChanged = wateringGroups.value.length !== initialGroupCount
-
-    // 只处理有变更的轮灌组（包括新增的）
-    const groupsToUpdate = wateringGroups.value.filter(group => {
-        if (!group || !group.name) return false
-        const configKey = group.configKey || group.name
-        // 如果是新增的轮灌组（不在初始快照中），需要更新
-        const isNewGroup = initialAreas.value[configKey] === undefined
-        // 如果面积有变更，或者配置有变更，或者是新增的，则需要更新
-        return isNewGroup || changedAreas.value[configKey] !== undefined || changedFertConfigs.value[configKey] !== undefined
-    })
-
-    if (!isCountChanged && groupsToUpdate.length === 0) {
-        ElMessage.info('没有需要更新的配置')
-        return
-    }
 
     // 如果有任何变更，我们需要下发当前方案中所有的轮灌组配置，因为后端通常是全量覆盖
     const finalConfig = wateringGroups.value.map(group => {
