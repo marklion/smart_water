@@ -134,20 +134,33 @@ const showFarmSelector = computed(() => route.name === '监控中心')
 const currentSchemeName = ref('')
 const selectedSchemeId = ref('')
 
-// 加载方案列表
+// 加载方案列表，并从后端同步“当前方案”（与 mobile 保持一致）
 const loadSchemeList = async () => {
     try {
         const response = await call_remote('/policy/list_schemes', {})
         if (response && response.schemes) {
-            // 如果有方案且未选中，默认选中第一个
-            if (response.schemes.length > 0 && !selectedSchemeId.value) {
-                selectedSchemeId.value = response.schemes[0].name
-                currentSchemeName.value = response.schemes[0].name
-            } else if (selectedSchemeId.value) {
-                // 更新当前方案名称
-                const currentScheme = response.schemes.find(s => s.name === selectedSchemeId.value)
-                if (currentScheme) {
-                    currentSchemeName.value = currentScheme.name
+            const schemes = response.schemes
+
+            // 1) 优先从后端 get_current_scheme 同步当前方案
+            try {
+                if (selectedFarm.value) {
+                    const curResp = await call_remote('/policy/get_current_scheme', {
+                        farm_name: selectedFarm.value
+                    })
+                    if (curResp?.scheme_id && schemes.find(s => s.name === curResp.scheme_id)) {
+                        selectedSchemeId.value = curResp.scheme_id
+                        currentSchemeName.value = curResp.scheme_id
+                    }
+                }
+            } catch (e) {
+                console.warn('从后端获取当前方案失败:', e)
+            }
+
+            // 2) 如果后端没有记录当前方案，再按原逻辑兜底
+            if (!selectedSchemeId.value) {
+                if (schemes.length > 0) {
+                    selectedSchemeId.value = schemes[0].name
+                    currentSchemeName.value = schemes[0].name
                 }
             }
         }

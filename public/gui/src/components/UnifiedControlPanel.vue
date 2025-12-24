@@ -47,6 +47,16 @@
                         停止
                     </UnifiedButton>
                 </div>
+                <!-- 显示定时运行时间 -->
+                <div v-if="nextRunTime" class="schedule-time-info">
+                    <el-icon class="schedule-icon">
+                        <Clock />
+                    </el-icon>
+                    <span class="schedule-text">定时运行：{{ nextRunTime }}</span>
+                    <el-icon class="cancel-icon" @click="cancelScheduledRun">
+                        <Close />
+                    </el-icon>
+                </div>
             </div>
         </div>
 
@@ -162,10 +172,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, inject, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, inject, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Monitor, VideoPlay, VideoPause, Clock, Setting, Warning, CircleCheck, Edit } from '@element-plus/icons-vue'
+import { Monitor, VideoPlay, VideoPause, Clock, Setting, Warning, CircleCheck, Edit, Close } from '@element-plus/icons-vue'
 import UnifiedButton from './UnifiedButton.vue'
 import call_remote from '../../../lib/call_remote.js'
 
@@ -215,6 +225,8 @@ const scheduleDialogVisible = ref(false)
 const scheduledTime = ref('')
 const scheduleLoading = ref(false)
 const isRunning = ref(false) // 方案是否正在运行
+const nextRunTime = ref('') // 下次运行时间
+let runningStatusTimer = null // 运行状态定时器
 
 // 解析方案文件内容，提取轮灌组信息
 const parseWateringGroups = (content) => {
@@ -314,6 +326,7 @@ const getTotalPolicyName = async (schemeName) => {
 const checkRunningStatus = async () => {
     if (!selectedSchemeId.value) {
         isRunning.value = false
+        nextRunTime.value = ''
         return
     }
 
@@ -327,13 +340,36 @@ const checkRunningStatus = async () => {
             const variables = JSON.parse(runtimeResponse.variables)
             // 检查"需要启动"变量是否为true
             isRunning.value = variables['需要启动'] === true || variables['需要启动'] === 'true'
+            
+            // 获取下次启动时间
+            const nextStartTime = variables['下次启动时间']
+            if (nextStartTime && nextStartTime !== '' && nextStartTime !== '""') {
+                // 格式化显示时间
+                const timeStr = nextStartTime.replace(/"/g, '')
+                const date = new Date(timeStr)
+                if (!isNaN(date.getTime())) {
+                    nextRunTime.value = date.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                } else {
+                    nextRunTime.value = ''
+                }
+            } else {
+                nextRunTime.value = ''
+            }
         } else {
             isRunning.value = false
+            nextRunTime.value = ''
         }
     } catch (error) {
         // 如果获取失败，假设未运行
         console.warn('检查运行状态失败:', error)
         isRunning.value = false
+        nextRunTime.value = ''
     }
 }
 
@@ -457,7 +493,40 @@ const applyScheme = async () => {
 
     applySchemeLoading.value = true
     try {
-        await call_remote('/policy/restore_scheme', { scheme_id: tempSelectedSchemeId.value })
+        // 获取农场名称（用于同步当前方案到后端）
+        let farmName = null
+        try {
+            // 优先从方案内容中解析农场名称
+            const response = await call_remote('/policy/get_scheme_content', { scheme_name: tempSelectedSchemeId.value })
+            if (response && response.content) {
+                farmName = parseFarmName(response.content)
+            }
+        } catch (e) {
+            console.warn('从方案内容解析农场名称失败:', e)
+        }
+        
+        // 如果无法从方案中获取，尝试从设备中获取
+        if (!farmName && props.devices && props.devices.length > 0) {
+            farmName = props.devices[0].farmName || props.devices[0].farm_name
+        }
+
+        // 恢复方案配置
+        await call_remote('/policy/restore_scheme', { 
+            scheme_id: tempSelectedSchemeId.value,
+            farm_name: farmName || undefined
+        })
+
+        // 同步当前方案到后端（用于 PC / mobile 跨端同步）
+        if (farmName) {
+            try {
+                await call_remote('/policy/set_current_scheme', {
+                    farm_name: farmName,
+                    scheme_id: tempSelectedSchemeId.value
+                })
+            } catch (e) {
+                console.warn('同步当前方案到后端失败:', e)
+            }
+        }
 
         // 更新当前选中的方案
         selectedSchemeId.value = tempSelectedSchemeId.value
@@ -552,10 +621,35 @@ const setScheduledRun = async () => {
         })
         ElMessage.success(`已设置定时运行: ${scheduledTime.value}`)
         scheduleDialogVisible.value = false
+        // 设置后立即刷新状态
+        await checkRunningStatus()
     } catch (error) {
         ElMessage.error(error.err_msg || '设置定时运行失败')
     } finally {
         scheduleLoading.value = false
+    }
+}
+
+// 撤销定时运行
+const cancelScheduledRun = async () => {
+    if (!selectedSchemeId.value) {
+        return
+    }
+
+    try {
+        // 获取总策略名称
+        const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
+        await call_remote('/policy/runtime_assignment', {
+            policy_name: totalPolicyName,
+            variable_name: '下次启动时间',
+            expression: '""',
+            is_constant: true
+        })
+        ElMessage.success('已撤销定时运行')
+        // 立即刷新状态
+        await checkRunningStatus()
+    } catch (error) {
+        ElMessage.error(error.err_msg || '撤销定时运行失败')
     }
 }
 
@@ -653,12 +747,37 @@ const executeEmergencyStop = async () => {
     }
 }
 
+// 启动定时刷新运行状态
+const startRunningStatusTimer = () => {
+    // 清除已有定时器
+    if (runningStatusTimer) {
+        clearInterval(runningStatusTimer)
+    }
+    // 每5秒检查一次运行状态
+    runningStatusTimer = setInterval(async () => {
+        if (selectedSchemeId.value) {
+            await checkRunningStatus()
+        }
+    }, 5000)
+}
+
+// 停止定时刷新运行状态
+const stopRunningStatusTimer = () => {
+    if (runningStatusTimer) {
+        clearInterval(runningStatusTimer)
+        runningStatusTimer = null
+    }
+}
+
 // 监听方案切换，检查运行状态
 watch(selectedSchemeId, async (newSchemeId) => {
     if (newSchemeId) {
         await checkRunningStatus()
+        // 重新启动定时器
+        startRunningStatusTimer()
     } else {
         isRunning.value = false
+        stopRunningStatusTimer()
     }
 }, { immediate: true })
 
@@ -667,7 +786,14 @@ onMounted(async () => {
     // 加载方案列表后检查运行状态
     if (selectedSchemeId.value) {
         await checkRunningStatus()
+        // 启动定时刷新
+        startRunningStatusTimer()
     }
+})
+
+onUnmounted(() => {
+    // 组件卸载时清除定时器
+    stopRunningStatusTimer()
 })
 </script>
 
@@ -763,9 +889,50 @@ onMounted(async () => {
 
 .policy-controls {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     justify-content: flex-start;
     width: 100%;
+    gap: 12px;
+}
+
+.schedule-time-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%);
+    border-radius: 8px;
+    border-left: 3px solid #ffc107;
+    font-size: 12px;
+    color: #856404;
+    width: 100%;
+}
+
+.schedule-time-info .schedule-icon {
+    font-size: 14px;
+    color: #ffc107;
+    flex-shrink: 0;
+}
+
+.schedule-time-info .schedule-text {
+    font-weight: 500;
+    flex: 1;
+}
+
+.schedule-time-info .cancel-icon {
+    font-size: 14px;
+    color: #909399;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 2px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.schedule-time-info .cancel-icon:hover {
+    color: #f56c6c;
+    background: rgba(245, 108, 108, 0.1);
 }
 
 .control-buttons-group {

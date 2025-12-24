@@ -9,6 +9,113 @@
         <!-- 主要内容区域 - 使用 scroll-view 支持滚动 -->
         <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="content">
+                <!-- 当前方案运行状态 -->
+                <view class="current-scheme-card">
+                    <view class="scheme-row">
+                        <view class="scheme-title">当前方案</view>
+                        <view class="scheme-name">{{ selectedSchemeId || '未选择' }}</view>
+                        <view class="scheme-status" :class="isRunning ? 'running' : 'stopped'">
+                            {{ isRunning ? '运行中' : '未运行' }}
+                        </view>
+                    </view>
+                    <view class="scheme-progress">
+                        <view class="progress-track">
+                            <view class="progress-bar" :class="{ active: isRunning }" :style="{ width: isRunning ? '100%' : '0%' }"></view>
+                        </view>
+                    </view>
+                </view>
+
+                <!-- 方案控制部分 -->
+                <view class="policy-control-section">
+                    <view class="section-header">
+                        <fui-text :text="'方案控制'" :size="30" :fontWeight="600" color="#303133"></fui-text>
+                    </view>
+                    <view class="policy-controls">
+                        <view class="control-buttons-row">
+                            <view class="control-btn info" @tap.stop="showSchemeDialog">
+                                <fui-text :text="'查看所有方案'" :size="24" color="#fff"></fui-text>
+                            </view>
+                        </view>
+                        <view class="control-buttons-row">
+                            <view class="control-btn primary" @tap.stop="runSchemeNow" 
+                                :class="{ disabled: !selectedSchemeId || isRunning, loading: runNowLoading }">
+                                <fui-text :text="'立即运行'" :size="24" color="#fff"></fui-text>
+                            </view>
+                            <view class="control-btn warning" @tap.stop="showScheduleDialog" 
+                                :class="{ disabled: !selectedSchemeId || isRunning }">
+                                <fui-text :text="'定时运行'" :size="24" color="#fff"></fui-text>
+                            </view>
+                        </view>
+                        <view class="control-buttons-row">
+                            <view class="control-btn danger" @tap.stop="stopScheme" 
+                                :class="{ disabled: !selectedSchemeId, loading: stopSchemeLoading }">
+                                <fui-text :text="'停止'" :size="24" color="#fff"></fui-text>
+                            </view>
+                        </view>
+                        <!-- 显示定时运行时间 -->
+                        <view v-if="nextRunTime" class="schedule-time-info">
+                            <text class="schedule-icon">🕐</text>
+                            <fui-text :text="`定时运行：${nextRunTime}`" :size="24" color="#856404"></fui-text>
+                            <text class="cancel-icon" @tap.stop="cancelScheduledRun">✕</text>
+                        </view>
+                    </view>
+                </view>
+
+                <!-- 搅拌策略部分 -->
+                <view v-if="currentFarmName" class="mixing-strategy-section">
+                    <view class="section-header">
+                        <fui-text :text="'搅拌策略'" :size="30" :fontWeight="600" color="#303133"></fui-text>
+                    </view>
+                    <view class="mixing-strategy-card">
+                        <view class="mixing-inputs-row">
+                            <view class="mixing-input-item">
+                                <view class="input-label">
+                                    <fui-text :text="'搅拌间隔'" :size="24" color="#606266"></fui-text>
+                                </view>
+                                <fui-input v-model="mixingStartInterval" 
+                                    type="number" placeholder="60" 
+                                    :maxlength="4" :borderColor="'#e4e7ed'" />
+                            </view>
+                            <view class="mixing-input-item">
+                                <view class="input-label">
+                                    <fui-text :text="'持续时间'" :size="24" color="#606266"></fui-text>
+                                </view>
+                                <fui-input v-model="mixingDuration" 
+                                    type="number" placeholder="6" 
+                                    :maxlength="4" :borderColor="'#e4e7ed'" />
+                            </view>
+                        </view>
+
+                        <!-- 显示定时运行时间 -->
+                        <view v-if="mixingNextRunTime" class="mixing-schedule-info">
+                            <text class="schedule-icon">🕐</text>
+                            <fui-text :text="`定时运行：${mixingNextRunTime}`" :size="24" color="#856404"></fui-text>
+                            <text class="cancel-icon" @tap.stop="cancelMixingScheduledRun">✕</text>
+                        </view>
+
+                        <view class="mixing-buttons-row">
+                            <view class="control-btn primary" @tap.stop="startMixing" 
+                                :class="{ disabled: isMixingRunning, loading: mixingStartLoading }">
+                                <fui-text :text="'启动'" :size="24" color="#fff"></fui-text>
+                            </view>
+                            <view class="control-btn warning" @tap.stop="showMixingScheduleDialog" 
+                                :class="{ disabled: isMixingRunning }">
+                                <fui-text :text="'定时启动'" :size="24" color="#fff"></fui-text>
+                            </view>
+                        </view>
+                        <view class="mixing-buttons-row">
+                            <view class="control-btn danger" @tap.stop="stopMixing" 
+                                :class="{ disabled: !isMixingRunning, loading: mixingStopLoading }">
+                                <fui-text :text="'停止'" :size="24" color="#fff"></fui-text>
+                            </view>
+                            <view class="control-btn success" @tap.stop="applyMixingPolicy" 
+                                :class="{ loading: mixingSaving }">
+                                <fui-text :text="'保存'" :size="24" color="#fff"></fui-text>
+                            </view>
+                        </view>
+                    </view>
+                </view>
+
                 <view class="section-title-row">
                     <fui-text :text="'轮灌组运行状态'" :size="30" :fontWeight="600" color="#303133"></fui-text>
                 </view>
@@ -39,10 +146,10 @@
                     <fui-text :text="'暂无轮灌组，请先新增或在PC配置后刷新'" :size="26" color="#909399"></fui-text>
                 </view>
                 <view v-else class="group-list">
-                    <view v-for="group in filteredGroups" :key="group.name" class="group-card">
+                    <view v-for="group in filteredGroups" :key="group.name" class="group-card" :class="getCardStatusClass(group.cur_state)">
                         <view class="group-header">
                             <view class="group-title">
-                                <fui-text :text="group.name" :size="32" :fontWeight="600" color="#303133"></fui-text>
+                                <fui-text :text="group.name" :size="32" :fontWeight="600" :color="getTextColor(group.cur_state)"></fui-text>
                                 <view class="view-config-btn" @click="viewPolicyConfig(group.name)">
                                     <text class="eye-icon">👁</text>
                                 </view>
@@ -54,29 +161,29 @@
                         <view class="group-meta">
                             <view class="meta-item">
                                 <view class="meta-label">面积(亩)</view>
-                                <fui-text :text="formatNumber(group.area)" :size="24" color="#303133"></fui-text>
+                                <fui-text :text="formatNumber(group.area)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
                             <view class="meta-item">
                                 <view class="meta-label">方式</view>
-                                <fui-text :text="group.method || '-'" :size="24" color="#303133"></fui-text>
+                                <fui-text :text="group.method || '-'" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
                             <view class="meta-item">
                                 <view class="meta-label">施肥率(L/亩)</view>
-                                <fui-text :text="formatNumber(group.fert_rate)" :size="24" color="#303133"></fui-text>
+                                <fui-text :text="formatNumber(group.fert_rate)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
                         </view>
                         <view class="group-meta">
                             <view class="meta-item">
                                 <view class="meta-label">总水量(L)</view>
-                                <fui-text :text="formatNumber(group.total_water)" :size="24" color="#303133"></fui-text>
+                                <fui-text :text="formatNumber(group.total_water)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
                             <view class="meta-item">
                                 <view class="meta-label">总肥量(L)</view>
-                                <fui-text :text="formatNumber(group.total_fert)" :size="24" color="#303133"></fui-text>
+                                <fui-text :text="formatNumber(group.total_fert)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
                             <view class="meta-item">
                                 <view class="meta-label">剩余时间(分)</view>
-                                <fui-text :text="formatNumber(group.minute_left)" :size="24" color="#303133"></fui-text>
+                                <fui-text :text="formatNumber(group.minute_left)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
                         </view>
                         <view class="valves-row">
@@ -88,11 +195,8 @@
                         </view>
 
                         <view class="card-actions">
-                            <view class="water-only-btn"
-                                :class="{ active: waterOnlyMode[group.name], loading: waterOnlyLoading[group.name] }"
-                                @click="handleWaterOnlyToggle(group.name)">
-                                <fui-text :text="waterOnlyMode[group.name] ? '只浇水 ✓' : '只浇水'" :size="24"
-                                    :color="waterOnlyMode[group.name] ? '#fff' : '#67C23A'"></fui-text>
+                            <view v-if="waterOnlyMode[group.name]" class="water-only-btn active">
+                                <fui-text :text="'只浇水 ✓'" :size="24" color="#fff"></fui-text>
                             </view>
                             <view class="action-buttons-row">
                                 <view class="action-btn success" @click="handleQuickAction(group.name, '启动')"
@@ -157,31 +261,38 @@
                                 <view class="picker-value">{{ getMethodLabel(formData.method) }}</view>
                             </picker>
                         </view>
-                        <view class="form-item">
+                        <view v-if="formData.method === 'AreaBased'" class="form-item">
                             <view class="form-label">亩定量(L/亩)</view>
                             <input class="form-input" v-model.number="formData.AB_fert" type="number"
-                                placeholder="方法为定量时必填" />
+                                placeholder="亩定量模式时必填" />
                         </view>
-                        <view class="form-item">
+                        <view v-if="formData.method === 'Total'" class="form-item">
                             <view class="form-label">总定量(L)</view>
                             <input class="form-input" v-model.number="formData.total_fert" type="number"
-                                placeholder="方法为总定量时必填" />
+                                placeholder="总定量模式时必填" />
                         </view>
-                        <view class="form-item">
-                            <view class="form-label">定时(分钟)</view>
-                            <input class="form-input" v-model.number="formData.fert_time" type="number"
-                                placeholder="方法为定时时必填" />
-                        </view>
-                        <view class="form-item">
-                            <view class="form-label">肥后时间(分钟)</view>
-                            <input class="form-input" v-model.number="formData.post_fert_time" type="number"
-                                placeholder="可选，默认0" />
-                        </view>
-                        <view class="form-item">
-                            <view class="form-label">总时间(分钟)</view>
+                        <view v-if="formData.method === 'WaterOnly'" class="form-item">
+                            <view class="form-label">总灌溉时间(分钟)</view>
                             <input class="form-input" v-model.number="formData.total_time" type="number"
-                                placeholder="必填，>0" />
+                                placeholder="只浇水模式时必填" />
                         </view>
+                        <template v-else>
+                            <view v-if="formData.method === 'Time'" class="form-item">
+                                <view class="form-label">施肥时间(分钟)</view>
+                                <input class="form-input" v-model.number="formData.fert_time" type="number"
+                                    placeholder="定时模式时必填" />
+                            </view>
+                            <view class="form-item">
+                                <view class="form-label">肥前时间(分钟)</view>
+                                <input class="form-input" v-model.number="formData.pre_fert_time" type="number"
+                                    placeholder="必填，>=0" />
+                            </view>
+                            <view class="form-item">
+                                <view class="form-label">肥后时间(分钟)</view>
+                                <input class="form-input" v-model.number="formData.post_fert_time" type="number"
+                                    placeholder="必填，>=0" />
+                            </view>
+                        </template>
                     </view>
 
                     <!-- Step 2 分配阀门 -->
@@ -246,26 +357,32 @@
                                 <view class="summary-label">方式</view>
                                 <view class="summary-value">{{ getMethodLabel(formData.method) }}</view>
                             </view>
-                            <view class="summary-row">
+                            <view v-if="formData.method === 'AreaBased'" class="summary-row">
                                 <view class="summary-label">亩定量</view>
                                 <view class="summary-value">{{ formData.AB_fert ?? '-' }}</view>
                             </view>
-                            <view class="summary-row">
+                            <view v-if="formData.method === 'Total'" class="summary-row">
                                 <view class="summary-label">总定量</view>
                                 <view class="summary-value">{{ formData.total_fert ?? '-' }}</view>
                             </view>
-                            <view class="summary-row">
-                                <view class="summary-label">定时</view>
-                                <view class="summary-value">{{ formData.fert_time ?? '-' }}</view>
-                            </view>
-                            <view class="summary-row">
-                                <view class="summary-label">肥后时间</view>
-                                <view class="summary-value">{{ formData.post_fert_time ?? 0 }}</view>
-                            </view>
-                            <view class="summary-row">
-                                <view class="summary-label">总时间</view>
+                            <view v-if="formData.method === 'WaterOnly'" class="summary-row">
+                                <view class="summary-label">总灌溉时间</view>
                                 <view class="summary-value">{{ formData.total_time ?? '-' }}</view>
                             </view>
+                            <template v-else>
+                                <view v-if="formData.method === 'Time'" class="summary-row">
+                                    <view class="summary-label">施肥时间</view>
+                                    <view class="summary-value">{{ formData.fert_time ?? '-' }}</view>
+                                </view>
+                                <view class="summary-row">
+                                    <view class="summary-label">肥前时间</view>
+                                    <view class="summary-value">{{ formData.pre_fert_time ?? 0 }}</view>
+                                </view>
+                                <view class="summary-row">
+                                    <view class="summary-label">肥后时间</view>
+                                    <view class="summary-value">{{ formData.post_fert_time ?? 0 }}</view>
+                                </view>
+                            </template>
                             <view class="summary-row">
                                 <view class="summary-label">阀门</view>
                                 <view class="summary-tags" v-if="selectedValves.length">
@@ -297,6 +414,69 @@
 
         <!-- 加载组件 -->
         <Loading :show="pageLoading" text="加载中..." />
+
+        <!-- 方案选择对话框 -->
+        <fui-dialog :show="schemeDialogVisible" title="选择方案" :buttons="schemeDialogButtons"
+            :maskClosable="true" @click="handleSchemeDialogClick" @close="closeSchemeDialog">
+            <view class="scheme-dialog-content">
+                <view v-if="schemeListLoading" class="scheme-loading">
+                    <fui-text :text="'加载中...'" :size="28" color="#909399"></fui-text>
+                </view>
+                <view v-else-if="schemeList.length === 0" class="scheme-empty">
+                    <fui-text :text="'暂无方案，请先创建方案'" :size="28" color="#909399"></fui-text>
+                </view>
+                <view v-else class="scheme-list">
+                    <view v-for="scheme in schemeList" :key="scheme.name" 
+                        class="scheme-item" 
+                        :class="{ 'is-selected': String(tempSelectedSchemeId) === String(scheme.name) }"
+                        @click="selectSchemeInDialog(scheme.name)">
+                        <view class="scheme-name">{{ scheme.name }}</view>
+                        <view v-if="scheme.wateringGroups && scheme.wateringGroups.length > 0" class="scheme-groups">
+                            <fui-text :text="'轮灌组：'" :size="24" color="#909399"></fui-text>
+                            <view class="groups-tags">
+                                <view v-for="group in scheme.wateringGroups" :key="group" class="group-tag">
+                                    <fui-text :text="group" :size="22" color="#409eff"></fui-text>
+                                </view>
+                            </view>
+                        </view>
+                        <view v-if="String(tempSelectedSchemeId) === String(scheme.name)" class="check-icon">✓</view>
+                    </view>
+                </view>
+            </view>
+        </fui-dialog>
+
+        <!-- 搅拌策略定时启动对话框 -->
+        <fui-dialog :show="mixingScheduleDialogVisible" title="搅拌策略定时启动设置" 
+            :buttons="mixingScheduleDialogButtons"
+            :maskClosable="true" @click="handleMixingScheduleDialogClick" @close="closeMixingScheduleDialog">
+            <view class="schedule-dialog-content">
+                <view class="form-item">
+                    <view class="form-label">启动时间</view>
+                    <picker mode="date" :value="mixingScheduledDate" @change="onMixingScheduleDateChange">
+                        <view class="picker-value">{{ mixingScheduledDate || '选择日期' }}</view>
+                    </picker>
+                    <picker mode="time" :value="mixingScheduledTimeOnly" @change="onMixingScheduleTimeChange">
+                        <view class="picker-value">{{ mixingScheduledTimeOnly || '选择时间' }}</view>
+                    </picker>
+                </view>
+            </view>
+        </fui-dialog>
+
+        <!-- 定时运行对话框 -->
+        <fui-dialog :show="scheduleDialogVisible" title="定时运行设置" :buttons="scheduleDialogButtons"
+            :maskClosable="true" @click="handleScheduleDialogClick" @close="closeScheduleDialog">
+            <view class="schedule-dialog-content">
+                <view class="form-item">
+                    <view class="form-label">运行时间</view>
+                    <picker mode="date" :value="scheduleDate" @change="onScheduleDateChange">
+                        <view class="picker-value">{{ scheduleDate || '选择日期' }}</view>
+                    </picker>
+                    <picker mode="time" :value="scheduleTime" @change="onScheduleTimeChange">
+                        <view class="picker-value">{{ scheduleTime || '选择时间' }}</view>
+                    </picker>
+                </view>
+            </view>
+        </fui-dialog>
 
         <!-- 策略配置查看对话框 -->
         <fui-dialog :show="showPolicyConfigDialog" :title="policyConfigTitle" :buttons="policyConfigButtons"
@@ -398,6 +578,15 @@
                         </view>
                         <view class="config-item">
                             <view class="config-item-label">
+                                <fui-text :text="'肥前时间：'" :size="26" color="#606266"></fui-text>
+                            </view>
+                            <view class="config-item-value">
+                                <fui-text :text="(policyConfigData.fertConfig?.pre_fert_time || 0) + ' 分钟'" :size="26"
+                                    color="#303133"></fui-text>
+                            </view>
+                        </view>
+                        <view class="config-item">
+                            <view class="config-item-label">
                                 <fui-text :text="'肥后时间：'" :size="26" color="#606266"></fui-text>
                             </view>
                             <view class="config-item-value">
@@ -422,10 +611,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { ref, computed, watch, nextTick } from 'vue'
+import { onShow, onHide } from '@dcloudio/uni-app'
 import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import fuiDialog from 'firstui-uni/firstui/fui-dialog/fui-dialog.vue'
+import fuiInput from 'firstui-uni/firstui/fui-input/fui-input.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
 import call_remote from '../../../../lib/call_remote.js'
@@ -438,10 +628,55 @@ const loading = ref(false)
 const currentFarmName = ref('')
 const groupSearch = ref('')
 const groups = ref([])
-const waterOnlyMode = ref({}) // 跟踪每个轮灌组的"只浇水"状态
-const waterOnlyLoading = ref({}) // 跟踪"只浇水"按钮的加载状态
-const quickActionLoading = ref({}) // 跟踪快速操作的加载状态
+const waterOnlyMode = ref({})
+const quickActionLoading = ref({})
 const isFirstLoad = ref(true) // 标记是否是首次加载
+
+// 方案控制相关
+const schemeList = ref([])
+const schemeListLoading = ref(false)
+const selectedSchemeId = ref('')
+const tempSelectedSchemeId = ref('')
+const schemeDialogVisible = ref(false)
+const schemeDialogButtons = ref([
+    { text: '取消', color: '#909399' },
+    { text: '编辑当前方案', color: '#909399' },
+    { text: '应用', color: '#409eff' }
+])
+const applySchemeLoading = ref(false)
+const runNowLoading = ref(false)
+const stopSchemeLoading = ref(false)
+const isRunning = ref(false)
+const totalPolicyWarningShown = ref(false)
+const scheduleDialogVisible = ref(false)
+const scheduleDate = ref('')
+const scheduleTime = ref('')
+const scheduleDialogButtons = ref([
+    { text: '取消', color: '#909399' },
+    { text: '确定', color: '#409eff' }
+])
+const scheduleLoading = ref(false)
+const nextRunTime = ref('') // 方案下次运行时间
+let runningStatusTimer = null // 方案运行状态定时器
+
+// 搅拌策略相关
+const mixingStartInterval = ref(60) // 启动间隔，默认60分钟
+const mixingDuration = ref(6) // 期望运行时间，默认6分钟
+const mixingSaving = ref(false)
+const mixingStartLoading = ref(false)
+const mixingStopLoading = ref(false)
+const mixingScheduleDialogVisible = ref(false) // 搅拌策略定时启动对话框显示状态
+const mixingScheduleDialogButtons = ref([
+    { text: '取消', color: '#909399' },
+    { text: '确定', color: '#409eff' }
+])
+const mixingScheduledTime = ref('') // 搅拌策略定时启动时间（完整日期时间字符串）
+const mixingScheduledDate = ref('') // 搅拌策略定时启动日期
+const mixingScheduledTimeOnly = ref('') // 搅拌策略定时启动时间（仅时间部分）
+const mixingScheduleLoading = ref(false) // 搅拌策略定时启动加载状态
+const mixingNextRunTime = ref('') // 搅拌策略下次运行时间
+const isMixingRunning = ref(false) // 搅拌策略是否正在运行
+let mixingStatusTimer = null // 搅拌策略状态定时器
 
 // 策略配置查看相关
 const showPolicyConfigDialog = ref(false)
@@ -474,36 +709,22 @@ const farmAreaParams = ref({
     coefficient: 0.9
 })
 const methodOptions = [
-    { label: '定量', value: 'AreaBased' },
+    { label: '只浇水', value: 'WaterOnly' },
+    { label: '亩定量', value: 'AreaBased' },
     { label: '总定量', value: 'Total' },
     { label: '定时', value: 'Time' },
 ]
 const formData = ref({
     name: '',
     area: null,
-    method: 'AreaBased',
+    method: 'WaterOnly',
     AB_fert: null,
     total_fert: null,
     fert_time: null,
+    pre_fert_time: null,
     post_fert_time: null,
     total_time: null,
 })
-
-const resetForm = () => {
-    formData.value = {
-        name: '',
-        area: null,
-        method: 'AreaBased',
-        AB_fert: null,
-        total_fert: null,
-        fert_time: null,
-        post_fert_time: null,
-        total_time: null,
-    }
-    selectedValves.value = []
-    wizardStep.value = 1
-    startTime.value = '08:00'
-}
 
 const filteredGroups = computed(() => {
     const keyword = groupSearch.value.trim().toLowerCase()
@@ -526,7 +747,6 @@ const parseValves = (valveStr) => {
     return valveStr.split(/[,|\s]+/).map(v => v.trim()).filter(Boolean)
 }
 
-// 从表达式字符串解析阀门列表（PC端逻辑）
 const parseValvesFromExpression = (expression) => {
     if (!expression || expression === '-') return []
     if (expression.includes('|')) {
@@ -536,19 +756,17 @@ const parseValvesFromExpression = (expression) => {
     return matches ? matches.map(m => m.replaceAll('"', '')) : []
 }
 
-// 解析施肥方式（PC端逻辑）
 const parseFertMethod = (expression) => {
     const methodStr = (expression || '').replaceAll('"', '')
+    if (methodStr === '只浇水' || methodStr === 'WaterOnly') return 'WaterOnly'
     if (methodStr === '亩定量' || methodStr === 'AreaBased') return 'AreaBased'
     if (methodStr === '总定量' || methodStr === 'Total') return 'Total'
     if (methodStr === '定时' || methodStr === 'Time') return 'Time'
-    return 'AreaBased'
+    return 'WaterOnly'
 }
 
-// 解析时间值（PC端逻辑，毫秒转分钟）
 const parseTimeValue = (expression) => {
     const value = Number.parseFloat(expression) || 0
-    // 如果是毫秒，转换为分钟
     if (value > 1000) {
         return value / 60000
     }
@@ -570,7 +788,6 @@ const parseAreaFromVariable = (initVariables) => {
     return null
 }
 
-// 从初始化变量中解析施肥配置（PC端逻辑）
 const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
     if (!initVariables) return
 
@@ -582,6 +799,8 @@ const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
             fertConfig.method = parseFertMethod(expression)
         } else if (varName === 'fert_time' || varName === '施肥时间') {
             fertConfig.fert_time = parseTimeValue(expression)
+        } else if (varName === 'pre_ms' || varName === '肥前时间') {
+            fertConfig.pre_fert_time = parseTimeValue(expression)
         } else if (varName === 'post_ms' || varName === '肥后时间') {
             fertConfig.post_fert_time = parseTimeValue(expression)
         } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
@@ -591,19 +810,17 @@ const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
         }
     }
 
-    // 如果施肥方式是"总定量"，且期望施肥总量有值，计算亩定量
     if (fertConfig.method === 'Total' && fertConfig.total_fert > 0 && area > 0) {
         fertConfig.AB_fert = fertConfig.total_fert / area
     }
 
-    // 如果施肥方式是"亩定量"，且期望每亩施肥量有值，计算总定量
     if (fertConfig.method === 'AreaBased' && fertConfig.AB_fert > 0 && area > 0) {
         fertConfig.total_fert = fertConfig.AB_fert * area
     }
 }
 
-// 获取施肥方式标签
 const getFertMethodLabel = (method) => {
+    if (method === 'WaterOnly') return '只浇水'
     if (method === 'AreaBased') return '亩定量'
     if (method === 'Total') return '总定量'
     if (method === 'Time') return '定时'
@@ -612,9 +829,48 @@ const getFertMethodLabel = (method) => {
 
 const statusClass = (state) => {
     if (!state) return 'info'
-    if (state.includes('执行') || state.includes('灌溉') || state.includes('running')) return 'success'
-    if (state.includes('暂停') || state.includes('warning')) return 'warning'
-    return 'info'
+    const statusTrimmed = state.toString().trim()
+    switch (statusTrimmed) {
+        case '空闲':
+            return 'info'
+        case '浇水':
+            return 'primary'
+        case '肥前':
+            return 'warning'
+        case '施肥':
+            return 'purple'
+        case '肥后':
+            return 'success'
+        case '收尾':
+            return 'success'
+        default:
+            return 'info'
+    }
+}
+
+const getCardStatusClass = (state) => {
+    if (!state) return 'status-idle'
+    const statusTrimmed = state.toString().trim()
+    switch (statusTrimmed) {
+        case '空闲':
+            return 'status-idle'
+        case '浇水':
+            return 'status-watering'
+        case '肥前':
+            return 'status-pre-fert'
+        case '施肥':
+            return 'status-fertilizing'
+        case '肥后':
+            return 'status-post-fert'
+        case '收尾':
+            return 'status-finishing'
+        default:
+            return 'status-idle'
+    }
+}
+
+const getTextColor = (state) => {
+    return '#ffffff'
 }
 
 const onMethodChange = (e) => {
@@ -625,11 +881,10 @@ const onMethodChange = (e) => {
 
 const getMethodLabel = (val) => {
     const opt = methodOptions.find(o => o.value === val)
-    return opt ? opt.label : '定量'
+    return opt ? opt.label : '亩定量'
 }
 
 const openCreateForm = (isCopy, group = null) => {
-    // 清除之前的编辑方案名称（如果有）
     uni.removeStorageSync('edit_scheme_name')
     
     if (isCopy && group) {
@@ -637,20 +892,12 @@ const openCreateForm = (isCopy, group = null) => {
         uni.navigateTo({ url: '/pages/irrigation/wizard?mode=copy' })
         return
     }
-    // 跳转到方案创建向导（4步流程）
     uni.navigateTo({ url: '/pages/irrigation/wizard?mode=create' })
 }
 
 const closeForm = () => {
     if (submitting.value) return
     formVisible.value = false
-}
-
-const mapMethodToEnum = (methodLabel) => {
-    if (!methodLabel) return 'AreaBased'
-    if (methodLabel.includes('定时')) return 'Time'
-    if (methodLabel.includes('总')) return 'Total'
-    return 'AreaBased'
 }
 
 const validateStep1 = () => {
@@ -663,26 +910,42 @@ const validateStep1 = () => {
         uni.showToast({ title: '面积需大于0', icon: 'none' })
         return false
     }
-    if (!formData.value.total_time || Number(formData.value.total_time) <= 0) {
-        uni.showToast({ title: '总时间需大于0', icon: 'none' })
-        return false
+    
+    const method = formData.value.method
+    if (method === 'WaterOnly') {
+        if (!formData.value.total_time || Number(formData.value.total_time) <= 0) {
+            uni.showToast({ title: '总灌溉时间需大于0', icon: 'none' })
+            return false
+        }
+    } else {
+        const preTime = Number(formData.value.pre_fert_time) || 0
+        const fertTime = method === 'Time' ? (Number(formData.value.fert_time) || 0) : 0
+        const postTime = Number(formData.value.post_fert_time) || 0
+        const totalTime = preTime + fertTime + postTime
+        
+        if (totalTime <= 0) {
+            uni.showToast({ title: '肥前时间、施肥时间、肥后时间总和需大于0', icon: 'none' })
+            return false
+        }
+        
+        if (method === 'AreaBased') {
+            if (!formData.value.AB_fert || Number(formData.value.AB_fert) <= 0) {
+                uni.showToast({ title: '亩定量需大于0', icon: 'none' })
+                return false
+            }
+        } else if (method === 'Total') {
+            if (!formData.value.total_fert || Number(formData.value.total_fert) <= 0) {
+                uni.showToast({ title: '总定量需大于0', icon: 'none' })
+                return false
+            }
+        } else if (method === 'Time') {
+            if (!formData.value.fert_time || Number(formData.value.fert_time) <= 0) {
+                uni.showToast({ title: '施肥时间需大于0', icon: 'none' })
+                return false
+            }
+        }
     }
-    if (formData.value.method === 'AreaBased' && (!formData.value.AB_fert || Number(formData.value.AB_fert) <= 0)) {
-        uni.showToast({ title: '亩定量需大于0', icon: 'none' })
-        return false
-    }
-    if (formData.value.method === 'Total' && (!formData.value.total_fert || Number(formData.value.total_fert) <= 0)) {
-        uni.showToast({ title: '总定量需大于0', icon: 'none' })
-        return false
-    }
-    if (formData.value.method === 'Time' && (!formData.value.fert_time || Number(formData.value.fert_time) <= 0)) {
-        uni.showToast({ title: '定时需大于0', icon: 'none' })
-        return false
-    }
-    if (!formData.value.total_time || Number(formData.value.total_time) <= 0) {
-        uni.showToast({ title: '总时间需大于0', icon: 'none' })
-        return false
-    }
+    
     return true
 }
 
@@ -798,25 +1061,49 @@ const prevWizardStep = () => {
 }
 
 const buildPayload = () => {
-    const abVal = formData.value.method === 'Total'
-        ? Number(formData.value.total_fert || 0) / Number(formData.value.area || 1)
-        : formData.value.AB_fert
+    const method = formData.value.method
+    const groupData = {
+        name: (formData.value.name || '').trim(),
+        area: Number(formData.value.area),
+        valves: selectedValves.value.slice(),
+        method: method,
+    }
 
-    return {
-        groups: [{
-            name: (formData.value.name || '').trim(),
-            area: Number(formData.value.area),
-            valves: selectedValves.value.slice(),
-            method: formData.value.method,
-            AB_fert: abVal !== null ? Number(abVal) : undefined,
-            total_fert: formData.value.total_fert !== null ? Number(formData.value.total_fert) : undefined,
-            fert_time: formData.value.method === 'Time' ? Number(formData.value.fert_time || 0) : 0,
-            post_fert_time: formData.value.post_fert_time !== null ? Number(formData.value.post_fert_time) : 0,
-            total_time: formData.value.total_time !== null ? Number(formData.value.total_time) : undefined,
-        }],
+    if (method === 'WaterOnly') {
+        groupData.total_time = formData.value.total_time !== null ? Number(formData.value.total_time) : undefined
+        groupData.post_fert_time = 0
+    } else {
+        const preTime = formData.value.pre_fert_time !== null ? Number(formData.value.pre_fert_time) : 0
+        const fertTime = method === 'Time' ? (formData.value.fert_time !== null ? Number(formData.value.fert_time) : 0) : 0
+        const postTime = formData.value.post_fert_time !== null ? Number(formData.value.post_fert_time) : 0
+        groupData.pre_fert_time = preTime
+        if (method === 'Time') {
+            groupData.fert_time = fertTime
+        }
+        groupData.post_fert_time = postTime
+        groupData.total_time = preTime + fertTime + postTime
+        
+        if (method === 'AreaBased') {
+            groupData.AB_fert = formData.value.AB_fert !== null ? Number(formData.value.AB_fert) : undefined
+        } else if (method === 'Total') {
+            const abVal = Number(formData.value.total_fert || 0) / Number(formData.value.area || 1)
+            groupData.AB_fert = abVal !== null ? Number(abVal) : undefined
+            groupData.total_fert = formData.value.total_fert !== null ? Number(formData.value.total_fert) : undefined
+        }
+    }
+
+    const payload = {
+        groups: [groupData],
         farm_name: currentFarmName.value || undefined,
         start_time: startTime.value
     }
+
+    if (selectedSchemeId.value) {
+        payload.scheme_id = selectedSchemeId.value
+        payload.scheme_name = selectedSchemeId.value
+    }
+
+    return payload
 }
 
 const submitForm = async () => {
@@ -880,7 +1167,12 @@ const loadGroups = async () => {
         let hasMore = true
         const allGroups = []
         while (hasMore) {
-            const resp = await call_remote('/policy/list_watering_groups', { pageNo }, token)
+            // 只加载当前方案下的轮灌组：如果已选择方案，则带上 scheme_id 参数
+            const params = { pageNo }
+            if (selectedSchemeId.value) {
+                params.scheme_id = selectedSchemeId.value
+            }
+            const resp = await call_remote('/policy/list_watering_groups', params, token)
             const list = resp && resp.groups ? resp.groups : []
             allGroups.push(...list)
             // 如果返回的数据少于20条，说明已经是最后一页了
@@ -889,7 +1181,6 @@ const loadGroups = async () => {
         }
         const filtered = await filterByFarm(allGroups)
         groups.value = filtered.map(mapGroup)
-        // 加载每个轮灌组的"只浇水"状态
         await loadWaterOnlyStates()
     } catch (error) {
         console.error('加载轮灌组失败', error)
@@ -948,7 +1239,6 @@ const useSuggestedArea = () => {
     }
 }
 
-// 加载每个轮灌组的"只浇水"状态
 const loadWaterOnlyStates = async () => {
     const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
     for (const group of groups.value) {
@@ -963,7 +1253,6 @@ const loadWaterOnlyStates = async () => {
                 } catch (e) {
                     console.warn(`解析策略 ${group.name} 变量数据失败:`, e)
                 }
-                // 如果"是否只浇水"为true，则"只浇水"按钮应该被选中
                 waterOnlyMode.value[group.name] = variables['是否只浇水'] === true
             }
         } catch (error) {
@@ -973,51 +1262,6 @@ const loadWaterOnlyStates = async () => {
     }
 }
 
-// 处理"只浇水"按钮切换
-const handleWaterOnlyToggle = async (policyName) => {
-    const currentState = waterOnlyMode.value[policyName] || false
-    const newState = !currentState
-
-    try {
-        waterOnlyLoading.value[policyName] = true
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-
-        // 设置"是否只浇水"变量
-        const result = await call_remote('/policy/runtime_assignment', {
-            policy_name: policyName,
-            variable_name: '是否只浇水',
-            expression: newState ? 'true' : 'false',
-            is_constant: false
-        }, token)
-
-        if (result.result) {
-            // 如果启用只浇水模式，需要停止当前的施肥流程（设置"需要启动"为false）
-            if (newState) {
-                await call_remote('/policy/runtime_assignment', {
-                    policy_name: policyName,
-                    variable_name: '需要启动',
-                    expression: 'false',
-                    is_constant: false
-                }, token)
-            }
-
-            waterOnlyMode.value[policyName] = newState
-            uni.showToast({
-                title: newState ? '已启用只浇水模式' : '已关闭只浇水模式',
-                icon: 'success'
-            })
-            // 重新加载轮灌组数据
-            await loadGroups()
-        } else {
-            uni.showToast({ title: result?.err_msg || '操作失败', icon: 'none' })
-        }
-    } catch (error) {
-        console.error('切换只浇水模式失败:', error)
-        uni.showToast({ title: error?.err_msg || '切换只浇水模式失败', icon: 'none' })
-    } finally {
-        waterOnlyLoading.value[policyName] = false
-    }
-}
 
 // 处理快速操作
 const handleQuickAction = async (policyName, actionName) => {
@@ -1128,6 +1372,7 @@ const viewPolicyConfig = async (policyName) => {
             AB_fert: 0,
             total_fert: 0,
             fert_time: 0,
+            pre_fert_time: 0,
             post_fert_time: 0,
             total_time: group.total_time || 0,
         }
@@ -1203,11 +1448,878 @@ const onRefresh = async () => {
     }
 }
 
-const onFarmChange = (farmName) => {
+const onFarmChange = async (farmName) => {
     currentFarmName.value = farmName
+    // 重新启动搅拌策略状态定时器
+    if (farmName) {
+        startMixingStatusTimer()
+    } else {
+        stopMixingStatusTimer()
+    }
+    // 重新启动方案运行状态定时器
+    if (selectedSchemeId.value) {
+        startRunningStatusTimer()
+    } else {
+        stopRunningStatusTimer()
+    }
+    // 加载数据
     loadGroups()
     fetchSuggestedArea()
 }
+
+// 方案控制相关函数
+// 解析方案文件内容，提取轮灌组信息
+const parseWateringGroups = (content) => {
+    const groups = new Set()
+    const allGroupsMatch = content.match(/所有轮灌组[^[]*\[([^\]]+)\]/)
+    if (allGroupsMatch) {
+        const groupsStr = allGroupsMatch[1]
+        const groupNames = groupsStr.match(/"([^"]+)"/g)
+        if (groupNames) {
+            groupNames.forEach(name => {
+                const cleanName = name.replace(/"/g, '').trim()
+                if (cleanName && (cleanName.includes('轮灌组') || cleanName.includes('组'))) {
+                    groups.add(cleanName)
+                }
+            })
+        }
+    }
+    if (groups.size === 0) {
+        const policyMatches = content.matchAll(/policy\s+'([^']+)'/g)
+        for (const match of policyMatches) {
+            const policyName = match[1]
+            if (policyName.includes('轮灌组') || policyName.includes('组')) {
+                groups.add(policyName)
+            }
+        }
+    }
+    return Array.from(groups).sort()
+}
+
+// 从方案内容中解析农场名称
+const parseFarmName = (content) => {
+    const totalPolicyMatch = content.match(/policy\s+'([^']+-总策略)'/)
+    if (totalPolicyMatch) {
+        const totalPolicyName = totalPolicyMatch[1]
+        const farmName = totalPolicyName.replace('-总策略', '')
+        return farmName
+    }
+    const farmMatch = content.match(/add\s+farm\s+'([^']+)'/)
+    if (farmMatch) {
+        return farmMatch[1]
+    }
+    return null
+}
+
+// 获取总策略名称并验证存在性
+const getTotalPolicyName = async (schemeName) => {
+    let totalPolicyName = null
+    const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
+    try {
+        const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeName }, token)
+        if (response && response.content) {
+            const farmName = parseFarmName(response.content)
+            if (farmName) {
+                totalPolicyName = `${farmName}-总策略`
+            }
+        }
+    } catch (error) {
+        console.warn('获取方案内容失败:', error)
+    }
+
+    if (!totalPolicyName && currentFarmName.value) {
+        totalPolicyName = `${currentFarmName.value}-总策略`
+    }
+
+    if (!totalPolicyName) {
+        return null
+    }
+
+    try {
+        await call_remote('/policy/get_policy_runtime', {
+            policy_name: totalPolicyName
+        }, token)
+        return totalPolicyName
+    } catch (error) {
+        return null
+    }
+}
+
+// 检查方案是否正在运行
+const checkRunningStatus = async () => {
+    if (!selectedSchemeId.value) {
+        isRunning.value = false
+        nextRunTime.value = ''
+        return
+    }
+
+    try {
+        const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
+        if (!totalPolicyName) {
+            if (!totalPolicyWarningShown.value) {
+                totalPolicyWarningShown.value = true
+                uni.showToast({
+                    title: '总策略未找到，请先应用方案或确认已加载',
+                    icon: 'none'
+                })
+            }
+            isRunning.value = false
+            nextRunTime.value = ''
+            return
+        }
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const runtimeResponse = await call_remote('/policy/get_policy_runtime', {
+            policy_name: totalPolicyName
+        }, token)
+
+        if (runtimeResponse && runtimeResponse.variables) {
+            const variables = JSON.parse(runtimeResponse.variables)
+            isRunning.value = variables['需要启动'] === true || variables['需要启动'] === 'true'
+            
+            // 获取下次启动时间
+            const nextStartTime = variables['下次启动时间']
+            if (nextStartTime && nextStartTime !== '' && nextStartTime !== '""') {
+                // 格式化显示时间
+                const timeStr = nextStartTime.replace(/"/g, '')
+                const date = new Date(timeStr)
+                if (!isNaN(date.getTime())) {
+                    nextRunTime.value = date.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                } else {
+                    nextRunTime.value = ''
+                }
+            } else {
+                nextRunTime.value = ''
+            }
+        } else {
+            isRunning.value = false
+            nextRunTime.value = ''
+        }
+    } catch (error) {
+        console.warn('检查运行状态失败:', error)
+        isRunning.value = false
+        nextRunTime.value = ''
+    }
+}
+
+// 获取方案详情（包括轮灌组）
+const getSchemeDetails = async (schemeName) => {
+    try {
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeName }, token)
+        if (response && response.content) {
+            return parseWateringGroups(response.content)
+        }
+    } catch (error) {
+        console.warn('获取方案详情失败:', error)
+    }
+    return []
+}
+
+// 加载方案列表
+const loadSchemeList = async () => {
+    schemeListLoading.value = true
+    try {
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const response = await call_remote('/policy/list_schemes', {}, token)
+        if (response?.schemes) {
+            schemeList.value = response.schemes.map(scheme => ({
+                ...scheme,
+                wateringGroups: []
+            }))
+            
+            // 优先从后端“当前方案”接口同步（PC / mobile 共用）
+            try {
+                const farmName = currentFarmName.value || (pageHeaderRef.value && pageHeaderRef.value.getCurrentFarmName && pageHeaderRef.value.getCurrentFarmName())
+                if (farmName) {
+                    const curResp = await call_remote('/policy/get_current_scheme', { farm_name: farmName }, token)
+                    if (curResp?.scheme_id && schemeList.value.find(s => s.name === curResp.scheme_id)) {
+                        selectedSchemeId.value = curResp.scheme_id
+                        uni.setStorageSync('selectedSchemeId', selectedSchemeId.value)
+                    }
+                }
+            } catch (e) {
+                console.warn('从后端获取当前方案失败:', e)
+            }
+
+            // 如果后端没有记录当前方案，再使用本地记录或第一个方案兜底
+            if (!selectedSchemeId.value) {
+                const savedSchemeId = uni.getStorageSync('selectedSchemeId') || ''
+                if (savedSchemeId && schemeList.value.find(s => s.name === savedSchemeId)) {
+                    selectedSchemeId.value = savedSchemeId
+                } else if (schemeList.value.length > 0) {
+                    selectedSchemeId.value = schemeList.value[0].name
+                }
+                if (selectedSchemeId.value) {
+                    uni.setStorageSync('selectedSchemeId', selectedSchemeId.value)
+                }
+            }
+            
+            // 检查运行状态
+            if (selectedSchemeId.value) {
+                await checkRunningStatus()
+                // 启动方案运行状态定时器
+                startRunningStatusTimer()
+            }
+        }
+    } catch (error) {
+        console.error('加载方案列表失败:', error)
+    } finally {
+        schemeListLoading.value = false
+    }
+}
+
+// 启动方案运行状态定时器
+const startRunningStatusTimer = () => {
+    // 清除已有定时器
+    if (runningStatusTimer) {
+        clearInterval(runningStatusTimer)
+    }
+    // 立即检查一次状态
+    checkRunningStatus()
+    // 每5秒检查一次状态
+    runningStatusTimer = setInterval(async () => {
+        if (selectedSchemeId.value) {
+            await checkRunningStatus()
+        }
+    }, 5000)
+}
+
+// 停止方案运行状态定时器
+const stopRunningStatusTimer = () => {
+    if (runningStatusTimer) {
+        clearInterval(runningStatusTimer)
+        runningStatusTimer = null
+    }
+}
+
+// 显示方案选择对话框
+const showSchemeDialog = async () => {
+    tempSelectedSchemeId.value = selectedSchemeId.value ? String(selectedSchemeId.value) : ''
+    schemeDialogVisible.value = true
+
+    // 加载所有方案的轮灌组信息
+    for (const scheme of schemeList.value) {
+        scheme.wateringGroups = await getSchemeDetails(scheme.name)
+    }
+}
+
+// 在对话框中选择方案
+const selectSchemeInDialog = (schemeId) => {
+    if (!schemeId) return
+    tempSelectedSchemeId.value = String(schemeId)
+}
+
+// 应用选中的方案
+const applyScheme = async () => {
+    if (!tempSelectedSchemeId.value) {
+        uni.showToast({ title: '请先选择一个方案', icon: 'none' })
+        return
+    }
+
+    applySchemeLoading.value = true
+    try {
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        // 1) 恢复方案配置（真正切换 sw_cli_config）
+        await call_remote('/policy/restore_scheme', {
+            scheme_id: tempSelectedSchemeId.value,
+            farm_name: currentFarmName.value || undefined
+        }, token)
+
+        // 2) 显式设置后端“当前方案”，用于 PC / mobile 之间同步显示
+        if (currentFarmName.value) {
+            await call_remote('/policy/set_current_scheme', {
+                farm_name: currentFarmName.value,
+                scheme_id: tempSelectedSchemeId.value
+            }, token)
+        }
+
+        selectedSchemeId.value = tempSelectedSchemeId.value
+        uni.setStorageSync('selectedSchemeId', tempSelectedSchemeId.value)
+        totalPolicyWarningShown.value = false
+
+        await checkRunningStatus()
+        // 启动方案运行状态定时器
+        startRunningStatusTimer()
+
+        uni.showToast({ title: `已应用方案: ${tempSelectedSchemeId.value}`, icon: 'success' })
+        schemeDialogVisible.value = false
+        await loadGroups()
+    } catch (error) {
+        uni.showToast({ title: error.err_msg || '应用方案失败', icon: 'none' })
+    } finally {
+        applySchemeLoading.value = false
+    }
+}
+
+// 立即运行方案
+const runSchemeNow = async () => {
+    if (!selectedSchemeId.value || isRunning.value) return
+
+    runNowLoading.value = true
+    try {
+        const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        await call_remote('/policy/runtime_assignment', {
+            policy_name: totalPolicyName,
+            variable_name: '需要启动',
+            expression: 'true',
+            is_constant: true
+        }, token)
+        isRunning.value = true
+        uni.showToast({ title: `方案 ${selectedSchemeId.value} 已启动`, icon: 'success' })
+        await loadGroups()
+    } catch (error) {
+        uni.showToast({ title: error.err_msg || '启动方案失败', icon: 'none' })
+    } finally {
+        runNowLoading.value = false
+    }
+}
+
+// 停止方案
+const stopScheme = async () => {
+    if (!selectedSchemeId.value) return
+
+    stopSchemeLoading.value = true
+    try {
+        const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        await call_remote('/policy/runtime_assignment', {
+            policy_name: totalPolicyName,
+            variable_name: '需要启动',
+            expression: 'false',
+            is_constant: true
+        }, token)
+        isRunning.value = false
+        uni.showToast({ title: `方案 ${selectedSchemeId.value} 已停止`, icon: 'success' })
+        await loadGroups()
+    } catch (error) {
+        uni.showToast({ title: error.err_msg || '停止方案失败', icon: 'none' })
+    } finally {
+        stopSchemeLoading.value = false
+    }
+}
+
+// 显示定时运行对话框
+const showScheduleDialog = () => {
+    scheduleDate.value = ''
+    scheduleTime.value = ''
+    scheduleDialogVisible.value = true
+}
+
+// 设置定时运行
+const setScheduledRun = async () => {
+    if (!selectedSchemeId.value || !scheduleDate.value || !scheduleTime.value) {
+        uni.showToast({ title: '请选择运行时间', icon: 'none' })
+        return
+    }
+
+    scheduleLoading.value = true
+    try {
+        const scheduledTime = `${scheduleDate.value} ${scheduleTime.value}`
+        const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        await call_remote('/policy/runtime_assignment', {
+            policy_name: totalPolicyName,
+            variable_name: '下次启动时间',
+            expression: `"${scheduledTime}"`,
+            is_constant: true
+        }, token)
+        uni.showToast({ title: `已设置定时运行: ${scheduledTime}`, icon: 'success' })
+        scheduleDialogVisible.value = false
+        // 设置后立即刷新状态
+        await checkRunningStatus()
+    } catch (error) {
+        uni.showToast({ title: error.err_msg || '设置定时运行失败', icon: 'none' })
+    } finally {
+        scheduleLoading.value = false
+    }
+}
+
+// 显示策略配置向导
+const showPolicyConfigWizard = () => {
+    uni.navigateTo({ url: '/pages/irrigation/wizard?mode=create' })
+}
+
+// 处理方案对话框按钮点击
+const handleSchemeDialogClick = (e) => {
+    if (e.index === 0) {
+        // 取消
+        closeSchemeDialog()
+    } else if (e.index === 1) {
+        // 编辑当前方案：直接跳转到向导第二步，便于增减轮灌组
+        editCurrentScheme()
+    } else if (e.index === 2) {
+        // 应用
+        applyScheme()
+    }
+}
+
+// 编辑当前方案：从当前选择的方案进入向导第二步
+const editCurrentScheme = () => {
+    const schemeId = tempSelectedSchemeId.value || selectedSchemeId.value
+    if (!schemeId) {
+        uni.showToast({ title: '请先选择一个方案', icon: 'none' })
+        return
+    }
+    const scheme = schemeList.value.find(s => String(s.id || s.name) === String(schemeId))
+    const name = scheme?.name || schemeId
+
+    // 将当前方案选择保存到本地，保持与运行页面状态一致
+    selectedSchemeId.value = schemeId
+    uni.setStorageSync('selectedSchemeId', schemeId)
+
+    schemeDialogVisible.value = false
+
+    // 跳转到向导页面，从第二步开始编辑当前方案的轮灌组
+    const query = `mode=edit&schemeId=${encodeURIComponent(schemeId)}&schemeName=${encodeURIComponent(name)}&startStep=2`
+    uni.navigateTo({
+        url: `/pages/irrigation/wizard?${query}`
+    })
+}
+
+// 关闭方案对话框
+const closeSchemeDialog = () => {
+    schemeDialogVisible.value = false
+}
+
+// 处理定时运行对话框按钮点击
+const handleScheduleDialogClick = (e) => {
+    if (e.index === 0) {
+        // 取消
+        closeScheduleDialog()
+    } else if (e.index === 1) {
+        // 确定
+        setScheduledRun()
+    }
+}
+
+// 关闭定时运行对话框
+const closeScheduleDialog = () => {
+    scheduleDialogVisible.value = false
+}
+
+// 定时日期变化
+const onScheduleDateChange = (e) => {
+    try {
+        if (e && e.detail) {
+            scheduleDate.value = e.detail.value
+        }
+    } catch (error) {
+        console.error('日期选择错误:', error)
+    }
+}
+
+// 撤销方案定时运行
+const cancelScheduledRun = async () => {
+    if (!selectedSchemeId.value) {
+        return
+    }
+
+    try {
+        const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        await call_remote('/policy/runtime_assignment', {
+            policy_name: totalPolicyName,
+            variable_name: '下次启动时间',
+            expression: '""',
+            is_constant: true
+        }, token)
+        uni.showToast({ title: '已撤销定时运行', icon: 'success' })
+        // 立即刷新状态
+        await checkRunningStatus()
+    } catch (error) {
+        uni.showToast({ title: error.err_msg || '撤销定时运行失败', icon: 'none' })
+    }
+}
+
+// 搅拌策略相关函数
+// 启动搅拌（快速操作：开始）
+const startMixing = async () => {
+    try {
+        if (!currentFarmName.value) {
+            uni.showToast({ title: '请先选择农场', icon: 'none' })
+            return
+        }
+        if (isMixingRunning.value) {
+            return // 如果正在运行，不执行
+        }
+        const policyName = `${currentFarmName.value}-搅拌`
+        mixingStartLoading.value = true
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const resp = await call_remote('/policy/do_quick_action', {
+            policy_name: policyName,
+            action_name: '开始'
+        }, token)
+        if (resp && resp.result) {
+            isMixingRunning.value = true
+            uni.showToast({ title: '搅拌已启动', icon: 'success' })
+            // 立即刷新状态
+            await loadMixingStatus()
+        } else {
+            uni.showToast({ title: resp?.err_msg || '启动搅拌失败', icon: 'none' })
+        }
+    } catch (error) {
+        console.error('启动搅拌失败:', error)
+        uni.showToast({ title: error.err_msg || '启动搅拌失败', icon: 'none' })
+    } finally {
+        mixingStartLoading.value = false
+    }
+}
+
+// 停止搅拌（快速操作：停止）
+const stopMixing = async () => {
+    try {
+        if (!currentFarmName.value) {
+            uni.showToast({ title: '请先选择农场', icon: 'none' })
+            return
+        }
+        if (!isMixingRunning.value) {
+            return // 如果未运行，不执行
+        }
+        const policyName = `${currentFarmName.value}-搅拌`
+        mixingStopLoading.value = true
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const resp = await call_remote('/policy/do_quick_action', {
+            policy_name: policyName,
+            action_name: '停止'
+        }, token)
+        if (resp && resp.result) {
+            isMixingRunning.value = false
+            uni.showToast({ title: '搅拌已停止', icon: 'success' })
+            // 立即刷新状态
+            await loadMixingStatus()
+        } else {
+            uni.showToast({ title: resp?.err_msg || '停止搅拌失败', icon: 'none' })
+        }
+    } catch (error) {
+        console.error('停止搅拌失败:', error)
+        uni.showToast({ title: error.err_msg || '停止搅拌失败', icon: 'none' })
+    } finally {
+        mixingStopLoading.value = false
+    }
+}
+
+// 显示搅拌策略定时启动对话框
+const showMixingScheduleDialog = () => {
+    try {
+        if (isMixingRunning.value) {
+            uni.showToast({ title: '搅拌策略正在运行中，无法设置定时启动', icon: 'none' })
+            return // 如果正在运行，不执行
+        }
+        mixingScheduledTime.value = ''
+        mixingScheduledDate.value = ''
+        mixingScheduledTimeOnly.value = ''
+        mixingScheduleDialogVisible.value = true
+    } catch (error) {
+        console.error('显示定时启动对话框错误:', error)
+        uni.showToast({ title: '打开对话框失败: ' + (error.message || '未知错误'), icon: 'none' })
+    }
+}
+
+// 搅拌策略定时启动对话框按钮点击处理
+const handleMixingScheduleDialogClick = (e) => {
+    if (e.index === 0) {
+        // 取消
+        closeMixingScheduleDialog()
+    } else if (e.index === 1) {
+        // 确定
+        setMixingScheduledStart()
+    }
+}
+
+// 关闭搅拌策略定时启动对话框
+const closeMixingScheduleDialog = () => {
+    mixingScheduleDialogVisible.value = false
+}
+
+// 搅拌策略定时日期变化
+const onMixingScheduleDateChange = (e) => {
+    try {
+        if (e && e.detail) {
+            mixingScheduledDate.value = e.detail.value
+            updateMixingScheduledTime()
+        }
+    } catch (error) {
+        console.error('日期选择错误:', error)
+    }
+}
+
+// 搅拌策略定时时间变化
+const onMixingScheduleTimeChange = (e) => {
+    try {
+        if (e && e.detail) {
+            mixingScheduledTimeOnly.value = e.detail.value
+            updateMixingScheduledTime()
+        }
+    } catch (error) {
+        console.error('时间选择错误:', error)
+    }
+}
+
+// 更新搅拌策略定时时间字符串
+const updateMixingScheduledTime = () => {
+    try {
+        if (mixingScheduledDate.value && mixingScheduledTimeOnly.value) {
+            mixingScheduledTime.value = `${mixingScheduledDate.value} ${mixingScheduledTimeOnly.value}`
+        } else {
+            mixingScheduledTime.value = ''
+        }
+    } catch (error) {
+        console.error('更新定时时间字符串错误:', error)
+    }
+}
+
+// 设置搅拌策略定时启动
+const setMixingScheduledStart = async () => {
+    try {
+        if (!currentFarmName.value) {
+            uni.showToast({ title: '请先选择农场', icon: 'none' })
+            return
+        }
+        if (!mixingScheduledTime.value) {
+            uni.showToast({ title: '请选择启动时间', icon: 'none' })
+            return
+        }
+
+        mixingScheduleLoading.value = true
+        const policyName = `${currentFarmName.value}-搅拌`
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        await call_remote('/policy/runtime_assignment', {
+            policy_name: policyName,
+            variable_name: '下次运行时间',
+            expression: `"${mixingScheduledTime.value}"`,
+            is_constant: true
+        }, token)
+        uni.showToast({ title: `已设置定时启动: ${mixingScheduledTime.value}`, icon: 'success' })
+        mixingScheduleDialogVisible.value = false
+        // 设置后立即刷新状态
+        await loadMixingStatus()
+    } catch (error) {
+        console.error('设置搅拌策略定时启动失败:', error)
+        uni.showToast({ title: error.err_msg || '设置定时启动失败', icon: 'none' })
+    } finally {
+        mixingScheduleLoading.value = false
+    }
+}
+
+// 加载搅拌策略状态（获取下次运行时间和运行状态）
+const loadMixingStatus = async () => {
+    if (!currentFarmName.value) return
+    
+    try {
+        const policyName = `${currentFarmName.value}-搅拌`
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const runtimeResponse = await call_remote('/policy/get_policy_runtime', {
+            policy_name: policyName
+        }, token)
+        
+        if (runtimeResponse && runtimeResponse.variables) {
+            const variables = JSON.parse(runtimeResponse.variables)
+            
+            // 检查运行状态
+            const needStart = variables['需要启动']
+            isMixingRunning.value = needStart === true || needStart === 'true'
+            
+            // 获取下次运行时间
+            const nextRunTime = variables['下次运行时间']
+            if (nextRunTime && nextRunTime !== '' && nextRunTime !== '""') {
+                // 格式化显示时间
+                const timeStr = nextRunTime.replace(/"/g, '')
+                const date = new Date(timeStr)
+                if (!isNaN(date.getTime())) {
+                    mixingNextRunTime.value = date.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                } else {
+                    mixingNextRunTime.value = ''
+                }
+            } else {
+                mixingNextRunTime.value = ''
+            }
+        } else {
+            isMixingRunning.value = false
+            mixingNextRunTime.value = ''
+        }
+    } catch (error) {
+        console.warn('获取搅拌策略状态失败:', error)
+        isMixingRunning.value = false
+        mixingNextRunTime.value = ''
+    }
+}
+
+// 启动搅拌策略状态定时器
+const startMixingStatusTimer = () => {
+    // 清除已有定时器
+    if (mixingStatusTimer) {
+        clearInterval(mixingStatusTimer)
+    }
+    // 立即加载一次
+    loadMixingStatus()
+    // 每5秒检查一次状态
+    mixingStatusTimer = setInterval(async () => {
+        if (currentFarmName.value) {
+            await loadMixingStatus()
+        }
+    }, 5000)
+}
+
+// 停止搅拌策略状态定时器
+const stopMixingStatusTimer = () => {
+    if (mixingStatusTimer) {
+        clearInterval(mixingStatusTimer)
+        mixingStatusTimer = null
+    }
+}
+
+// 撤销搅拌策略定时运行
+const cancelMixingScheduledRun = async () => {
+    try {
+        if (!currentFarmName.value) {
+            return
+        }
+
+        const policyName = `${currentFarmName.value}-搅拌`
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        await call_remote('/policy/runtime_assignment', {
+            policy_name: policyName,
+            variable_name: '下次运行时间',
+            expression: '""',
+            is_constant: true
+        }, token)
+        uni.showToast({ title: '已撤销定时运行', icon: 'success' })
+        // 立即刷新状态
+        await loadMixingStatus()
+    } catch (error) {
+        console.error('撤销定时运行失败:', error)
+        uni.showToast({ title: error.err_msg || '撤销定时运行失败', icon: 'none' })
+    }
+}
+
+// 应用搅拌策略（保存配置）
+const applyMixingPolicy = async () => {
+    try {
+        if (!currentFarmName.value) {
+            uni.showToast({ title: '请先选择农场', icon: 'none' })
+            return
+        }
+
+        mixingSaving.value = true
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        // 更新搅拌策略配置
+        await call_remote('/config/init_fert_mixing_policy', {
+            farm_name: currentFarmName.value,
+            start_interval: mixingStartInterval.value || 60,
+            duration: mixingDuration.value || 6
+        }, token)
+        
+        // 保存当前配置到方案文件
+        await call_remote('/config/save_config', {}, token)
+        
+        // 如果有选中的方案，保存到方案文件
+        if (selectedSchemeId.value) {
+            try {
+                const schemeContent = await call_remote('/policy/get_scheme_content', {
+                    scheme_id: selectedSchemeId.value
+                }, token)
+                if (schemeContent && schemeContent.farm_name) {
+                    await call_remote('/policy/restore_scheme', {
+                        scheme_id: selectedSchemeId.value,
+                        farm_name: schemeContent.farm_name
+                    }, token)
+                }
+            } catch (schemeError) {
+                console.warn('保存到方案文件失败:', schemeError)
+                // 即使保存到方案失败，也不影响搅拌策略的更新
+            }
+        }
+        
+        uni.showToast({ title: '搅拌策略已保存', icon: 'success' })
+    } catch (error) {
+        console.error('保存搅拌策略失败:', error)
+        uni.showToast({ title: error.err_msg || '保存搅拌策略失败', icon: 'none' })
+    } finally {
+        mixingSaving.value = false
+    }
+}
+
+// 定时时间变化
+const onScheduleTimeChange = (e) => {
+    try {
+        if (e && e.detail) {
+            scheduleTime.value = e.detail.value
+        }
+    } catch (error) {
+        console.error('时间选择错误:', error)
+    }
+}
+
+// 输入框值变化监听（使用watch来验证和限制值，避免无限循环）
+let isUpdatingStartInterval = false
+watch(mixingStartInterval, (newVal, oldVal) => {
+    if (isUpdatingStartInterval) return
+    try {
+        // 避免初始化时触发
+        if (oldVal === undefined) return
+        
+        // 如果值没有变化，不处理
+        if (newVal === oldVal) return
+        
+        if (newVal !== null && newVal !== undefined && newVal !== '') {
+            const numValue = parseInt(String(newVal)) || 0
+            if (numValue > 1440) {
+                isUpdatingStartInterval = true
+                mixingStartInterval.value = 1440
+                nextTick(() => { isUpdatingStartInterval = false })
+            } else if (numValue < 1 && numValue !== 0) {
+                isUpdatingStartInterval = true
+                mixingStartInterval.value = 1
+                nextTick(() => { isUpdatingStartInterval = false })
+            }
+        }
+    } catch (error) {
+        console.warn('搅拌间隔值验证错误:', error)
+        isUpdatingStartInterval = false
+    }
+})
+
+let isUpdatingDuration = false
+watch(mixingDuration, (newVal, oldVal) => {
+    if (isUpdatingDuration) return
+    try {
+        // 避免初始化时触发
+        if (oldVal === undefined) return
+        
+        // 如果值没有变化，不处理
+        if (newVal === oldVal) return
+        
+        if (newVal !== null && newVal !== undefined && newVal !== '') {
+            const numValue = parseInt(String(newVal)) || 0
+            if (numValue > 1440) {
+                isUpdatingDuration = true
+                mixingDuration.value = 1440
+                nextTick(() => { isUpdatingDuration = false })
+            } else if (numValue < 1 && numValue !== 0) {
+                isUpdatingDuration = true
+                mixingDuration.value = 1
+                nextTick(() => { isUpdatingDuration = false })
+            }
+        }
+    } catch (error) {
+        console.warn('持续时间值验证错误:', error)
+        isUpdatingDuration = false
+    }
+})
 
 // 页面显示时加载/刷新数据
 onShow(async () => {
@@ -1231,11 +2343,17 @@ onShow(async () => {
             await pageHeaderRef.value.refresh()
             currentFarmName.value = pageHeaderRef.value.getCurrentFarmName()
         }
+        // 加载方案列表
+        await loadSchemeList()
         // 首次加载时获取建议面积
         if (pageLoading.value) {
             await fetchSuggestedArea()
         }
         await loadGroups()
+        // 启动搅拌策略状态定时器
+        if (currentFarmName.value) {
+            startMixingStatusTimer()
+        }
     } catch (error) {
         console.error('加载数据失败:', error)
     } finally {
@@ -1410,32 +2528,145 @@ onShow(async () => {
     gap: 24rpx;
 }
 
+.current-scheme-card {
+    background: #ffffff;
+    border-radius: 20rpx;
+    padding: 24rpx;
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.scheme-row {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    flex-wrap: wrap;
+    margin-bottom: 12rpx;
+}
+
+.scheme-title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #303133;
+}
+
+.scheme-name {
+    font-size: 26rpx;
+    color: #409eff;
+    font-weight: 600;
+}
+
+.scheme-status {
+    padding: 6rpx 14rpx;
+    border-radius: 999rpx;
+    font-size: 22rpx;
+    color: #fff;
+}
+
+.scheme-status.running {
+    background: #67c23a;
+}
+
+.scheme-status.stopped {
+    background: #c0c4cc;
+}
+
+.scheme-progress {
+    margin-top: 4rpx;
+}
+
+.progress-track {
+    height: 16rpx;
+    border-radius: 999rpx;
+    background: #f2f6fc;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 999rpx;
+    background: linear-gradient(90deg, #409eff 0%, #66b1ff 100%);
+    transition: width 0.3s ease;
+}
+
+.progress-bar.active {
+    animation: progress-stripe 1.2s linear infinite;
+    background-size: 40rpx 40rpx;
+}
+
+@keyframes progress-stripe {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 40rpx 0;
+    }
+}
+
 .group-card {
     background: #ffffff;
     border-radius: 20rpx;
     padding: 32rpx;
     box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
     border: 1px solid rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
 }
 
-.action-btn {
-    padding: 16rpx 28rpx;
-    border-radius: 999rpx;
-    background: #409eff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 180rpx;
+.group-card.status-idle {
+    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+    border-left: 4px solid #475569;
+    color: #ffffff;
 }
 
-.action-btn.ghost {
-    background: #e8f3ff;
-    border: 1px solid #c6e2ff;
+.group-card.status-watering {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    border-left: 4px solid #0e7490;
+    color: #ffffff;
 }
 
-.action-btn.primary.disabled {
-    opacity: 0.6;
+.group-card.status-pre-fert {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border-left: 4px solid #b45309;
+    color: #ffffff;
 }
+
+.group-card.status-fertilizing {
+    background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+    border-left: 4px solid #7e22ce;
+    color: #ffffff;
+}
+
+.group-card.status-post-fert {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-left: 4px solid #047857;
+    color: #ffffff;
+}
+
+.group-card.status-finishing {
+    background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+    border-left: 4px solid #0f766e;
+    color: #ffffff;
+}
+
+.group-card.status-idle,
+.group-card.status-watering,
+.group-card.status-pre-fert,
+.group-card.status-fertilizing,
+.group-card.status-post-fert,
+.group-card.status-finishing {
+    color: #ffffff !important;
+}
+
+.group-card.status-idle .meta-label,
+.group-card.status-watering .meta-label,
+.group-card.status-pre-fert .meta-label,
+.group-card.status-fertilizing .meta-label,
+.group-card.status-post-fert .meta-label,
+.group-card.status-finishing .meta-label {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
 
 .group-header {
     display: flex;
@@ -1477,19 +2708,27 @@ onShow(async () => {
 .group-state {
     padding: 8rpx 16rpx;
     border-radius: 999rpx;
-    background: #c0c4cc;
-}
-
-.group-state.success {
-    background: #67c23a;
-}
-
-.group-state.warning {
-    background: #e6a23c;
+    background: #909399; /* 默认灰色（空闲） */
 }
 
 .group-state.info {
-    background: #909399;
+    background: #909399; /* 灰色 - 空闲 */
+}
+
+.group-state.primary {
+    background: #409eff; /* 蓝色 - 浇水 */
+}
+
+.group-state.warning {
+    background: #e6a23c; /* 橙色 - 肥前 */
+}
+
+.group-state.purple {
+    background: #a855f7; /* 紫色 - 施肥 */
+}
+
+.group-state.success {
+    background: #67c23a; /* 绿色 - 肥后、收尾 */
 }
 
 .group-meta {
@@ -1556,8 +2795,7 @@ onShow(async () => {
     box-shadow: 0 4rpx 12rpx rgba(103, 194, 58, 0.3);
 }
 
-.water-only-btn.loading {
-    opacity: 0.6;
+.water-only-btn {
     pointer-events: none;
 }
 
@@ -1970,6 +3208,379 @@ onShow(async () => {
     flex: 1;
     text-align: right;
     word-break: break-all;
+}
+
+/* 方案控制部分样式 */
+.policy-control-section {
+    background: #ffffff;
+    border-radius: 20rpx;
+    padding: 32rpx;
+    margin-bottom: 32rpx;
+    box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.policy-control-section .section-header {
+    margin-bottom: 24rpx;
+}
+
+.policy-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+}
+
+.control-buttons-row {
+    display: flex;
+    gap: 16rpx;
+    width: 100%;
+}
+
+.control-btn {
+    flex: 1;
+    padding: 20rpx 24rpx;
+    border-radius: 12rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.control-btn.success {
+    background: linear-gradient(135deg, #67C23A 0%, #85ce61 100%);
+}
+
+.control-btn.info {
+    background: linear-gradient(135deg, #909399 0%, #a6a9ad 100%);
+}
+
+.control-btn.primary {
+    background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+}
+
+.control-btn.warning {
+    background: linear-gradient(135deg, #E6A23C 0%, #f0c78a 100%);
+}
+
+.control-btn.danger {
+    background: linear-gradient(135deg, #F56C6C 0%, #f89898 100%);
+}
+
+.control-btn.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.control-btn.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.control-btn:active:not(.disabled):not(.loading) {
+    transform: scale(0.98);
+    box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.15);
+}
+
+/* 方案对话框样式 */
+.scheme-dialog-content {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 20rpx 0;
+}
+
+.scheme-loading,
+.scheme-empty {
+    padding: 40rpx 0;
+    text-align: center;
+}
+
+.scheme-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+}
+
+.scheme-item {
+    padding: 24rpx;
+    border: 2rpx solid #e4e7ed;
+    border-radius: 16rpx;
+    background: #ffffff;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.scheme-item:active {
+    transform: scale(0.98);
+}
+
+.scheme-item.is-selected {
+    border-color: #409eff;
+    background: #ecf5ff;
+}
+
+.scheme-name {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 12rpx;
+}
+
+.scheme-groups {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8rpx;
+    margin-top: 8rpx;
+}
+
+.groups-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8rpx;
+}
+
+.group-tag {
+    padding: 6rpx 12rpx;
+    background: #f0f7ff;
+    border: 1rpx solid #c6e2ff;
+    border-radius: 8rpx;
+}
+
+.check-icon {
+    position: absolute;
+    top: 24rpx;
+    right: 24rpx;
+    width: 40rpx;
+    height: 40rpx;
+    border-radius: 50%;
+    background: #409eff;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24rpx;
+    font-weight: bold;
+}
+
+/* 定时运行对话框样式 */
+.schedule-dialog-content {
+    padding: 20rpx 0;
+}
+
+.schedule-dialog-content .form-item {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+}
+
+.schedule-dialog-content .picker-value {
+    border: 1px solid #ebeef5;
+    border-radius: 12rpx;
+    padding: 16rpx;
+    font-size: 26rpx;
+    background: #f8fafc;
+    margin-bottom: 12rpx;
+}
+
+/* 搅拌策略样式 */
+.mixing-strategy-section {
+    margin-top: 24rpx;
+}
+
+.mixing-strategy-card {
+    background: #ffffff;
+    border-radius: 16rpx;
+    padding: 24rpx;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+}
+
+.mixing-inputs-row {
+    display: flex;
+    gap: 16rpx;
+    margin-bottom: 24rpx;
+}
+
+.mixing-input-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+}
+
+.mixing-input-item .input-label {
+    font-size: 24rpx;
+    color: #606266;
+}
+
+.mixing-input {
+    width: 100%;
+    padding: 16rpx;
+    border: 2rpx solid #e4e7ed;
+    border-radius: 12rpx;
+    font-size: 26rpx;
+    color: #303133;
+    background: #ffffff;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
+}
+
+.mixing-input:focus {
+    border-color: #409eff;
+    outline: none;
+}
+
+.mixing-input::-webkit-inner-spin-button,
+.mixing-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.mixing-input {
+    width: 100%;
+    padding: 16rpx;
+    border: 2rpx solid #e4e7ed;
+    border-radius: 12rpx;
+    font-size: 26rpx;
+    color: #303133;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.mixing-input:focus {
+    border-color: #409eff;
+    outline: none;
+}
+
+.mixing-schedule-info {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    padding: 16rpx;
+    margin-bottom: 24rpx;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%);
+    border-radius: 12rpx;
+    border-left: 6rpx solid #ffc107;
+}
+
+.mixing-schedule-info .schedule-icon {
+    font-size: 28rpx;
+    flex-shrink: 0;
+}
+
+.mixing-schedule-info .cancel-icon {
+    font-size: 32rpx;
+    color: #909399;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 4rpx;
+    border-radius: 8rpx;
+    transition: all 0.2s;
+    margin-left: auto;
+}
+
+.mixing-schedule-info .cancel-icon:active {
+    color: #f56c6c;
+    background: rgba(245, 108, 108, 0.1);
+}
+
+.mixing-buttons-row {
+    display: flex;
+    gap: 16rpx;
+    margin-bottom: 16rpx;
+}
+
+.mixing-buttons-row:last-child {
+    margin-bottom: 0;
+}
+
+.mixing-buttons-row .control-btn {
+    flex: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.schedule-time-info {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    padding: 16rpx;
+    margin-top: 24rpx;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%);
+    border-radius: 12rpx;
+    border-left: 6rpx solid #ffc107;
+}
+
+.schedule-time-info .schedule-icon {
+    font-size: 28rpx;
+    flex-shrink: 0;
+}
+
+.schedule-time-info .cancel-icon {
+    font-size: 32rpx;
+    color: #909399;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 4rpx;
+    border-radius: 8rpx;
+    transition: all 0.2s;
+    margin-left: auto;
+}
+
+.schedule-time-info .cancel-icon:active {
+    color: #f56c6c;
+    background: rgba(245, 108, 108, 0.1);
+}
+
+.picker-view {
+    padding: 16rpx;
+    border: 2rpx solid #e4e7ed;
+    border-radius: 12rpx;
+    background: #f8fafc;
+    margin-bottom: 12rpx;
+}
+
+.dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 24rpx;
+    padding: 24rpx;
+    border-top: 2rpx solid #e4e7ed;
+}
+
+.dialog-btn {
+    padding: 16rpx 32rpx;
+    border-radius: 12rpx;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dialog-btn.cancel {
+    background: #f5f7fa;
+}
+
+.dialog-btn.cancel:active {
+    background: #e4e7ed;
+}
+
+.dialog-btn.confirm {
+    background: #ecf5ff;
+}
+
+.dialog-btn.confirm:active {
+    background: #d9ecff;
+}
+
+.dialog-btn.loading {
+    opacity: 0.6;
+    pointer-events: none;
 }
 
 @media (max-width: 375px) {

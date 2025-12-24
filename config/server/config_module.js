@@ -472,6 +472,7 @@ export default {
                 },
                 method: { type: String, mean: '施肥方式', example: '定时', have_to: true },
                 area_based_amount: { type: Number, mean: '基于面积施肥量(升/亩)', example: 5, have_to: false },
+                total_fert: { type: Number, mean: '总施肥量(升，仅用于总定量模式)', example: 500, have_to: false },
                 area: { type: Number, mean: '轮灌面积(亩)', example: 10, have_to: true },
                 water_only: { type: Boolean, mean: '是否只浇水', example: false, have_to: false },
                 total_time: { type: Number, mean: '总灌溉时间(分钟，仅用于只浇水模式)', example: 120, have_to: false },
@@ -483,9 +484,11 @@ export default {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
-                let sub_policies = ['供水', '施肥', '总策略'].map(item => `${body.farm_name}-${item}`);
-                sub_policies = sub_policies.concat(body.wgv_array.map(item => item.name));
-                for (let policy_name of sub_policies) {
+                console.log(`[config_module] add_group_policy 函数开始执行，接收到的body:`, JSON.stringify(body, null, 2));
+                console.log(`[config_module] add_group_policy body中是否有total_fert:`, 'total_fert' in body, body.total_fert);
+                
+                let required_policies = ['供水', '施肥', '总策略'].map(item => `${body.farm_name}-${item}`);
+                for (let policy_name of required_policies) {
                     let sub_policy = await policy_lib.find_policy(policy_name, token);
                     if (!sub_policy) {
                         throw {
@@ -513,15 +516,25 @@ export default {
                             }
                             await policy_lib.init_assignment(policy_name, '所有轮灌组', new_expression, false, token);
                         } catch (error) {
-
+                            // 忽略错误
                         }
                     }
-                    else if (body.wgv_array.find(item => item.name === policy_name)) {
+                }
+                if (body.wgv_array && Array.isArray(body.wgv_array)) {
+                    for (let valve_item of body.wgv_array) {
+                        const valve_policy_name = valve_item.name;
                         try {
-                            await policy_lib.del_assignment(policy_name, '异常', 'enter', '需要跳过', body.policy_name);
-                        }
-                        catch (error) {
-
+                            let valve_policy = await policy_lib.find_policy(valve_policy_name, token);
+                            if (!valve_policy) {
+                                console.warn(`添加轮灌组策略时未找到阀门子策略: ${valve_policy_name}，将继续创建轮灌组策略`);
+                                continue;
+                            }
+                            try {
+                                await policy_lib.del_assignment(valve_policy_name, '异常', 'enter', '需要跳过', body.policy_name, token);
+                            } catch (error) {
+                            }
+                        } catch (e) {
+                            console.warn(`检查阀门子策略 ${valve_policy_name} 失败:`, e);
                         }
                     }
                 }
@@ -529,7 +542,24 @@ export default {
                 if (found_policy) {
                     await policy_lib.del_policy(body.policy_name, token);
                 }
-                await cli_runtime_lib.do_config_batch(quick_config_template.add_group_policy(body), true);
+                console.log(`[config_module] add_group_policy 接收到的body参数:`, JSON.stringify(body, null, 2));
+                console.log(`[config_module] add_group_policy body中是否有total_fert:`, 'total_fert' in body, body.total_fert);
+                
+                // 确保total_fert被包含在传递给模板的参数中
+                // 如果body中没有total_fert，但method是总定量，设置为0（虽然这不应该发生）
+                if (!('total_fert' in body) && body.method === '总定量') {
+                    console.warn(`[config_module] add_group_policy 警告: 总定量模式但body中没有total_fert，设置为0`);
+                    body.total_fert = 0;
+                }
+                
+                // 确保传递给模板的参数包含所有必要字段
+                const templateParams = {
+                    ...body,
+                    total_fert: body.total_fert !== undefined ? body.total_fert : (body.method === '总定量' ? 0 : undefined)
+                };
+                
+                console.log(`[config_module] add_group_policy 传递给模板的参数:`, JSON.stringify(templateParams, null, 2));
+                await cli_runtime_lib.do_config_batch(quick_config_template.add_group_policy(templateParams), true);
                 let assignment_config = (await policy_lib.find_policy(`${body.farm_name}-总策略`, token)).init_variables.find(item => item.variable_name === '所有轮灌组');
                 let original_array = [];
                 if (assignment_config && assignment_config.expression && assignment_config.expression.length > 2) {
@@ -586,4 +616,5 @@ export default {
         },
     }
 };
+
 
