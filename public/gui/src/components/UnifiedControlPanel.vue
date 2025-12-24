@@ -125,9 +125,13 @@
                                     </el-tag>
                                 </div>
                             </div>
-                            <div v-else class="scheme-groups loading">
+                            <div v-else-if="scheme.wateringGroupsLoading" class="scheme-groups loading">
                                 <span class="groups-label">轮灌组：</span>
                                 <span class="loading-text">加载中...</span>
+                            </div>
+                            <div v-else class="scheme-groups loading">
+                                <span class="groups-label">轮灌组：</span>
+                                <span class="loading-text">暂无轮灌组</span>
                             </div>
                         </div>
                     </div>
@@ -231,9 +235,7 @@ let runningStatusTimer = null // 运行状态定时器
 // 解析方案文件内容，提取轮灌组信息
 const parseWateringGroups = (content) => {
     const groups = new Set()
-    // 优先查找 "所有轮灌组" 的初始化（这是最准确的来源）
-    // 匹配格式：init assignment 'false' '所有轮灌组' '["轮灌组1","轮灌组2"]'
-    // 使用 [^\]]+ 避免回溯，限制匹配到第一个 ] 为止
+    // 优先使用 "所有轮灌组" 列表（允许任意命名，不再强制包含“组”字）
     const allGroupsMatch = content.match(/所有轮灌组[^[]*\[([^\]]+)\]/)
     if (allGroupsMatch) {
         const groupsStr = allGroupsMatch[1]
@@ -241,18 +243,17 @@ const parseWateringGroups = (content) => {
         if (groupNames) {
             groupNames.forEach(name => {
                 const cleanName = name.replace(/"/g, '').trim()
-                if (cleanName && (cleanName.includes('轮灌组') || cleanName.includes('组'))) {
-                    groups.add(cleanName)
-                }
+                if (cleanName) groups.add(cleanName)
             })
         }
     }
-    // 如果没有找到，查找所有 policy '轮灌组X' 的定义（作为兜底）
+    // 兜底：从 policy 名称提取，排除明显的非轮灌组策略
     if (groups.size === 0) {
         const policyMatches = content.matchAll(/policy\s+'([^']+)'/g)
+        const excludeKeywords = ['总策略', '供水', '施肥', '搅拌']
         for (const match of policyMatches) {
             const policyName = match[1]
-            if (policyName.includes('轮灌组') || policyName.includes('组')) {
+            if (!excludeKeywords.some(k => policyName.includes(k))) {
                 groups.add(policyName)
             }
         }
@@ -454,11 +455,20 @@ const loadSchemeList = async () => {
 
         schemeList.value = response.schemes.map(scheme => ({
             ...scheme,
-            wateringGroups: []
+            wateringGroups: [],
+            wateringGroupsLoading: false
         }))
 
         if (!restoreSavedScheme(schemeList.value)) {
-            setDefaultScheme(schemeList.value)
+            // 若有名为“测试1”的方案，优先默认选择它，避免空方案卡加载
+            const testScheme = schemeList.value.find(s => s.name === '测试1')
+            if (testScheme) {
+                selectedSchemeId.value = testScheme.name
+                currentSchemeName.value = testScheme.name
+                saveSelectedSchemeToStorage(testScheme.name)
+            } else {
+                setDefaultScheme(schemeList.value)
+            }
         }
     } catch (error) {
         console.error('加载方案列表失败:', error)
@@ -473,7 +483,15 @@ const showSchemeDialog = async () => {
 
     // 每次打开弹窗时都重新加载所有方案的轮灌组信息，确保显示最新数据
     for (const scheme of schemeList.value) {
-        scheme.wateringGroups = await getSchemeDetails(scheme.name)
+        scheme.wateringGroupsLoading = true
+        try {
+            scheme.wateringGroups = await getSchemeDetails(scheme.name)
+        } catch (e) {
+            console.error(`加载方案 ${scheme.name} 的轮灌组失败:`, e)
+            scheme.wateringGroups = []
+        } finally {
+            scheme.wateringGroupsLoading = false
+        }
     }
 }
 
