@@ -109,31 +109,48 @@
                       </div>
                       <div class="panel-body">
                         <el-form label-position="top" size="small">
-                          <el-form-item label="启动间隔（分钟）">
-                            <el-input-number v-model="mixingStartInterval" :min="1" :step="5" :max="1440"
-                              controls-position="right" style="width: 100%;" />
-                          </el-form-item>
-                          <el-form-item label="期望运行时间（分钟）">
-                            <el-input-number v-model="mixingDuration" :min="1" :step="1" :max="1440"
-                              controls-position="right" style="width: 100%;" />
-                          </el-form-item>
+                          <div class="mixing-inputs-row">
+                            <el-form-item label="搅拌间隔" class="mixing-input-item">
+                              <el-input-number v-model="mixingStartInterval" :min="1" :step="5" :max="1440"
+                                controls-position="right" style="width: 100%;" />
+                            </el-form-item>
+                            <el-form-item label="持续时间" class="mixing-input-item">
+                              <el-input-number v-model="mixingDuration" :min="1" :step="1" :max="1440"
+                                controls-position="right" style="width: 100%;" />
+                            </el-form-item>
+                          </div>
                         </el-form>
 
+                        <!-- 显示定时运行时间 -->
+                        <div v-if="mixingNextRunTime" class="mixing-schedule-info">
+                          <el-icon class="schedule-icon">
+                            <Clock />
+                          </el-icon>
+                          <span class="schedule-text">定时运行：{{ mixingNextRunTime }}</span>
+                          <el-icon class="cancel-icon" @click="cancelMixingScheduledRun">
+                            <Close />
+                          </el-icon>
+                        </div>
+
                         <div class="panel-actions">
-                          <el-space wrap>
+                          <div class="mixing-buttons-grid">
                             <UnifiedButton variant="primary" size="small" :loading="mixingStartLoading" @click="startMixing"
-                              :icon="VideoPlay" round>
+                              :icon="VideoPlay" round :disabled="isMixingRunning">
                               启动
                             </UnifiedButton>
+                            <UnifiedButton variant="warning" size="small" @click="showMixingScheduleDialog"
+                              :icon="Clock" round :disabled="isMixingRunning">
+                              定时启动
+                            </UnifiedButton>
                             <UnifiedButton variant="danger" size="small" :loading="mixingStopLoading" @click="stopMixing"
-                              :icon="VideoPause" round>
+                              :icon="VideoPause" round :disabled="!isMixingRunning">
                               停止
                             </UnifiedButton>
                             <UnifiedButton variant="success" size="small" :loading="mixingSaving" @click="applyMixingPolicy"
                               :icon="Setting" round class="mixing-apply-btn">
                               保存
                             </UnifiedButton>
-                          </el-space>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -326,13 +343,29 @@
         <UnifiedButton variant="default" @click="closeDeviceDetailDialog">关闭</UnifiedButton>
       </template>
     </el-dialog>
+
+    <!-- 搅拌策略定时启动对话框 -->
+    <el-dialog v-model="mixingScheduleDialogVisible" title="搅拌策略定时启动设置" width="450px" append-to-body>
+      <div class="schedule-form">
+        <el-form label-width="120px">
+          <el-form-item label="启动时间">
+            <el-date-picker v-model="mixingScheduledTime" type="datetime" placeholder="选择日期和时间"
+              format="YYYY-MM-DD HH:mm" value-format="YYYY-MM-DD HH:mm" style="width: 100%;" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <UnifiedButton variant="default" @click="mixingScheduleDialogVisible = false">取消</UnifiedButton>
+        <UnifiedButton variant="primary" @click="setMixingScheduledStart" :loading="mixingScheduleLoading">确定</UnifiedButton>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
-import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Plus, Setting } from '@element-plus/icons-vue'
+import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Plus, Setting, Clock } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
@@ -424,6 +457,12 @@ const mixingDuration = ref(6) // 期望运行时间，默认6分钟
 const mixingSaving = ref(false)
 const mixingStartLoading = ref(false)
 const mixingStopLoading = ref(false)
+const mixingScheduleDialogVisible = ref(false) // 搅拌策略定时启动对话框显示状态
+const mixingScheduledTime = ref('') // 搅拌策略定时启动时间
+const mixingScheduleLoading = ref(false) // 搅拌策略定时启动加载状态
+const mixingNextRunTime = ref('') // 搅拌策略下次运行时间
+const isMixingRunning = ref(false) // 搅拌策略是否正在运行
+let mixingStatusTimer = null // 搅拌策略状态定时器
 
 
 // Tab切换相关
@@ -614,6 +653,12 @@ const handleFarmChange = async (farmId) => {
   selectedFarm.value = farmId
   await loadBlocks(farmId)
   await loadFarmData(farmId)
+  // 重新启动搅拌策略状态定时器
+  if (farmId) {
+    startMixingStatusTimer()
+  } else {
+    stopMixingStatusTimer()
+  }
 }
 
 
@@ -1068,6 +1113,52 @@ const applyMixingPolicy = async () => {
     }
     const resp = await call_remote('/config/init_fert_mixing_policy', payload)
     if (resp && resp.result) {
+      // 将搅拌策略配置保存到当前方案中
+      const currentSchemeId = injectedSelectedSchemeId?.value || injectedCurrentSchemeName?.value || localStorage.getItem('selectedSchemeId') || null
+      if (currentSchemeId) {
+        try {
+          // 获取当前方案内容
+          const schemeResponse = await call_remote('/policy/get_scheme_content', {
+            scheme_name: currentSchemeId,
+            farm_name: selectedFarm.value
+          })
+          if (schemeResponse && schemeResponse.content) {
+            let content = schemeResponse.content
+            // 构建搅拌策略配置命令
+            const mixingCommand = `init fert mixing policy '${selectedFarm.value}' ${mixingStartInterval.value} ${mixingDuration.value}`
+            
+            // 检查是否已存在搅拌策略配置
+            const mixingPattern = /init\s+fert\s+mixing\s+policy\s+'[^']+'\s+\d+\s+\d+/i
+            if (mixingPattern.test(content)) {
+              // 如果存在，替换它
+              content = content.replace(mixingPattern, mixingCommand)
+            } else {
+              // 如果不存在，在 policy 部分的开头添加
+              const policyMatch = content.match(/(policy\s*\n)/i)
+              if (policyMatch) {
+                content = content.replace(policyMatch[0], `${policyMatch[0]}  ${mixingCommand}\n`)
+              } else {
+                // 如果没有找到 policy 部分，在文件末尾添加
+                content += `\npolicy\n  ${mixingCommand}\nreturn\n`
+              }
+            }
+            
+            // 通过保存配置并重新保存为方案文件来更新方案
+            // 先保存当前配置（包含搅拌策略）
+            await call_remote('/config/save_config', {})
+            
+            // 然后保存为方案文件
+            await call_remote('/policy/add_scheme', {
+              name: currentSchemeId,
+              farm_name: selectedFarm.value
+            })
+          }
+        } catch (e) {
+          console.warn('保存搅拌策略到方案失败:', e)
+          // 即使保存到方案失败，也不影响搅拌策略的更新
+        }
+      }
+      
       ElMessage.success('搅拌策略已更新')
     } else {
       ElMessage.error('搅拌策略更新失败')
@@ -1086,6 +1177,9 @@ const startMixing = async () => {
     ElMessage.warning('请先选择农场')
     return
   }
+  if (isMixingRunning.value) {
+    return // 如果正在运行，不执行
+  }
   const policyName = `${selectedFarm.value}-搅拌`
   try {
     mixingStartLoading.value = true
@@ -1094,7 +1188,10 @@ const startMixing = async () => {
       action_name: '开始'
     })
     if (resp && resp.result) {
+      isMixingRunning.value = true
       ElMessage.success('搅拌已启动')
+      // 立即刷新状态
+      await loadMixingStatus()
     } else {
       ElMessage.error(resp?.err_msg || '启动搅拌失败')
     }
@@ -1112,6 +1209,9 @@ const stopMixing = async () => {
     ElMessage.warning('请先选择农场')
     return
   }
+  if (!isMixingRunning.value) {
+    return // 如果未运行，不执行
+  }
   const policyName = `${selectedFarm.value}-搅拌`
   try {
     mixingStopLoading.value = true
@@ -1120,7 +1220,10 @@ const stopMixing = async () => {
       action_name: '停止'
     })
     if (resp && resp.result) {
+      isMixingRunning.value = false
       ElMessage.success('搅拌已停止')
+      // 立即刷新状态
+      await loadMixingStatus()
     } else {
       ElMessage.error(resp?.err_msg || '停止搅拌失败')
     }
@@ -1129,6 +1232,138 @@ const stopMixing = async () => {
     ElMessage.error(error.err_msg || '停止搅拌失败')
   } finally {
     mixingStopLoading.value = false
+  }
+}
+
+// 显示搅拌策略定时启动对话框
+const showMixingScheduleDialog = () => {
+  mixingScheduledTime.value = ''
+  mixingScheduleDialogVisible.value = true
+}
+
+// 设置搅拌策略定时启动
+const setMixingScheduledStart = async () => {
+  if (!selectedFarm.value) {
+    ElMessage.warning('请先选择农场')
+    return
+  }
+  if (!mixingScheduledTime.value) {
+    ElMessage.warning('请选择启动时间')
+    return
+  }
+
+  mixingScheduleLoading.value = true
+  try {
+    const policyName = `${selectedFarm.value}-搅拌`
+    await call_remote('/policy/runtime_assignment', {
+      policy_name: policyName,
+      variable_name: '下次运行时间',
+      expression: `"${mixingScheduledTime.value}"`,
+      is_constant: true
+    })
+    ElMessage.success(`已设置定时启动: ${mixingScheduledTime.value}`)
+    mixingScheduleDialogVisible.value = false
+    // 设置后立即刷新状态
+    await loadMixingStatus()
+  } catch (error) {
+    console.error('设置搅拌策略定时启动失败:', error)
+    ElMessage.error(error.err_msg || '设置定时启动失败')
+  } finally {
+    mixingScheduleLoading.value = false
+  }
+}
+
+// 加载搅拌策略状态（获取下次运行时间和运行状态）
+const loadMixingStatus = async () => {
+  if (!selectedFarm.value) return
+  
+  try {
+    const policyName = `${selectedFarm.value}-搅拌`
+    const runtimeResponse = await call_remote('/policy/get_policy_runtime', {
+      policy_name: policyName
+    })
+    
+    if (runtimeResponse && runtimeResponse.variables) {
+      const variables = JSON.parse(runtimeResponse.variables)
+      
+      // 检查运行状态
+      const needStart = variables['需要启动']
+      isMixingRunning.value = needStart === true || needStart === 'true'
+      
+      // 获取下次运行时间
+      const nextRunTime = variables['下次运行时间']
+      if (nextRunTime && nextRunTime !== '' && nextRunTime !== '""') {
+        // 格式化显示时间
+        const timeStr = nextRunTime.replace(/"/g, '')
+        const date = new Date(timeStr)
+        if (!isNaN(date.getTime())) {
+          mixingNextRunTime.value = date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        } else {
+          mixingNextRunTime.value = ''
+        }
+      } else {
+        mixingNextRunTime.value = ''
+      }
+    } else {
+      isMixingRunning.value = false
+      mixingNextRunTime.value = ''
+    }
+  } catch (error) {
+    console.warn('获取搅拌策略状态失败:', error)
+    isMixingRunning.value = false
+    mixingNextRunTime.value = ''
+  }
+}
+
+// 启动搅拌策略状态定时器
+const startMixingStatusTimer = () => {
+  // 清除已有定时器
+  if (mixingStatusTimer) {
+    clearInterval(mixingStatusTimer)
+  }
+  // 立即加载一次
+  loadMixingStatus()
+  // 每5秒检查一次状态
+  mixingStatusTimer = setInterval(async () => {
+    if (selectedFarm.value) {
+      await loadMixingStatus()
+    }
+  }, 5000)
+}
+
+// 停止搅拌策略状态定时器
+const stopMixingStatusTimer = () => {
+  if (mixingStatusTimer) {
+    clearInterval(mixingStatusTimer)
+    mixingStatusTimer = null
+  }
+}
+
+// 撤销搅拌策略定时运行
+const cancelMixingScheduledRun = async () => {
+  if (!selectedFarm.value) {
+    return
+  }
+
+  try {
+    const policyName = `${selectedFarm.value}-搅拌`
+    await call_remote('/policy/runtime_assignment', {
+      policy_name: policyName,
+      variable_name: '下次运行时间',
+      expression: '""',
+      is_constant: true
+    })
+    ElMessage.success('已撤销定时运行')
+    // 立即刷新状态
+    await loadMixingStatus()
+  } catch (error) {
+    ElMessage.error(error.err_msg || '撤销定时运行失败')
   }
 }
 
@@ -1151,6 +1386,8 @@ onMounted(async () => {
       selectedFarm.value = savedFarm
       await loadBlocks(savedFarm)
       await loadFarmData(savedFarm)
+      // 启动搅拌策略状态定时器
+      startMixingStatusTimer()
     } else {
       // 如果没有保存的农场，等待 MainLayout 触发事件
     }
@@ -1162,6 +1399,8 @@ onUnmounted(() => {
   window.removeEventListener('farmChanged', handleFarmChange)
   // 停止自动刷新定时器
   stopRuntimeInfoAutoRefresh()
+  // 停止搅拌策略状态定时器
+  stopMixingStatusTimer()
 })
 
 // 监听对话框关闭，停止定时器
@@ -1182,9 +1421,14 @@ watch(() => route.name, async (newRouteName, oldRouteName) => {
       selectedFarm.value = currentFarm
       await loadBlocks(currentFarm)
       await loadFarmData(currentFarm)
+      // 启动搅拌策略状态定时器
+      startMixingStatusTimer()
     } else {
       // 如果没有保存的农场，等待 MainLayout 触发事件
     }
+  } else if (newRouteName !== '监控中心') {
+    // 离开监控中心页面时停止定时器
+    stopMixingStatusTimer()
   }
 })
 
@@ -1752,8 +1996,95 @@ html {
   font-size: 12px;
 }
 
+.mixing-inputs-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mixing-input-item {
+  flex: 1;
+  margin-bottom: 0 !important;
+}
+
+.mixing-input-item :deep(.el-form-item__label) {
+  font-size: 12px;
+  padding-bottom: 4px;
+}
+
+.mixing-schedule-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%);
+  border-radius: 8px;
+  border-left: 3px solid #ffc107;
+  font-size: 12px;
+  color: #856404;
+}
+
+.mixing-schedule-info .schedule-icon {
+  font-size: 14px;
+  color: #ffc107;
+  flex-shrink: 0;
+}
+
+.mixing-schedule-info .schedule-text {
+  font-weight: 500;
+  flex: 1;
+}
+
+.mixing-schedule-info .cancel-icon {
+  font-size: 14px;
+  color: #909399;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.mixing-schedule-info .cancel-icon:hover {
+  color: #f56c6c;
+  background: rgba(245, 108, 108, 0.1);
+}
+
 .mixing-strategy-panel .panel-actions {
-  margin-top: 4px;
+  margin-top: 12px;
+}
+
+.mixing-buttons-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.mixing-buttons-grid :deep(.unified-btn) {
+  width: 100% !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 12px !important;
+  margin: 0 !important;
+}
+
+.mixing-buttons-grid :deep(.el-button) {
+  width: 100% !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 12px !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .mixing-apply-btn {

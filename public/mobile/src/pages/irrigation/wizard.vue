@@ -11,18 +11,52 @@
                 <view class="form-card">
                     <!-- 步骤指示器 -->
                     <view class="step-indicator">
-                        <view :class="['step-dot', wizardStep === 1 ? 'active' : '']">1</view>
-                        <view class="step-label">创建轮灌组</view>
-                        <view class="step-line"></view>
-                        <view :class="['step-dot', wizardStep === 2 ? 'active' : '']">2</view>
-                        <view class="step-label">分配设备</view>
-                        <view class="step-line"></view>
-                        <view :class="['step-dot', wizardStep === 3 ? 'active' : '']">3</view>
-                        <view class="step-label">施肥配置</view>
+                        <view class="step-item">
+                            <view :class="['step-dot', wizardStep === 1 ? 'active' : '', wizardStep > 1 ? 'completed' : '']">
+                                <text v-if="wizardStep > 1" class="step-check">✓</text>
+                                <text v-else class="step-number">1</text>
+                            </view>
+                            <view :class="['step-label', wizardStep === 1 ? 'active' : '']">输入方案名称</view>
+                        </view>
+                        <view :class="['step-line', wizardStep > 1 ? 'completed' : '']"></view>
+                        
+                        <view class="step-item">
+                            <view :class="['step-dot', wizardStep === 2 ? 'active' : '', wizardStep > 2 ? 'completed' : '']">
+                                <text v-if="wizardStep > 2" class="step-check">✓</text>
+                                <text v-else class="step-number">2</text>
+                            </view>
+                            <view :class="['step-label', wizardStep === 2 ? 'active' : '']">创建轮灌组</view>
+                        </view>
+                        <view :class="['step-line', wizardStep > 2 ? 'completed' : '']"></view>
+                        
+                        <view class="step-item">
+                            <view :class="['step-dot', wizardStep === 3 ? 'active' : '', wizardStep > 3 ? 'completed' : '']">
+                                <text v-if="wizardStep > 3" class="step-check">✓</text>
+                                <text v-else class="step-number">3</text>
+                            </view>
+                            <view :class="['step-label', wizardStep === 3 ? 'active' : '']">分配设备</view>
+                        </view>
+                        <view :class="['step-line', wizardStep > 3 ? 'completed' : '']"></view>
+                        
+                        <view class="step-item">
+                            <view :class="['step-dot', wizardStep === 4 ? 'active' : '']">
+                                <text class="step-number">4</text>
+                            </view>
+                            <view :class="['step-label', wizardStep === 4 ? 'active' : '']">施肥配置</view>
+                        </view>
                     </view>
 
-                    <!-- 步骤1：创建轮灌组 -->
+                    <!-- 步骤1：仅输入方案名称（对齐 PC 行为） -->
                     <view v-if="wizardStep === 1" class="wizard-step-content">
+                        <view class="scheme-name-card">
+                            <text class="form-label">方案名称</text>
+                            <input class="scheme-input" v-model="schemeName" placeholder="请输入方案名称" />
+                            <text class="scheme-hint">最终会生成类似 plan_{{ schemeName || '方案名称' }}.txt 的方案文件</text>
+                        </view>
+                    </view>
+
+                    <!-- 步骤2：创建轮灌组 -->
+                    <view v-else-if="wizardStep === 2" class="wizard-step-content">
                         <view class="watering-groups-config">
                             <view class="groups-header">
                                 <text>轮灌组列表</text>
@@ -36,18 +70,31 @@
                                 </view>
                             </view>
 
-                            <!-- 已配置的轮灌组 -->
-                            <view v-if="existingGroups.length > 0" class="existing-groups-section">
+                            <!-- 已配置的轮灌组（列表形式，卡片样式，可查看/编辑阀门/复制/删除） -->
+                            <view v-if="existingGroups.length > 0 && !isEditMode" class="existing-groups-section">
                                 <view class="existing-groups-header">
-                                    <text>已配置的轮灌组（点击复制新增）</text>
+                                    <text>已配置的轮灌组</text>
                                     <text class="groups-count">共 {{ existingGroups.length }} 个</text>
                                 </view>
                                 <view class="existing-groups-list">
                                     <view v-for="existingGroup in existingGroups" :key="existingGroup.name"
-                                        class="existing-group-item">
-                                        <view class="copy-group-btn" @click="copyExistingGroup(existingGroup)">
-                                            <text class="copy-icon">⧉</text>
-                                            <text class="copy-text">{{ existingGroup.name }}</text>
+                                        class="existing-group-row">
+                                        <view class="group-info">
+                                            <view class="group-name-input readonly">
+                                                {{ existingGroup.name }}
+                                            </view>
+                                        </view>
+                                        <view class="group-info group-info-bottom">
+                                            <view class="group-area-input readonly">
+                                                {{ existingGroup.area || 0 }}
+                                            </view>
+                                            <text class="unit">亩</text>
+                                        </view>
+                                        <view class="action-row">
+                                            <view class="mini-btn view" @click.stop="viewExistingGroup(existingGroup)">查看</view>
+                                            <view class="mini-btn edit" @click.stop="editExistingGroupValves(existingGroup)">编辑阀门</view>
+                                            <view class="mini-btn copy" @click.stop="copyExistingGroup(existingGroup)">复制</view>
+                                            <view class="mini-btn delete" @click.stop="removeExistingGroup(existingGroup)">删除</view>
                                         </view>
                                     </view>
                                 </view>
@@ -60,16 +107,19 @@
                                     <input class="group-area-input" v-model.number="group.area" type="number"
                                         placeholder="面积" />
                                     <text class="unit">亩</text>
-                                    <view class="icon-btn delete-btn" @click="removeWateringGroup(index)">
-                                        <text class="icon-text">×</text>
+                                    <view class="action-row">
+                                        <view class="mini-btn view" @click.stop="viewGroupDetail(group)">查看</view>
+                                        <view class="mini-btn edit" @click.stop="editValvesForGroup(index)">编辑阀门</view>
+                                        <view class="mini-btn copy" @click.stop="copyCurrentGroup(group)">复制</view>
+                                        <view class="mini-btn delete" @click.stop="removeWateringGroup(index)">删除</view>
                                     </view>
                                 </view>
                             </view>
                         </view>
                     </view>
 
-                    <!-- 步骤2：分配设备 -->
-                    <view v-else-if="wizardStep === 2" class="wizard-step-content">
+                    <!-- 步骤3：分配设备 -->
+                    <view v-else-if="wizardStep === 3" class="wizard-step-content">
                         <view v-if="availableValveDevices.length === 0" class="no-devices-warning">
                             <text>未找到WaterGroupValve设备，请先配置相关设备</text>
                         </view>
@@ -161,76 +211,87 @@
                         </view>
                     </view>
 
-                    <!-- 步骤3：施肥配置 -->
-                    <view v-else-if="wizardStep === 3" class="wizard-step-content">
+                    <!-- 步骤4：施肥配置 -->
+                    <view v-else-if="wizardStep === 4" class="wizard-step-content">
                         <view class="fert-config">
-                            <view v-for="group in wateringGroups.filter(g => g.isCopied !== true)" :key="group.name"
-                                class="group-fert-config">
+                            <view v-for="group in wateringGroups" :key="group.name" class="group-fert-config">
                                 <text class="group-name-title">{{ group.name }}</text>
 
                                 <view class="fert-method">
                                     <text class="form-label">施肥方式：</text>
                                     <view class="radio-group">
                                         <view
-                                            :class="['radio-item', fertConfigs[group.configKey || group.name]?.method === 'AreaBased' ? 'active' : '']"
-                                            @click="fertConfigs[group.configKey || group.name].method = 'AreaBased'">
+                                            :class="['radio-item', getFertConfig(group).method === 'WaterOnly' ? 'active' : '']"
+                                            @click="getFertConfig(group).method = 'WaterOnly'">
+                                            <text>只浇水</text>
+                                        </view>
+                                        <view
+                                            :class="['radio-item', getFertConfig(group).method === 'AreaBased' ? 'active' : '']"
+                                            @click="getFertConfig(group).method = 'AreaBased'">
                                             <text>亩定量</text>
                                         </view>
                                         <view
-                                            :class="['radio-item', fertConfigs[group.configKey || group.name]?.method === 'Total' ? 'active' : '']"
-                                            @click="fertConfigs[group.configKey || group.name].method = 'Total'">
+                                            :class="['radio-item', getFertConfig(group).method === 'Total' ? 'active' : '']"
+                                            @click="getFertConfig(group).method = 'Total'">
                                             <text>总定量</text>
                                         </view>
                                         <view
-                                            :class="['radio-item', fertConfigs[group.configKey || group.name]?.method === 'Time' ? 'active' : '']"
-                                            @click="fertConfigs[group.configKey || group.name].method = 'Time'">
+                                            :class="['radio-item', getFertConfig(group).method === 'Time' ? 'active' : '']"
+                                            @click="getFertConfig(group).method = 'Time'">
                                             <text>定时</text>
                                         </view>
                                     </view>
                                 </view>
 
-                                <view class="fert-params">
-                                    <view v-if="fertConfigs[group.configKey || group.name]?.method === 'AreaBased'"
-                                        class="param-item">
+                                <!-- 施肥量相关参数（只浇水时隐藏） -->
+                                <view v-if="getFertConfig(group).method !== 'WaterOnly'" class="fert-params">
+                                    <view v-if="getFertConfig(group).method === 'AreaBased'" class="param-item">
                                         <text class="param-label">每亩施肥量：</text>
                                         <input class="param-input"
-                                            v-model.number="fertConfigs[group.configKey || group.name].AB_fert"
+                                            v-model.number="getFertConfig(group).AB_fert"
                                             type="number" placeholder="施肥量" />
                                         <text class="unit">L/亩</text>
                                     </view>
 
-                                    <view v-if="fertConfigs[group.configKey || group.name]?.method === 'Total'"
-                                        class="param-item">
+                                    <view v-if="getFertConfig(group).method === 'Total'" class="param-item">
                                         <text class="param-label">施肥总量：</text>
                                         <input class="param-input"
-                                            v-model.number="fertConfigs[group.configKey || group.name].total_fert"
+                                            v-model.number="getFertConfig(group).total_fert"
                                             type="number" placeholder="总量" />
                                         <text class="unit">L</text>
                                     </view>
 
-                                    <view v-if="fertConfigs[group.configKey || group.name]?.method === 'Time'"
-                                        class="param-item">
+                                    <view v-if="getFertConfig(group).method === 'Time'" class="param-item">
                                         <text class="param-label">施肥时间：</text>
                                         <input class="param-input"
-                                            v-model.number="fertConfigs[group.configKey || group.name].fert_time"
+                                            v-model.number="getFertConfig(group).fert_time"
                                             type="number" placeholder="施肥时间" />
                                         <text class="unit">分钟</text>
                                     </view>
                                 </view>
 
-                                <view class="time-params">
+                                <!-- 时间参数：只浇水模式只需要总灌溉时间，其它模式配置肥前/肥后时间 -->
+                                <view v-if="getFertConfig(group).method === 'WaterOnly'" class="time-params">
                                     <view class="param-item">
-                                        <text class="param-label">灌溉总时间：</text>
+                                        <text class="param-label">总灌溉时间：</text>
                                         <input class="param-input"
-                                            v-model.number="fertConfigs[group.configKey || group.name].total_time"
-                                            type="number" placeholder="灌溉总时间" />
+                                            v-model.number="getFertConfig(group).total_time"
+                                            type="number" placeholder="总灌溉时间" />
                                         <text class="unit">分钟</text>
                                     </view>
-
+                                </view>
+                                <view v-else class="time-params">
+                                    <view class="param-item">
+                                        <text class="param-label">肥前时间：</text>
+                                        <input class="param-input"
+                                            v-model.number="getFertConfig(group).pre_fert_time"
+                                            type="number" placeholder="肥前时间" />
+                                        <text class="unit">分钟</text>
+                                    </view>
                                     <view class="param-item">
                                         <text class="param-label">肥后时间：</text>
                                         <input class="param-input"
-                                            v-model.number="fertConfigs[group.configKey || group.name].post_fert_time"
+                                            v-model.number="getFertConfig(group).post_fert_time"
                                             type="number" placeholder="肥后时间" />
                                         <text class="unit">分钟</text>
                                     </view>
@@ -240,43 +301,38 @@
                     </view>
                 </view>
 
-                <!-- 建议亩数显示在操作按钮上方 -->
-                <view v-if="wizardStep === 1" class="recommended-area-card" @click="openAreaParamsDialog">
-                    <text class="recommended-label">建议亩数</text>
-                    <text class="recommended-value" v-if="getRecommendedArea(0) > 0">
-                        {{ getRecommendedArea(0).toFixed(2) }}亩
-                    </text>
-                    <text class="recommended-value" v-else>点击设置</text>
-                </view>
-
-                <!-- 操作按钮 -->
-                <view class="wizard-actions">
-                    <view class="action-btn ghost" @click="goBack">
-                        <text>返回</text>
-                    </view>
-
-                    <view v-if="wizardStep > 1" class="action-btn ghost" @click="prevStep">
-                        <text>上一步</text>
-                    </view>
-
-                    <view v-if="wizardStep === 2 && allGroupsAreCopied" class="action-btn success"
-                        @click="finishWizard">
-                        <text>完成配置</text>
-                    </view>
-                    <view v-else-if="wizardStep === 2" class="action-btn primary" @click="nextStep">
-                        <text>下一步</text>
-                    </view>
-
-                    <view v-else-if="wizardStep === 1" class="action-btn primary" @click="nextStep">
-                        <text>下一步</text>
-                    </view>
-
-                    <view v-if="wizardStep === 3" class="action-btn success" @click="finishWizard">
-                        <text>完成配置</text>
-                    </view>
-                </view>
             </view>
         </scroll-view>
+
+        <!-- 底部固定区域 -->
+        <view class="wizard-footer">
+            <!-- 建议亩数 - 仅在步骤2显示 -->
+            <view v-if="wizardStep === 2" class="recommended-area-card" @click="openAreaParamsDialog">
+                <text class="recommended-label">建议亩数</text>
+                <text class="recommended-value" v-if="getRecommendedArea(0) > 0">
+                    {{ getRecommendedArea(0).toFixed(2) }}亩
+                </text>
+                <text class="recommended-value" v-else>点击设置</text>
+            </view>
+
+            <!-- 操作按钮 -->
+            <view class="wizard-actions">
+            <view class="action-btn ghost" @click="goBack">
+                <text>返回</text>
+            </view>
+
+            <view v-if="wizardStep > 1" class="action-btn ghost" @click="prevStep">
+                <text>上一步</text>
+            </view>
+
+            <view v-if="wizardStep === 4" class="action-btn success" @click="finishWizard">
+                <text>完成配置</text>
+            </view>
+            <view v-else class="action-btn primary" @click="nextStep">
+                <text>下一步</text>
+            </view>
+            </view>
+        </view>
 
         <Loading :show="pageLoading" text="加载中..." />
 
@@ -361,10 +417,19 @@ import fuiInput from 'firstui-uni/firstui/fui-input/fui-input.vue'
 import call_remote from '../../../../lib/call_remote.js'
 
 const mode = ref('create')
+const isEditMode = computed(() => mode.value === 'edit')
 const pageHeaderRef = ref(null)
 const pageLoading = ref(false)
 const wizardStep = ref(1)
 const currentFarmName = ref('')
+
+// 方案数据：仅用于输入方案名称（对齐 PC：第 1 步只输入名称）
+// 不在第一步真正创建/下发方案，只有在 finishWizard 时统一下发
+const schemes = ref([]) // 预留：后续如需加载已存在方案可复用
+const selectedSchemeId = ref('') // 当前无选择已有方案的入口，可保持为空
+const schemeName = ref('')
+const newSchemeName = ref('')
+const newSchemeDescription = ref('')
 
 // 轮灌组数据
 const wateringGroups = ref([])
@@ -378,8 +443,63 @@ const valveDisplayMode = ref('list')
 const mapCenter = ref({ lat: 23.1291, lng: 113.2644 })
 const mapScale = ref(12)
 
-// 施肥配置
+// 施肥配置（与 PC PolicyWizard 的字段保持一致）
 const fertConfigs = ref({})
+
+// 获取某个轮灌组的施肥配置（懒加载初始化，字段与 PC 完全一致）
+const getFertConfig = (group) => {
+    const key = group.configKey || group.name
+    if (!fertConfigs.value[key]) {
+        fertConfigs.value[key] = {
+            method: 'AreaBased', // WaterOnly / AreaBased / Total / Time
+            AB_fert: 0,
+            total_fert: 0,
+            fert_time: 0,
+            pre_fert_time: 0,
+            post_fert_time: 0,
+            total_time: 0,
+        }
+    }
+    return fertConfigs.value[key]
+}
+
+// 编辑模式下：将当前方案已有的轮灌组初始化到编辑列表中
+const initWateringGroupsFromExisting = async () => {
+    if (!isEditMode.value) return
+    // 如果已经有编辑中的轮灌组，就不再重复初始化
+    if (wateringGroups.value.length > 0) return
+    if (!existingGroups.value.length) return
+
+    existingGroups.value.forEach(g => {
+        const name = g.name
+        wateringGroups.value.push({
+            name,
+            area: g.area || 0,
+            isCopied: false,
+            configKey: name
+        })
+        fertConfigs.value[name] = g.fertConfig || {
+            method: 'AreaBased',
+            AB_fert: 0,
+            total_fert: 0,
+            fert_time: 0,
+            pre_fert_time: 0,
+            post_fert_time: 0,
+            total_time: 0,
+        }
+        
+        // 确保阀门数据是数组格式，并去除重复项
+        let valvesArray = []
+        if (g.valves) {
+            if (Array.isArray(g.valves)) {
+                valvesArray = [...g.valves]
+            } else if (typeof g.valves === 'string') {
+                valvesArray = parseValvesFromGroup({ valves: g.valves })
+            }
+        }
+        selectedValveDevices.value[name] = [...new Set(valvesArray.filter(v => v && v.trim()))]
+    })
+}
 
 // 面积参数
 const farmAreaParams = ref({
@@ -472,6 +592,8 @@ const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
             fertConfig.method = parseFertMethod(expression)
         } else if (varName === 'fert_time' || varName === '施肥时间') {
             fertConfig.fert_time = parseTimeValue(expression)
+        } else if (varName === 'pre_ms' || varName === '肥前时间') {
+            fertConfig.pre_fert_time = parseTimeValue(expression)
         } else if (varName === 'post_ms' || varName === '肥后时间') {
             fertConfig.post_fert_time = parseTimeValue(expression)
         } else if (varName === '期望每亩施肥量' || varName === 'area_based_amount') {
@@ -502,14 +624,17 @@ const parseAreaFromVariable = (initVariables) => {
 }
 
 const parseValvesFromGroup = (group) => {
-    if (!group.valves || group.valves === '-') {
+    const valveStr = group?.valves || group
+    if (!valveStr || valveStr === '-') {
         return []
     }
-    if (group.valves.includes('|')) {
-        return group.valves.split('|').map(v => v.trim()).filter(Boolean)
+    // 先尝试匹配引号内的内容
+    const quoted = valveStr.match(/"([^"]+)"/g)
+    if (quoted && quoted.length) {
+        return quoted.map(i => i.replaceAll('"', '').trim()).filter(Boolean)
     }
-    const matches = group.valves.match(/"([^"]+)"/g)
-    return matches ? matches.map(m => m.replaceAll('"', '')) : []
+    // 如果没有引号，按逗号、竖线或空格分割
+    return valveStr.split(/[,|\s]+/).map(v => v.trim()).filter(Boolean)
 }
 
 // 打开弹窗
@@ -661,8 +786,9 @@ const addWateringGroup = async () => {
             AB_fert: 0,
             total_fert: 0,
             fert_time: 0,
-            total_time: 0,
+            pre_fert_time: 0,
             post_fert_time: 0,
+            total_time: 0,
         }
     }
 
@@ -684,12 +810,21 @@ const removeWateringGroup = (index) => {
 const loadExistingGroups = async () => {
     try {
         const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-        const response = await call_remote('/policy/list_watering_groups', { pageNo: 0 }, token)
+        const params = { pageNo: 0 }
+        const currentSchemeId = selectedSchemeId.value ? String(selectedSchemeId.value) : ''
+        // 编辑模式下，如果携带了方案ID，只加载当前方案下的轮灌组
+        if (isEditMode.value && currentSchemeId) {
+            params.scheme_id = currentSchemeId
+        }
+        const response = await call_remote('/policy/list_watering_groups', params, token)
         if (response && response.groups) {
             let filteredGroups = response.groups
+            if (currentSchemeId) {
+                filteredGroups = filteredGroups.filter(g => String(g.scheme_id || '') === currentSchemeId)
+            }
             if (currentFarmName.value && currentFarmName.value !== '默认农场') {
                 const policyFarmMatches = await Promise.all(
-                    response.groups.map(async (group) => {
+                    filteredGroups.map(async (group) => {
                         try {
                             const farmMatch = await call_remote('/policy/get_matched_farm', {
                                 policy_name: group.name
@@ -724,6 +859,7 @@ const loadExistingGroups = async () => {
                     AB_fert: 0,
                     total_fert: 0,
                     fert_time: 0,
+                    pre_fert_time: 0,
                     post_fert_time: 0,
                     total_time: group.total_time || 0,
                 }
@@ -750,7 +886,7 @@ const loadExistingGroups = async () => {
                 // 解析施肥配置
                 parseFertConfigFromVariables(policy.init_variables, fertConfig, area)
 
-                // 解析时间值
+                // 解析时间值（从毫秒转换为分钟）
                 let preTimeMs = 0
                 let fertTimeMs = 0
                 let postTimeMs = 0
@@ -759,10 +895,14 @@ const loadExistingGroups = async () => {
                     const expression = initVar.expression || ''
                     if (varName === '肥前时间') {
                         preTimeMs = Number.parseFloat(expression) || 0
+                        // 如果值大于1000，说明是毫秒，需要转换为分钟；否则已经是分钟
+                        fertConfig.pre_fert_time = preTimeMs > 1000 ? preTimeMs / 60000 : preTimeMs
                     } else if (varName === '施肥时间') {
                         fertTimeMs = Number.parseFloat(expression) || 0
+                        fertConfig.fert_time = fertTimeMs > 1000 ? fertTimeMs / 60000 : fertTimeMs
                     } else if (varName === '肥后时间') {
                         postTimeMs = Number.parseFloat(expression) || 0
+                        fertConfig.post_fert_time = postTimeMs > 1000 ? postTimeMs / 60000 : postTimeMs
                     }
                 }
                 if (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0) {
@@ -776,8 +916,19 @@ const loadExistingGroups = async () => {
                 const policy = allPolicies.find(p => p.name === group.name)
                 const { area, valves: parsedValves, fertConfig } = parseGroupConfig(group, policy)
 
-                // 如果阀门列表为空，尝试从轮灌组数据中获取
-                const valves = parsedValves.length === 0 ? parseValvesFromGroup(group) : parsedValves
+                // 优先使用从 init_variables 解析的阀门，如果为空或数量较少，则从 group.valves 补充
+                let valves = parsedValves.length > 0 ? [...parsedValves] : []
+                const groupValves = parseValvesFromGroup(group)
+                if (groupValves.length > 0) {
+                    // 合并两个来源的阀门，去重
+                    const allValves = [...new Set([...valves, ...groupValves])]
+                    // 如果 group.valves 有更多阀门，优先使用它（因为它是运行时数据，更准确）
+                    if (groupValves.length >= valves.length) {
+                        valves = groupValves
+                    } else {
+                        valves = allValves
+                    }
+                }
 
                 return {
                     name: group.name,
@@ -852,8 +1003,9 @@ const copyExistingGroup = (existingGroup) => {
             AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
             total_fert: existingGroup.fertConfig?.total_fert ?? 0,
             fert_time: existingGroup.fertConfig?.fert_time ?? 0,
-            total_time: existingGroup.fertConfig?.total_time ?? 0,
+            pre_fert_time: existingGroup.fertConfig?.pre_fert_time ?? 0,
             post_fert_time: existingGroup.fertConfig?.post_fert_time ?? 0,
+            total_time: existingGroup.fertConfig?.total_time ?? 0,
         }
 
         selectedValveDevices.value[trimmedName] = []
@@ -862,6 +1014,8 @@ const copyExistingGroup = (existingGroup) => {
             title: `已将轮灌组 ${existingGroup.name} 的配置复制到 ${trimmedName}`,
             icon: 'success'
         })
+
+        return trimmedName
     }
 
     openDialog('复制轮灌组', `请输入新轮灌组的名称（复制自：${existingGroup.name}）`, '请输入轮灌组名称', defaultName, validateFn)
@@ -931,6 +1085,175 @@ const switchToNextGroup = () => {
         if (groupName && !selectedValveDevices.value[groupName]) {
             selectedValveDevices.value[groupName] = []
         }
+    }
+}
+
+// 复制当前列表中的组
+const copyCurrentGroup = (group) => {
+    if (!group || !group.name) return
+    let baseName = group.name
+    let counter = 1
+    let newName = `${baseName}-副本${counter}`
+    while (isGroupNameDuplicate(newName)) {
+        counter++
+        newName = `${baseName}-副本${counter}`
+    }
+    const newGroup = {
+        name: newName,
+        area: group.area || 0,
+        isCopied: true,
+        configKey: newName
+    }
+    wateringGroups.value.push(newGroup)
+    fertConfigs.value[newName] = {
+        ...(fertConfigs.value[group.configKey || group.name] || {
+            method: 'AreaBased',
+            AB_fert: 0,
+            total_fert: 0,
+            fert_time: 0,
+            pre_fert_time: 0,
+            post_fert_time: 0,
+            total_time: 0,
+        })
+    }
+    selectedValveDevices.value[newName] = [...(selectedValveDevices.value[group.configKey || group.name] || [])]
+    uni.showToast({ title: `已复制 ${group.name}`, icon: 'success' })
+}
+
+// 查看组详情（简版弹窗）
+const viewGroupDetail = (group) => {
+    if (!group) return
+    const configKey = group.configKey || group.name
+    const config = fertConfigs.value[configKey] || {}
+    const valves = selectedValveDevices.value[configKey] || []
+    const detail = `
+名称：${group.name}
+面积：${group.area || 0} 亩
+阀门：${valves.join(', ') || '-'}
+施肥方式：${config.method || '-'}
+每亩施肥量：${config.AB_fert ?? '-'}
+总定量：${config.total_fert ?? '-'}
+施肥时间：${config.fert_time ?? '-'}
+肥前时间：${config.pre_fert_time ?? '-'}
+肥后时间：${config.post_fert_time ?? '-'}
+总灌溉时间：${config.total_time ?? '-'}
+    `
+    uni.showModal({
+        title: '轮灌组详情',
+        content: detail,
+        showCancel: false
+    })
+}
+
+// 查看已配置轮灌组详情
+const viewExistingGroup = (existingGroup) => {
+    if (!existingGroup) return
+    const config = existingGroup.fertConfig || {}
+    const valves = existingGroup.valves || []
+    const detail = `
+名称：${existingGroup.name}
+面积：${existingGroup.area || 0} 亩
+阀门：${valves.join(', ') || '-'}
+施肥方式：${config.method || '-'}
+每亩施肥量：${config.AB_fert ?? '-'}
+总定量：${config.total_fert ?? '-'}
+施肥时间：${config.fert_time ?? '-'}
+肥前时间：${config.pre_fert_time ?? '-'}
+肥后时间：${config.post_fert_time ?? '-'}
+总灌溉时间：${config.total_time ?? '-'}
+    `
+    uni.showModal({
+        title: '轮灌组详情',
+        content: detail,
+        showCancel: false
+    })
+}
+
+// 从已配置轮灌组直接进入"编辑阀门"：不再新增副本，直接用原名进入第3步
+const editExistingGroupValves = async (existingGroup) => {
+    if (!existingGroup || !existingGroup.name) return
+
+    // 重新从后端获取最新的轮灌组数据，确保阀门数据是最新的
+    try {
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const groupsResp = await call_remote('/policy/list_watering_groups', { pageNo: 0 }, token)
+        const latestGroup = groupsResp?.groups?.find(g => g.name === existingGroup.name)
+        
+        // 如果找到最新数据，使用最新的阀门数据
+        if (latestGroup && latestGroup.valves && latestGroup.valves !== '-') {
+            const latestValves = parseValvesFromGroup({ valves: latestGroup.valves })
+            if (latestValves.length > 0) {
+                existingGroup.valves = latestValves
+            }
+        }
+    } catch (error) {
+        console.warn('获取最新轮灌组数据失败，使用缓存数据:', error)
+    }
+
+    // 先尝试在当前编辑列表中找到该组
+    let idx = wateringGroups.value.findIndex(g => g.name === existingGroup.name)
+
+    // 如果当前列表没有，就按原名补一条（不加"副本"）
+    if (idx < 0) {
+        const newGroup = {
+            name: existingGroup.name,
+            area: existingGroup.area || 0,
+            isCopied: true,
+            configKey: existingGroup.name
+        }
+        wateringGroups.value.push(newGroup)
+
+        // 补全施肥配置
+        fertConfigs.value[existingGroup.name] = {
+            method: existingGroup.fertConfig?.method || 'AreaBased',
+            AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
+            total_fert: existingGroup.fertConfig?.total_fert ?? 0,
+            fert_time: existingGroup.fertConfig?.fert_time ?? 0,
+            pre_fert_time: existingGroup.fertConfig?.pre_fert_time ?? 0,
+            post_fert_time: existingGroup.fertConfig?.post_fert_time ?? 0,
+            total_time: existingGroup.fertConfig?.total_time ?? 0,
+        }
+
+        idx = wateringGroups.value.length - 1
+    } else {
+        // 如果组已存在，确保它有 configKey
+        if (!wateringGroups.value[idx].configKey) {
+            wateringGroups.value[idx].configKey = existingGroup.name
+        }
+    }
+
+    // 无论组是否已存在，都要更新阀门列表（确保使用最新数据）
+    const configKey = wateringGroups.value[idx]?.configKey || existingGroup.name
+    
+    // 确保阀门数据是数组格式，并去除重复项
+    let valvesArray = []
+    if (existingGroup.valves) {
+        if (Array.isArray(existingGroup.valves)) {
+            valvesArray = [...existingGroup.valves]
+        } else if (typeof existingGroup.valves === 'string') {
+            // 如果是字符串，尝试解析
+            valvesArray = parseValvesFromGroup({ valves: existingGroup.valves })
+        }
+    }
+    
+    // 去除重复项并过滤空值
+    selectedValveDevices.value[configKey] = [...new Set(valvesArray.filter(v => v && v.trim()))]
+
+    // 跳到第3步并定位到该组
+    currentGroupIndex.value = idx
+    wizardStep.value = 3
+}
+
+// 从候选列表中移除已配置轮灌组（仅前端列表，不立即删后端）
+const removeExistingGroup = (existingGroup) => {
+    existingGroups.value = existingGroups.value.filter(g => g.name !== existingGroup.name)
+}
+
+// 编辑阀门：跳到第 3 步并聚焦当前组
+const editValvesForGroup = (index) => {
+    if (index >= 0 && index < wateringGroups.value.length) {
+        currentGroupIndex.value = index
+        wizardStep.value = 3
     }
 }
 
@@ -1004,7 +1327,24 @@ const onMarkerTap = (e) => {
     }
 }
 
-// 验证步骤1：检查轮灌组和面积
+// 方案相关
+// 目前 mobile 向导暂不支持在第一步选择历史方案，因此不加载 scheme 列表，
+// 保留 loadSchemes 空实现以便后续扩展时兼容调用。
+const loadSchemes = async () => {
+    schemes.value = []
+}
+
+const validateSchemeStep = () => {
+    const name = (schemeName.value || '').trim()
+    if (!name) {
+        uni.showToast({ title: '请输入方案名称', icon: 'none' })
+        return false
+    }
+    schemeName.value = name
+    return true
+}
+
+// 验证步骤：检查轮灌组和面积
 const validateStep1 = () => {
     if (wateringGroups.value.length === 0) {
         uni.showToast({ title: '请至少创建一个轮灌组', icon: 'none' })
@@ -1019,7 +1359,7 @@ const validateStep1 = () => {
     return true
 }
 
-// 验证步骤2：检查阀门分配
+// 验证步骤：检查阀门分配
 const validateStep2 = () => {
     for (const group of wateringGroups.value) {
         const configKey = group.configKey || group.name
@@ -1034,16 +1374,20 @@ const validateStep2 = () => {
 // 步骤导航
 const nextStep = async () => {
     if (wizardStep.value === 1) {
-        if (!validateStep1()) return
+        if (!validateSchemeStep()) return
         wizardStep.value = 2
-        await loadValveDevices()
-    } else if (wizardStep.value === 2) {
-        if (!validateStep2()) return
-        if (allGroupsAreCopied.value) {
-            await finishWizard()
-            return
-        }
+        return
+    }
+    if (wizardStep.value === 2) {
+        if (!validateStep1()) return
         wizardStep.value = 3
+        await loadValveDevices()
+        return
+    }
+    if (wizardStep.value === 3) {
+        if (!validateStep2()) return
+        wizardStep.value = 4
+        return
     }
 }
 
@@ -1061,51 +1405,91 @@ const goBack = () => {
     })
 }
 
-// 验证施肥配置
+// 验证施肥配置（完全对齐 PC PolicyWizard 的规则）
 const validateFertConfig = (group, config) => {
     if (!config) {
         uni.showToast({ title: `请为${group.name}设置施肥配置`, icon: 'none' })
         return false
     }
-    if (config.method === 'AreaBased' && config.AB_fert <= 0) {
+
+    // 只浇水：只校验总灌溉时间
+    if (config.method === 'WaterOnly') {
+        if (!config.total_time || config.total_time <= 0) {
+            uni.showToast({ title: `请为${group.name}设置有效的总灌溉时间参数`, icon: 'none' })
+            return false
+        }
+        return true
+    }
+
+    // 非只浇水：校验肥前/施肥/肥后时间组合
+    const pre = config.pre_fert_time || 0
+    const fert = config.method === 'Time' ? (config.fert_time || 0) : 0
+    const post = config.post_fert_time || 0
+    const total = pre + fert + post
+
+    if (total <= 0) {
+        uni.showToast({ title: `请为${group.name}设置有效的灌溉时间参数（肥前时间、施肥时间、肥后时间）`, icon: 'none' })
+        return false
+    }
+    if (config.method === 'AreaBased' && (!config.AB_fert || config.AB_fert <= 0)) {
         uni.showToast({ title: `请为${group.name}设置有效的亩定量施肥参数`, icon: 'none' })
         return false
     }
-    if (config.method === 'Total' && config.total_fert <= 0) {
+    if (config.method === 'Total' && (!config.total_fert || config.total_fert <= 0)) {
         uni.showToast({ title: `请为${group.name}设置有效的总定量施肥参数`, icon: 'none' })
         return false
     }
-    if (config.method === 'Time' && config.fert_time <= 0) {
+    if (config.method === 'Time' && fert <= 0) {
         uni.showToast({ title: `请为${group.name}设置有效的定时施肥参数`, icon: 'none' })
-        return false
-    }
-    if (config.total_time <= 0) {
-        uni.showToast({ title: `请为${group.name}设置有效的总灌溉时间参数`, icon: 'none' })
         return false
     }
     return true
 }
 
-// 构建最终配置
+// 构建最终配置（字段和含义与 PC 的 finalConfig 完全一致）
 const buildFinalConfig = (group) => {
     const configKey = group.configKey || group.name
     const config = fertConfigs.value[configKey]
-    let AB_fert = config.AB_fert
-    let total_fert = config.total_fert || 0
-    if (config.method === 'Total') {
-        AB_fert = config.total_fert / group.area
-        total_fert = config.total_fert
+    if (!config) return null
+
+    const area = group.area
+    let AB_fert = config.AB_fert || 0
+    if (config.method === 'Total' && area > 0) {
+        AB_fert = config.total_fert / area
     }
+    // 只浇水：施肥量强制为 0
+    if (config.method === 'WaterOnly') {
+        AB_fert = 0
+    }
+
+    let total_time_minutes = 0
+    let pre_fert_time_hours = 0
+    let fert_time_hours = 0
+    let post_fert_time_hours = 0
+
+    if (config.method === 'WaterOnly') {
+        total_time_minutes = config.total_time || 0
+    } else {
+        const pre_minutes = config.pre_fert_time || 0
+        const fert_minutes = config.method === 'Time' ? (config.fert_time || 0) : 0
+        const post_minutes = config.post_fert_time || 0
+        pre_fert_time_hours = pre_minutes / 60
+        fert_time_hours = fert_minutes / 60
+        post_fert_time_hours = post_minutes / 60
+    }
+
     return {
         name: group.name,
-        area: group.area,
+        area,
         valves: selectedValveDevices.value[group.name] || [],
-        method: config.method,
+        method: config.method === 'WaterOnly' ? 'AreaBased' : config.method,
         AB_fert: Number.parseFloat(AB_fert.toFixed(2)),
-        total_fert: config.method === 'Total' ? Number.parseFloat(total_fert.toFixed(2)) : undefined,
-        fert_time: config.method === 'Time' ? config.fert_time : 0,
-        total_time: config.total_time,
-        post_fert_time: config.post_fert_time || 0,
+        total_fert: config.method === 'Total' ? (config.total_fert || 0) : 0,
+        fert_time: fert_time_hours,
+        pre_fert_time: pre_fert_time_hours,
+        post_fert_time: post_fert_time_hours,
+        total_time: total_time_minutes,
+        water_only: config.method === 'WaterOnly',
     }
 }
 
@@ -1133,6 +1517,10 @@ const finishWizard = async () => {
         return
     }
 
+    if (!validateSchemeStep()) {
+        return
+    }
+
     try {
         const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
         const farm_name = currentFarmName.value || undefined
@@ -1142,21 +1530,25 @@ const finishWizard = async () => {
             return
         }
 
-        // 确保必要的策略存在
+        // 与 PC 端保持一致：下发前先确保供水/总策略/施肥等必要策略存在
         try {
             await ensureRequiredPolicies(farm_name, token)
         } catch (e) {
             console.error('确保必要策略失败:', e)
-            const errorMsg = e?.err_msg || e?.message || String(e)
-            uni.showToast({ title: errorMsg, icon: 'none', duration: 3000 })
+            uni.showToast({
+                title: e?.err_msg || e?.message || '检查必要策略失败',
+                icon: 'none'
+            })
             return
         }
 
         // 下发配置
-        console.log('下发轮灌组配置:', { groups: finalConfig, farm_name })
+        console.log('下发轮灌组配置:', { groups: finalConfig, farm_name, scheme_id: selectedSchemeId.value, scheme_name: schemeName.value })
         const resp = await call_remote('/policy/apply_wizard_groups', {
             groups: finalConfig,
-            farm_name: farm_name
+            farm_name: farm_name,
+            scheme_id: selectedSchemeId.value || undefined,
+            scheme_name: schemeName.value?.trim() || undefined
         }, token)
         console.log('接口返回:', resp)
 
@@ -1457,7 +1849,13 @@ const useRecommendedArea = (index) => {
 
 const onFarmChange = async (farmName) => {
     currentFarmName.value = farmName
-    await loadExistingGroups()
+    // 只有编辑模式需要加载已配置组
+    if (isEditMode.value) {
+        await loadExistingGroups()
+        await initWateringGroupsFromExisting()
+    } else {
+        existingGroups.value = []
+    }
 
     // 重新加载农场面积参数
     try {
@@ -1513,6 +1911,17 @@ const openValveMap = (groupName) => {
 // 初始化
 onLoad((opts) => {
     mode.value = opts?.mode || 'create'
+
+    // 从选择方案弹窗跳转过来时，带上当前方案信息，并可直接从指定步骤开始
+    if (opts?.schemeName) {
+        schemeName.value = opts.schemeName
+    }
+    if (opts?.schemeId) {
+        selectedSchemeId.value = opts.schemeId
+    }
+    if (opts?.startStep && Number(opts.startStep) >= 2) {
+        wizardStep.value = Number(opts.startStep)
+    }
 })
 
 // 更新阀门选择（供地图页面调用）
@@ -1563,8 +1972,13 @@ onMounted(async () => {
             await pageHeaderRef.value.refresh()
             currentFarmName.value = pageHeaderRef.value.getCurrentFarmName()
         }
+        await loadSchemes()
         await loadValveDevices()
-        await loadExistingGroups()
+        // 新建模式不需要加载已配置的组；只有编辑模式才加载
+        if (isEditMode.value) {
+            await loadExistingGroups()
+            await initWateringGroupsFromExisting()
+        }
 
         // 加载农场面积参数
         try {
@@ -1606,7 +2020,8 @@ onMounted(async () => {
     width: 100%;
     box-sizing: border-box;
     padding-top: calc(160rpx + env(safe-area-inset-top));
-    padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+    padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
+    overflow-y: auto;
 }
 
 .content {
@@ -1642,40 +2057,97 @@ onMounted(async () => {
 }
 
 .step-indicator {
-    display: grid;
-    grid-template-columns: 40rpx auto 1fr 40rpx auto 1fr 40rpx auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 32rpx;
+    padding: 24rpx 0 40rpx;
+    position: relative;
+}
+
+.step-item {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8rpx;
-    margin-bottom: 16rpx;
+    flex: 1;
+    position: relative;
+    z-index: 2;
+}
+
+.step-line {
+    position: absolute;
+    top: 28rpx;
+    left: 50%;
+    right: -50%;
+    height: 4rpx;
+    background: #ebeef5;
+    z-index: 1;
+    transition: all 0.3s ease;
+    border-radius: 2rpx;
+}
+
+.step-line.completed {
+    background: linear-gradient(90deg, #67c23a 0%, #85ce61 100%);
 }
 
 .step-dot {
-    width: 40rpx;
-    height: 40rpx;
+    width: 56rpx;
+    height: 56rpx;
     border-radius: 50%;
     background: #ebeef5;
     color: #909399;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
     font-size: 24rpx;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 3px solid #ebeef5;
+    box-sizing: border-box;
+    margin-bottom: 12rpx;
+    position: relative;
+    z-index: 3;
 }
 
 .step-dot.active {
-    background: #409eff;
-    color: #fff;
+    background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+    color: #ffffff;
+    border-color: #409eff;
+    box-shadow: 0 4rpx 12rpx rgba(64, 158, 255, 0.4);
+    transform: scale(1.1);
+}
+
+.step-dot.completed {
+    background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+    color: #ffffff;
+    border-color: #67c23a;
+    box-shadow: 0 4rpx 12rpx rgba(103, 194, 58, 0.4);
+}
+
+.step-number {
+    font-size: 28rpx;
+    font-weight: 600;
+}
+
+.step-check {
+    font-size: 32rpx;
+    font-weight: bold;
 }
 
 .step-label {
-    font-size: 24rpx;
-    color: #606266;
+    font-size: 22rpx;
+    color: #909399;
+    text-align: center;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+    margin-top: 4rpx;
+    line-height: 1.4;
 }
 
-.step-line {
-    height: 1px;
-    background: #dcdfe6;
-    width: 100%;
+.step-label.active {
+    color: #409eff;
+    font-weight: 600;
+    font-size: 24rpx;
 }
 
 .wizard-step-content {
@@ -1709,10 +2181,26 @@ onMounted(async () => {
     flex-wrap: wrap;
 }
 
-/* 建议亩数卡片样式 - 显示在按钮下方 */
+/* 底部固定区域 */
+.wizard-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: #ffffff;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 建议亩数卡片样式 - 固定在底部 */
 .recommended-area-card {
-    margin-bottom: 12rpx;
-    padding: 14rpx 20rpx;
+    margin: 0 32rpx;
+    margin-top: 16rpx;
+    padding: 16rpx 24rpx;
     background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
     border: 1px solid #409eff;
     border-radius: 12rpx;
@@ -1745,11 +2233,6 @@ onMounted(async () => {
 
 .existing-groups-section {
     margin-bottom: 24rpx;
-    padding: 32rpx;
-    background: linear-gradient(135deg, #e3f2fd 0%, #f5f7fa 100%);
-    border-radius: 20rpx;
-    border: 1px solid #b3d8ff;
-    box-shadow: 0 4rpx 12rpx rgba(64, 158, 255, 0.1);
 }
 
 .existing-groups-header {
@@ -1770,41 +2253,79 @@ onMounted(async () => {
 
 .existing-groups-list {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 12rpx;
 }
 
-.existing-group-item {
-    display: flex;
-    align-items: center;
-}
-
-.copy-group-btn {
-    display: flex;
-    align-items: center;
-    gap: 8rpx;
-    padding: 12rpx 20rpx;
-    background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+.existing-group-row {
+    padding: 24rpx 28rpx;
     border-radius: 20rpx;
-    box-shadow: 0 2rpx 8rpx rgba(64, 158, 255, 0.3);
-    transition: all 0.3s;
+    background: #ffffff;
+    border: 1px solid #e4e7ed;
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+    transition: all 0.2s;
 }
 
-.copy-group-btn:active {
-    transform: scale(0.95);
-    box-shadow: 0 1rpx 4rpx rgba(64, 158, 255, 0.2);
+.existing-group-row:active {
+    transform: scale(0.98);
+    box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.08);
 }
 
-.copy-icon {
-    font-size: 32rpx;
-    color: #fff;
-    font-weight: 600;
+.group-info-bottom {
+    margin-top: 8rpx;
 }
 
-.copy-text {
+.group-name-input.readonly,
+.group-area-input.readonly {
+    background: #f8fafc;
+    border-color: #ebeef5;
+    color: #303133;
+}
+
+.action-row {
+    display: flex;
+    flex-wrap: nowrap; /* 同行展示 */
+    gap: 12rpx;
+    margin-top: 12rpx;
+    align-items: center;
+    flex: 1;
+}
+
+.mini-btn {
+    padding: 10rpx 22rpx;
+    border-radius: 999rpx;
+    border: 1px solid #dcdfe6;
     font-size: 24rpx;
-    color: #fff;
-    font-weight: 500;
+    color: #606266;
+    background: #f5f7fa;
+    white-space: nowrap;
+}
+
+.mini-btn.view {
+    border-color: #67c23a;
+    color: #67c23a;
+    background: #f0f9eb;
+}
+
+.mini-btn.edit {
+    border-color: #e6a23c;
+    color: #e6a23c;
+    background: #fdf6ec;
+}
+
+.mini-btn.copy {
+    border-color: #409eff;
+    color: #409eff;
+    background: #ecf5ff;
+}
+
+.mini-btn.delete {
+    border-color: #f56c6c;
+    color: #f56c6c;
+    background: #fef0f0;
 }
 
 .icon-btn {
@@ -1822,15 +2343,30 @@ onMounted(async () => {
     transform: scale(0.9);
 }
 
-.delete-btn {
+.icon-btn.delete-btn {
     background: linear-gradient(135deg, #f56c6c 0%, #f78989 100%);
     box-shadow: 0 4rpx 12rpx rgba(245, 108, 108, 0.35);
 }
 
-.delete-btn .icon-text {
-    font-size: 48rpx;
+.icon-btn.primary-btn {
+    background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+    box-shadow: 0 4rpx 12rpx rgba(64, 158, 255, 0.35);
+}
+
+.icon-btn.warning-btn {
+    background: linear-gradient(135deg, #E6A23C 0%, #f0c78a 100%);
+    box-shadow: 0 4rpx 12rpx rgba(230, 162, 60, 0.35);
+}
+
+.icon-btn.info-btn {
+    background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+    box-shadow: 0 4rpx 12rpx rgba(103, 194, 58, 0.35);
+}
+
+.icon-text {
+    font-size: 30rpx;
     color: #fff;
-    font-weight: 300;
+    font-weight: 600;
     line-height: 1;
 }
 
@@ -2306,14 +2842,8 @@ onMounted(async () => {
     display: flex;
     justify-content: center;
     gap: 20rpx;
-    margin-top: 0;
     padding: 24rpx 32rpx;
-    background: #ffffff;
-    border-radius: 20rpx;
-    box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.05);
-    position: sticky;
-    bottom: 0;
-    z-index: 100;
+    box-sizing: border-box;
 }
 
 .no-devices-warning {
@@ -2433,5 +2963,99 @@ onMounted(async () => {
     align-items: center;
     justify-content: space-between;
     gap: 20rpx;
+}
+
+/* 方案选择样式 */
+.scheme-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 20rpx;
+    padding: 24rpx;
+    box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+}
+
+.scheme-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8rpx;
+}
+
+.scheme-title {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: #303133;
+}
+
+.scheme-count {
+    font-size: 24rpx;
+    color: #909399;
+}
+
+.scheme-empty {
+    font-size: 26rpx;
+    color: #909399;
+    padding: 20rpx 0;
+}
+
+.scheme-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+}
+
+.scheme-card {
+    padding: 18rpx;
+    border: 1px solid #ebeef5;
+    border-radius: 16rpx;
+    background: #f8fafc;
+    transition: all 0.2s;
+}
+
+.scheme-card.active {
+    border-color: #409eff;
+    background: #ecf5ff;
+    box-shadow: 0 4rpx 12rpx rgba(64, 158, 255, 0.2);
+}
+
+.scheme-name {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: #303133;
+}
+
+.scheme-desc {
+    margin-top: 6rpx;
+    font-size: 24rpx;
+    color: #909399;
+}
+
+.create-scheme {
+    margin-top: 20rpx;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 20rpx;
+    padding: 20rpx;
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+    box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+}
+
+.create-title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: #303133;
+}
+
+.scheme-input {
+    border: 1px solid #ebeef5;
+    border-radius: 12rpx;
+    padding: 14rpx;
+    font-size: 26rpx;
+    background: #f8fafc;
 }
 </style>

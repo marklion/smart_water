@@ -190,11 +190,13 @@ policy
     init assignment 'false' '启动间隔' '${start_interval_ms}'
     init assignment 'false' '期望运行时间' '${duration_ms}'
     init assignment 'false' '停留时间' '0'
+    init assignment 'false' '下次运行时间' '""'
     state '空闲'
       enter assignment 'false' '需要启动' 'false'
       enter assignment 'false' '进入时间' 'Date.now()'
       enter assignment 'false' '停留时间' '0'
       do assignment 'false' '停留时间' '(Date.now() - prs.variables.get("进入时间"))'
+      do assignment 'false' '需要启动' '(prs.variables.get("下次运行时间") != "" ? (new Date(prs.variables.get("下次运行时间")).getTime() <= Date.now() ? true : prs.variables.get("需要启动")) : prs.variables.get("需要启动"))'
       transformer 'next'
         rule 'false' '搅拌' 'prs.variables.get("需要启动") == true'
       return
@@ -205,6 +207,7 @@ policy
     state '搅拌'
       enter assignment 'false' '停留时间' '0'
       enter assignment 'false' '需要启动' 'true'
+      enter assignment 'false' '下次运行时间' '""'
       enter action '${mixing_pump_name}' 'open'
       enter assignment 'false' '进入时间' 'Date.now()'
       exit action '${mixing_pump_name}' 'close'
@@ -224,6 +227,7 @@ return
     return config_string;
   },
   add_group_policy: function (params) {
+    
     let valve_open_config = '';
     for (let single_sub_policy of params.wgv_array) {
       valve_open_config += `\n enter crossAssignment 'false' '"${single_sub_policy.name}"' '需要启动' 'true'`;
@@ -242,6 +246,32 @@ return
       return
       `;
     }
+    
+    // 根据method类型计算期望施肥总量和期望每亩施肥量
+    // AB_fert (area_based_amount) 填写位置：第270行的 '期望每亩施肥量'
+    // total_fert 填写位置：第272行的 '期望施肥总量'
+    let expected_per_mu_fert = 0;  // 期望每亩施肥量 (AB_fert / area_based_amount)
+    let expected_total_fert = 0;   // 期望施肥总量 (total_fert)
+    
+    if (params.method === '总定量') {
+      // 总定量模式：使用total_fert，期望每亩施肥量设为0
+      expected_total_fert = params.total_fert || 0;
+      expected_per_mu_fert = 0;
+    } else if (params.method === '亩定量' || params.method === '定量' || params.method === '只浇水') {
+      // 亩定量模式：使用area_based_amount，计算total_fert
+      // 注意：只浇水模式虽然method是'只浇水'，但也会走到这里，不过water_only=true时会跳过这段代码
+      expected_per_mu_fert = params.area_based_amount || 0;
+      expected_total_fert = expected_per_mu_fert * (params.area || 0);
+    } else if (params.method === '定时') {
+      // 定时模式：两个值都为0
+      expected_per_mu_fert = 0;
+      expected_total_fert = 0;
+    } else {
+      // 其他未知模式：两个值都为0
+      expected_per_mu_fert = 0;
+      expected_total_fert = 0;
+    }
+    
     let config_string = `
 policy
   ${exeption_push_config}
@@ -256,9 +286,9 @@ policy
     init assignment 'false' '施肥时间' '${(params.fert_time || 0) * 1000 * 60}'
     init assignment 'false' '肥后时间' '${(params.post_fert_time || 0) * 1000 * 60}'`}
     init assignment 'false' '施肥策略' '${params.method}'
-    ${params.water_only ? '' : `init assignment 'false' '期望每亩施肥量' '${params.area_based_amount || 0}'
+    ${params.water_only ? '' : `init assignment 'false' '期望每亩施肥量' '${expected_per_mu_fert}'
     init assignment 'false' '期望施肥速率' '0'
-    init assignment 'false' '期望施肥总量' '${(params.area_based_amount || 0) * params.area}'`}
+    init assignment 'false' '期望施肥总量' '${expected_total_fert}'`}
     init assignment 'false' '面积' '${params.area}'
     init assignment 'false' '需要启动' 'false'
     init assignment 'false' '需要跳过' 'false'

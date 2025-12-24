@@ -387,13 +387,6 @@
                                         placeholder="总量" />
                                     <span class="unit">L</span>
                                 </div>
-
-                                <div v-if="getFertConfig(group).method === 'Time'" class="param-item">
-                                    <label>施肥时间：</label>
-                                    <el-input-number v-model="getFertConfig(group).fert_time" :min="0" :precision="1"
-                                        placeholder="施肥时间" />
-                                    <span class="unit">分钟</span>
-                                </div>
                             </div>
 
                             <div v-if="getFertConfig(group).method === 'WaterOnly'" class="time-params">
@@ -406,13 +399,18 @@
                             </div>
 
                             <div v-else class="time-params">
+                                <div v-if="getFertConfig(group).method === 'Time'" class="param-item">
+                                    <label>施肥时间：</label>
+                                    <el-input-number v-model="getFertConfig(group).fert_time" :min="0" :precision="1"
+                                        placeholder="施肥时间" />
+                                    <span class="unit">分钟</span>
+                                </div>
                                 <div class="param-item">
                                     <label>肥前时间：</label>
                                     <el-input-number v-model="getFertConfig(group).pre_fert_time" :min="0"
                                         :precision="1" placeholder="肥前时间" />
                                     <span class="unit">分钟</span>
                                 </div>
-
                                 <div class="param-item">
                                     <label>肥后时间：</label>
                                     <el-input-number v-model="getFertConfig(group).post_fert_time" :min="0"
@@ -444,7 +442,12 @@
                         下一步
                     </UnifiedButton>
 
-                    <UnifiedButton v-if="wizardStep === 4" variant="success" @click="finishWizard">
+                    <UnifiedButton
+                        v-if="wizardStep === 4"
+                        variant="success"
+                        :loading="finishWizardLoading"
+                        @click="finishWizard"
+                    >
                         完成配置
                     </UnifiedButton>
                 </div>
@@ -503,6 +506,7 @@ const route = useRoute()
 
 // 向导步骤
 const wizardStep = ref(1)
+const finishLoading = ref(false)
 
 // 方案数据
 const schemes = ref([])
@@ -544,7 +548,7 @@ const getFertConfig = (group) => {
     const key = group.configKey || group.name
     if (!fertConfigs.value[key]) {
         fertConfigs.value[key] = {
-            method: 'AreaBased',
+            method: 'WaterOnly',
             AB_fert: 0,
             total_fert: 0,
             fert_time: 0,
@@ -589,7 +593,6 @@ watch(() => wateringGroups.value.map(g => ({ key: g.configKey || g.name, area: g
 watch(selectedSchemeId, async (newSchemeId, oldSchemeId) => {
     if (newSchemeId !== oldSchemeId && wizardStep >= 2) {
         // 如果已经在步骤2或之后，且方案发生了变化，重新加载已配置的轮灌组
-        console.log(`方案变化: ${oldSchemeId} -> ${newSchemeId}，重新加载轮灌组列表`)
         await loadExistingGroups()
     }
 }, { immediate: false })
@@ -827,19 +830,20 @@ const parseTimeValue = (expression) => {
 // 辅助函数：处理时间变量
 const handleTimeVariable = (varName, expression, fertConfig) => {
     if (varName === 'fert_time' || varName === '施肥时间') {
-        fertConfig.fert_time = parseTimeValue(expression)
+        const value = parseTimeValue(expression)
+        fertConfig.fert_time = value
         return true
     }
     if (varName === 'pre_ms' || varName === '肥前时间') {
-        if (fertConfig.pre_fert_time === undefined) {
-            fertConfig.pre_fert_time = parseTimeValue(expression)
-        }
+        // 总是更新，确保能正确解析
+        const value = parseTimeValue(expression)
+        fertConfig.pre_fert_time = value
         return true
     }
     if (varName === 'post_ms' || varName === '肥后时间') {
-        if (fertConfig.post_fert_time === undefined) {
-            fertConfig.post_fert_time = parseTimeValue(expression)
-        }
+        // 总是更新，确保能正确解析
+        const value = parseTimeValue(expression)
+        fertConfig.post_fert_time = value
         return true
     }
     return false
@@ -859,12 +863,14 @@ const handleFertAmountVariable = (varName, expression, fertConfig) => {
 }
 
 const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
+    let methodFromVar = null
+    // 先读取所有变量，但不立即设置method
     for (const initVar of initVariables) {
         const varName = initVar.variable_name
         const expression = initVar.expression || ''
 
         if (varName === 'method' || varName === '施肥策略') {
-            fertConfig.method = parseFertMethod(expression)
+            methodFromVar = expression
         } else if (handleTimeVariable(varName, expression, fertConfig)) {
             // 已处理时间变量
         } else if (handleFertAmountVariable(varName, expression, fertConfig)) {
@@ -872,14 +878,64 @@ const parseFertConfigFromVariables = (initVariables, fertConfig, area = 0) => {
         }
     }
 
-    // 如果施肥方式是"总定量"，且期望施肥总量有值，计算亩定量
+    // 如果method是"定量"，需要根据施肥量变量来判断是"亩定量"还是"总定量"
+    // 优先检查total_fert，因为它是更明确的指标
+    if (methodFromVar === '定量') {
+        const perMuValue = fertConfig.AB_fert || 0
+        const totalValue = fertConfig.total_fert || 0
+        
+        // 优先判断：如果总定量有值且亩定量为0或很小，判断为总定量模式
+        if (totalValue > 0 && perMuValue < 0.01) {
+            fertConfig.method = 'Total'
+            fertConfig.AB_fert = 0
+        } else if (totalValue > 0 && perMuValue > 0) {
+            // 如果两个都有值，需要判断哪个是用户设置的
+            // 如果total_fert不是perMuValue * area的倍数（允许一定误差），说明是用户直接设置的总定量
+            const calculatedTotal = perMuValue * area
+            const diff = Math.abs(totalValue - calculatedTotal)
+            // 如果差异大于1%，说明是用户直接设置的总定量
+            if (diff > totalValue * 0.01) {
+                fertConfig.method = 'Total'
+                // 保留total_fert，清除AB_fert（因为它是从total_fert计算出来的）
+                fertConfig.AB_fert = 0
+            } else {
+                // 否则是亩定量模式
+                fertConfig.method = 'AreaBased'
+            }
+        } else if (perMuValue > 0) {
+            // 如果只有亩定量有值，判断为亩定量模式
+            fertConfig.method = 'AreaBased'
+            // 计算总定量
+            if (area > 0) {
+                fertConfig.total_fert = fertConfig.AB_fert * area
+            }
+        } else if (totalValue > 0) {
+            // 如果只有总定量有值，判断为总定量模式
+            fertConfig.method = 'Total'
+            fertConfig.AB_fert = 0
+        } else {
+            // 如果都没有值，默认为亩定量
+            fertConfig.method = 'AreaBased'
+        }
+    } else if (methodFromVar) {
+        // 如果method不是"定量"，直接使用解析后的值
+        fertConfig.method = parseFertMethod(methodFromVar)
+    }
+
+    // 如果施肥方式是"总定量"，且期望施肥总量有值，计算亩定量（仅用于显示）
     if (fertConfig.method === 'Total' && fertConfig.total_fert > 0 && area > 0) {
+        // 只有当AB_fert为0或未设置时才计算，避免覆盖用户设置
+        if (!fertConfig.AB_fert || fertConfig.AB_fert < 0.01) {
         fertConfig.AB_fert = fertConfig.total_fert / area
+        }
     }
 
     // 如果施肥方式是"亩定量"，且期望每亩施肥量有值，计算总定量
     if (fertConfig.method === 'AreaBased' && fertConfig.AB_fert > 0 && area > 0) {
+        // 只有当total_fert为0或未设置时才计算，避免覆盖用户设置
+        if (!fertConfig.total_fert || fertConfig.total_fert < 0.01) {
         fertConfig.total_fert = fertConfig.AB_fert * area
+        }
     }
 }
 
@@ -950,36 +1006,85 @@ const parseWaterOnlyConfig = (policyContent) => {
         
 // 辅助函数：解析施肥策略（从方案内容）
 const parseFertMethodFromContent = (policyContent) => {
-        const fertMethodMatch = policyContent.match(/init assignment\s+'false'\s+'施肥策略'\s+'([^']+)'/)
+    const fertMethodMatch = policyContent.match(/init assignment\s+'false'\s+'施肥策略'\s+'([^']+)'/)
     if (!fertMethodMatch) return null
 
-            const method = fertMethodMatch[1]
-            if (method === '定量') {
-                const perMuMatch = policyContent.match(/init assignment\s+'false'\s+'期望每亩施肥量'\s+'([^']+)'/)
-                const totalMatch = policyContent.match(/init assignment\s+'false'\s+'期望施肥总量'\s+'([^']+)'/)
-                if (perMuMatch) {
-            return {
-                method: 'AreaBased',
-                AB_fert: parseFloat(perMuMatch[1]) || 0,
-                total_fert: 0
+    const method = fertMethodMatch[1]
+    
+    // 直接匹配明确的模式名称
+    if (method === '总定量') {
+        const totalMatch = policyContent.match(/init assignment\s+'false'\s+'期望施肥总量'\s+'([^']+)'/)
+        let totalValue = totalMatch ? parseFloat(totalMatch[1]) || 0 : 0
+        
+        // 如果策略文件中总定量是0，尝试从亩定量和面积计算（作为后备方案）
+        if (totalValue === 0) {
+            const perMuMatch = policyContent.match(/init assignment\s+'false'\s+'期望每亩施肥量'\s+'([^']+)'/)
+            const areaMatch = policyContent.match(/init assignment\s+'false'\s+'面积'\s+'([^']+)'/)
+            if (perMuMatch && areaMatch) {
+                const perMuValue = parseFloat(perMuMatch[1]) || 0
+                const areaValue = parseFloat(areaMatch[1]) || 0
+                if (perMuValue > 0 && areaValue > 0) {
+                    totalValue = perMuValue * areaValue
+                }
             }
         }
-        if (totalMatch) {
+        
+        return {
+            method: 'Total',
+            AB_fert: 0,
+            total_fert: totalValue
+        }
+    } else if (method === '亩定量' || method === '定量') {
+                const perMuMatch = policyContent.match(/init assignment\s+'false'\s+'期望每亩施肥量'\s+'([^']+)'/)
+                const totalMatch = policyContent.match(/init assignment\s+'false'\s+'期望施肥总量'\s+'([^']+)'/)
+        const perMuValue = perMuMatch ? parseFloat(perMuMatch[1]) || 0 : 0
+        const totalValue = totalMatch ? parseFloat(totalMatch[1]) || 0 : 0
+        
+        // 如果method是"定量"，需要根据施肥量变量来判断是"亩定量"还是"总定量"
+        // 优先检查总定量：如果总定量有值且亩定量为0或很小，判断为总定量模式
+        if (method === '定量' && totalValue > 0 && perMuValue < 0.01) {
             return {
                 method: 'Total',
                 AB_fert: 0,
-                total_fert: parseFloat(totalMatch[1]) || 0
+                total_fert: totalValue
+            }
+        }
+        // 如果method是"定量"且两个都有值，需要判断哪个是用户设置的
+        if (method === '定量' && totalValue > 0 && perMuValue > 0) {
+            // 如果总定量不是亩定量*面积的倍数（允许一定误差），说明是用户直接设置的总定量
+            // 这里需要面积信息，但在这个函数中无法获取，所以优先判断为总定量
+            return {
+                method: 'Total',
+                AB_fert: 0,
+                total_fert: totalValue
+            }
+        }
+        // 如果只有亩定量有值，或者method明确是"亩定量"，判断为亩定量模式
+        if (perMuValue > 0 || method === '亩定量') {
+            return {
+                method: 'AreaBased',
+                AB_fert: perMuValue,
+                total_fert: totalValue > 0 ? totalValue : 0
             }
                 }
             } else if (method === '定时') {
                 const timeMatch = policyContent.match(/init assignment\s+'false'\s+'施肥时间'\s+'([^']+)'/)
+        const fertTime = timeMatch ? parseFloat(timeMatch[1]) / 60000 || 0 : 0
         return {
             method: 'Time',
             AB_fert: 0,
             total_fert: 0,
-            fert_time: timeMatch ? parseFloat(timeMatch[1]) / 60000 || 0 : 0
+            fert_time: fertTime
+        }
+    } else if (method === '只浇水') {
+        return {
+            method: 'WaterOnly',
+            AB_fert: 0,
+            total_fert: 0,
+            fert_time: 0
                 }
             }
+    
     return null
         }
         
@@ -989,7 +1094,7 @@ const parseTimeParams = (policyContent, fertMethod) => {
         const fertTimeMatch = policyContent.match(/init assignment\s+'false'\s+'施肥时间'\s+'([^']+)'/)
         const postTimeMatch = policyContent.match(/init assignment\s+'false'\s+'肥后时间'\s+'([^']+)'/)
         const totalTimeMatch = policyContent.match(/init assignment\s+'false'\s+'总灌溉时间'\s+'([^']+)'/)
-        
+    
         const preTimeMs = preTimeMatch ? parseFloat(preTimeMatch[1]) || 0 : 0
         const fertTimeMs = fertTimeMatch ? parseFloat(fertTimeMatch[1]) || 0 : 0
         const postTimeMs = postTimeMatch ? parseFloat(postTimeMatch[1]) || 0 : 0
@@ -1021,7 +1126,44 @@ const parseFertConfig = (policyContent) => {
     if (methodInfo) {
         fertConfig.method = methodInfo.method
         fertConfig.AB_fert = methodInfo.AB_fert || 0
-        fertConfig.total_fert = methodInfo.total_fert || 0
+        // 确保总定量被正确设置
+        if (methodInfo.total_fert !== undefined) {
+            fertConfig.total_fert = methodInfo.total_fert
+        }
+        
+        // 如果是总定量模式，确保从策略内容中解析总定量
+        if (fertConfig.method === 'Total') {
+            const totalMatch = policyContent.match(/init assignment\s+'false'\s+'期望施肥总量'\s+'([^']+)'/)
+            if (totalMatch) {
+                const totalValue = parseFloat(totalMatch[1]) || 0
+                // 如果策略内容中的值大于0，使用策略内容中的值
+                if (totalValue > 0) {
+                    fertConfig.total_fert = totalValue
+                } else {
+                    // 如果策略内容中是0，但methodInfo中有值，使用methodInfo中的值
+                    if (methodInfo.total_fert > 0) {
+                        fertConfig.total_fert = methodInfo.total_fert
+                    } else {
+                        // 如果都是0，尝试从亩定量和面积计算（作为后备方案）
+                        const perMuMatch = policyContent.match(/init assignment\s+'false'\s+'期望每亩施肥量'\s+'([^']+)'/)
+                        const areaMatch = policyContent.match(/init assignment\s+'false'\s+'面积'\s+'([^']+)'/)
+                        if (perMuMatch && areaMatch) {
+                            const perMuValue = parseFloat(perMuMatch[1]) || 0
+                            const areaValue = parseFloat(areaMatch[1]) || 0
+                            if (perMuValue > 0 && areaValue > 0) {
+                                fertConfig.total_fert = perMuValue * areaValue
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 如果策略内容中没有期望施肥总量，使用methodInfo中的值
+                if (methodInfo.total_fert > 0) {
+                    fertConfig.total_fert = methodInfo.total_fert
+                }
+            }
+        }
+        
         if (methodInfo.fert_time !== undefined) {
             fertConfig.fert_time = methodInfo.fert_time
         }
@@ -1029,7 +1171,7 @@ const parseFertConfig = (policyContent) => {
 
     const timeParams = parseTimeParams(policyContent, fertConfig.method)
     Object.assign(fertConfig, timeParams)
-
+    
     return fertConfig
 }
 
@@ -1082,9 +1224,19 @@ const loadExistingGroups = async () => {
             params.scheme_id = selectedSchemeId.value
         }
 
+        if (!selectedSchemeId.value) {
+            // 新增方案时不加载历史已配置组
+            existingGroups.value = []
+            return
+        }
+
         const response = await call_remote('/policy/list_watering_groups', params, token)
         if (response && response.groups) {
             let filteredGroups = response.groups
+            const currentSchemeId = selectedSchemeId.value
+            if (currentSchemeId) {
+                filteredGroups = filteredGroups.filter(g => String(g.scheme_id || '') === String(currentSchemeId))
+            }
             if (currentFarm && currentFarm !== '默认农场') {
                 const policyFarmMatches = await Promise.all(
                     response.groups.map(async (group) => {
@@ -1198,8 +1350,10 @@ const loadExistingGroups = async () => {
                     }
 
                     // 解析施肥配置，传入面积用于计算（在读取时间参数之后，避免覆盖）
+                    // 注意：parseFertConfigFromVariables 中的 handleTimeVariable 会更新时间值
+                    // 但如果 init_variables 中没有这些变量，已设置的值不会被覆盖
                     parseFertConfigFromVariables(policy.init_variables, fertConfig, area)
-
+                    
                     // 如果从策略变量中读取到了时间值，但总时间未设置，则计算总时间
                     if (!fertConfig.total_time && (preTimeMs > 0 || fertTimeMs > 0 || postTimeMs > 0)) {
                         fertConfig.total_time = (preTimeMs + fertTimeMs + postTimeMs) / 60000
@@ -1261,7 +1415,7 @@ const loadExistingGroups = async () => {
                         })
                         // 设置施肥配置
                         fertConfigs.value[groupName] = {
-                            method: existingGroup.fertConfig?.method || 'AreaBased',
+                            method: existingGroup.fertConfig?.method || 'WaterOnly',
                             AB_fert: existingGroup.fertConfig?.AB_fert ?? 0,
                             total_fert: existingGroup.fertConfig?.total_fert ?? 0,
                             fert_time: existingGroup.fertConfig?.fert_time ?? 0,
@@ -2053,7 +2207,10 @@ const prevStep = () => {
 }
 
 // 完成配置
+const finishWizardLoading = ref(false)
+
 const finishWizard = async () => {
+    if (finishWizardLoading.value) return
     if (!Array.isArray(wateringGroups.value)) {
         wateringGroups.value = []
         ElMessage.error('轮灌组数据异常，请重新配置')
@@ -2065,6 +2222,72 @@ const finishWizard = async () => {
         return
     }
 
+    finishWizardLoading.value = true
+
+    // 校验函数：根据不同的施肥方式校验不同的参数
+    const validateFertConfig = (groupName, config) => {
+        if (!config || !config.method) {
+            console.error(`[前端校验] ${groupName} 缺少施肥配置或method`)
+            return { valid: false, message: `请为${groupName}设置施肥配置` }
+        }
+
+        switch (config.method) {
+            case 'WaterOnly':
+                // 只浇水模式：只校验总灌溉时间
+                if (!config.total_time || config.total_time <= 0) {
+                    console.error(`[前端校验] ${groupName} 只浇水模式校验失败: 总灌溉时间无效`)
+                    return { valid: false, message: `请为${groupName}设置有效的总灌溉时间参数` }
+                }
+                return { valid: true }
+
+            case 'AreaBased':
+                // 亩定量模式：校验亩定量、肥前时间、肥后时间
+                if (!config.AB_fert || config.AB_fert <= 0) {
+                    console.error(`[前端校验] ${groupName} 亩定量模式校验失败: 亩定量无效`)
+                    return { valid: false, message: `请为${groupName}设置有效的亩定量参数（L/亩）` }
+                }
+                const preTime1 = config.pre_fert_time || 0
+                const postTime1 = config.post_fert_time || 0
+                if (preTime1 < 0 || postTime1 < 0) {
+                    console.error(`[前端校验] ${groupName} 亩定量模式校验失败: 时间参数无效`)
+                    return { valid: false, message: `请为${groupName}设置有效的肥前时间和肥后时间` }
+                }
+                return { valid: true }
+
+            case 'Total':
+                // 总定量模式：校验总定量、肥前时间、肥后时间
+                if (!config.total_fert || config.total_fert <= 0) {
+                    console.error(`[前端校验] ${groupName} 总定量模式校验失败: 总定量无效`)
+                    return { valid: false, message: `请为${groupName}设置有效的总定量参数（L）` }
+                }
+                const preTime2 = config.pre_fert_time || 0
+                const postTime2 = config.post_fert_time || 0
+                if (preTime2 < 0 || postTime2 < 0) {
+                    console.error(`[前端校验] ${groupName} 总定量模式校验失败: 时间参数无效`)
+                    return { valid: false, message: `请为${groupName}设置有效的肥前时间和肥后时间` }
+                }
+                return { valid: true }
+
+            case 'Time':
+                // 定时模式：校验施肥时间、肥前时间、肥后时间
+                if (!config.fert_time || config.fert_time <= 0) {
+                    console.error(`[前端校验] ${groupName} 定时模式校验失败: 施肥时间无效`)
+                    return { valid: false, message: `请为${groupName}设置有效的施肥时间参数` }
+                }
+                const preTime3 = config.pre_fert_time || 0
+                const postTime3 = config.post_fert_time || 0
+                if (preTime3 < 0 || postTime3 < 0) {
+                    console.error(`[前端校验] ${groupName} 定时模式校验失败: 时间参数无效`)
+                    return { valid: false, message: `请为${groupName}设置有效的肥前时间和肥后时间` }
+                }
+                return { valid: true }
+
+            default:
+                console.error(`[前端校验] ${groupName} 使用了无效的施肥方式: ${config.method}`)
+                return { valid: false, message: `请为${groupName}选择有效的施肥方式` }
+        }
+    }
+
     // 验证配置
     for (const group of wateringGroups.value) {
         if (!group || !group.name) {
@@ -2074,116 +2297,109 @@ const finishWizard = async () => {
 
         const configKey = group.configKey || group.name
         const config = fertConfigs.value[configKey]
-        if (!config) {
-            ElMessage.warning(`请为${group.name}设置施肥配置`)
+        const validation = validateFertConfig(group.name, config)
+        if (!validation.valid) {
+            console.error(`[前端] 轮灌组 ${group.name} 校验失败:`, validation.message)
+            ElMessage.warning(validation.message)
             return
-        }
-        // 如果选择"只浇水"，只需要验证总灌溉时间
-        if (config.method === 'WaterOnly') {
-            if (!config.total_time || config.total_time <= 0) {
-                ElMessage.warning(`请为${group.name}设置有效的总灌溉时间参数`)
-                return
-            }
-            // "只浇水"模式下，不需要验证施肥参数
-        } else {
-            // 验证三个独立时间参数
-            const pre_fert_time = config.pre_fert_time || 0;
-            const fert_time = config.method === 'Time' ? (config.fert_time || 0) : 0;
-            const post_fert_time = config.post_fert_time || 0;
-            const total_time = pre_fert_time + fert_time + post_fert_time;
-
-            if (total_time <= 0) {
-                ElMessage.warning(`请为${group.name}设置有效的灌溉时间参数（肥前时间、施肥时间、肥后时间）`)
-                return
-            }
-            if (config.method === 'AreaBased' && config.AB_fert <= 0) {
-                ElMessage.warning(`请为${group.name}设置有效的亩定量施肥参数`)
-                return
-            }
-            if (config.method === 'Total' && config.total_fert <= 0) {
-                ElMessage.warning(`请为${group.name}设置有效的总定量施肥参数`)
-                return
-            }
-            if (config.method === 'Time' && fert_time <= 0) {
-                ElMessage.warning(`请为${group.name}设置有效的定时施肥参数`)
-                return
-            }
-            if (total_time <= 0) {
-                ElMessage.warning(`请为${group.name}设置有效的灌溉时间参数（肥前时间、施肥时间、肥后时间）`)
-                return
-            }
         }
     }
 
 
-    // 如果有任何变更，我们需要下发当前方案中所有的轮灌组配置，因为后端通常是全量覆盖
+    // 构建提交配置：根据不同的施肥方式，只提交相关参数
+    const buildGroupConfig = (group, config, area) => {
+        const baseConfig = {
+            name: group.name,
+            area: area,
+            valves: selectedValveDevices.value[group.name] || [],
+            method: config.method
+        }
+
+        let result = null
+        switch (config.method) {
+            case 'WaterOnly':
+                // 只浇水模式：仅提交总灌溉时间
+                result = {
+                    ...baseConfig,
+                    method: 'WaterOnly',
+                    water_only: true,
+                    total_time: config.total_time || 0,
+                    AB_fert: 0,
+                    total_fert: 0,
+                    fert_time: 0,
+                    pre_fert_time: 0,
+                    post_fert_time: 0
+                }
+                return result
+
+            case 'AreaBased':
+                // 亩定量模式：只提交亩定量、肥前时间、肥后时间
+                result = {
+                    ...baseConfig,
+                    water_only: false,
+                    AB_fert: parseFloat((config.AB_fert || 0).toFixed(2)),
+                    pre_fert_time: (config.pre_fert_time || 0) / 60, // 分钟转小时
+                    post_fert_time: (config.post_fert_time || 0) / 60,
+                    // 不提交总定量和施肥时间
+                    total_fert: 0,
+                    fert_time: 0,
+                    total_time: 0
+                }
+                return result
+
+            case 'Total':
+                // 总定量模式：只提交总定量、肥前时间、肥后时间
+                result = {
+                    ...baseConfig,
+                    water_only: false,
+                    total_fert: parseFloat((config.total_fert || 0).toFixed(2)),
+                    pre_fert_time: (config.pre_fert_time || 0) / 60,
+                    post_fert_time: (config.post_fert_time || 0) / 60,
+                    // 不提交亩定量和施肥时间
+                    AB_fert: 0,
+                    fert_time: 0,
+                    total_time: 0
+                }
+                return result
+
+            case 'Time':
+                // 定时模式：只提交施肥时间、肥前时间、肥后时间
+                result = {
+                    ...baseConfig,
+                    water_only: false,
+                    fert_time: (config.fert_time || 0) / 60,
+                    pre_fert_time: (config.pre_fert_time || 0) / 60,
+                    post_fert_time: (config.post_fert_time || 0) / 60,
+                    // 不提交施肥量相关参数
+                    AB_fert: 0,
+                    total_fert: 0,
+                    total_time: 0
+                }
+                return result
+
+            default:
+                console.error(`[前端构建] ${group.name} 使用了无效的施肥方式: ${config.method}`)
+                return null
+            }
+        }
+
+    // 构建最终配置
     const finalConfig = wateringGroups.value.map(group => {
         if (!group || !group.name) {
             return null
         }
 
         const configKey = group.configKey || group.name
-        // 使用变更后的配置，如果没有变更则使用当前配置
         const config = changedFertConfigs.value[configKey] || fertConfigs.value[configKey]
         if (!config) {
+            console.warn(`[前端] 轮灌组 ${group.name} 没有配置，跳过`)
             return null
         }
         
-        // 使用变更后的面积，如果没有变更则使用当前面积
         const area = changedAreas.value[configKey] !== undefined ? changedAreas.value[configKey] : group.area
-        
-        // 如果选择"只浇水"，设置特殊标记
-        let AB_fert = config.AB_fert || 0;
-        if (config.method === 'Total') {
-            AB_fert = config.total_fert / area;
-        }
-        // "只浇水"模式下，施肥量设为0
-        if (config.method === 'WaterOnly') {
-            AB_fert = 0;
-        }
-        // 只浇水模式下，使用总灌溉时间；否则使用三个独立时间参数
-        let total_time_minutes = 0;
-        let pre_fert_time_hours = 0;
-        let fert_time_hours = 0;
-        let post_fert_time_hours = 0;
-
-        if (config.method === 'WaterOnly') {
-            // 只浇水模式：直接使用总灌溉时间
-            total_time_minutes = config.total_time || 0;
-        } else {
-            // 正常模式：使用三个独立时间参数
-            const pre_fert_time_minutes = config.pre_fert_time || 0;
-            const fert_time_minutes = config.method === 'Time' ? (config.fert_time || 0) : 0;
-            const post_fert_time_minutes = config.post_fert_time || 0;
-            pre_fert_time_hours = pre_fert_time_minutes / 60;
-            fert_time_hours = fert_time_minutes / 60;
-            post_fert_time_hours = post_fert_time_minutes / 60;
-
-            // 调试日志
-            console.log(`轮灌组 ${group.name} 的时间参数:`, {
-                'config.pre_fert_time': config.pre_fert_time,
-                'config.post_fert_time': config.post_fert_time,
-                'pre_fert_time_minutes': pre_fert_time_minutes,
-                'post_fert_time_minutes': post_fert_time_minutes,
-                'pre_fert_time_hours': pre_fert_time_hours,
-                'post_fert_time_hours': post_fert_time_hours
-            });
-        }
-
-        return {
-            name: group.name,
-            area: area,
-            valves: selectedValveDevices.value[group.name] || [],
-            method: config.method === 'WaterOnly' ? 'AreaBased' : config.method,
-            AB_fert: parseFloat(AB_fert.toFixed(2)),
-            total_fert: config.method === 'Total' ? (config.total_fert || 0) : 0,
-            fert_time: fert_time_hours,
-            pre_fert_time: pre_fert_time_hours,
-            post_fert_time: post_fert_time_hours,
-            total_time: total_time_minutes,
-            water_only: config.method === 'WaterOnly'
-        }
+        return buildGroupConfig(group, config, area)
     }).filter(Boolean)
+    
 
     if (finalConfig.length === 0) {
         ElMessage.error('没有有效的轮灌组配置')
@@ -2226,6 +2442,8 @@ const finishWizard = async () => {
         console.error('下发异常:', e)
         const errorMsg = e?.err_msg || e?.message || e?.toString() || '下发失败，未知错误'
         ElMessage.error(errorMsg)
+    } finally {
+        finishWizardLoading.value = false
     }
 }
 
@@ -2533,7 +2751,10 @@ onMounted(async () => {
     if (route.query.scheme_name) {
         await loadSchemeData(route.query.scheme_name)
     } else {
-        await loadExistingGroups()
+        // 仅在已有方案（即编辑）时加载已配置组；新增方案不加载
+        if (selectedSchemeId.value) {
+            await loadExistingGroups()
+        }
     }
 
     // 3. 加载农场参数

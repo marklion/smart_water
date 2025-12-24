@@ -63,20 +63,44 @@ export default {
         return await call_remote('/config/init_fert_mixing_policy', req, token);
     },
     add_group_policy: async function (group_policy_config, token) {
-        let req = {
+        const req = {
             policy_name: group_policy_config.policy_name,
             farm_name: group_policy_config.farm_name,
             wgv_array: group_policy_config.wgv_array,
-            total_time: parseFloat(group_policy_config.total_time),
-            pre_fert_time: parseFloat(group_policy_config.pre_fert_time),
-            post_fert_time: parseFloat(group_policy_config.post_fert_time),
             method: group_policy_config.method,
-            fert_time: parseFloat(group_policy_config.fert_time),
-            area_based_amount: parseFloat(group_policy_config.area_based_amount),
             area: parseFloat(group_policy_config.area),
             water_only: group_policy_config.water_only,
         };
-        return await call_remote('/config/add_group_policy', req, token);
+
+        if (group_policy_config.method === '只浇水') {
+            req.total_time = group_policy_config.total_time !== undefined ? parseFloat(group_policy_config.total_time) : undefined;
+        } else if (group_policy_config.method === '总定量') {
+            req.total_fert = group_policy_config.total_fert !== undefined ? parseFloat(group_policy_config.total_fert) : 0;
+            req.pre_fert_time = group_policy_config.pre_fert_time !== undefined ? parseFloat(group_policy_config.pre_fert_time) : undefined;
+            req.post_fert_time = group_policy_config.post_fert_time !== undefined ? parseFloat(group_policy_config.post_fert_time) : undefined;
+        } else if (group_policy_config.method === '亩定量') {
+            req.area_based_amount = group_policy_config.area_based_amount !== undefined ? parseFloat(group_policy_config.area_based_amount) : undefined;
+            req.pre_fert_time = group_policy_config.pre_fert_time !== undefined ? parseFloat(group_policy_config.pre_fert_time) : undefined;
+            req.post_fert_time = group_policy_config.post_fert_time !== undefined ? parseFloat(group_policy_config.post_fert_time) : undefined;
+        } else if (group_policy_config.method === '定时') {
+            req.fert_time = group_policy_config.fert_time !== undefined ? parseFloat(group_policy_config.fert_time) : undefined;
+            req.pre_fert_time = group_policy_config.pre_fert_time !== undefined ? parseFloat(group_policy_config.pre_fert_time) : undefined;
+            req.post_fert_time = group_policy_config.post_fert_time !== undefined ? parseFloat(group_policy_config.post_fert_time) : undefined;
+        } else {
+            req.total_time = group_policy_config.total_time !== undefined ? parseFloat(group_policy_config.total_time) : undefined;
+            req.pre_fert_time = group_policy_config.pre_fert_time !== undefined ? parseFloat(group_policy_config.pre_fert_time) : undefined;
+            req.post_fert_time = group_policy_config.post_fert_time !== undefined ? parseFloat(group_policy_config.post_fert_time) : undefined;
+            req.fert_time = group_policy_config.fert_time !== undefined ? parseFloat(group_policy_config.fert_time) : undefined;
+            req.area_based_amount = group_policy_config.area_based_amount !== undefined ? parseFloat(group_policy_config.area_based_amount) : undefined;
+            req.total_fert = group_policy_config.total_fert !== undefined ? parseFloat(group_policy_config.total_fert) : undefined;
+        }
+
+        try {
+            return await call_remote('/config/add_group_policy', req, token);
+        } catch (err) {
+            // 保留原错误结构，便于上层拿到 message/err_msg
+            throw err;
+        }
     },
     init_global_policy: async function (global_policy_config, token) {
         let req = {

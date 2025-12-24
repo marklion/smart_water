@@ -21,6 +21,28 @@ import config_lib from '../../config/lib/config_lib.js';
 import cli_runtime_lib from '../../public/cli/cli_runtime_lib.js';
 let default_config_file = 'sw_cli_config.txt';
 const policy_array = []
+// 判断是否有正在运行的轮灌组（用于阻止切换/覆盖）
+function getRunningWateringGroups() {
+    // 轮灌组状态基于策略定义：空闲/浇水/肥前/施肥/肥后/收尾
+    const waitingStates = new Set(['空闲'])
+    const runningStates = new Set(['浇水', '肥前', '施肥', '肥后', '收尾'])
+
+    const running = []
+    for (const policy of policy_array) {
+        if (!policy.watering_group_matrix || policy.watering_group_matrix.length === 0) continue
+        const rt = policy_runtime_states.get(policy.name)
+        const stateRaw = (rt?.current_state || '').toString().trim()
+        if (!stateRaw) continue
+        if (waitingStates.has(stateRaw)) continue
+        if (runningStates.has(stateRaw)) {
+            running.push(policy.name)
+            continue
+        }
+        // 未知状态默认按运行中处理，确保谨慎阻断
+        running.push(policy.name)
+    }
+    return running
+}
 
 // 辅助函数：获取传感器数据
 async function getSensorData() {
@@ -407,7 +429,8 @@ let scan_period_ms = 0
 let scan_timer = null
 // 策略运行状态存储
 const policy_runtime_states = new Map()
-
+// 每个农场当前选中的方案ID（用于 PC / mobile 同步当前方案显示）
+const current_farm_schemes = new Map()
 
 // 常量定义 - 减少重复代码
 const ACTION_FIELD_SCHEMA = {
@@ -1146,11 +1169,22 @@ export default {
                 let state = validateStateExists(policy, body.state_name);
                 let transformer = validateTransformerExists(state, body.transformer_name);
                 let rules = ensureArrayExists(transformer, 'rules');
-                rules.push({
-                    target_state: body.target_state,
-                    expression: body.expression,
-                    is_constant: body.is_constant || false
-                });
+                const isConstant = body.is_constant || false;
+                const added = addItemIfNotExists(
+                    rules,
+                    {
+                        target_state: body.target_state,
+                        expression: body.expression,
+                        is_constant: isConstant
+                    },
+                    rule =>
+                        rule.target_state === body.target_state &&
+                        rule.expression === body.expression &&
+                        (rule.is_constant || false) === isConstant
+                );
+                if (!added) {
+                    throw { err_msg: '转换器规则已存在' };
+                }
                 return { result: true };
             }
         },
@@ -1887,7 +1921,26 @@ export default {
                 result: { type: Boolean, mean: '是否成功', example: true }
             },
             func: async function (body, token) {
-                // 获取现有组和新建组列表
+                // 切换/重新下发前，若存在正在运行的轮灌组，阻止操作并提示先停止
+                const runningGroups = getRunningWateringGroups();
+                if (runningGroups.length > 0) {
+                    throw {
+                        err_msg: `当前有轮灌组正在运行，请先停止后再切换方案：${runningGroups.join(', ')}`
+                    };
+                }
+
+                // 1) 每次先从模板 sw_cli_config.txt 重新加载，确保基线干净（只包含公共策略，不带历史轮灌组）
+                try {
+                    await cli_runtime_lib.restore_config('sw_cli_config.txt');
+                } catch (e) {
+                    console.error('加载模板 sw_cli_config.txt 失败:', e);
+                    throw { err_msg: '加载模板失败，请检查 sw_cli_config.txt 是否存在且可读' };
+                }
+
+                // 清空运行时状态，避免不同方案/旧策略的运行标记残留导致新方案自动运行
+                policy_runtime_states.clear();
+
+                // 2) 基于模板进行轮灌组的创建/更新
                 const existingGroups = getExistingGroups(body.scheme_id);
                 const newGroupNames = new Set(body.groups.map(g => g.name));
                 const updatedGroups = [];
@@ -1926,50 +1979,131 @@ export default {
                     }
                 };
 
-                // 辅助函数：设置只浇水模式变量
-                const setWaterOnlyVariable = async (groupConfig) => {
-                    try {
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                        let runtimeState = policy_runtime_states.get(groupConfig.name);
-                        if (!runtimeState) {
-                            runtimeState = {
-                                current_state: null,
-                                variables: new Map(),
-                                last_execution_time: Date.now(),
-                                start_time: Date.now(),
-                                execution_count: 0,
-                                is_first_execution: true
-                            };
-                            policy_runtime_states.set(groupConfig.name, runtimeState);
-                        }
-                        runtimeState.variables.set('是否只浇水', true);
-                        console.log(`已为轮灌组 ${groupConfig.name} 设置"只浇水"模式`);
-                    } catch (e) {
-                        console.warn(`设置"是否只浇水"变量失败:`, e);
+                // 校验函数：根据不同的施肥方式校验不同的参数
+                const validateGroupConfig = (groupConfig) => {
+                    // 如果显式标记只浇水，则强制方法为 WaterOnly，避免前端状态残留
+                    if (groupConfig.water_only === true) {
+                        groupConfig.method = 'WaterOnly';
+                    }
+                    if (!groupConfig.method) {
+                        console.error(`[后端校验] ${groupConfig.name} 缺少施肥方式参数`);
+                        throw { err_msg: `轮灌组 ${groupConfig.name} 缺少施肥方式参数` };
+                    }
+
+                    switch (groupConfig.method) {
+                        case 'WaterOnly':
+                            // 只浇水模式：只校验总灌溉时间
+                            if (!groupConfig.total_time || groupConfig.total_time <= 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 只浇水模式校验失败: 总灌溉时间无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 只浇水模式需要设置有效的总灌溉时间` };
+                            }
+                            break;
+
+                        case 'AreaBased':
+                            // 亩定量模式：只校验亩定量、肥前时间、肥后时间
+                            if (!groupConfig.AB_fert || groupConfig.AB_fert <= 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 亩定量模式校验失败: 亩定量无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 亩定量模式需要设置有效的亩定量参数` };
+                            }
+                            if (groupConfig.pre_fert_time === undefined || groupConfig.pre_fert_time < 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 亩定量模式校验失败: 肥前时间无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 需要设置有效的肥前时间` };
+                            }
+                            if (groupConfig.post_fert_time === undefined || groupConfig.post_fert_time < 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 亩定量模式校验失败: 肥后时间无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 需要设置有效的肥后时间` };
+                            }
+                            break;
+
+                        case 'Total':
+                            // 总定量模式：只校验总定量、肥前时间、肥后时间
+                            if (!groupConfig.total_fert || groupConfig.total_fert <= 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 总定量模式校验失败: 总定量无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 总定量模式需要设置有效的总定量参数` };
+                            }
+                            if (groupConfig.pre_fert_time === undefined || groupConfig.pre_fert_time < 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 总定量模式校验失败: 肥前时间无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 需要设置有效的肥前时间` };
+                            }
+                            if (groupConfig.post_fert_time === undefined || groupConfig.post_fert_time < 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 总定量模式校验失败: 肥后时间无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 需要设置有效的肥后时间` };
+                            }
+                            break;
+
+                        case 'Time':
+                            // 定时模式：只校验施肥时间、肥前时间、肥后时间
+                            if (!groupConfig.fert_time || groupConfig.fert_time <= 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 定时模式校验失败: 施肥时间无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 定时模式需要设置有效的施肥时间参数` };
+                            }
+                            if (groupConfig.pre_fert_time === undefined || groupConfig.pre_fert_time < 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 定时模式校验失败: 肥前时间无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 需要设置有效的肥前时间` };
+                            }
+                            if (groupConfig.post_fert_time === undefined || groupConfig.post_fert_time < 0) {
+                                console.error(`[后端校验] ${groupConfig.name} 定时模式校验失败: 肥后时间无效`);
+                                throw { err_msg: `轮灌组 ${groupConfig.name} 需要设置有效的肥后时间` };
+                            }
+                            break;
+
+                        default:
+                            console.error(`[后端校验] ${groupConfig.name} 使用了无效的施肥方式: ${groupConfig.method}`);
+                            throw { err_msg: `轮灌组 ${groupConfig.name} 使用了无效的施肥方式: ${groupConfig.method}` };
                     }
                 };
 
-                // 创建策略的辅助函数
+                // 只做轮灌组创建/更新，不在这里初始化总/供水/施肥，避免重复
                 const createGroupPolicy = async (groupConfig) => {
-                    const pre_fert_time_hours = groupConfig.pre_fert_time || 0;
-                    const fert_time_hours = groupConfig.fert_time || 0;
-                    const post_fert_time_hours = groupConfig.post_fert_time || 0;
+                    // 先校验配置
+                    validateGroupConfig(groupConfig);
                     
+                    // 根据不同的施肥方式，只构建相关参数
                     const addGroupPolicyParams = {
                         policy_name: groupConfig.name,
-                        farm_name:body.farm_name,
+                        farm_name: body.farm_name,
                         wgv_array: groupConfig.valves.map(v => ({ name: v })),
-                        method: groupConfig.method == 'Time'?'定时':'定量',
-                        area_based_amount: groupConfig.AB_fert || 0,
                         area: groupConfig.area,
-                        water_only: groupConfig.water_only || false,
-                        total_time: groupConfig.water_only ? (groupConfig.total_time || 0) : undefined,
                     };
-                    
-                    if (!groupConfig.water_only) {
-                        addGroupPolicyParams.pre_fert_time = pre_fert_time_hours * 60;
-                        addGroupPolicyParams.fert_time = fert_time_hours * 60;
-                        addGroupPolicyParams.post_fert_time = post_fert_time_hours * 60;
+
+                    switch (groupConfig.method) {
+                        case 'WaterOnly':
+                            // 只浇水模式：只设置总灌溉时间
+                            addGroupPolicyParams.method = '只浇水';
+                            addGroupPolicyParams.water_only = true;
+                            addGroupPolicyParams.total_time = groupConfig.total_time || 0;
+                            addGroupPolicyParams.area_based_amount = 0;
+                            break;
+
+                        case 'AreaBased':
+                            // 亩定量模式：只设置亩定量、肥前时间、肥后时间
+                            addGroupPolicyParams.method = '亩定量';
+                            addGroupPolicyParams.water_only = false;
+                            addGroupPolicyParams.area_based_amount = groupConfig.AB_fert || 0;
+                            addGroupPolicyParams.pre_fert_time = (groupConfig.pre_fert_time || 0) * 60; // 小时转分钟
+                            addGroupPolicyParams.post_fert_time = (groupConfig.post_fert_time || 0) * 60;
+                            addGroupPolicyParams.fert_time = 0;
+                            break;
+
+                        case 'Total':
+                            // 总定量模式：只设置总定量、肥前时间、肥后时间
+                            addGroupPolicyParams.method = '总定量';
+                            addGroupPolicyParams.water_only = false;
+                            addGroupPolicyParams.total_fert = groupConfig.total_fert || 0;
+                            addGroupPolicyParams.area_based_amount = 0;
+                            addGroupPolicyParams.pre_fert_time = (groupConfig.pre_fert_time || 0) * 60;
+                            addGroupPolicyParams.post_fert_time = (groupConfig.post_fert_time || 0) * 60;
+                            addGroupPolicyParams.fert_time = 0;
+                            break;
+
+                        case 'Time':
+                            // 定时模式：只设置施肥时间、肥前时间、肥后时间
+                            addGroupPolicyParams.method = '定时';
+                            addGroupPolicyParams.water_only = false;
+                            addGroupPolicyParams.fert_time = (groupConfig.fert_time || 0) * 60;
+                            addGroupPolicyParams.pre_fert_time = (groupConfig.pre_fert_time || 0) * 60;
+                            addGroupPolicyParams.post_fert_time = (groupConfig.post_fert_time || 0) * 60;
+                            break;
                     }
                     
                     await config_lib.add_group_policy(addGroupPolicyParams, token);
@@ -1977,10 +2111,6 @@ export default {
                     const targetSchemeId = body.scheme_id || body.scheme_name;
                     if (targetSchemeId) {
                         await setPolicySchemeId(groupConfig, targetSchemeId);
-                    }
-                    
-                    if (groupConfig.water_only === true) {
-                        await setWaterOnlyVariable(groupConfig);
                     }
                 };
                 
@@ -1998,8 +2128,11 @@ export default {
                     try {
                         await createGroupPolicy(groupConfig);
                     } catch (e) {
-                        console.error(`创建轮灌组策略 ${groupConfig.name} 失败:`, e);
-                        throw { err_msg: `创建轮灌组策略 ${groupConfig.name} 失败: ${e.err_msg || e.message || String(e)}` };
+                        console.error(`[后端错误] 创建轮灌组策略 ${groupConfig.name} 失败:`, e);
+                        console.error(`[后端错误] 错误类型:`, typeof e);
+                        console.error(`[后端错误] 错误详情:`, JSON.stringify(e, null, 2));
+                        const errorMsg = e?.err_msg || e?.message || (typeof e === 'string' ? e : (e?.toString ? e.toString() : JSON.stringify(e)));
+                        throw { err_msg: `创建轮灌组策略 ${groupConfig.name} 失败: ${errorMsg || '未知错误'}` };
                     }
                 }
                 
@@ -2410,13 +2543,20 @@ export default {
             is_write: true,
             is_get_api: false,
             params: {
-                scheme_id: { type: String, mean: '方案名称', example: '方案1', have_to: true }
+                scheme_id: { type: String, mean: '方案名称', example: '方案1', have_to: true },
+                farm_name: { type: String, mean: '农场名称（可选，用于记录当前方案）', example: '农场1', have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
                 try {
+                    // 切换方案前检查是否有正在运行的轮灌组
+                    const runningGroups = getRunningWateringGroups();
+                    if (runningGroups.length > 0) {
+                        throw { err_msg: `当前有轮灌组正在运行，请先停止后再切换方案：${runningGroups.join(', ')}` };
+                    }
+
                     const schemeId = body.scheme_id;
                     const farmName = body.farm_name;
                     const fs = await import('fs');
@@ -2433,6 +2573,11 @@ export default {
                     
                     // 设置轮灌组的 scheme_id
                     await setGroupsSchemeIdFromFile(filename, schemeId, fs);
+
+                    // 记录当前农场选中的方案（如果提供了农场名称），用于 PC / mobile 同步“当前方案”
+                    if (farmName) {
+                        current_farm_schemes.set(farmName, schemeId);
+                    }
                     
                     return { result: true };
                 } catch (error) {
@@ -2440,6 +2585,40 @@ export default {
                         err_msg: error.err_msg || error.message || '恢复方案失败'
                     };
                 }
+            },
+        },
+        get_current_scheme: {
+            name: '获取农场当前方案',
+            description: '返回指定农场当前选中的方案ID（如果有）',
+            is_write: false,
+            is_get_api: true,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true }
+            },
+            result: {
+                scheme_id: { type: String, mean: '方案ID', example: '方案1' }
+            },
+            func: async function (body, token) {
+                const farmName = body.farm_name;
+                const schemeId = current_farm_schemes.get(farmName) || null;
+                return { scheme_id: schemeId };
+            },
+        },
+        set_current_scheme: {
+            name: '设置农场当前方案',
+            description: '显式设置指定农场当前选中的方案ID，供前端同步显示使用',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                scheme_id: { type: String, mean: '方案ID', example: '方案1', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '是否成功', example: true }
+            },
+            func: async function (body, token) {
+                current_farm_schemes.set(body.farm_name, body.scheme_id);
+                return { result: true };
             },
         },
         get_scheme_content: {

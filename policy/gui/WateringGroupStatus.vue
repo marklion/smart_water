@@ -96,7 +96,6 @@ const props = defineProps({
 
 // 从 MainLayout 获取当前选择的方案
 const injectedSelectedSchemeId = inject('selectedSchemeId', ref(''))
-const injectedCurrentSchemeName = inject('currentSchemeName', ref(''))
 
 // 当前方案中的轮灌组列表
 const schemeWateringGroups = ref([])
@@ -106,11 +105,7 @@ const irrigationGroups = ref([])
 const loading = ref(false)
 const quickActionLoading = ref({})
 const waterOnlyMode = ref({}) // 跟踪每个轮灌组的"只浇水"状态（只读展示）
-const schemes = ref([]) // 方案列表
 const selectedSchemeId = computed(() => injectedSelectedSchemeId.value || '')
-const restoreLoading = ref(false) // 恢复方案加载状态
-const startLoading = ref(false) // 启动加载状态
-const stopLoading = ref(false) // 停止加载状态
 
 // 解析方案文件内容，提取轮灌组信息
 const parseWateringGroups = (content) => {
@@ -167,80 +162,6 @@ const loadSchemeWateringGroups = async () => {
     }
 }
 
-// 加载方案列表
-const loadSchemes = async () => {
-    try {
-        const response = await call_remote('/policy/list_schemes', {})
-        if (response && response.schemes) {
-            schemes.value = response.schemes
-        }
-    } catch (error) {
-        // 加载方案列表失败
-    }
-}
-
-// 处理方案切换
-const handleSchemeChange = () => {
-    loadWateringGroups()
-}
-
-// 恢复方案配置
-const handleRestoreScheme = async () => {
-    if (!selectedSchemeId.value) return
-
-    restoreLoading.value = true
-    try {
-        await call_remote('/policy/restore_scheme', { scheme_id: selectedSchemeId.value })
-        ElMessage.success(`已加载方案: ${selectedSchemeId.value}`)
-        loadWateringGroups()
-    } catch (error) {
-        ElMessage.error(error.err_msg || '加载方案失败')
-    } finally {
-        restoreLoading.value = false
-    }
-}
-
-// 启动方案（设置总策略的"需要启动"变量为true）
-const handleStartScheme = async () => {
-    if (!selectedSchemeId.value) return
-
-    startLoading.value = true
-    try {
-        // 设置总策略的"需要启动"变量为true
-        const totalPolicyName = `${selectedSchemeId.value}-总策略`
-        await call_remote('/policy/set_vars', {
-            policy_name: totalPolicyName,
-            vars: { '需要启动': 'true' }
-        })
-        ElMessage.success(`方案 ${selectedSchemeId.value} 已启动`)
-        loadWateringGroups()
-    } catch (error) {
-        ElMessage.error(error.err_msg || '启动方案失败')
-    } finally {
-        startLoading.value = false
-    }
-}
-
-// 停止方案
-const handleStopScheme = async () => {
-    if (!selectedSchemeId.value) return
-
-    stopLoading.value = true
-    try {
-        // 设置总策略的"需要启动"变量为false
-        const totalPolicyName = `${selectedSchemeId.value}-总策略`
-        await call_remote('/policy/set_vars', {
-            policy_name: totalPolicyName,
-            vars: { '需要启动': 'false' }
-        })
-        ElMessage.success(`方案 ${selectedSchemeId.value} 已停止`)
-        loadWateringGroups()
-    } catch (error) {
-        ElMessage.error(error.err_msg || '停止方案失败')
-    } finally {
-        stopLoading.value = false
-    }
-}
 
 // 辅助函数：按方案过滤轮灌组
 const filterGroupsByScheme = (groups, responseGroups) => {
@@ -252,7 +173,6 @@ const filterGroupsByScheme = (groups, responseGroups) => {
     const filtered = groups.filter(group => schemeGroupNames.has(group.name))
 
     if (filtered.length === 0 && responseGroups.length > 0) {
-        console.warn(`方案 ${selectedSchemeId.value} 中的轮灌组名称与API返回的不匹配，使用API返回的数据`)
         return responseGroups
     }
 
@@ -309,41 +229,46 @@ const transformGroups = (groups) => {
     }))
 }
 
+const inferSchemeIdFromGroups = (groups) => {
+    if (!Array.isArray(groups) || groups.length === 0) return null
+    const schemeIds = Array.from(new Set(groups.map(g => g.scheme_id).filter(id => id && String(id).trim() !== '')))
+    return schemeIds.length === 1 ? String(schemeIds[0]) : null
+}
+
 // 加载轮灌组数据
 const loadWateringGroups = async () => {
     loading.value = true
     try {
+        // 先拉取当前所有轮灌组运行数据（不按方案过滤），用于推断当前已加载的方案
+        const response = await call_remote('/policy/list_watering_groups', { pageNo: 0 })
+
+        if (!response?.groups) {
+            irrigationGroups.value = []
+            schemeWateringGroups.value = []
+            return
+        }
+
+        const allGroups = response.groups
+
+        // 如果后端已有唯一的 scheme_id，与当前选择不一致，则自动切换到该方案，实现 PC / mobile 互相应用后的同步
+        const inferredSchemeId = inferSchemeIdFromGroups(allGroups)
+        if (inferredSchemeId && selectedSchemeId.value !== inferredSchemeId) {
+            injectedSelectedSchemeId.value = inferredSchemeId
+        }
+
+        // 根据（可能更新后的）方案ID加载方案中的轮灌组列表
         if (selectedSchemeId.value) {
             await loadSchemeWateringGroups()
         } else {
             schemeWateringGroups.value = []
         }
 
-        const params = { pageNo: 0 }
-        if (selectedSchemeId.value) {
-            params.scheme_id = selectedSchemeId.value
-        }
-
-        const response = await call_remote('/policy/list_watering_groups', params)
-
-        if (!response?.groups) {
-            irrigationGroups.value = []
-            return
-        }
-
-        let filteredGroups = response.groups
-        filteredGroups = filterGroupsByScheme(filteredGroups, response.groups)
-        filteredGroups = await filterGroupsByFarm(filteredGroups, response.groups)
-
-            if (filteredGroups.length === 0 && selectedSchemeId.value && schemeWateringGroups.value.length > 0) {
-                ElMessage.warning({
-                    message: `方案"${selectedSchemeId.value}"中包含 ${schemeWateringGroups.value.length} 个轮灌组，但当前没有加载的轮灌组数据。请先应用方案。`,
-                    duration: 5000
-                })
-            }
+        let filteredGroups = allGroups
+        filteredGroups = filterGroupsByScheme(filteredGroups, allGroups)
+        filteredGroups = await filterGroupsByFarm(filteredGroups, allGroups)
 
         irrigationGroups.value = transformGroups(filteredGroups)
-            await loadWaterOnlyStates()
+        await loadWaterOnlyStates()
     } catch (error) {
         ElMessage.error('加载轮灌组数据失败')
         irrigationGroups.value = []
@@ -353,83 +278,49 @@ const loadWateringGroups = async () => {
 }
 
 const tableRowClassName = ({ row }) => {
-    // 统一清洗状态，去除首尾空格，避免因空格/大小写导致样式不一致
+    // 统一清洗状态，去除首尾空格
     const statusRaw = row.cur_state || row.status || ''
     const status = statusRaw.toString().trim()
-    const statusLower = status.toLowerCase()
-
-    // 运行中：绿色
-    if (
-        statusLower.includes('执行中') ||
-        statusLower.includes('灌溉中') ||
-        statusLower.includes('运行中') ||
-        statusLower.includes('running') ||
-        statusLower.includes('working')
-    ) {
-        return 'running-row'
+    
+    // 根据固定状态返回对应的CSS类名
+    if (status === '空闲') {
+        return 'status-idle'
+    } else if (status === '浇水') {
+        return 'status-watering'
+    } else if (status === '肥前') {
+        return 'status-pre-fert'
+    } else if (status === '施肥') {
+        return 'status-fertilizing'
+    } else if (status === '肥后') {
+        return 'status-post-fert'
+    } else if (status === '收尾') {
+        return 'status-finishing'
     }
-
-    // 完成/结束：深绿
-    if (
-        statusLower.includes('完成') ||
-        statusLower.includes('结束') ||
-        statusLower.includes('done') ||
-        statusLower.includes('finished') ||
-        statusLower.includes('执行完成')
-    ) {
-        return 'completed-row'
-    }
-
-    // 排队/待机/准备中：与空闲同色（灰色），避免出现中间行不同色
-    if (
-        statusLower.includes('排队') ||
-        statusLower.includes('等待') ||
-        statusLower.includes('待机') ||
-        statusLower.includes('准备') ||
-        statusLower.includes('queued') ||
-        statusLower.includes('waiting') ||
-        statusLower.includes('ready')
-    ) {
-        return 'idle-row'
-    }
-
-    // 暂停/异常/故障：红色
-    if (
-        statusLower.includes('暂停') ||
-        statusLower.includes('异常') ||
-        statusLower.includes('故障') ||
-        statusLower.includes('error') ||
-        statusLower.includes('failed') ||
-        statusLower.includes('中断') ||
-        statusLower.includes('停止')
-    ) {
-        return 'paused-row'
-    }
-
-    // 空闲或未知：灰色
-    if (statusLower.includes('空闲') || statusLower.includes('idle') || status === '未知' || status === '') {
-        return 'idle-row'
-    }
-
-    // 其他状态：蓝色
-    return 'active-row'
+    
+    // 未知状态默认灰色
+    return 'status-idle'
 }
 
 // Element Plus标签类型
 const getStatusTagType = (status) => {
-    switch (status) {
-        case '执行中':
-        case '灌溉中':
-            return 'success'  // 绿色
-        case '执行完成':
-            return 'primary'  // 蓝色
-        case '排队中':
-        case '待机状态':
-            return 'warning'  // 橙色
-        case '暂停':
-            return 'danger'   // 红色
+    if (!status) return 'info'
+    const statusTrimmed = status.toString().trim()
+    
+    switch (statusTrimmed) {
+        case '空闲':
+            return 'info'      // 灰色
+        case '浇水':
+            return 'primary'   // 蓝色
+        case '肥前':
+            return 'warning'   // 橙色
+        case '施肥':
+            return ''          // 紫色（自定义）
+        case '肥后':
+            return 'success'   // 绿色
+        case '收尾':
+            return 'success'   // 绿色
         default:
-            return 'info'     // 灰色
+            return 'info'      // 灰色
     }
 }
 
@@ -518,8 +409,7 @@ defineExpose({
     refresh
 })
 
-onMounted(async () => {
-    await loadSchemes()
+onMounted(() => {
     loadWateringGroups()
 })
 </script>
@@ -572,109 +462,150 @@ onMounted(async () => {
     color: inherit !important;
 }
 
-/* 表格行样式 - 根据状态显示不同背景颜色 */
-/* 空闲状态 - 绿色（与完成状态同色系） */
-:deep(.idle-row) {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+/* 表格行样式 - 根据固定状态显示不同背景颜色 */
+
+/* 1. 空闲状态 - 银灰色渐变（待机状态，科技感） */
+:deep(.status-idle) {
+    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%) !important;
     transition: all 0.3s ease;
-    border-left: 4px solid #047857;
+    border-left: 4px solid #475569;
     color: #ffffff !important;
 }
 
-:deep(.idle-row:hover) {
-    background: linear-gradient(135deg, #0ea769 0%, #0b8f58 100%) !important;
-    box-shadow: 0 3px 8px rgba(4, 120, 87, 0.35);
+:deep(.status-idle:hover) {
+    background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+    box-shadow: 0 3px 8px rgba(71, 85, 105, 0.35);
     transform: translateY(-0.5px);
 }
 
-/* 非空闲状态（工作、准备、执行中等）- 深蓝色 */
-:deep(.active-row) {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+/* 2. 浇水状态 - 蓝色/青色渐变（水相关，科技感） */
+:deep(.status-watering) {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
     color: #ffffff !important;
     transition: all 0.3s ease;
-    border-left: 4px solid #1d4ed8;
+    border-left: 4px solid #0e7490;
 }
 
-:deep(.active-row:hover) {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+:deep(.status-watering:hover) {
+    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%) !important;
+    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.4);
     transform: translateY(-1px);
 }
 
-/* 运行过（已完成）- 深绿色 */
-:deep(.completed-row) {
+/* 3. 肥前状态 - 黄色/橙色渐变（准备阶段，科技感） */
+:deep(.status-pre-fert) {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+    color: #ffffff !important;
+    transition: all 0.3s ease;
+    border-left: 4px solid #b45309;
+}
+
+:deep(.status-pre-fert:hover) {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.4);
+    transform: translateY(-1px);
+}
+
+/* 4. 施肥状态 - 紫色/粉紫色渐变（施肥阶段，科技感） */
+:deep(.status-fertilizing) {
+    background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%) !important;
+    color: #ffffff !important;
+    transition: all 0.3s ease;
+    border-left: 4px solid #7e22ce;
+}
+
+:deep(.status-fertilizing:hover) {
+    background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%) !important;
+    box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4);
+    transform: translateY(-1px);
+}
+
+/* 5. 肥后状态 - 绿色渐变（冲洗阶段，科技感） */
+:deep(.status-post-fert) {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
     color: #ffffff !important;
     transition: all 0.3s ease;
     border-left: 4px solid #047857;
 }
 
-:deep(.completed-row:hover) {
+:deep(.status-post-fert:hover) {
     background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
     box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
     transform: translateY(-1px);
 }
 
+/* 6. 收尾状态 - 深绿色/青色渐变（完成状态，科技感） */
+:deep(.status-finishing) {
+    background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important;
+    color: #ffffff !important;
+    transition: all 0.3s ease;
+    border-left: 4px solid #0f766e;
+}
+
+:deep(.status-finishing:hover) {
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
+    transform: translateY(-1px);
+}
+
 /* 确保文字在深色背景上清晰可见 */
-:deep(.active-row td),
-:deep(.completed-row td) {
+:deep(.status-watering td),
+:deep(.status-pre-fert td),
+:deep(.status-fertilizing td),
+:deep(.status-post-fert td),
+:deep(.status-finishing td),
+:deep(.status-idle td) {
     color: #ffffff !important;
 }
 
-:deep(.active-row .el-tag),
-:deep(.completed-row .el-tag) {
+:deep(.status-watering .el-tag),
+:deep(.status-pre-fert .el-tag),
+:deep(.status-fertilizing .el-tag),
+:deep(.status-post-fert .el-tag),
+:deep(.status-finishing .el-tag),
+:deep(.status-idle .el-tag) {
     background-color: rgba(255, 255, 255, 0.2) !important;
     border-color: rgba(255, 255, 255, 0.3) !important;
     color: #ffffff !important;
 }
 
-/* 确保条纹表格的斑马纹效果与状态颜色协调 */
-:deep(.el-table--striped .idle-row.el-table__row--striped) {
-    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
-}
-
-:deep(.el-table--striped .idle-row.el-table__row--striped:hover) {
-    background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%) !important;
-}
-
-:deep(.el-table--striped .active-row.el-table__row--striped) {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-    color: #ffffff !important;
-}
-
-:deep(.el-table--striped .active-row.el-table__row--striped:hover) {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-}
-
-:deep(.el-table--striped .completed-row.el-table__row--striped) {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-    color: #ffffff !important;
-}
-
-:deep(.el-table--striped .completed-row.el-table__row--striped:hover) {
-    background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
-}
 
 /* 按钮在深色背景上的样式优化 */
-:deep(.active-row .el-button),
-:deep(.completed-row .el-button) {
+:deep(.status-watering .el-button),
+:deep(.status-pre-fert .el-button),
+:deep(.status-fertilizing .el-button),
+:deep(.status-post-fert .el-button),
+:deep(.status-finishing .el-button),
+:deep(.status-idle .el-button) {
     border-color: rgba(255, 255, 255, 0.5) !important;
 }
 
-:deep(.active-row .el-button--success),
-:deep(.completed-row .el-button--success) {
+:deep(.status-watering .el-button--success),
+:deep(.status-pre-fert .el-button--success),
+:deep(.status-fertilizing .el-button--success),
+:deep(.status-post-fert .el-button--success),
+:deep(.status-finishing .el-button--success),
+:deep(.status-idle .el-button--success) {
     background-color: rgba(16, 185, 129, 0.9) !important;
     border-color: #10b981 !important;
 }
 
-:deep(.active-row .el-button--warning),
-:deep(.completed-row .el-button--warning) {
+:deep(.status-watering .el-button--warning),
+:deep(.status-pre-fert .el-button--warning),
+:deep(.status-fertilizing .el-button--warning),
+:deep(.status-post-fert .el-button--warning),
+:deep(.status-finishing .el-button--warning),
+:deep(.status-idle .el-button--warning) {
     background-color: rgba(245, 158, 11, 0.9) !important;
     border-color: #f59e0b !important;
 }
 
-:deep(.active-row .el-button--danger),
-:deep(.completed-row .el-button--danger) {
+:deep(.status-watering .el-button--danger),
+:deep(.status-pre-fert .el-button--danger),
+:deep(.status-fertilizing .el-button--danger),
+:deep(.status-post-fert .el-button--danger),
+:deep(.status-finishing .el-button--danger),
+:deep(.status-idle .el-button--danger) {
     background-color: rgba(239, 68, 68, 0.9) !important;
     border-color: #ef4444 !important;
 }
