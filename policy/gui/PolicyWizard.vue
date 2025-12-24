@@ -442,7 +442,12 @@
                         下一步
                     </UnifiedButton>
 
-                    <UnifiedButton v-if="wizardStep === 4" variant="success" @click="finishWizard">
+                    <UnifiedButton
+                        v-if="wizardStep === 4"
+                        variant="success"
+                        :loading="finishWizardLoading"
+                        @click="finishWizard"
+                    >
                         完成配置
                     </UnifiedButton>
                 </div>
@@ -501,6 +506,7 @@ const route = useRoute()
 
 // 向导步骤
 const wizardStep = ref(1)
+const finishLoading = ref(false)
 
 // 方案数据
 const schemes = ref([])
@@ -2201,7 +2207,10 @@ const prevStep = () => {
 }
 
 // 完成配置
+const finishWizardLoading = ref(false)
+
 const finishWizard = async () => {
+    if (finishWizardLoading.value) return
     if (!Array.isArray(wateringGroups.value)) {
         wateringGroups.value = []
         ElMessage.error('轮灌组数据异常，请重新配置')
@@ -2212,6 +2221,8 @@ const finishWizard = async () => {
         ElMessage.warning('请至少创建一个轮灌组')
         return
     }
+
+    finishWizardLoading.value = true
 
     // 校验函数：根据不同的施肥方式校验不同的参数
     const validateFertConfig = (groupName, config) => {
@@ -2307,13 +2318,12 @@ const finishWizard = async () => {
         let result = null
         switch (config.method) {
             case 'WaterOnly':
-                // 只浇水模式：只提交总灌溉时间
+                // 只浇水模式：仅提交总灌溉时间
                 result = {
                     ...baseConfig,
-                    method: 'AreaBased', // 后端需要，但实际是只浇水
+                    method: 'WaterOnly',
                     water_only: true,
                     total_time: config.total_time || 0,
-                    // 不提交施肥相关参数
                     AB_fert: 0,
                     total_fert: 0,
                     fert_time: 0,
@@ -2432,6 +2442,8 @@ const finishWizard = async () => {
         console.error('下发异常:', e)
         const errorMsg = e?.err_msg || e?.message || e?.toString() || '下发失败，未知错误'
         ElMessage.error(errorMsg)
+    } finally {
+        finishWizardLoading.value = false
     }
 }
 

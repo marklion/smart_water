@@ -1981,6 +1981,10 @@ export default {
 
                 // 校验函数：根据不同的施肥方式校验不同的参数
                 const validateGroupConfig = (groupConfig) => {
+                    // 如果显式标记只浇水，则强制方法为 WaterOnly，避免前端状态残留
+                    if (groupConfig.water_only === true) {
+                        groupConfig.method = 'WaterOnly';
+                    }
                     if (!groupConfig.method) {
                         console.error(`[后端校验] ${groupConfig.name} 缺少施肥方式参数`);
                         throw { err_msg: `轮灌组 ${groupConfig.name} 缺少施肥方式参数` };
