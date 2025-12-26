@@ -12,7 +12,6 @@ export default async function (config_string) {
             let resp = await client.readHoldingRegisters(9, 3);
             ret.flow = resp.data[0] * 65536 + resp.data[1] + resp.data[2] / 100;
         } catch (error) {
-            console.log(`get flow via modbus error =:${JSON.stringify(error)}`);
             ret.online = false;
         }
         return ret;

@@ -3,12 +3,15 @@ export default async function (config_string) {
     let config = JSON.parse(config_string);
     let set_relay = async function (is_on) {
         let ret = true;
-        let client = await modbus_wrapper.fetchConnection(config.ip, config.port, config.device_id);
+        let connection = await modbus_wrapper.fetchConnection(config.ip, config.port, config.device_id);
+        await connection.lock.acquire();
         try {
-            await client.writeCoil(config.relay_address, is_on);
+            await connection.client.writeCoil(config.relay_address, is_on);
         } catch (error) {
             console.log(`set coil error =:${JSON.stringify(error)}`);
             ret = false;
+        } finally {
+            connection.lock.release();
         }
         return ret;
     };
