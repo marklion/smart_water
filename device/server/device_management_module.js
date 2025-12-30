@@ -29,19 +29,19 @@ const driver_array = [
         driver: mgg_znf,
     }, {
         name: 'FertFlowMeter',
-        config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
+        config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
         capability: [
             'readout', 'status_map', 'shutdown', 'ava_readout', 'set_key_const_value'],
         driver: dijiang,
     },{
         name:'WaterFlowMeter',
-        config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
+        config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
         capability: [
             'readout', 'total_readout', 'status_map', 'shutdown'],
         driver: kfd9000,
     }, {
         name:'PressureMeter',
-        config_method: '{ip:<设备IP>, port:<设备端口>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
+        config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
         capability: [
             'readout', 'status_map', 'shutdown'],
         driver: BCP8R,
