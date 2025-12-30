@@ -8,7 +8,7 @@ export default async function (config_string) {
             pressure:0,
         }
         const client = new ModbusRTU();
-        await client.connectTCP(config.ip, { port: config.port });
+        await client.connectRTU(config.serial_path, { baudRate: config.baud_rate || 9600 });
         try {
             client.setID(config.device_id);
             let resp = await client.readHoldingRegisters(3, 1);
