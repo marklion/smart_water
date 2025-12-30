@@ -5,6 +5,7 @@ import kfd9000 from './driver/kfd9000.js';
 import modbus_relay from './driver/modbus_relay.js';
 import mgg_znf from './driver/mgg_znf.js';
 import BCP8R from './driver/BCP8R.js';
+import XM9231B from './driver/XM9231B.js';
 const driver_array = [
     {
         name: 'virtualDevice',
@@ -51,6 +52,12 @@ const driver_array = [
         capability: [
             'open', 'close','is_opened', 'status_map', 'shutdown'],
         driver: modbus_relay,
+    },{
+        name:'DistanceMeter',
+        config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, multiplier:<倍率>, poll_interval:<轮询间隔(ms)>}',
+        capability: [
+            'readout', 'status_map', 'shutdown'],
+        driver: XM9231B,
     }
 ];
 export async function get_driver(device_name, capability) {
