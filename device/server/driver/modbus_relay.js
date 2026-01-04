@@ -1,12 +1,12 @@
 import modbus_wrapper from "./modbus_wrapper.js";
 export default async function (config_string) {
     let config = JSON.parse(config_string);
-    let set_relay = async function (is_on) {
+    let set_relay = async function (value) {
         let ret = true;
         let connection = await modbus_wrapper.fetchConnection(config.ip, config.port, config.device_id);
         await connection.lock.acquire();
         try {
-            await connection.client.writeCoil(config.relay_address, is_on);
+            await connection.client.writeRegisters(config.relay_address, [value]);
         } catch (error) {
             console.log(`set coil error =:${JSON.stringify(error)}`);
             ret = false;
@@ -44,7 +44,7 @@ export default async function (config_string) {
     }
     ret.m_timer = setInterval(async () => {
         try {
-            ret.m_is_online = await set_relay(ret.m_is_opened);
+            ret.m_is_online = await set_relay(ret.m_is_opened ? 1 : 0);
         } catch (error) {
             console.error('Error set relay:', error);
         }
