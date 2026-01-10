@@ -4,18 +4,20 @@ import moment from 'moment';
 
 export default async function (config) {
     // 支持传入配置对象或直接传入日志文件路径（向后兼容）
-    let log_file_path, device_type, device_name;
+    let log_file_path, device_type, device_name, full_height;
 
     if (typeof config === 'string') {
         // 向后兼容：直接传入日志文件路径
         log_file_path = config;
         device_type = 'valve'; // 默认类型
         device_name = 'unknown'; // 默认名称
+        full_height = undefined;
     } else {
         // 新方式：传入配置对象
         log_file_path = config.log_file;
         device_type = config.device_type || 'valve';
         device_name = config.device_name || 'unknown';
+        full_height = config.full_height; // 安装高度参数
     }
 
     // 如果传入的是相对路径或简单文件名，则使用统一的日志目录
@@ -96,15 +98,25 @@ export default async function (config) {
         readout: async function () {
             // 如果有模拟值，优先返回模拟值
             if (this.mock_value !== null) {
+                let finalValue = this.mock_value;
+                // 如果是液位计且配置了安装高度，应用计算
+                if ((device_type === 'level' || device_name.includes('液位计') || device_name.includes('液位')) && full_height !== undefined && full_height !== null) {
+                    finalValue = full_height - this.mock_value;
+                }
                 const deviceType = this.getDeviceType();
                 const unit = this.getUnit();
-                const details = `当前${deviceType}: ${this.mock_value}${unit}`;
+                const details = `当前${deviceType}: ${finalValue}${unit}`;
                 await this.write_log(`[读取] ${details}`);
-                return this.mock_value;
+                return finalValue;
             }
             let lastLine = await this.read_last_line();
             lastLine = lastLine.replace(/\[.*?\]\s*/, '');
-            const value = parseFloat(lastLine) || 0;
+            let value = parseFloat(lastLine) || 0;
+
+            // 如果是液位计且配置了安装高度，应用计算：full_height - 读取值
+            if ((device_type === 'level' || device_name.includes('液位计') || device_name.includes('液位')) && full_height !== undefined && full_height !== null) {
+                value = full_height - value;
+            }
 
             // 记录读取操作
             const deviceType = this.getDeviceType();
@@ -151,7 +163,8 @@ export default async function (config) {
                 'pump': '',
                 'temperature': '°C',
                 'humidity': '%',
-                'pressure': 'Pa'
+                'pressure': 'Pa',
+                'level': 'cm'
             };
             return unitMap[device_type] || '';
         },
