@@ -1,4 +1,4 @@
-import ModbusRTU from "modbus-serial";
+import modbus_wrapper from "./modbus_wrapper.js";
 
 export default async function (config_string) {
     let config = JSON.parse(config_string);
@@ -7,21 +7,21 @@ export default async function (config_string) {
             online: true,
             pressure:0,
         }
-        const client = new ModbusRTU();
-        await client.connectRTU(config.serial_path, { baudRate: config.baud_rate || 9600 });
+        let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
+        await connection.lock.acquire();
         try {
-            client.setID(config.device_id);
-            let resp = await client.readHoldingRegisters(3, 1);
+            let resp = await connection.client.readHoldingRegisters(3, 1);
             let pow = resp.buffer.readUint16BE();
-            resp = await client.readHoldingRegisters(4, 1);
+            resp = await connection.client.readHoldingRegisters(4, 1);
             let pressure = resp.buffer.readInt16BE();
             pressure = pressure / Math.pow(10, pow);
             ret.pressure = pressure;
         } catch (error) {
             console.log(`get pressure via modbus error =:${JSON.stringify(error)}`);
             ret.online = false;
+        } finally {
+            connection.lock.release();
         }
-        client.close();
         return ret;
     };
     let ret = {

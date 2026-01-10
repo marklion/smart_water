@@ -1,4 +1,4 @@
-import ModbusRTU from "modbus-serial";
+import modbus_wrapper from "./modbus_wrapper.js";
 
 export default async function (config_string) {
     let config = JSON.parse(config_string);
@@ -8,19 +8,19 @@ export default async function (config_string) {
             flow: 0,
             total_flow: 0,
         }
-        const client = new ModbusRTU();
-        await client.connectRTU(config.serial_path, { baudRate: config.baud_rate || 9600 });
+        let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
+        await connection.lock.acquire();
         try {
-            client.setID(config.device_id);
-            let resp = await client.readHoldingRegisters(0, 2);
+            let resp = await connection.client.readHoldingRegisters(0, 2);
             ret.flow = resp.buffer.readFloatBE();
-            resp = await client.readHoldingRegisters(0x13, 2);
+            resp = await connection.client.readHoldingRegisters(0x13, 2);
             ret.total_flow = resp.buffer.readUint32BE() / 100;
         } catch (error) {
             console.log(`get flow_info via modbus error =:${JSON.stringify(error)}`);
             ret.online = false;
+        } finally {
+            connection.lock.release();
         }
-        client.close();
         return ret;
     };
     let ret = {

@@ -1,4 +1,4 @@
-import ModbusRTU from "modbus-serial";
+import modbus_wrapper from "./modbus_wrapper.js";
 
 export default async function (config_string) {
     let config = JSON.parse(config_string);
@@ -7,16 +7,15 @@ export default async function (config_string) {
             online: true,
             flow: 0,
         }
-        const client = new ModbusRTU();
-        await client.connectRTU(config.serial_path, { baudRate: config.baud_rate || 9600 });
+        let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
+        await connection.lock.acquire();
         try {
-            client.setID(config.device_id);
-            let resp = await client.readHoldingRegisters(9, 3);
+            let resp = await connection.client.readHoldingRegisters(9, 3);
             ret.flow = resp.data[0] * 65536 + resp.data[1] + resp.data[2] / 100;
         } catch (error) {
             ret.online = false;
         } finally {
-            client.close();
+            connection.lock.release();
         }
         return ret;
     };
@@ -44,16 +43,15 @@ export default async function (config_string) {
             const buffer = Buffer.alloc(6);
             buffer.writeUInt32BE(parseInt(integerPart), 0);
             buffer.writeUInt16BE(parseInt(decimalPart), 4);
-            const client = new ModbusRTU();
-            await client.connectRTUBuffered(config.serial_path, { baudRate: config.baud_rate || 9600 });
+            let connection = await modbus_wrapper.fetchSerialBufferedConnection(config.serial_path, config.baud_rate, config.device_id);
+            await connection.lock.acquire();
             try {
-                client.setID(config.device_id);
-                await client.writeRegisters(6, buffer);
+                await connection.client.writeRegisters(6, buffer);
             } catch (error) {
                 console.log(error);
                 this.m_info.online = false;
             } finally {
-                client.close();
+                connection.lock.release();
             }
         },
         status_map: function () {
