@@ -87,13 +87,12 @@ export async function get_driver(device_name, capability) {
         if (driver_config.name == 'virtualDevice') {
             driver_arg = driver_config_obj;
         } else if (driver_config.name == 'DistanceMeter' && device.full_height !== undefined) {
-            // 对于 XM9231B 液位计，需要将 full_height 添加到配置中
             try {
                 let config = JSON.parse(device.config_key);
                 config.full_height = device.full_height;
                 driver_arg = JSON.stringify(config);
             } catch (e) {
-                // 如果解析失败，使用原始配置
+                console.error(`Failed to parse config_key for device ${device.device_name || device.device_sn}:`, e.message);
                 driver_arg = device.config_key;
             }
         }
