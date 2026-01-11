@@ -8,7 +8,6 @@ export default async function (config_string) {
             pressure:0,
         }
         let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
-        await connection.lock.acquire();
         try {
             let resp = await connection.client.readHoldingRegisters(3, 1);
             let pow = resp.buffer.readUint16BE();
@@ -20,7 +19,7 @@ export default async function (config_string) {
             console.log(`get pressure via modbus error =:${JSON.stringify(error)}`);
             ret.online = false;
         } finally {
-            connection.lock.release();
+            connection.unlock();
         }
         return ret;
     };
@@ -31,7 +30,7 @@ export default async function (config_string) {
         },
         status_map: function () {
             let ret = [];
-            ret.push({ text: '当前流量值', func: 'readout' });
+            ret.push({ text: '当前压力值', func: 'readout' });
             return ret;
         },
         shutdown: async function () {

@@ -9,7 +9,6 @@ export default async function (config_string) {
             level: 0,
         }
         let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
-        await connection.lock.acquire();
         try {
             let resp = await connection.client.readHoldingRegisters(0, 1);
             let raw_value = resp.data[0];
@@ -24,7 +23,7 @@ export default async function (config_string) {
             console.log(`get level info via modbus error: ${JSON.stringify(error)}`);
             ret.online = false;
         } finally {
-            connection.lock.release();
+            connection.unlock();
         }
         return ret;
     };

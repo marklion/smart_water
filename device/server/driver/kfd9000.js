@@ -9,17 +9,16 @@ export default async function (config_string) {
             total_flow: 0,
         }
         let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
-        await connection.lock.acquire();
         try {
             let resp = await connection.client.readHoldingRegisters(0, 2);
             ret.flow = resp.buffer.readFloatBE();
             resp = await connection.client.readHoldingRegisters(0x13, 2);
             ret.total_flow = resp.buffer.readUint32BE() / 100;
         } catch (error) {
-            console.log(`get flow_info via modbus error =:${JSON.stringify(error)}`);
+            console.log(`get flow_info via modbus error =:(error:${error})`);
             ret.online = false;
         } finally {
-            connection.lock.release();
+            connection.unlock();
         }
         return ret;
     };

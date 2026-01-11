@@ -8,14 +8,14 @@ export default async function (config_string) {
             flow: 0,
         }
         let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
-        await connection.lock.acquire();
         try {
             let resp = await connection.client.readHoldingRegisters(9, 3);
             ret.flow = resp.data[0] * 65536 + resp.data[1] + resp.data[2] / 100;
         } catch (error) {
+            console.log('error', error);
             ret.online = false;
         } finally {
-            connection.lock.release();
+            connection.unlock();
         }
         return ret;
     };
@@ -43,15 +43,14 @@ export default async function (config_string) {
             const buffer = Buffer.alloc(6);
             buffer.writeUInt32BE(parseInt(integerPart), 0);
             buffer.writeUInt16BE(parseInt(decimalPart), 4);
-            let connection = await modbus_wrapper.fetchSerialBufferedConnection(config.serial_path, config.baud_rate, config.device_id);
-            await connection.lock.acquire();
+            let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
             try {
                 await connection.client.writeRegisters(6, buffer);
             } catch (error) {
                 console.log(error);
                 this.m_info.online = false;
             } finally {
-                connection.lock.release();
+                connection.unlock();
             }
         },
         status_map: function () {
