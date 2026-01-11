@@ -2,6 +2,7 @@ import modbus_wrapper from "./modbus_wrapper.js";
 
 export default async function (config_string) {
     let config = JSON.parse(config_string);
+    let full_height = config.full_height; // 安装高度参数
     let get_level_info = async function () {
         let ret = {
             online: true,
@@ -13,7 +14,12 @@ export default async function (config_string) {
             let resp = await connection.client.readHoldingRegisters(0, 1);
             let raw_value = resp.data[0];
             let multiplier = config.multiplier || 100;
-            ret.level = raw_value / multiplier;
+            let raw_level = raw_value / multiplier;
+            if (full_height !== undefined && full_height !== null) {
+                ret.level = full_height - raw_level;
+            } else {
+                ret.level = raw_level;
+            }
         } catch (error) {
             console.log(`get level info via modbus error: ${JSON.stringify(error)}`);
             ret.online = false;

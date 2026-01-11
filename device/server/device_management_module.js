@@ -54,7 +54,7 @@ const driver_array = [
         driver: modbus_relay,
     },{
         name:'DistanceMeter',
-        config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, multiplier:<倍率>, poll_interval:<轮询间隔(ms)>}',
+        config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, multiplier:<倍率>, poll_interval:<轮询间隔(ms)>, full_height:<安装高度(可选)>}',
         capability: [
             'readout', 'status_map', 'shutdown'],
         driver: XM9231B,
@@ -80,11 +80,21 @@ export async function get_driver(device_name, capability) {
         const driver_config_obj = {
             log_file: device.config_key,
             device_type: device.device_type || 'valve', // 默认阀门类型
-            device_name: device_name
+            device_name: device_name,
+            full_height: device.full_height // 传递安装高度参数
         };
         let driver_arg = device.config_key;
         if (driver_config.name == 'virtualDevice') {
             driver_arg = driver_config_obj;
+        } else if (driver_config.name == 'DistanceMeter' && device.full_height !== undefined) {
+            try {
+                let config = JSON.parse(device.config_key);
+                config.full_height = device.full_height;
+                driver_arg = JSON.stringify(config);
+            } catch (e) {
+                console.error(`Failed to parse config_key for device ${device.device_name || device.device_sn}:`, e.message);
+                driver_arg = device.config_key;
+            }
         }
         const driver_instance = await driver_config.driver(driver_arg);
         driver_instances.set(cache_key, driver_instance);
@@ -139,11 +149,12 @@ export default {
                 device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' },
                 driver_name: { type: String, have_to: true, mean: '驱动名称', example: 'virtualDevice' },
                 config_key: { type: String, have_to: true, mean: '配置json', example: 'log_file' },
-                device_type: { type: String, have_to: false, mean: '设备类型', example: 'flowmeter', options: ['valve', 'flowmeter', 'fertilizer', 'sensor', 'pump', 'temperature', 'humidity', 'pressure'] },
+                device_type: { type: String, have_to: false, mean: '设备类型', example: 'flowmeter', options: ['valve', 'flowmeter', 'fertilizer', 'sensor', 'pump', 'temperature', 'humidity', 'pressure', 'level'] },
                 longitude: { type: Number, have_to: true, mean: '经度', example: 111.670801 },
                 latitude: { type: Number, have_to: true, mean: '纬度', example: 40.818311 },
                 farm_name: { type: String, have_to: false, mean: '所属农场', example: '农场1' },
                 block_name: { type: String, have_to: false, mean: '所属区块', example: '区块1' },
+                full_height: { type: Number, have_to: false, mean: '安装高度（仅液位计有效）', example: 200 },
             },
             result: {
                 result: { type: Boolean, mean: '添加结果', example: true }
@@ -183,6 +194,9 @@ export default {
                 }
                 if (body.block_name) {
                     exist_device.block_name = body.block_name;
+                }
+                if (body.full_height !== undefined) {
+                    exist_device.full_height = body.full_height;
                 }
                 await get_driver(body.device_name);
                 return { result: true };
@@ -237,6 +251,7 @@ export default {
                         block_name: { type: String, mean: '所属区块', example: '区块1' },
                         longitude: { type: Number, mean: '经度', example: 111.670801 },
                         latitude: { type: Number, mean: '纬度', example: 40.818311 },
+                        full_height: { type: Number, mean: '安装高度（仅液位计有效）', example: 200 },
                         runtime_info: {
                             type: Array, mean: '运行时信息', explain: {
                                 title: { type: String, mean: '信息标题', example: '开关是否打开' },
@@ -316,7 +331,8 @@ export default {
                         farm_name: device.farm_name || '',
                         block_name: device.block_name || '',
                         longitude: device.longitude || null,
-                        latitude: device.latitude || null
+                        latitude: device.latitude || null,
+                        full_height: device.full_height || null
                     });
                 });
                 let pageNo = body.pageNo || 0;
