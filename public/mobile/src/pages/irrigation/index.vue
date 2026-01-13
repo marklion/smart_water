@@ -833,6 +833,8 @@ const statusClass = (state) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'info'
+        case '阀门响应':
+            return 'info'  // 使用自定义颜色
         case '浇水':
             return 'primary'
         case '肥前':
@@ -854,6 +856,8 @@ const getCardStatusClass = (state) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'status-idle'
+        case '阀门响应':
+            return 'status-waiting-valve'
         case '浇水':
             return 'status-watering'
         case '肥前':
@@ -1579,10 +1583,16 @@ const checkRunningStatus = async () => {
             
             // 获取下次启动时间
             const nextStartTime = variables['下次启动时间']
-            if (nextStartTime && nextStartTime !== '' && nextStartTime !== '""') {
-                // 格式化显示时间
-                const timeStr = nextStartTime.replace(/"/g, '')
-                const date = new Date(timeStr)
+            if (nextStartTime && nextStartTime !== '' && nextStartTime !== '""' && nextStartTime !== 0 && nextStartTime !== '0') {
+                // 处理时间戳（数字）或字符串格式
+                let date
+                if (typeof nextStartTime === 'number' || (typeof nextStartTime === 'string' && /^\d+$/.test(nextStartTime.replace(/"/g, '')))) {
+                    const timestamp = typeof nextStartTime === 'number' ? nextStartTime : parseInt(nextStartTime.replace(/"/g, ''))
+                    date = new Date(timestamp)
+                } else {
+                    const timeStr = nextStartTime.replace(/"/g, '')
+                    date = new Date(timeStr)
+                }
                 if (!isNaN(date.getTime())) {
                     nextRunTime.value = date.toLocaleString('zh-CN', {
                         year: 'numeric',
@@ -1823,12 +1833,18 @@ const setScheduledRun = async () => {
     scheduleLoading.value = true
     try {
         const scheduledTime = `${scheduleDate.value} ${scheduleTime.value}`
+        // 将日期时间字符串转换为时间戳（数字）
+        const timestamp = new Date(scheduledTime).getTime()
+        if (isNaN(timestamp)) {
+            uni.showToast({ title: '时间格式错误', icon: 'none' })
+            return
+        }
         const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
         const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
         await call_remote('/policy/runtime_assignment', {
             policy_name: totalPolicyName,
             variable_name: '下次启动时间',
-            expression: `"${scheduledTime}"`,
+            expression: String(timestamp), // 使用时间戳（数字字符串）
             is_constant: true
         }, token)
         uni.showToast({ title: `已设置定时运行: ${scheduledTime}`, icon: 'success' })
@@ -2091,10 +2107,18 @@ const setMixingScheduledStart = async () => {
         mixingScheduleLoading.value = true
         const policyName = `${currentFarmName.value}-搅拌`
         const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        
+        // 将日期时间字符串转换为时间戳（数字）
+        const timestamp = new Date(mixingScheduledTime.value).getTime()
+        if (isNaN(timestamp)) {
+            uni.showToast({ title: '时间格式错误', icon: 'none' })
+            return
+        }
+        
         await call_remote('/policy/runtime_assignment', {
             policy_name: policyName,
             variable_name: '下次运行时间',
-            expression: `"${mixingScheduledTime.value}"`,
+            expression: String(timestamp), // 使用时间戳（数字字符串）
             is_constant: true
         }, token)
         uni.showToast({ title: `已设置定时启动: ${mixingScheduledTime.value}`, icon: 'success' })
@@ -2129,10 +2153,16 @@ const loadMixingStatus = async () => {
             
             // 获取下次运行时间
             const nextRunTime = variables['下次运行时间']
-            if (nextRunTime && nextRunTime !== '' && nextRunTime !== '""') {
-                // 格式化显示时间
-                const timeStr = nextRunTime.replace(/"/g, '')
-                const date = new Date(timeStr)
+            if (nextRunTime && nextRunTime !== '' && nextRunTime !== '""' && nextRunTime !== 0 && nextRunTime !== '0') {
+                // 处理时间戳或字符串格式
+                let date
+                if (typeof nextRunTime === 'number' || (typeof nextRunTime === 'string' && /^\d+$/.test(nextRunTime.replace(/"/g, '')))) {
+                    const timestamp = typeof nextRunTime === 'number' ? nextRunTime : parseInt(nextRunTime.replace(/"/g, ''))
+                    date = new Date(timestamp)
+                } else {
+                    const timeStr = nextRunTime.replace(/"/g, '')
+                    date = new Date(timeStr)
+                }
                 if (!isNaN(date.getTime())) {
                     mixingNextRunTime.value = date.toLocaleString('zh-CN', {
                         year: 'numeric',
@@ -2643,6 +2673,12 @@ onShow(async () => {
     color: #ffffff;
 }
 
+.group-card.status-waiting-valve {
+    background: #10b981; /* 青绿色 - 等待阀门 */
+    border-left: 4px solid #047857;
+    color: #ffffff;
+}
+
 .group-card.status-finishing {
     background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
     border-left: 4px solid #0f766e;
@@ -2654,6 +2690,7 @@ onShow(async () => {
 .group-card.status-pre-fert,
 .group-card.status-fertilizing,
 .group-card.status-post-fert,
+.group-card.status-waiting-valve,
 .group-card.status-finishing {
     color: #ffffff !important;
 }
@@ -2663,6 +2700,7 @@ onShow(async () => {
 .group-card.status-pre-fert .meta-label,
 .group-card.status-fertilizing .meta-label,
 .group-card.status-post-fert .meta-label,
+.group-card.status-waiting-valve .meta-label,
 .group-card.status-finishing .meta-label {
     color: rgba(255, 255, 255, 0.9) !important;
 }
@@ -2713,6 +2751,10 @@ onShow(async () => {
 
 .group-state.info {
     background: #909399; /* 灰色 - 空闲 */
+}
+
+.group-state.info.status-waiting-valve {
+    background: #10b981; /* 青绿色 - 等待阀门（与其他状态区分明显） */
 }
 
 .group-state.primary {

@@ -285,6 +285,8 @@ const tableRowClassName = ({ row }) => {
     // 根据固定状态返回对应的CSS类名
     if (status === '空闲') {
         return 'status-idle'
+    } else if (status === '阀门响应') {
+        return 'status-waiting-valve'
     } else if (status === '浇水') {
         return 'status-watering'
     } else if (status === '肥前') {
@@ -309,6 +311,8 @@ const getStatusTagType = (status) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'info'      // 灰色
+        case '阀门响应':
+            return ''          // 青绿色（自定义颜色，与其他状态区分明显）
         case '浇水':
             return 'primary'   // 蓝色
         case '肥前':
@@ -548,12 +552,27 @@ onMounted(() => {
     transform: translateY(-1px);
 }
 
+/* 7. 等待阀门状态 - 青绿色渐变（等待状态，与其他状态区分明显） */
+:deep(.status-waiting-valve) {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    color: #ffffff !important;
+    transition: all 0.3s ease;
+    border-left: 4px solid #047857;
+}
+
+:deep(.status-waiting-valve:hover) {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
+    transform: translateY(-1px);
+}
+
 /* 确保文字在深色背景上清晰可见 */
 :deep(.status-watering td),
 :deep(.status-pre-fert td),
 :deep(.status-fertilizing td),
 :deep(.status-post-fert td),
 :deep(.status-finishing td),
+:deep(.status-waiting-valve td),
 :deep(.status-idle td) {
     color: #ffffff !important;
 }
@@ -563,6 +582,7 @@ onMounted(() => {
 :deep(.status-fertilizing .el-tag),
 :deep(.status-post-fert .el-tag),
 :deep(.status-finishing .el-tag),
+:deep(.status-waiting-valve .el-tag),
 :deep(.status-idle .el-tag) {
     background-color: rgba(255, 255, 255, 0.2) !important;
     border-color: rgba(255, 255, 255, 0.3) !important;

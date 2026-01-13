@@ -1254,11 +1254,17 @@ const setMixingScheduledStart = async () => {
 
   mixingScheduleLoading.value = true
   try {
+    // 将日期时间字符串转换为时间戳（数字）
+    const timestamp = new Date(mixingScheduledTime.value).getTime()
+    if (isNaN(timestamp)) {
+      ElMessage.warning('时间格式错误')
+      return
+    }
     const policyName = `${selectedFarm.value}-搅拌`
     await call_remote('/policy/runtime_assignment', {
       policy_name: policyName,
       variable_name: '下次运行时间',
-      expression: `"${mixingScheduledTime.value}"`,
+      expression: String(timestamp), // 使用时间戳（数字字符串）
       is_constant: true
     })
     ElMessage.success(`已设置定时启动: ${mixingScheduledTime.value}`)
@@ -1292,10 +1298,16 @@ const loadMixingStatus = async () => {
       
       // 获取下次运行时间
       const nextRunTime = variables['下次运行时间']
-      if (nextRunTime && nextRunTime !== '' && nextRunTime !== '""') {
-        // 格式化显示时间
-        const timeStr = nextRunTime.replace(/"/g, '')
-        const date = new Date(timeStr)
+      if (nextRunTime && nextRunTime !== '' && nextRunTime !== '""' && nextRunTime !== 0 && nextRunTime !== '0') {
+        // 处理时间戳或字符串格式
+        let date
+        if (typeof nextRunTime === 'number' || (typeof nextRunTime === 'string' && /^\d+$/.test(nextRunTime.replace(/"/g, '')))) {
+          const timestamp = typeof nextRunTime === 'number' ? nextRunTime : parseInt(nextRunTime.replace(/"/g, ''))
+          date = new Date(timestamp)
+        } else {
+          const timeStr = nextRunTime.replace(/"/g, '')
+          date = new Date(timeStr)
+        }
         if (!isNaN(date.getTime())) {
           mixingNextRunTime.value = date.toLocaleString('zh-CN', {
             year: 'numeric',
