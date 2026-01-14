@@ -232,8 +232,13 @@
             <el-input v-model="valveConfigForm.token" placeholder="token，例如：9CrLOUBhedObQjLTmhZJbQ==" />
             <el-input v-model="valveConfigForm.device_sn" placeholder="device_sn，例如：DZ005JSJ25180162" />
             <el-switch v-model="valveConfigForm.is_left" active-text="左侧阀门" inactive-text="右侧阀门" />
-            <el-input-number v-model="valveConfigForm.poll_interval" :min="1000" :step="1000" style="width: 100%;"
-              placeholder="poll_interval 轮询间隔（毫秒）" />
+            <el-input v-model="valveConfigForm.selfurl" placeholder="回调URL，例如：https://myserver.com/api/v1/dz005/callback" />
+          </div>
+        </el-form-item>
+        <el-form-item label="压力告警配置（必填）" prop="pressureAlarmConfig">
+          <div class="valve-config-fields">
+            <el-input-number v-model="valveConfigForm.pressureGreaterThan" :placeholder="`${valveConfigForm.is_left ? '左' : '右'}管道压力大于阈值`" :precision="2" :step="0.01" style="width: 100%; margin-bottom: 10px;" />
+            <el-input-number v-model="valveConfigForm.pressureLessThan" :placeholder="`${valveConfigForm.is_left ? '左' : '右'}管道压力小于阈值`" :precision="2" :step="0.01" style="width: 100%;" />
           </div>
         </el-form-item>
         <el-form-item label="经度（-180~180）" prop="longitude">
@@ -499,7 +504,10 @@ const valveConfigForm = ref({
   token: '',
   device_sn: '',
   is_left: false,
-  poll_interval: 5000
+  selfurl: '',
+  // 压力告警配置（根据左侧/右侧自动生成对应配置）
+  pressureGreaterThan: null,
+  pressureLessThan: null
 })
 
 const addWaterGroupValveRules = {
@@ -512,7 +520,21 @@ const addWaterGroupValveRules = {
   latitude: [{ required: true, message: '纬度不能为空', trigger: 'change' }],
   open_pressure_low_limit: [{ required: true, message: '开阀压力下限不能为空', trigger: 'change' }],
   close_pressure_high_limit: [{ required: true, message: '关阀压力上限不能为空', trigger: 'change' }],
-  pressure_check_interval: [{ required: true, message: '压力检查周期不能为空', trigger: 'change' }]
+  pressure_check_interval: [{ required: true, message: '压力检查周期不能为空', trigger: 'change' }],
+  pressureAlarmConfig: [
+    {
+      validator: (rule, value, callback) => {
+        if (valveConfigForm.value.pressureGreaterThan === null || valveConfigForm.value.pressureGreaterThan === undefined) {
+          callback(new Error('压力大于阈值不能为空'))
+        } else if (valveConfigForm.value.pressureLessThan === null || valveConfigForm.value.pressureLessThan === undefined) {
+          callback(new Error('压力小于阈值不能为空'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
+  ]
 }
 
 // 创建自动刷新定时器管理器
@@ -897,8 +919,7 @@ const openAddWaterGroupValveDialog = () => {
   valveConfigForm.value = {
     token: '',
     device_sn: '',
-    is_left: false,
-    poll_interval: 5000
+    is_left: false
   }
   if (blocks.value.length === 0) {
     loadBlocks(selectedFarm.value)
@@ -916,12 +937,32 @@ const submitAddWaterGroupValve = () => {
       return
     }
     try {
-      addWaterGroupValveForm.value.valve_config_key = JSON.stringify({
+      let configObj = {
         token: valveConfigForm.value.token,
         device_sn: valveConfigForm.value.device_sn,
-        is_left: !!valveConfigForm.value.is_left,
-        poll_interval: Number(valveConfigForm.value.poll_interval) || 5000
-      })
+        is_left: !!valveConfigForm.value.is_left
+      }
+      if (valveConfigForm.value.selfurl) {
+        configObj.selfurl = valveConfigForm.value.selfurl
+      }
+      // 添加压力告警配置（必填，根据左侧/右侧自动生成对应配置）
+      if (valveConfigForm.value.pressureGreaterThan === null || valveConfigForm.value.pressureGreaterThan === undefined ||
+          valveConfigForm.value.pressureLessThan === null || valveConfigForm.value.pressureLessThan === undefined) {
+        ElMessage.warning('请填写完整的压力告警配置（大于阈值和小于阈值必填）')
+        return
+      }
+      let pressureAlarmConfig = {}
+      if (valveConfigForm.value.is_left) {
+        // 左侧阀门：设置左管道告警阈值
+        pressureAlarmConfig.leftPipePressureGreaterThan = valveConfigForm.value.pressureGreaterThan
+        pressureAlarmConfig.leftPipePressureLessThan = valveConfigForm.value.pressureLessThan
+      } else {
+        // 右侧阀门：设置右管道告警阈值
+        pressureAlarmConfig.rightPipePressureGreaterThan = valveConfigForm.value.pressureGreaterThan
+        pressureAlarmConfig.rightPipePressureLessThan = valveConfigForm.value.pressureLessThan
+      }
+      configObj.pressure_alarm_config = pressureAlarmConfig
+      addWaterGroupValveForm.value.valve_config_key = JSON.stringify(configObj)
       const payload = {
         ...addWaterGroupValveForm.value
       }
@@ -3354,11 +3395,33 @@ html {
 }
 
 /* 添加轮灌阀门对话框样式 */
+.add-wgv-dialog :deep(.el-dialog__wrapper) {
+  overflow: hidden !important;
+}
+
+.add-wgv-dialog :deep(.el-dialog) {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden !important;
+}
+
 .add-wgv-dialog :deep(.el-dialog__body) {
   padding: 16px 24px 24px;
   background: linear-gradient(145deg, #ffffff, #f8fafc);
-  max-height: none;
-  overflow-y: visible;
+  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(90vh - 120px);
+}
+
+.add-wgv-dialog :deep(.el-form) {
+  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+  height: 100%;
+  max-height: 100%;
 }
 
 .add-wgv-dialog :deep(.el-form-item) {

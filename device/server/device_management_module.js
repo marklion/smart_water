@@ -14,12 +14,12 @@ const driver_array = [
             'open', 'close', 'readout', 'mock_readout','ava_readout','battery_voltage','set_key_const_value',
             'is_opened', 'status_map', 'shutdown', 'total_readout', 'mock_total_readout'],
         driver: virtual_driver,
-    }, {
+    },     {
         name: 'WaterGroupValve',
-        config_method: '{device_sn:<设备序列号>, is_left:<是否左阀>, poll_interval:<轮询间隔(ms)>, token:<鉴权token>}',
+        config_method: '{device_sn:<设备序列号>, is_left:<是否左阀>, token:<鉴权token>, selfurl:<回调URL(必填)>}',
         capability: [
             'open', 'close', 'readout', 'battery_voltage',
-            'is_opened', 'status_map', 'shutdown'],
+            'is_opened', 'status_map', 'shutdown', 'refresh_info'],
         driver: DZ005,
     }, {
         name: 'WaterGroupValve_v2',
@@ -73,8 +73,18 @@ export async function get_driver(device_name, capability) {
         throw { err_msg: '驱动不支持该能力' };
     }
 
-    // 使用设备名称作为缓存键，确保每个设备只有一个驱动实例
-    const cache_key = device_name;
+    let cache_key = device_name;
+    if (driver_config.name == 'WaterGroupValve') {
+        try {
+            let config = JSON.parse(device.config_key);
+            if (config.device_sn) {
+                cache_key = `WaterGroupValve_${config.device_sn}`;
+            }
+        } catch (e) {
+            console.error(`Failed to parse config_key for device ${device.device_name}:`, e.message);
+        }
+    }
+    
     if (!driver_instances.has(cache_key)) {
         // 构建驱动配置，包含设备类型信息
         const driver_config_obj = {
@@ -565,6 +575,43 @@ export default {
                     await driver.set_key_const_value(body.value);
                 }
                 return { result: true };
+            }
+        },
+        refresh_device_info: {
+            name: '刷新设备信息',
+            description: '手动刷新设备信息（如压力、电压等），适用于DZ005等设备',
+            is_write: false,
+            is_get_api: false,
+            params: {
+                device_name: { type: String, have_to: true, mean: '设备名称', example: 'DZ005设备1' }
+            },
+            result: {
+                result: { type: Boolean, mean: '刷新结果', example: true },
+                info: {
+                    type: Object,
+                    mean: '设备信息',
+                    explain: {
+                        online: { type: Boolean, mean: '设备是否在线', example: true },
+                        pressure: { type: Number, mean: '当前压力值', example: 1.5 },
+                        batteryVoltage: { type: Number, mean: '电池电压', example: 3.7 }
+                    }
+                }
+            },
+            func: async function (body, token) {
+                let driver = await get_driver(body.device_name, 'refresh_info');
+                if (driver && driver.refresh_info) {
+                    await driver.refresh_info();
+                    return {
+                        result: true,
+                        info: {
+                            online: await driver.is_online(),
+                            pressure: await driver.readout(),
+                            batteryVoltage: await driver.battery_voltage()
+                        }
+                    };
+                } else {
+                    throw { err_msg: '设备不支持刷新信息功能' };
+                }
             }
         },
     }

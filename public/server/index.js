@@ -56,6 +56,48 @@ app.use(historyApiFallback({
 }));
 app.use(express.static(web_dir));
 
+app.post('/api/v1/dz005/callback', async (req, res) => {
+    try {
+        const body = req.body;
+        console.log('收到DZ005设备回调:', JSON.stringify(body, null, 2));
+
+        const deviceSN = body.deviceSN || '';
+        const events = body.events || [];
+        for (const event of events) {
+            if (event.type === 2004) {
+                const metadata = event.metadata || {};
+                const leftPressure = metadata.leftPipePressure || '';
+                const rightPressure = metadata.rightPipePressure || '';
+                let alarmContent = `设备 ${deviceSN} 气压预警`;
+                if (leftPressure !== '' && leftPressure !== null && leftPressure !== undefined) {
+                    alarmContent += `，左管道压力: ${leftPressure}`;
+                }
+                if (rightPressure !== '' && rightPressure !== null && rightPressure !== undefined) {
+                    alarmContent += `，右管道压力: ${rightPressure}`;
+                }
+                try {
+                    const warningModule = (await import('../../warning/server/warning_module.js')).default;
+                    await warningModule.methods.generate_warning.func({ content: alarmContent }, null);
+                    console.log('告警记录已生成:', alarmContent);
+                } catch (error) {
+                    console.error('生成告警记录失败:', error);
+                }
+            }
+        }
+
+        res.json({
+            code: 0,
+            msg: 'ok'
+        });
+    } catch (error) {
+        console.error('处理DZ005回调失败:', error);
+        res.json({
+            code: -1,
+            msg: error.message || '处理失败'
+        });
+    }
+});
+
 app.post('/api/v1/restart', async (req, res)=>{
     res.json({
         err_msg: '',

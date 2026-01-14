@@ -72,9 +72,28 @@
                     </view>
 
                     <view class="form-item">
-                        <text class="form-label">轮询间隔(ms)</text>
-                        <input class="input-field" type="number" v-model.number="valveConfigForm.poll_interval"
-                            placeholder="例如 5000" />
+                        <text class="form-label">回调URL（必填）</text>
+                        <input class="input-field" v-model="valveConfigForm.selfurl" placeholder="回调URL，例如：https://myserver.com/api/v1/dz005/callback" />
+                    </view>
+
+                </view>
+
+                <!-- 压力告警配置 -->
+                <view class="section-card">
+                    <view class="section-header">
+                        <text class="section-title">压力告警配置（必填）</text>
+                    </view>
+
+                    <view class="form-item">
+                        <text class="form-label">{{ valveConfigForm.is_left ? '左' : '右' }}管道压力大于阈值</text>
+                        <input class="input-field" type="number" v-model.number="valveConfigForm.pressureGreaterThan"
+                            placeholder="例如：0.5" />
+                    </view>
+
+                    <view class="form-item">
+                        <text class="form-label">{{ valveConfigForm.is_left ? '左' : '右' }}管道压力小于阈值</text>
+                        <input class="input-field" type="number" v-model.number="valveConfigForm.pressureLessThan"
+                            placeholder="例如：0.1" />
                     </view>
                 </view>
 
@@ -154,7 +173,10 @@ const valveConfigForm = ref({
     token: '',
     device_sn: '',
     is_left: false,
-    poll_interval: 5000
+    selfurl: '',
+    // 压力告警配置（根据左侧/右侧自动生成对应配置）
+    pressureGreaterThan: null,
+    pressureLessThan: null
 })
 
 const blocks = ref([])
@@ -214,13 +236,33 @@ const submitAddValve = async () => {
         uni.showToast({ title: '请填写 token 和 device_sn', icon: 'none' })
         return
     }
+    if (valveConfigForm.value.pressureGreaterThan === null || valveConfigForm.value.pressureGreaterThan === undefined ||
+        valveConfigForm.value.pressureLessThan === null || valveConfigForm.value.pressureLessThan === undefined) {
+        uni.showToast({ title: '请填写完整的压力告警配置（大于阈值和小于阈值必填）', icon: 'none' })
+        return
+    }
     try {
-        addValveForm.value.valve_config_key = JSON.stringify({
+        let configObj = {
             token: valveConfigForm.value.token,
             device_sn: valveConfigForm.value.device_sn,
-            is_left: !!valveConfigForm.value.is_left,
-            poll_interval: Number(valveConfigForm.value.poll_interval) || 5000
-        })
+            is_left: !!valveConfigForm.value.is_left
+        }
+        if (valveConfigForm.value.selfurl) {
+            configObj.selfurl = valveConfigForm.value.selfurl
+        }
+        // 添加压力告警配置（必填，根据左侧/右侧自动生成对应配置）
+        let pressureAlarmConfig = {}
+        if (valveConfigForm.value.is_left) {
+            // 左侧阀门：设置左管道告警阈值
+            pressureAlarmConfig.leftPipePressureGreaterThan = valveConfigForm.value.pressureGreaterThan
+            pressureAlarmConfig.leftPipePressureLessThan = valveConfigForm.value.pressureLessThan
+        } else {
+            // 右侧阀门：设置右管道告警阈值
+            pressureAlarmConfig.rightPipePressureGreaterThan = valveConfigForm.value.pressureGreaterThan
+            pressureAlarmConfig.rightPipePressureLessThan = valveConfigForm.value.pressureLessThan
+        }
+        configObj.pressure_alarm_config = pressureAlarmConfig
+        addValveForm.value.valve_config_key = JSON.stringify(configObj)
 
         const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
         const payload = {

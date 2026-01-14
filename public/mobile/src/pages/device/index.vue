@@ -205,11 +205,6 @@
                         <switch :checked="valveConfigForm.is_left" @change="(e) => valveConfigForm.is_left = e.detail.value" />
                         <text class="switch-text">{{ valveConfigForm.is_left ? '左侧阀门' : '右侧阀门' }}</text>
                     </view>
-                    <view class="form-item">
-                        <text class="form-label">轮询间隔(ms)</text>
-                        <input class="input-field" type="number" v-model.number="valveConfigForm.poll_interval"
-                            placeholder="例如 5000" />
-                    </view>
                     <view class="form-row">
                         <view class="form-item half">
                             <text class="form-label">经度</text>
@@ -294,8 +289,7 @@ const addValveForm = ref({
 const valveConfigForm = ref({
     token: '',
     device_sn: '',
-    is_left: false,
-    poll_interval: 5000
+    is_left: false
 })
 
 // 设备能力按钮映射配置
@@ -608,8 +602,7 @@ const submitAddValve = async () => {
         addValveForm.value.valve_config_key = JSON.stringify({
             token: valveConfigForm.value.token,
             device_sn: valveConfigForm.value.device_sn,
-            is_left: !!valveConfigForm.value.is_left,
-            poll_interval: Number(valveConfigForm.value.poll_interval) || 5000
+            is_left: !!valveConfigForm.value.is_left
         })
 
         const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
