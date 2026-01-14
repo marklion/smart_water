@@ -308,7 +308,7 @@ export default {
                 block_name: { type: String, mean: '地块名称', example: '地块1', have_to: true },
                 valve_name: { type: String, mean: '阀门名称', example: '轮灌阀门1', have_to: true },
                 driver_name: { type: String, mean: '阀门驱动名称', example: 'virtualDevice', have_to: true },
-                valve_config_key: { type: String, mean: '阀门配置关键字', example: 'all_device_log.log', have_to: true },
+                valve_config_key: { type: String, mean: '阀门配置关键字（JSON字符串），对于WaterGroupValve驱动必须包含selfurl字段作为回调URL（必填）', example: '{"device_sn":"DZ005JSJ25180162","token":"xxx","selfurl":"https://myserver.com/api/v1/dz005/callback"}', have_to: true },
                 latitude: { type: Number, mean: '阀门纬度', example: 40.818311, have_to: true },
                 longitude: { type: Number, mean: '阀门经度', example: 111.670801, have_to: true },
                 open_pressure_low_limit: { type: Number, mean: '开启压力下限', example: 0.2, have_to: true },

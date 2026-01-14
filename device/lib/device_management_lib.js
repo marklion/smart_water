@@ -57,4 +57,7 @@ export default{
     shutdown_device: async function (device_name, token) {
         return await call_remote('/device_management/shutdown_device', { device_name }, token);
     },
+    refresh_device_info: async function (device_name, token) {
+        return await call_remote('/device_management/refresh_device_info', { device_name }, token);
+    },
 }
