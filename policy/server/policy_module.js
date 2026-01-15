@@ -230,10 +230,20 @@ function cleanupDeletedGroups(deletedGroups, schemeId) {
 }
 
 // 辅助函数：查找总策略
-function findTotalPolicy(originalPolicyArray, farmName) {
+function findTotalPolicy(originalPolicyArray, farmName, schemeId) {
     let totalPolicyName = null;
     let totalPolicy = null;
 
+    // 1) 如果提供了 schemeId，优先按 scheme_id 精确查找
+    if (schemeId) {
+        totalPolicy = originalPolicyArray.find(p =>
+            p.name && p.name.includes('总策略') && p.scheme_id === schemeId
+        );
+        if (totalPolicy) {
+            totalPolicyName = totalPolicy.name;
+            return { totalPolicy, totalPolicyName };
+        }
+    }
     if (farmName) {
         totalPolicyName = `${farmName}-总策略`;
         totalPolicy = originalPolicyArray.find(p => p.name === totalPolicyName);
@@ -247,6 +257,47 @@ function findTotalPolicy(originalPolicyArray, farmName) {
     }
 
     return { totalPolicy, totalPolicyName };
+}
+
+// 辅助函数：级联停止轮灌组策略（支持按方案过滤）
+async function cascadeStopWateringGroups(schemeId, stoppedPolicyName) {
+    try {
+        const wateringGroupPolicies = policy_array.filter(p => {
+            // 仅针对轮灌组策略（存在 watering_group_matrix）
+            if (!p.watering_group_matrix || p.watering_group_matrix.length === 0) {
+                return false;
+            }
+            // 排除已经停止的那个策略自身
+            if (p.name === stoppedPolicyName) {
+                return false;
+            }
+            // 如果指定 schemeId，仅停止该方案下的轮灌组
+            if (schemeId) {
+                return p.scheme_id === schemeId;
+            }
+            // 未指定 schemeId 时，停止所有方案
+            return true;
+        });
+
+        console.log(`级联停止：${schemeId ? `方案 ${schemeId}` : '所有方案'} 下有 ${wateringGroupPolicies.length} 个轮灌组策略需要停止`);
+
+        for (const policy of wateringGroupPolicies) {
+            const runtimeState = policy_runtime_states.get(policy.name);
+            if (runtimeState && !runtimeState.is_stopped) {
+                runtimeState.saved_state = runtimeState.current_state;
+                runtimeState.saved_variables = new Map(runtimeState.variables);
+                runtimeState.is_stopped = true;
+                runtimeState.stopped_time = Date.now();
+                runtimeState.stopped_by = stoppedPolicyName;
+                console.log(`级联停止：轮灌组策略 ${policy.name} 已停止（由 ${stoppedPolicyName} 触发）`);
+            }
+        }
+
+        return wateringGroupPolicies.length;
+    } catch (error) {
+        console.error('级联停止轮灌组策略失败:', error);
+        throw error;
+    }
 }
 
 // 辅助函数：更新总策略的"所有轮灌组"变量
@@ -266,6 +317,31 @@ function updateTotalPolicyGroups(policy, groupNamesArray) {
             variable_name: '所有轮灌组',
             expression: `[${groupNamesArray}]`
         });
+    }
+}
+
+// 辅助函数：重新初始化关键策略的运行时状态（总策略、供水策略、施肥策略）
+async function reinitializeKeyPoliciesRuntime() {
+    try {
+        const keyPolicyNames = ['总策略', '供水', '施肥'];
+        const keyPolicies = policy_array.filter(p =>
+            p.name && keyPolicyNames.some(keyword => p.name.includes(keyword))
+        );
+
+        for (const policy of keyPolicies) {
+            try {
+                if (policy_runtime_states.has(policy.name)) {
+                    policy_runtime_states.delete(policy.name);
+                }
+                // 触发策略初始化，使用最新 init_variables
+                await processPolicyExecution(policy);
+                console.log(`策略 ${policy.name} 的运行时状态已重新初始化`);
+            } catch (error) {
+                console.error(`重新初始化策略 ${policy.name} 运行时状态失败:`, error);
+            }
+        }
+    } catch (error) {
+        console.error(`重新初始化关键策略运行时状态失败:`, error);
     }
 }
 
@@ -335,7 +411,7 @@ async function saveSchemeFile(body, expectedGroupNames, deletedGroups) {
         cleanupDeletedGroups(deletedGroups, body.scheme_id);
 
         const schemePolicies = filterSchemePolicies(expectedGroupNames);
-        const { totalPolicy, totalPolicyName } = findTotalPolicy(originalPolicyArray, body.farm_name);
+        const { totalPolicy, totalPolicyName } = findTotalPolicy(originalPolicyArray, body.farm_name, body.scheme_id);
 
         const groupNamesArray = Array.from(expectedGroupNames).map(name => `"${name}"`).join(',');
 
@@ -729,7 +805,15 @@ export default {
                     else
                         return true;
                 });
-                let result = getPaginatedResult(filtered_policies, body.pageNo);
+                // 仅返回必要字段，附带 scheme_id 与 watering_group_matrix 供前端识别轮灌组
+                let mapped_policies = filtered_policies.map(policy => ({
+                    name: policy.name,
+                    farm_name: policy.farm_name,
+                    scheme_id: policy.scheme_id || null,
+                    init_variables: policy.init_variables || [],
+                    watering_group_matrix: policy.watering_group_matrix || null,
+                }));
+                let result = getPaginatedResult(mapped_policies, body.pageNo);
                 return {
                     policies: result.items,
                     total: result.total,
@@ -1775,6 +1859,7 @@ export default {
                     ret.current_state = runtimeState.current_state;
                     // 将 Map 转换为普通对象后再序列化
                     ret.variables = JSON.stringify(Object.fromEntries(runtimeState.variables));
+                    ret.is_stopped = runtimeState.is_stopped || false;
                 }
                 else {
                     throw { err_msg: `策略 ${body.policy_name} 的运行时状态不存在` };
@@ -2141,6 +2226,8 @@ export default {
                     try {
                         const expectedGroupNames = new Set(body.groups.map(g => g.name));
                         await saveSchemeFile(body, expectedGroupNames, deletedGroups);
+                        // 保存方案后，重新初始化关键策略的运行时状态，确保变量更新
+                        await reinitializeKeyPoliciesRuntime();
                     } catch (error) {
                         console.error('保存方案文件失败:', error);
                         throw { err_msg: `保存方案文件失败: ${error.message || String(error)}` };
@@ -2347,6 +2434,38 @@ export default {
 
                 // 执行表达式
                 try {
+                    // 特殊处理停止 / 启动操作，支持断点续传与级联停止
+                    if (body.action_name === '停止' || body.action_name === '停止运行') {
+                        if (runtimeState) {
+                            runtimeState.saved_state = runtimeState.current_state;
+                            runtimeState.saved_variables = new Map(runtimeState.variables);
+                            runtimeState.is_stopped = true;
+                            runtimeState.stopped_time = Date.now();
+                            console.log(`策略 ${body.policy_name} 已停止，保存状态: ${runtimeState.current_state}`);
+
+                            // 如果是总策略或供水策略，级联停止同方案下的轮灌组
+                            const isTotalPolicy = policy.name && (policy.name.includes('总策略') || policy.name.endsWith('-总策略'));
+                            const isWaterSupplyPolicy = policy.name && policy.name.includes('供水');
+                            if (isTotalPolicy || isWaterSupplyPolicy) {
+                                const schemeId = policy.scheme_id;
+                                console.log(`检测到总策略或供水策略停止，开始级联停止轮灌组策略（方案: ${schemeId || '所有'}）`);
+                                await cascadeStopWateringGroups(schemeId, body.policy_name);
+                            }
+                        }
+                    } else if (body.action_name === '启动' || body.action_name === '开始' || body.action_name === '启动运行') {
+                        if (runtimeState) {
+                            if (runtimeState.is_stopped) {
+                                runtimeState.is_stopped = false;
+                                if (runtimeState.saved_state) {
+                                    console.log(`策略 ${body.policy_name} 从保存的状态继续: ${runtimeState.saved_state}，当前状态: ${runtimeState.current_state}`);
+                                }
+                                console.log(`策略 ${body.policy_name} 已启动，将从状态 ${runtimeState.current_state} 继续执行`);
+                            } else {
+                                console.log(`策略 ${body.policy_name} 启动操作（当前状态: ${runtimeState.current_state || '未初始化'}）`);
+                            }
+                        }
+                    }
+
                     if (action.is_constant) {
                         // 如果是常量表达式，直接解析
                         const numericValue = parseFloat(action.expression);
@@ -2568,6 +2687,9 @@ export default {
                         throw { err_msg: `方案文件 不存在，无法恢复（方案: ${schemeId}${farmName ? `, 农场: ${farmName}` : ''}）` };
                     }
 
+                    // 清空运行时状态，避免不同方案的运行标记残留
+                    policy_runtime_states.clear();
+
                     await cli_runtime_lib.restore_config(filename);
                     await new Promise(resolve => setTimeout(resolve, 500));
                     
@@ -2578,6 +2700,9 @@ export default {
                     if (farmName) {
                         current_farm_schemes.set(farmName, schemeId);
                     }
+                    
+                    // 重新初始化关键策略的运行时状态，确保从方案文件加载的策略定义正确生效
+                    await reinitializeKeyPoliciesRuntime();
                     
                     return { result: true };
                 } catch (error) {
@@ -2702,6 +2827,12 @@ async function processPolicyExecution(policy) {
         return;
     }
     let runtimeState = policy_runtime_states.get(policy.name);
+    
+    // 如果策略被标记为停止，跳过执行（断点续传）
+    if (runtimeState && runtimeState.is_stopped) {
+        return;
+    }
+
     if (!runtimeState) {
         // 确定初始状态：必须使用设置的初始状态
         let initialStateName;

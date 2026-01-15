@@ -344,10 +344,16 @@ const checkRunningStatus = async () => {
             
             // 获取下次启动时间
             const nextStartTime = variables['下次启动时间']
-            if (nextStartTime && nextStartTime !== '' && nextStartTime !== '""') {
-                // 格式化显示时间
-                const timeStr = nextStartTime.replace(/"/g, '')
-                const date = new Date(timeStr)
+            if (nextStartTime && nextStartTime !== '' && nextStartTime !== '""' && nextStartTime !== 0 && nextStartTime !== '0') {
+                // 处理时间戳（数字）或字符串格式
+                let date
+                if (typeof nextStartTime === 'number' || (typeof nextStartTime === 'string' && /^\d+$/.test(nextStartTime.replace(/"/g, '')))) {
+                    const timestamp = typeof nextStartTime === 'number' ? nextStartTime : parseInt(nextStartTime.replace(/"/g, ''))
+                    date = new Date(timestamp)
+                } else {
+                    const timeStr = nextStartTime.replace(/"/g, '')
+                    date = new Date(timeStr)
+                }
                 if (!isNaN(date.getTime())) {
                     nextRunTime.value = date.toLocaleString('zh-CN', {
                         year: 'numeric',
@@ -629,12 +635,18 @@ const setScheduledRun = async () => {
 
     scheduleLoading.value = true
     try {
+        // 将日期时间字符串转换为时间戳（数字）
+        const timestamp = new Date(scheduledTime.value).getTime()
+        if (isNaN(timestamp)) {
+            ElMessage.warning('时间格式错误')
+            return
+        }
         // 获取总策略名称
         const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
         await call_remote('/policy/runtime_assignment', {
             policy_name: totalPolicyName,
             variable_name: '下次启动时间',
-            expression: `"${scheduledTime.value}"`,
+            expression: String(timestamp), // 使用时间戳（数字字符串）
             is_constant: true
         })
         ElMessage.success(`已设置定时运行: ${scheduledTime.value}`)
