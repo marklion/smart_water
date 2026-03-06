@@ -1,4 +1,7 @@
 import ModbusRTU from "modbus-serial";
+
+const MODBUS_RESPONSE_TIMEOUT_MS = 3000;
+
 class AsyncLock {
     constructor() {
         this.queue = [];
@@ -37,6 +40,7 @@ class ModbusConnectionManager {
         if (!this.tcpPools.has(key)) {
             const client = new ModbusRTU();
             await client.connectTCP(ip, { port: port });
+            client.setTimeout(MODBUS_RESPONSE_TIMEOUT_MS);
             this.tcpPools.set(key, {
                 client: client,
                 lock: new AsyncLock(),
@@ -69,6 +73,7 @@ class ModbusConnectionManager {
                 xany: false,
                 bufferSize: 128,
              });
+            client.setTimeout(MODBUS_RESPONSE_TIMEOUT_MS);
             this.serialPools.set(key, {
                 client: client,
                 lock: new AsyncLock(),
