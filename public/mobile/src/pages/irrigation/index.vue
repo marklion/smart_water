@@ -49,7 +49,11 @@
                         <view class="control-buttons-row">
                             <view class="control-btn danger" @tap.stop="stopScheme" 
                                 :class="{ disabled: !selectedSchemeId, loading: stopSchemeLoading }">
-                                <fui-text :text="'停止'" :size="24" color="#fff"></fui-text>
+                                <fui-text :text="'暂停方案'" :size="24" color="#fff"></fui-text>
+                            </view>
+                            <view class="control-btn danger" @tap.stop="showEmergencyStopDialog"
+                                :class="{ disabled: !currentFarmName, loading: emergencyStopLoading }">
+                                <fui-text :text="'设备紧急停止'" :size="24" color="#fff"></fui-text>
                             </view>
                         </view>
                         <!-- 显示定时运行时间 -->
@@ -478,6 +482,31 @@
             </view>
         </fui-dialog>
 
+        <!-- 紧急停止对话框 -->
+        <fui-dialog :show="emergencyStopDialogVisible" title="紧急停止" :buttons="emergencyStopDialogButtons"
+            :maskClosable="true" @click="handleEmergencyStopDialogClick" @close="closeEmergencyStopDialog">
+            <view class="emergency-stop-content">
+                <view class="emergency-warning">
+                    <fui-text :text="'请选择需要执行急停的地块：'" :size="26" color="#f56c6c"></fui-text>
+                </view>
+                <view v-if="emergencyStopBlocksLoading" class="emergency-loading">
+                    <fui-text :text="'加载地块中...'" :size="26" color="#909399"></fui-text>
+                </view>
+                <view v-else-if="emergencyStopAvailableBlocks.length === 0" class="emergency-empty">
+                    <fui-text :text="'当前农场下暂无地块设备'" :size="26" color="#909399"></fui-text>
+                </view>
+                <view v-else class="emergency-block-list">
+                    <view v-for="block in emergencyStopAvailableBlocks" :key="block.id"
+                        class="emergency-block-item"
+                        :class="{ selected: isEmergencyStopBlockSelected(block.id) }"
+                        @click="toggleEmergencyStopBlock(block.id)">
+                        <fui-text :text="block.name" :size="28" :color="isEmergencyStopBlockSelected(block.id) ? '#409eff' : '#303133'"></fui-text>
+                        <text class="emergency-block-check">{{ isEmergencyStopBlockSelected(block.id) ? '✓' : '' }}</text>
+                    </view>
+                </view>
+            </view>
+        </fui-dialog>
+
         <!-- 策略配置查看对话框 -->
         <fui-dialog :show="showPolicyConfigDialog" :title="policyConfigTitle" :buttons="policyConfigButtons"
             :maskClosable="true" @click="handlePolicyConfigDialogClick" @close="closePolicyConfigDialog">
@@ -658,6 +687,17 @@ const scheduleDialogButtons = ref([
 const scheduleLoading = ref(false)
 const nextRunTime = ref('') // 方案下次运行时间
 let runningStatusTimer = null // 方案运行状态定时器
+
+// 紧急停止相关
+const emergencyStopDialogVisible = ref(false)
+const emergencyStopAvailableBlocks = ref([])
+const emergencyStopSelectedBlocks = ref([])
+const emergencyStopLoading = ref(false)
+const emergencyStopBlocksLoading = ref(false)
+const emergencyStopDialogButtons = ref([
+    { text: '取消', color: '#909399' },
+    { text: '执行急停', color: '#f56c6c' }
+])
 
 // 搅拌策略相关
 const mixingStartInterval = ref(60) // 启动间隔，默认60分钟
@@ -1803,6 +1843,99 @@ const stopScheme = async () => {
         uni.showToast({ title: error.err_msg || '停止方案失败', icon: 'none' })
     } finally {
         stopSchemeLoading.value = false
+    }
+}
+
+// 紧急停止：显示对话框并加载当前农场下地块列表
+const showEmergencyStopDialog = async () => {
+    if (!currentFarmName.value) {
+        uni.showToast({ title: '请先选择农场', icon: 'none' })
+        return
+    }
+    emergencyStopDialogVisible.value = true
+    emergencyStopSelectedBlocks.value = []
+    emergencyStopBlocksLoading.value = true
+    try {
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        let pageNo = 0
+        let hasMore = true
+        const blockSet = new Set()
+        while (hasMore) {
+            const result = await call_remote('/device_management/list_device', { pageNo, farm_name: currentFarmName.value }, token)
+            const devices = result?.devices || []
+            devices.forEach(d => {
+                const bn = d.block_name || d.blockName
+                if (bn) blockSet.add(bn)
+            })
+            hasMore = devices.length >= 20
+            pageNo++
+        }
+        emergencyStopAvailableBlocks.value = Array.from(blockSet).map(name => ({ id: name, name }))
+    } catch (error) {
+        console.error('加载地块列表失败', error)
+        uni.showToast({ title: '加载地块列表失败', icon: 'none' })
+        emergencyStopAvailableBlocks.value = []
+    } finally {
+        emergencyStopBlocksLoading.value = false
+    }
+}
+
+const toggleEmergencyStopBlock = (blockId) => {
+    const idx = emergencyStopSelectedBlocks.value.indexOf(blockId)
+    if (idx >= 0) {
+        emergencyStopSelectedBlocks.value = emergencyStopSelectedBlocks.value.filter(b => b !== blockId)
+    } else {
+        emergencyStopSelectedBlocks.value = [...emergencyStopSelectedBlocks.value, blockId]
+    }
+}
+
+const isEmergencyStopBlockSelected = (blockId) => emergencyStopSelectedBlocks.value.includes(blockId)
+
+const closeEmergencyStopDialog = () => {
+    emergencyStopDialogVisible.value = false
+    emergencyStopSelectedBlocks.value = []
+}
+
+const handleEmergencyStopDialogClick = (e) => {
+    if (e.index === 0) {
+        closeEmergencyStopDialog()
+    } else if (e.index === 1) {
+        executeEmergencyStop()
+    }
+}
+
+// 执行紧急停止：设备 + 策略（总策略/供水/施肥/轮灌组）恢复空闲
+const executeEmergencyStop = async () => {
+    if (emergencyStopSelectedBlocks.value.length === 0) {
+        uni.showToast({ title: '请选择至少一个地块', icon: 'none' })
+        return
+    }
+    emergencyStopLoading.value = true
+    try {
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        const response = await call_remote('/device_management/emergency_stop', {
+            farm_name: currentFarmName.value,
+            block_names: emergencyStopSelectedBlocks.value
+        }, token)
+        if (response.result) {
+            const stoppedCount = response.stopped_devices ? response.stopped_devices.length : 0
+            const failedCount = response.failed_devices ? response.failed_devices.length : 0
+            const resetPolicyCount = response.reset_policies ? response.reset_policies.length : 0
+            const policyErr = response.policy_reset_error
+            let msg = `急停成功，已停止 ${stoppedCount} 个设备`
+            if (resetPolicyCount > 0) msg += `，${resetPolicyCount} 个策略已恢复空闲`
+            if (policyErr) msg += `（策略恢复异常）`
+            uni.showToast({ title: msg, icon: failedCount > 0 || policyErr ? 'none' : 'success' })
+            closeEmergencyStopDialog()
+            await loadGroups()
+        } else {
+            uni.showToast({ title: '急停执行失败', icon: 'none' })
+        }
+    } catch (error) {
+        console.error('执行急停失败', error)
+        uni.showToast({ title: error.err_msg || '执行急停失败', icon: 'none' })
+    } finally {
+        emergencyStopLoading.value = false
     }
 }
 
@@ -3381,6 +3514,44 @@ onShow(async () => {
     font-size: 26rpx;
     background: #f8fafc;
     margin-bottom: 12rpx;
+}
+
+/* 紧急停止对话框 */
+.emergency-stop-content {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 20rpx 0;
+}
+.emergency-warning {
+    margin-bottom: 24rpx;
+}
+.emergency-loading,
+.emergency-empty {
+    padding: 40rpx 0;
+    text-align: center;
+}
+.emergency-block-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16rpx;
+}
+.emergency-block-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24rpx;
+    border-radius: 12rpx;
+    border: 1px solid #e4e7ed;
+    background: #fafafa;
+}
+.emergency-block-item.selected {
+    border-color: #409eff;
+    background: #ecf5ff;
+}
+.emergency-block-check {
+    font-size: 32rpx;
+    color: #409eff;
+    font-weight: 600;
 }
 
 /* 搅拌策略样式 */
