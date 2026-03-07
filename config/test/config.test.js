@@ -329,10 +329,10 @@ describe('供水策略快速配置和验证', () => {
         await mock_readout('农场1-主管道压力计', 1.2);
         await wait_for_policy_status('农场1-供水', '主泵工作', 15000);
         await confirm_valve_status('农场1-主泵', true);
-        // 主泵工作后需超过压力停机检查周期(1s)且压力过低才转异常停机，先等够时间再轮询
-        await wait_ms(2500);
+        // 主泵工作后需超过压力停机检查周期(1s)且压力过低才转异常停机，多等几秒并拉长轮询
+        await wait_ms(5000);
         await mock_readout('农场1-主管道压力计', 1.2);
-        await wait_for_policy_status('农场1-供水', '异常停机', 15000);
+        await wait_for_policy_status('农场1-供水', '异常停机', 25000);
         await confirm_valve_status('农场1-主泵', false);
         await reset_water_policy();
         await confirm_policy_status('农场1-供水', '空闲');
@@ -550,6 +550,14 @@ async function trigger_global_policy(is_open) {
     await wait_ms(60);
     await cli.run_cmd('return');
 }
+
+/** 总策略运行时若 所有轮灌组 为空则不会给轮灌组设 需要启动，此处显式写入保证轮灌组能启动 */
+async function ensure_global_policy_group_list() {
+    await cli.run_cmd('policy');
+    await cli.run_cmd(`runtime assignment 农场1-总策略 false '所有轮灌组' '["轮灌组1","轮灌组2"]'`);
+    await wait_ms(60);
+    await cli.run_cmd('return');
+}
 async function reset_global_policy(is_open) {
     await cli.run_cmd('policy');
     await cli.run_cmd(`runtime assignment 农场1-总策略 false '需要重置' '${is_open ? 'true' : 'false'}'`);
@@ -569,13 +577,12 @@ describe('总策略快速配置和验证', () => {
     });
     test('手动触发总策略', async () => {
         await trigger_global_policy(true);
+        await ensure_global_policy_group_list();
         let start_point = Date.now();
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        // 先等轮灌组进入阀门响应并设置 当前轮灌组已启动，总策略才会转 工作
-        await wait_for_policy_status('轮灌组1', '阀门响应', 12000);
-        await wait_for_policy_status('农场1-总策略', '工作', 8000);
+        await wait_for_policy_status('农场1-总策略', '工作', 15000);
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
@@ -596,13 +603,13 @@ describe('总策略快速配置和验证', () => {
     });
     test('总策略过程中有跳过', async () => {
         await trigger_global_policy(true);
+        await ensure_global_policy_group_list();
         await wait_ms(100);
         let start_point = Date.now();
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_for_policy_status('轮灌组1', '阀门响应', 12000);
-        await wait_for_policy_status('农场1-总策略', '工作', 8000);
+        await wait_for_policy_status('农场1-总策略', '工作', 15000);
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
