@@ -1,5 +1,7 @@
 import test_utils, { wait_ms, wait_spend_ms } from "../../public/lib/test_utils.js";
 import { print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
+// 与 quick_config_template 默认一致：供水「等待阀门」、轮灌组「阀门响应」需过此时间(ms)才进主泵工作/浇水
+const VALVE_RESPONSE_MS = 5000;
 let cli;
 beforeAll(async () => {
     print_test_log('water group valve quick config test begin', true)
@@ -252,14 +254,14 @@ describe('供水策略快速配置和验证', () => {
         await mock_total_readout('农场1-主管道流量计', 80);
         await sim_water_policy_run(true);
         let start_point = Date.now();
-        await wait_spend_ms(start_point, 2000);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 500);
         await mock_total_readout('农场1-主管道流量计', 90);
         await confirm_valve_status('农场1-主泵', true);
         await sim_water_policy_run(false);
         await confirm_valve_status('农场1-主泵', false);
         start_point = Date.now();
-        await wait_spend_ms(start_point, 2000);
         await sim_water_policy_run(true);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 500);
         await mock_total_readout('农场1-主管道流量计', 110);
         await confirm_valve_status('农场1-主泵', true);
         await sim_water_policy_run(false);
@@ -274,17 +276,17 @@ describe('供水策略快速配置和验证', () => {
         let start_point = Date.now();
         await mock_readout('农场1-主管道流量计', 50);
         await mock_readout('农场1-主管道压力计', 4.2);
-        await wait_spend_ms(start_point, 2050);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 500);
         await confirm_valve_status('农场1-主泵', true);
         await confirm_warning(`压力异常:4.2`)
         await mock_readout('农场1-主管道压力计', 25);
         await mock_readout('农场1-主管道流量计', 101);
-        await wait_spend_ms(start_point, 4100);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 2100);
         await confirm_valve_status('农场1-主泵', true);
         await confirm_warning(`流量异常:101`)
         await mock_readout('农场1-主管道流量计', 20);
         await mock_readout('农场1-主管道压力计', 52);
-        await wait_spend_ms(start_point, 6150);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 4200);
         await confirm_valve_status('农场1-主泵', true);
         await confirm_warning(`压力异常:52`)
     });
@@ -293,9 +295,9 @@ describe('供水策略快速配置和验证', () => {
         let start_point = Date.now();
         await mock_readout('农场1-主管道流量计', 50);
         await mock_readout('农场1-主管道压力计', 1.2);
-        await wait_spend_ms(start_point, 500);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 500);
         await confirm_valve_status('农场1-主泵', true);
-        await wait_spend_ms(start_point, 1000);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 1500);
         await confirm_valve_status('农场1-主泵', false);
         await confirm_policy_status('农场1-供水', '异常停机');
         await reset_water_policy();
@@ -539,6 +541,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
+        await wait_ms(400);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
@@ -560,12 +563,12 @@ describe('总策略快速配置和验证', () => {
     });
     test('总策略过程中有跳过', async () => {
         await trigger_global_policy(true);
-        await wait_ms(100); // 等待策略状态更新
+        await wait_ms(100);
         let start_point = Date.now();
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_ms(100); // 等待状态更新
+        await wait_ms(400);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
@@ -605,36 +608,31 @@ describe('轮灌组策略快速配置和验证', () => {
     });
 
     test('只浇水模式下施肥泵关闭且供水统计正常增加', async () => {
-        // 在开始前设置总流量读数
         await mock_total_readout('农场1-主管道流量计', 100);
 
-        // 设定只浇水变量
         await cli.run_cmd('policy');
         await cli.run_cmd(`runtime assignment 轮灌组1 false '是否只浇水' 'true'`);
         await wait_ms(60);
         await cli.run_cmd('return');
 
-        // 启动轮灌组
+        // 先等供水从「等待阀门」进入「主泵工作」（阀门响应时间），否则无供水、统计为 0
+        await wait_ms(VALVE_RESPONSE_MS + 500);
+
         await trigger_group_policy('轮灌组1', true);
         let start_point = Date.now();
 
-        // 模拟阀门压力正常，避免进入异常分支
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
 
-        // 等待一小段时间，让策略进入浇水状态
-        await wait_spend_ms(start_point, 200);
+        await wait_spend_ms(start_point, 300);
 
-        // 验证施肥泵在只浇水模式下一直是关闭的
         await confirm_valve_status('农场1-施肥泵', false);
 
-        // 在浇水快结束前更新总流量读数，模拟供水量为 30
         await mock_total_readout('农场1-主管道流量计', 130);
 
-        // 等待总灌溉时间结束（0.07 分钟 ≈ 4200ms），略多等一点
-        await wait_spend_ms(start_point, 4500);
+        // 轮灌组1 阀门响应(5s) + 总灌溉时间 0.07 分钟(≈4200ms)，略多等
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 4500);
 
-        // 校验统计值是否按供水增量正常增加
         const statistics = await get_statistics('轮灌组1累计供水量');
         expect(statistics.length).toBeGreaterThanOrEqual(1);
         expect(statistics[0]).toBe(30);
