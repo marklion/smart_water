@@ -576,8 +576,8 @@ describe('总策略快速配置和验证', () => {
         await begin_policy_run();
     });
     test('手动触发总策略', async () => {
-        await trigger_global_policy(true);
         await ensure_global_policy_group_list();
+        await trigger_global_policy(true);
         let start_point = Date.now();
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
@@ -602,8 +602,8 @@ describe('总策略快速配置和验证', () => {
         await confirm_valve_status('轮灌阀门3', false);
     });
     test('总策略过程中有跳过', async () => {
-        await trigger_global_policy(true);
         await ensure_global_policy_group_list();
+        await trigger_global_policy(true);
         await wait_ms(100);
         let start_point = Date.now();
         await mock_readout('轮灌阀门1', 5);
