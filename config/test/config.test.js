@@ -1,8 +1,6 @@
 import test_utils, { wait_ms, wait_spend_ms } from "../../public/lib/test_utils.js";
 import { print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
 let cli;
-// 与 quick_config_template 中默认值一致，总策略/轮灌组从「准备」到「工作」需等待阀门响应时间
-const VALVE_RESPONSE_MS = 5000;
 beforeAll(async () => {
     print_test_log('water group valve quick config test begin', true)
     cli = await test_utils('npm run dev_cli');
@@ -541,12 +539,11 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 600);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 4650 + VALVE_RESPONSE_MS + 200);
+        await wait_spend_ms(start_point, 4650);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
@@ -568,16 +565,15 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 600);
+        await wait_ms(100); // 等待状态更新
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 1650);
+        await wait_spend_ms(start_point, 1650);
         await mock_readout('轮灌阀门2', 2);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 3750);
+        await wait_spend_ms(start_point, 3750);
         await mock_readout('轮灌阀门3', 5);
-        await wait_ms(VALVE_RESPONSE_MS + 200);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
@@ -626,17 +622,17 @@ describe('轮灌组策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
 
-        // 等待阀门响应时间后才会从「阀门响应」进入「浇水」
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 200);
+        // 等待一小段时间，让策略进入浇水状态
+        await wait_spend_ms(start_point, 200);
 
         // 验证施肥泵在只浇水模式下一直是关闭的
         await confirm_valve_status('农场1-施肥泵', false);
 
-        // 在浇水阶段内更新总流量读数，模拟供水量增量为 30
+        // 在浇水快结束前更新总流量读数，模拟供水量为 30
         await mock_total_readout('农场1-主管道流量计', 130);
 
-        // 等待总灌溉时间结束（0.07 分钟 ≈ 4200ms）并进入收尾写入统计，略多等一点
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 4500);
+        // 等待总灌溉时间结束（0.07 分钟 ≈ 4200ms），略多等一点
+        await wait_spend_ms(start_point, 4500);
 
         // 校验统计值是否按供水增量正常增加
         const statistics = await get_statistics('轮灌组1累计供水量');
