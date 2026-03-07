@@ -134,7 +134,12 @@ export default {
         if (!vorpal) {
             vorpal = get_vorpal();
         }
-        return await cli_utils.do_config(vorpal, command, care_error);
+        let next = await cli_utils.do_config(vorpal, command, care_error);
+        // 只有返回值是 Vorpal 实例（有 pipe 方法）时才作为下一级 prompt，否则命令返回的是字符串/数字等
+        if (next != null && next !== vorpal && typeof next.pipe === 'function') {
+            return next;
+        }
+        return vorpal;
     },
     do_config_batch: async function (commands, care_error = false) {
         await this.save_config('tmp_config_for_restore.txt');
@@ -142,7 +147,7 @@ export default {
         try {
             let lines = commands.split('\n').filter(line => line.trim() !== '');
             for (let line of lines) {
-                vorpal = await this.do_config(vorpal, line, care_error);
+                vorpal = await this.do_config(vorpal, line.trim(), care_error);
             }
         }
         catch (err) {
