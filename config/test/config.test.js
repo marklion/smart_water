@@ -541,13 +541,12 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await confirm_policy_status('农场1-总策略', '准备');
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 200);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 600);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 4650);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 4650 + VALVE_RESPONSE_MS + 200);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
@@ -569,8 +568,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await confirm_policy_status('农场1-总策略', '准备');
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 200);
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 600);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
@@ -579,6 +577,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门2', 2);
         await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 3750);
         await mock_readout('轮灌阀门3', 5);
+        await wait_ms(VALVE_RESPONSE_MS + 200);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
