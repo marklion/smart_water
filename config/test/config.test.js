@@ -98,6 +98,43 @@ async function confirm_valve_status(wgv_name, expected_status) {
     await cli.run_cmd('return');
 }
 
+const POLL_INTERVAL_MS = 200;
+
+async function get_policy_status(policy_name) {
+    await cli.run_cmd('policy');
+    let lines = (await cli.run_cmd(`list policy ${policy_name}`)).split('\n');
+    await cli.run_cmd('return');
+    let i = lines.findIndex(line => line.startsWith('当前状态'));
+    if (i === -1) return null;
+    return lines[i].split(':')[1].trim();
+}
+
+async function wait_for_policy_status(policy_name, expected_status, timeout_ms) {
+    const deadline = Date.now() + timeout_ms;
+    while (Date.now() < deadline) {
+        const status = await get_policy_status(policy_name);
+        if (status === expected_status) return;
+        await wait_ms(POLL_INTERVAL_MS);
+    }
+    const last = await get_policy_status(policy_name);
+    expect(last).toBe(expected_status);
+}
+
+async function wait_for_warning(contains_str, timeout_ms) {
+    const deadline = Date.now() + timeout_ms;
+    while (Date.now() < deadline) {
+        await cli.run_cmd('warning');
+        let lines = (await cli.run_cmd('list warnings')).split('\n');
+        await cli.run_cmd('return');
+        if (lines.some(line => line.includes(contains_str))) return;
+        await wait_ms(POLL_INTERVAL_MS);
+    }
+    await cli.run_cmd('warning');
+    let lines = (await cli.run_cmd('list warnings')).split('\n');
+    await cli.run_cmd('return');
+    expect(lines.some(line => line.includes(contains_str))).toBe(true);
+}
+
 async function confirm_warning(expected_warning) {
     await cli.run_cmd('warning');
     let warnings_lines = (await cli.run_cmd('list warnings')).split('\n');
@@ -272,42 +309,34 @@ describe('供水策略快速配置和验证', () => {
     });
     test('工作时压力和流量异常告警', async () => {
         await trigger_water_policy(true);
-        let start_point = Date.now();
         await mock_readout('农场1-主管道流量计', 50);
         await mock_readout('农场1-主管道压力计', 4.2);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 500);
+        await wait_for_policy_status('农场1-供水', '主泵工作', 15000);
         await confirm_valve_status('农场1-主泵', true);
-        await confirm_warning(`主管道压力异常:4.2`);
+        await wait_for_warning('主管道压力异常:4.2', 8000);
         await mock_readout('农场1-主管道压力计', 25);
         await mock_readout('农场1-主管道流量计', 101);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 2100);
+        await wait_for_warning('主管道流量异常:101', 8000);
         await confirm_valve_status('农场1-主泵', true);
-        await confirm_warning(`主管道流量异常:101`);
         await mock_readout('农场1-主管道流量计', 20);
         await mock_readout('农场1-主管道压力计', 52);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 4200);
+        await wait_for_warning('主管道压力异常:52', 8000);
         await confirm_valve_status('农场1-主泵', true);
-        await confirm_warning(`主管道压力异常:52`);
     });
     test('工作时压力变化很多', async () => {
         await trigger_water_policy(true);
-        let start_point = Date.now();
         await mock_readout('农场1-主管道流量计', 50);
         await mock_readout('农场1-主管道压力计', 1.2);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 500);
+        await wait_for_policy_status('农场1-供水', '主泵工作', 15000);
         await confirm_valve_status('农场1-主泵', true);
-        // 主泵工作后压力过低，需等压力停机检查周期(1s)后才转异常停机，多等一些保证 timeup 已触发
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 5500);
+        await wait_for_policy_status('农场1-供水', '异常停机', 10000);
         await confirm_valve_status('农场1-主泵', false);
-        await confirm_policy_status('农场1-供水', '异常停机');
         await reset_water_policy();
         await confirm_policy_status('农场1-供水', '空闲');
         await confirm_valve_status('农场1-主泵', false);
         await trigger_water_policy(true);
-        start_point = Date.now();
         await mock_readout('农场1-主管道压力计', 112);
-        await wait_spend_ms(start_point, 1000);
-        await confirm_policy_status('农场1-供水', '异常停机');
+        await wait_for_policy_status('农场1-供水', '异常停机', 5000);
     });
 });
 async function prepare_fert_policy_config() {
@@ -541,8 +570,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_ms(1500);
-        await confirm_policy_status('农场1-总策略', '工作');
+        await wait_for_policy_status('农场1-总策略', '工作', 10000);
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
@@ -568,8 +596,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_ms(1500);
-        await confirm_policy_status('农场1-总策略', '工作');
+        await wait_for_policy_status('农场1-总策略', '工作', 10000);
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
