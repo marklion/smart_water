@@ -23,9 +23,8 @@ let default_config_file = 'sw_cli_config.txt';
 const policy_array = []
 // 判断是否有正在运行的轮灌组（用于阻止切换/覆盖）
 function getRunningWateringGroups() {
-    // 轮灌组状态基于策略定义：空闲/浇水/肥前/施肥/肥后/收尾
     const waitingStates = new Set(['空闲'])
-    const runningStates = new Set(['浇水', '肥前', '施肥', '肥后', '收尾'])
+    const runningStates = new Set(['阀门响应', '浇水', '肥前', '施肥', '肥后', '收尾'])
 
     const running = []
     for (const policy of policy_array) {
@@ -2053,6 +2052,19 @@ export default {
                     }
                 };
 
+                // 从供水策略读取阀门响应时间(ms)，使向导下发的轮灌组与供水/总策略一致，避免“响应时间不对”
+                let valveResponseMs = 5000;
+                try {
+                    const waterPolicy = await policy_lib.find_policy(`${body.farm_name}-供水`, token);
+                    const valveVar = waterPolicy?.init_variables?.find(v => v && v.variable_name === '阀门响应时间');
+                    if (valveVar && valveVar.expression != null && valveVar.expression !== '') {
+                        const v = parseInt(valveVar.expression, 10);
+                        if (!isNaN(v) && v > 0) valveResponseMs = v;
+                    }
+                } catch (e) {
+                    console.warn('读取供水策略阀门响应时间失败，使用默认5000ms:', e?.err_msg || e);
+                }
+
                 // 只做轮灌组创建/更新，不在这里初始化总/供水/施肥，避免重复
                 const createGroupPolicy = async (groupConfig) => {
                     // 先校验配置
@@ -2064,6 +2076,7 @@ export default {
                         farm_name: body.farm_name,
                         wgv_array: groupConfig.valves.map(v => ({ name: v })),
                         area: groupConfig.area,
+                        valve_response_ms: valveResponseMs,
                     };
 
                     switch (groupConfig.method) {
@@ -2136,6 +2149,17 @@ export default {
                     }
                 }
                 
+                // 同步总策略的「所有轮灌组」为当前向导的组列表，避免只显示部分组（如配置/加载顺序导致只写入 2 个）
+                const totalPolicyName = `${body.farm_name}-总策略`;
+                const groupNames = body.groups.map(g => g.name);
+                const allGroupsExpression = '["' + groupNames.join('","') + '"]';
+                try {
+                    await policy_lib.init_assignment(totalPolicyName, '所有轮灌组', allGroupsExpression, false, token);
+                    await policy_lib.runtime_assignment(totalPolicyName, '所有轮灌组', allGroupsExpression, false, token);
+                } catch (syncErr) {
+                    console.warn('同步总策略所有轮灌组失败:', syncErr?.err_msg || syncErr);
+                }
+
                 // 如果指定了方案名称，保存配置文件
                 if (body.scheme_name) {
                     try {

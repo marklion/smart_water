@@ -285,6 +285,8 @@ const tableRowClassName = ({ row }) => {
     // 根据固定状态返回对应的CSS类名
     if (status === '空闲') {
         return 'status-idle'
+    } else if (status === '阀门响应') {
+        return 'status-valve-response'
     } else if (status === '浇水') {
         return 'status-watering'
     } else if (status === '肥前') {
@@ -309,6 +311,8 @@ const getStatusTagType = (status) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'info'      // 灰色
+        case '阀门响应':
+            return 'success'   // 绿色（与空闲区分，表示等待阀门）
         case '浇水':
             return 'primary'   // 蓝色
         case '肥前':
@@ -478,7 +482,21 @@ onMounted(() => {
     transform: translateY(-0.5px);
 }
 
-/* 2. 浇水状态 - 蓝色/青色渐变（水相关，科技感） */
+/* 2. 阀门响应状态 - 绿色渐变（与空闲灰色明显区分，等待阀门期间主泵不启动） */
+:deep(.status-valve-response) {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+    color: #ffffff !important;
+    transition: all 0.3s ease;
+    border-left: 4px solid #15803d;
+}
+
+:deep(.status-valve-response:hover) {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%) !important;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+    transform: translateY(-1px);
+}
+
+/* 3. 浇水状态 - 蓝色/青色渐变（水相关，科技感） */
 :deep(.status-watering) {
     background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
     color: #ffffff !important;
@@ -492,7 +510,7 @@ onMounted(() => {
     transform: translateY(-1px);
 }
 
-/* 3. 肥前状态 - 黄色/橙色渐变（准备阶段，科技感） */
+/* 4. 肥前状态 - 黄色/橙色渐变（准备阶段，科技感） */
 :deep(.status-pre-fert) {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
     color: #ffffff !important;
@@ -506,7 +524,7 @@ onMounted(() => {
     transform: translateY(-1px);
 }
 
-/* 4. 施肥状态 - 紫色/粉紫色渐变（施肥阶段，科技感） */
+/* 5. 施肥状态 - 紫色/粉紫色渐变（施肥阶段，科技感） */
 :deep(.status-fertilizing) {
     background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%) !important;
     color: #ffffff !important;
@@ -520,7 +538,7 @@ onMounted(() => {
     transform: translateY(-1px);
 }
 
-/* 5. 肥后状态 - 绿色渐变（冲洗阶段，科技感） */
+/* 6. 肥后状态 - 绿色渐变（冲洗阶段，科技感） */
 :deep(.status-post-fert) {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
     color: #ffffff !important;
@@ -534,7 +552,7 @@ onMounted(() => {
     transform: translateY(-1px);
 }
 
-/* 6. 收尾状态 - 深绿色/青色渐变（完成状态，科技感） */
+/* 7. 收尾状态 - 深绿色/青色渐变（完成状态，科技感） */
 :deep(.status-finishing) {
     background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important;
     color: #ffffff !important;
@@ -550,6 +568,7 @@ onMounted(() => {
 
 /* 确保文字在深色背景上清晰可见 */
 :deep(.status-watering td),
+:deep(.status-valve-response td),
 :deep(.status-pre-fert td),
 :deep(.status-fertilizing td),
 :deep(.status-post-fert td),

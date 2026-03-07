@@ -833,6 +833,8 @@ const statusClass = (state) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'info'
+        case '阀门响应':
+            return 'valve-response'
         case '浇水':
             return 'primary'
         case '肥前':
@@ -854,6 +856,8 @@ const getCardStatusClass = (state) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'status-idle'
+        case '阀门响应':
+            return 'status-valve-response'
         case '浇水':
             return 'status-watering'
         case '肥前':
@@ -2619,6 +2623,12 @@ onShow(async () => {
     color: #ffffff;
 }
 
+.group-card.status-valve-response {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    border-left: 4px solid #15803d;
+    color: #ffffff;
+}
+
 .group-card.status-watering {
     background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
     border-left: 4px solid #0e7490;
@@ -2650,6 +2660,7 @@ onShow(async () => {
 }
 
 .group-card.status-idle,
+.group-card.status-valve-response,
 .group-card.status-watering,
 .group-card.status-pre-fert,
 .group-card.status-fertilizing,
@@ -2659,6 +2670,7 @@ onShow(async () => {
 }
 
 .group-card.status-idle .meta-label,
+.group-card.status-valve-response .meta-label,
 .group-card.status-watering .meta-label,
 .group-card.status-pre-fert .meta-label,
 .group-card.status-fertilizing .meta-label,
@@ -2708,27 +2720,31 @@ onShow(async () => {
 .group-state {
     padding: 8rpx 16rpx;
     border-radius: 999rpx;
-    background: #909399; /* 默认灰色（空闲） */
+    background: #94a3b8; /* 默认与 PC 空闲一致 */
 }
 
 .group-state.info {
-    background: #909399; /* 灰色 - 空闲 */
+    background: #94a3b8; /* 灰色 - 空闲（与 PC 一致） */
+}
+
+.group-state.valve-response {
+    background: #22c55e; /* 绿色 - 阀门响应（与 PC 一致） */
 }
 
 .group-state.primary {
-    background: #409eff; /* 蓝色 - 浇水 */
+    background: #06b6d4; /* 蓝色/青 - 浇水（与 PC 一致） */
 }
 
 .group-state.warning {
-    background: #e6a23c; /* 橙色 - 肥前 */
+    background: #f59e0b; /* 橙色 - 肥前（与 PC 一致） */
 }
 
 .group-state.purple {
-    background: #a855f7; /* 紫色 - 施肥 */
+    background: #a855f7; /* 紫色 - 施肥（与 PC 一致） */
 }
 
 .group-state.success {
-    background: #67c23a; /* 绿色 - 肥后、收尾 */
+    background: #10b981; /* 绿色 - 肥后、收尾（与 PC 一致） */
 }
 
 .group-meta {

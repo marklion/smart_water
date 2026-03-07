@@ -350,6 +350,7 @@ export default {
                 pressure_shutdown_high_limit: { type: Number, mean: '压力停机上限', example: 80, have_to: true },
                 flow_check_interval: { type: Number, mean: '流量检查间隔(秒)', example: 10, have_to: true },
                 pressure_shutdown_check_interval: { type: Number, mean: '压力停机检查间隔(秒)', example: 10, have_to: true },
+                valve_response_ms: { type: Number, mean: '阀门响应时间：填毫秒(如5000)或1-120整数按秒(如15=15秒)，该时间内只开阀、阀门完毕后才启动主泵', example: 15000, have_to: false },
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -375,6 +376,35 @@ export default {
                 await policy_lib.add_quick_action(policy_name, '启动', 'prs.variables.set("需要启动", true)', false, token);
                 await policy_lib.add_quick_action(policy_name, '停止', 'prs.variables.set("需要启动", false)', false, token);
                 await policy_lib.add_quick_action(policy_name, '重置', 'prs.variables.set("需要重置", true)', false, token);
+                // 阀门响应时间：若为 1–120 的整数则按秒换算为毫秒
+                let valve_ms = body.valve_response_ms != null ? body.valve_response_ms : 5000;
+                if (typeof valve_ms === 'number' && valve_ms >= 1 && valve_ms <= 120 && valve_ms === Math.floor(valve_ms)) {
+                    valve_ms = valve_ms * 1000;
+                }
+                // 将供水策略的阀门响应时间同步到总策略，使“先开阀再供水”的延迟生效
+                let total_policy_name = `${body.farm_name}-总策略`;
+                try {
+                    let total_found = await policy_lib.find_policy(total_policy_name, token);
+                    if (total_found) {
+                        await policy_lib.init_assignment(total_policy_name, '阀门响应时间', String(valve_ms), true, token);
+                        await policy_lib.runtime_assignment(total_policy_name, '阀门响应时间', String(valve_ms), true, token);
+                        let allGroupsVar = total_found.init_variables && total_found.init_variables.find(v => v && v.variable_name === '所有轮灌组');
+                        if (allGroupsVar && allGroupsVar.expression && allGroupsVar.expression.length > 2) {
+                            let groupNames = allGroupsVar.expression.replace(/^\[|\]$/g, '').split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+                            for (let groupName of groupNames) {
+                                if (!groupName) continue;
+                                try {
+                                    await policy_lib.init_assignment(groupName, '阀门响应时间', String(valve_ms), true, token);
+                                    await policy_lib.runtime_assignment(groupName, '阀门响应时间', String(valve_ms), true, token);
+                                } catch (e) {
+                                    console.warn('同步轮灌组阀门响应时间失败:', groupName, e?.err_msg || e);
+                                }
+                            }
+                        }
+                    }
+                } catch (syncErr) {
+                    console.warn('同步总策略阀门响应时间失败(不影响供水策略):', syncErr?.err_msg || syncErr);
+                }
                 return { result: true };
             },
         },
@@ -479,11 +509,16 @@ export default {
                 pre_fert_time: { type: Number, mean: '肥前时间(分钟)', example: 10, have_to: false },
                 fert_time: { type: Number, mean: '施肥时间(分钟)', example: 30, have_to: false },
                 post_fert_time: { type: Number, mean: '肥后时间(分钟)', example: 10, have_to: false },
+                valve_response_ms: { type: Number, mean: '阀门响应时间(毫秒)，若填1–120且未写“毫秒”则按秒换算', example: 5000, have_to: false },
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
             },
             func: async function (body, token) {
+                // 阀门响应时间：若为 1–120 的整数则按秒换算为毫秒，避免界面填“10秒”只生效 10ms
+                if (body.valve_response_ms != null && typeof body.valve_response_ms === 'number' && body.valve_response_ms >= 1 && body.valve_response_ms <= 120 && body.valve_response_ms === Math.floor(body.valve_response_ms)) {
+                    body.valve_response_ms = body.valve_response_ms * 1000;
+                }
                 console.log(`[config_module] add_group_policy 函数开始执行，接收到的body:`, JSON.stringify(body, null, 2));
                 console.log(`[config_module] add_group_policy body中是否有total_fert:`, 'total_fert' in body, body.total_fert);
                 
@@ -582,6 +617,7 @@ export default {
             params: {
                 start_hour: { type: Number, mean: '开始小时', example: 6, have_to: true },
                 farm_name: { type: String, mean: '农场名称', example: '农场1', have_to: true },
+                valve_response_ms: { type: Number, mean: '阀门响应时间(毫秒)，该时间内不启动主泵', example: 5000, have_to: false },
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true },
