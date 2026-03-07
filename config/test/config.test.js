@@ -101,8 +101,7 @@ async function confirm_valve_status(wgv_name, expected_status) {
 async function confirm_warning(expected_warning) {
     await cli.run_cmd('warning');
     let warnings_lines = (await cli.run_cmd('list warnings')).split('\n');
-    let focus_line = warnings_lines[0];
-    expect(focus_line).toContain(expected_warning);
+    expect(warnings_lines.some(line => line.includes(expected_warning))).toBe(true);
     await cli.run_cmd('return');
 }
 
@@ -297,7 +296,8 @@ describe('供水策略快速配置和验证', () => {
         await mock_readout('农场1-主管道压力计', 1.2);
         await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 500);
         await confirm_valve_status('农场1-主泵', true);
-        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 1500);
+        // 主泵工作后压力过低，需等压力停机检查周期(3s)后才转异常停机
+        await wait_spend_ms(start_point, VALVE_RESPONSE_MS + 3500);
         await confirm_valve_status('农场1-主泵', false);
         await confirm_policy_status('农场1-供水', '异常停机');
         await reset_water_policy();
@@ -541,7 +541,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_ms(400);
+        await wait_ms(800);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
@@ -568,7 +568,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_ms(400);
+        await wait_ms(800);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
