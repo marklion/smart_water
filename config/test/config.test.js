@@ -411,6 +411,16 @@ describe('施肥策略快速配置和验证', () => {
     });
 });
 
+/** 设置总策略与轮灌组的阀门响应时间(毫秒)，测试中设为 0 可避免默认 5 秒延迟 */
+async function set_valve_response_ms(ms) {
+    await cli.run_cmd('policy');
+    await cli.run_cmd(`runtime assignment 农场1-总策略 false '阀门响应时间' '${ms}'`);
+    await cli.run_cmd(`runtime assignment 轮灌组1 false '阀门响应时间' '${ms}'`);
+    await cli.run_cmd(`runtime assignment 轮灌组2 false '阀门响应时间' '${ms}'`);
+    await wait_ms(60);
+    await cli.run_cmd('return');
+}
+
 async function prepare_group_policy_config() {
     await prepare_resource_config();
     await prepare_fert_policy_config();
@@ -421,6 +431,7 @@ async function prepare_group_policy_config() {
     await cli.run_cmd(`add group policy 轮灌组1 农场1 0.07 0.02 定时 0.03 20 20 轮灌阀门1 轮灌阀门2`);
     await cli.run_cmd(`add group policy 轮灌组2 农场1 0.07 0.02 定量 0 20 1 轮灌阀门3`);
     await cli.run_cmd('return');
+    await set_valve_response_ms(0);
     await reset_statistics();
 }
 
@@ -532,6 +543,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('农场1-施肥流量计', 666.66);
         await mock_readout('农场1-施肥液位计', 50);
         await begin_policy_run();
+        await wait_ms(150); // 等待至少一次策略扫描，确保总策略等运行时状态已创建
     });
     test('手动触发总策略', async () => {
         await trigger_global_policy(true);
@@ -539,6 +551,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
+        await wait_spend_ms(start_point, 250);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
@@ -565,7 +578,7 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
-        await wait_ms(100); // 等待状态更新
+        await wait_spend_ms(start_point, 250); // 等待阀门响应时间(测试中为0)及状态更新
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
@@ -596,6 +609,7 @@ describe('轮灌组策略快速配置和验证', () => {
         await prepare_group_policy_config();
         await cli.run_cmd('save sample.txt');
         await begin_policy_run();
+        await wait_ms(150); // 等待策略扫描创建运行时
         await sim_water_policy_run(true);
         await mock_readout('农场1-施肥流量计', 666.66);
         await mock_readout('农场1-施肥液位计', 50);
@@ -605,7 +619,7 @@ describe('轮灌组策略快速配置和验证', () => {
     });
 
     test('只浇水模式下施肥泵关闭且供水统计正常增加', async () => {
-        // 在开始前设置总流量读数
+        // 在开始前设置总流量读数（轮灌组 空闲→阀门响应 时会把此值记作 主管道流量累计值）
         await mock_total_readout('农场1-主管道流量计', 100);
 
         // 设定只浇水变量
@@ -614,7 +628,7 @@ describe('轮灌组策略快速配置和验证', () => {
         await wait_ms(60);
         await cli.run_cmd('return');
 
-        // 启动轮灌组
+        // 启动轮灌组（prepare 已设阀门响应时间 0，会很快进入浇水）
         await trigger_group_policy('轮灌组1', true);
         let start_point = Date.now();
 
@@ -622,17 +636,17 @@ describe('轮灌组策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
 
-        // 等待一小段时间，让策略进入浇水状态
-        await wait_spend_ms(start_point, 200);
+        // 等待进入浇水并运行若干 do（当前浇水量 = 供水流量累计读数 - 主管道流量累计值）
+        await wait_spend_ms(start_point, 400);
 
         // 验证施肥泵在只浇水模式下一直是关闭的
         await confirm_valve_status('农场1-施肥泵', false);
 
-        // 在浇水快结束前更新总流量读数，模拟供水量为 30
+        // 更新总流量读数，模拟供水量增量为 30
         await mock_total_readout('农场1-主管道流量计', 130);
 
-        // 等待总灌溉时间结束（0.07 分钟 ≈ 4200ms），略多等一点
-        await wait_spend_ms(start_point, 4500);
+        // 等待总灌溉时间结束（0.07 分钟 ≈ 4200ms），进入收尾并写入 轮灌组1累计供水量
+        await wait_spend_ms(start_point, 5000);
 
         // 校验统计值是否按供水增量正常增加
         const statistics = await get_statistics('轮灌组1累计供水量');
