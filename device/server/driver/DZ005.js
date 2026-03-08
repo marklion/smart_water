@@ -118,7 +118,7 @@ export default async function (config_string) {
                 // 只使用设备基础信息中的在线状态字段
                 if (basic_info.list.length == 1) {
                     let device_detail = basic_info.list[0].detail || {};
-                    bv = device_detail.batteryVoltage || 0;
+                    bv = device_detail.batteryVoltage ?? device_detail.battery_voltage ?? 0;
                     
                     // 检查设备基础信息中是否有在线状态字段
                     if (device_detail.online !== undefined) {
@@ -253,7 +253,10 @@ export default async function (config_string) {
             return device_base_info.online || false;
         },
         battery_voltage: async function () {
-            return device_base_info.batteryVoltage || 0;
+            if (device_base_info.last_update_time === 0) {
+                await this.refresh_info();
+            }
+            return device_base_info.batteryVoltage ?? 0;
         },
         destroy: async function () {
         },
