@@ -549,10 +549,18 @@ describe('总策略快速配置和验证', () => {
         await begin_policy_run();
     });
     test('手动触发总策略', async () => {
-        // 1. 开启总策略：总策略→准备→给轮灌组1、供水 需要启动，供水→等待阀门，轮灌组1→阀门响应
+        // 模版流程：点运行 → 总策略 空闲→准备(给轮灌组1、供水 需要启动) → 供水 空闲→等待阀门 → 轮灌组1 空闲→阀门响应(开阀、上报当前轮灌组已启动) → 总策略 准备→工作
         await trigger_global_policy(true);
         let start_point = Date.now();
+        await wait_ms(200);
         await confirm_policy_status('农场1-供水', '等待阀门');
+        await cli.run_cmd('policy');
+        let totalLines = (await cli.run_cmd('list policy 农场1-总策略')).split('\n');
+        let totalIdx = totalLines.findIndex(l => l.startsWith('当前状态'));
+        let totalState = totalIdx >= 0 ? totalLines[totalIdx].split(':')[1].trim() : '';
+        expect(['准备', '工作']).toContain(totalState);
+        await cli.run_cmd('return');
+        // 模版：等待阀门 等 阀门反应时间 后 → 主泵工作；轮灌组 阀门响应 等 阀门反应时间 后 → 肥前。先 mock 阀门读数再等
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
@@ -560,22 +568,22 @@ describe('总策略快速配置和验证', () => {
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('农场1-供水', '主泵工作');
         await cli.run_cmd('policy');
-        let lines = (await cli.run_cmd('list policy 轮灌组1')).split('\n');
-        let idx = lines.findIndex(l => l.startsWith('当前状态'));
-        let group1_state = idx >= 0 ? lines[idx].split(':')[1].trim() : '';
-        expect(['肥前', '施肥', '肥后']).toContain(group1_state);
+        let g1Lines = (await cli.run_cmd('list policy 轮灌组1')).split('\n');
+        let g1Idx = g1Lines.findIndex(l => l.startsWith('当前状态'));
+        let g1State = g1Idx >= 0 ? g1Lines[g1Idx].split(':')[1].trim() : '';
+        expect(['肥前', '施肥', '肥后']).toContain(g1State);
         await cli.run_cmd('return');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
         await confirm_valve_status('农场1-主泵', true);
-        // 2. 等轮灌组1 收尾、轮灌组2 启动（阀门反应5s + 肥前0 + 施肥约2s + 肥后约1s 后轮灌组2 开阀3）
+        // 模版：轮灌组1 收尾后 总策略 准备→下一组 轮灌组2；轮灌组2 阀门响应 开阀3
         await wait_spend_ms(start_point, 9500);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门3', true);
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门2', false);
-        // 3. 关总策略：总策略→空闲，供水与当前轮灌组收 需要启动 false，轮灌组收尾关阀后→空闲
+        // 模版：点停止 → 总策略 工作→空闲(给供水、当前轮灌组 需要启动 false) → 当前轮灌组 收尾关阀→空闲
         await trigger_global_policy(false);
         await wait_ms(1800);
         await confirm_policy_status('农场1-总策略', '空闲');
@@ -584,7 +592,7 @@ describe('总策略快速配置和验证', () => {
         await confirm_valve_status('轮灌阀门3', false);
     });
     test('总策略过程中有跳过', async () => {
-        // 1. 开启总策略，等阀门反应后轮灌组1 运行（阀1、2 开，阀3 关）
+        // 模版：启动总策略 → 轮灌组1 运行(阀1、2开) → 轮灌组1 收尾、轮灌组2 启动(阀3开) → 停止 → 全停
         await trigger_global_policy(true);
         let start_point = Date.now();
         await mock_readout('轮灌阀门1', 5);
@@ -595,7 +603,6 @@ describe('总策略快速配置和验证', () => {
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
-        // 2. 等轮灌组1 收尾、轮灌组2 启动（阀3 开，阀1、2 关）
         await wait_spend_ms(start_point, VALVE_WAIT_MS + 1650);
         await mock_readout('轮灌阀门2', 2);
         await wait_spend_ms(start_point, VALVE_WAIT_MS + 3750);
@@ -605,7 +612,6 @@ describe('总策略快速配置和验证', () => {
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门3', true);
         await mock_readout('轮灌阀门1', 2);
-        // 3. 关总策略，当前轮灌组(轮灌组2)收尾关阀后总策略空闲
         await trigger_global_policy(false);
         await wait_ms(1800);
         await confirm_policy_status('农场1-总策略', '空闲');
