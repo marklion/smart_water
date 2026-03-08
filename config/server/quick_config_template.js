@@ -56,6 +56,7 @@ policy
     init assignment 'false' '压力停机检查周期' '${params.pressure_shutdown_check_interval * 1000}'
     init assignment 'false' '需要启动' 'false'
     init assignment 'false' '需要重置' 'false'
+    init assignment 'false' '是否由总策略启动' 'false'
     init assignment 'false' '主管道累计流量' '0'
     init assignment 'false' '主管道累计流量增量' '0'
     init assignment 'false' '阀门反应时间' '${(params.valve_wait_time_ms != null ? params.valve_wait_time_ms : 5000)}'
@@ -65,9 +66,11 @@ policy
     state '空闲'
       enter action '${params.farm_name}-主泵' 'close'
       enter assignment 'false' '需要重置' 'false'
+      enter assignment 'false' '是否由总策略启动' 'false'
       exit assignment 'false' '主管道累计流量' 'await prs.getSource("主管道流量累计读数")'
       transformer 'next'
-        rule 'false' '等待阀门' 'prs.variables.get("需要启动") == true'
+        rule 'false' '等待阀门' 'prs.variables.get("需要启动") == true && prs.variables.get("是否由总策略启动") == true'
+        rule 'false' '主泵工作' 'prs.variables.get("需要启动") == true && prs.variables.get("是否由总策略启动") != true'
       return
     return
     state '等待阀门'
@@ -445,6 +448,7 @@ policy
       enter assignment 'false' '当前轮灌组名称' 'prs.variables.get("当前轮灌组索引")>=prs.variables.get("所有轮灌组").length?"":(prs.variables.get("所有轮灌组")[prs.variables.get("当前轮灌组索引")])'
       do crossAssignment 'false' 'prs.variables.get("当前轮灌组名称")' '需要启动' 'true'
       exit crossAssignment 'false' '"${params.farm_name}-供水"' '需要启动' 'true'
+      enter crossAssignment 'false' '"${params.farm_name}-供水"' '是否由总策略启动' 'true'
       exit crossAssignment 'false' 'prs.variables.get("上一个轮灌组名称")' '需要启动' 'false'
       transformer 'next'
         rule 'false' '空闲' 'prs.variables.get("当前轮灌组名称") == ""'
