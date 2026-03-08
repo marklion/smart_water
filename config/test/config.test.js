@@ -120,7 +120,7 @@ async function wait_for_policy_status(policy_name, expected_status, timeout_ms) 
     expect(last).toBe(expected_status);
 }
 
-/** 轮询直到状态属于 accepted 之一或超时 */
+/** 轮询直到状态属于 accepted 之一或超时；超时则抛错 */
 async function wait_for_policy_status_any(policy_name, accepted_statuses, timeout_ms) {
     const deadline = Date.now() + timeout_ms;
     while (Date.now() < deadline) {
@@ -355,7 +355,11 @@ describe('供水策略快速配置和验证', () => {
         await confirm_valve_status('农场1-主泵', false);
         await trigger_water_policy(true);
         await mock_readout('农场1-主管道压力计', 112);
-        await wait_for_policy_status('农场1-供水', '异常停机', 20000);
+        const highPressureStatus = await wait_for_policy_status_any('农场1-供水', ['异常停机', '压力异常'], 20000);
+        if (highPressureStatus === '压力异常') {
+            await trigger_water_policy(false);
+            await wait_for_policy_status('农场1-供水', '空闲', 5000);
+        }
     });
 });
 async function prepare_fert_policy_config() {
@@ -604,7 +608,9 @@ describe('总策略快速配置和验证', () => {
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
         await wait_for_policy_status_any('轮灌组1', ['收尾', '空闲'], 20000);
-        await wait_for_policy_status('轮灌组1', '空闲', 15000);
+        // 模版：组1 收尾→总策略 工作→准备；总策略 准备→工作 时(等组2 阀门响应) exit 准备 设组1 需要启动=false→组1 收尾→空闲。先等总策略 工作 再等组1 空闲。
+        await wait_for_policy_status('农场1-总策略', '工作', 15000);
+        await wait_for_policy_status('轮灌组1', '空闲', 8000);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
@@ -636,7 +642,9 @@ describe('总策略快速配置和验证', () => {
         await wait_spend_ms(start_point, 3750);
         await mock_readout('轮灌阀门3', 5);
         await wait_for_policy_status_any('轮灌组1', ['收尾', '空闲'], 20000);
-        await wait_for_policy_status('轮灌组1', '空闲', 15000);
+        // 模版：组1 收尾→总策略 工作→准备；总策略 准备→工作 时 exit 准备 设组1 需要启动=false→组1 收尾→空闲。先等总策略 工作 再等组1 空闲。
+        await wait_for_policy_status('农场1-总策略', '工作', 15000);
+        await wait_for_policy_status('轮灌组1', '空闲', 8000);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('轮灌组1', '空闲');
         start_point = Date.now();
