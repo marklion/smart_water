@@ -552,7 +552,7 @@ describe('总策略快速配置和验证', () => {
         // 模版流程：点运行 → 总策略 空闲→准备(给轮灌组1、供水 需要启动) → 供水 空闲→等待阀门 → 轮灌组1 空闲→阀门响应(开阀、上报当前轮灌组已启动) → 总策略 准备→工作
         await trigger_global_policy(true);
         let start_point = Date.now();
-        await wait_ms(200);
+        await wait_ms(700);
         await confirm_policy_status('农场1-供水', '等待阀门');
         await cli.run_cmd('policy');
         let totalLines = (await cli.run_cmd('list policy 农场1-总策略')).split('\n');
@@ -595,6 +595,7 @@ describe('总策略快速配置和验证', () => {
         // 模版：启动总策略 → 轮灌组1 运行(阀1、2开) → 轮灌组1 收尾、轮灌组2 启动(阀3开) → 停止 → 全停
         await trigger_global_policy(true);
         let start_point = Date.now();
+        await wait_ms(700);
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
