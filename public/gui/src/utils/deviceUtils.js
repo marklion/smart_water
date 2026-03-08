@@ -72,6 +72,32 @@ export function hasAnyDeviceCapability(device) {
   return allCapabilities.some(capability => hasDeviceCapability(device, capability))
 }
 
+export const LOW_BATTERY_VOLTAGE_THRESHOLD = 3.2
+export function batteryVoltageToPercent(voltage) {
+  const v = Number(voltage)
+  if (Number.isNaN(v)) return 0
+  if (v >= 4.15) return Math.min(100, 90 + (v - 4.15) * 50)
+  if (v >= 4.0) return 70 + (v - 4.0) / 0.15 * 20
+  if (v >= 3.85) return 50 + (v - 3.85) / 0.15 * 20
+  if (v >= 3.7) return 30 + (v - 3.7) / 0.15 * 20
+  if (v >= 3.5) return 10 + (v - 3.5) / 0.2 * 20
+  if (v >= 3.2) return (v - 3.2) / 0.3 * 10
+  return Math.max(0, (v - 2.5) / 0.7 * 10)
+}
+export function formatRuntimeInfoDisplay(info) {
+  if (info.title === '电池电压') {
+    const voltage = parseFloat(info.text)
+    const percent = Math.round(batteryVoltageToPercent(voltage))
+    return {
+      title: '电量',
+      text: `${percent}%`,
+      isLowBattery: !Number.isNaN(voltage) && voltage <= LOW_BATTERY_VOLTAGE_THRESHOLD,
+      batteryPercent: Math.min(100, Math.max(0, percent))
+    }
+  }
+  return { ...info, isLowBattery: false }
+}
+
 /**
  * 获取设备按钮分组（动态生成，开启和关闭按钮放在同一行）
  */

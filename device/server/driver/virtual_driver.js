@@ -150,8 +150,9 @@ export default async function (config) {
             return '虚拟设备';
         },
         battery_voltage: async function() {
-            // 虚拟设备始终返回3.7V
-            return 3.7;
+            // 仅测试用设备名包含「低电量测试」时返回 3.1V；其他虚拟设备无电池，返回 null
+            if (device_name && device_name.includes('低电量测试')) return 3.1;
+            return null;
         },
         getUnit: function() {
             // 根据设备类型返回对应的单位
@@ -187,7 +188,9 @@ export default async function (config) {
             ret.push({text:'开关是否打开', func:'is_opened'});
             ret.push({text:'当前仪表读数', func:'readout'});
             ret.push({text:'当前仪表累计读数', func:'total_readout'});
-            ret.push({text:'电池电压', func:'battery_voltage'});
+            if (device_name && device_name.includes('低电量测试')) {
+                ret.push({text:'电池电压', func:'battery_voltage'});
+            }
             return ret;
         },
         shutdown:async function() {

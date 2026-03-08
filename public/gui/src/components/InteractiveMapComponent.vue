@@ -136,10 +136,25 @@
                             </div>
                         </div>
 
-                        <div v-for="(info, index) in selectedDevice.runtime_info" :key="index"
-                            class="runtime-info-item">
-                            <div class="info-label">{{ info.title }}：</div>
-                            <div class="info-value">{{ info.text }}</div>
+                        <div v-for="(disp, index) in formattedRuntimeInfo" :key="index"
+                            class="runtime-info-item"
+                            :class="{ 'low-battery': disp.isLowBattery }">
+                            <div class="info-label">{{ disp.title }}：</div>
+                            <div class="info-value">
+                                <template v-if="disp.batteryPercent !== undefined">
+                                    <div class="battery-display">
+                                        <div class="battery-icon" :class="{ 'low': disp.isLowBattery }">
+                                            <div class="battery-body">
+                                                <div class="battery-fill" :style="{ width: disp.batteryPercent + '%' }"
+                                                    :class="{ 'low': disp.isLowBattery, 'mid': !disp.isLowBattery && disp.batteryPercent < 50 }"></div>
+                                            </div>
+                                            <div class="battery-head"></div>
+                                        </div>
+                                        <span class="battery-percent">{{ disp.text }}</span>
+                                    </div>
+                                </template>
+                                <template v-else>{{ disp.text }}</template>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -190,6 +205,9 @@ import {
     getDeviceType,
     hasDeviceCapability,
     hasAnyDeviceCapability,
+    formatRuntimeInfoDisplay,
+    LOW_BATTERY_VOLTAGE_THRESHOLD,
+    batteryVoltageToPercent,
     refreshRuntimeInfo as refreshRuntimeInfoUtil,
     createRuntimeInfoAutoRefresh,
     handleDeviceAction as handleDeviceActionUtil,
@@ -299,8 +317,28 @@ const runtimeInfoAutoRefresh = createRuntimeInfoAutoRefresh(
     30000
 )
 
+// 运行时信息展示用（电池电压 -> 电量百分比）
+const formattedRuntimeInfo = computed(() =>
+    (selectedDevice.value?.runtime_info || []).map(info => formatRuntimeInfoDisplay(info))
+)
 
-
+// 电量低告警：电压 ≤ 3.2V 时提示，同一设备只告警一次
+const lowBatteryWarnedFor = ref(null)
+watch(selectedDevice, (device) => {
+    if (!device) {
+        lowBatteryWarnedFor.value = null
+        return
+    }
+    if (!device.runtime_info || !Array.isArray(device.runtime_info)) return
+    const bat = device.runtime_info.find(i => i.title === '电池电压')
+    if (!bat) return
+    const v = parseFloat(bat.text)
+    if (Number.isNaN(v) || v > LOW_BATTERY_VOLTAGE_THRESHOLD) return
+    const deviceName = device.device_name || device.deviceName
+    if (lowBatteryWarnedFor.value === deviceName) return
+    lowBatteryWarnedFor.value = deviceName
+    ElMessage.warning(`当前设备「${deviceName}」电量不足（约 ${Math.round(batteryVoltageToPercent(v))}%），请及时充电。`)
+}, { deep: true })
 
 const scanPeriod = ref(200)
 const scanLoading = ref(false)
@@ -1460,6 +1498,59 @@ onUnmounted(() => {
     border-color: #f56c6c !important;
 }
 
+.runtime-info-item.low-battery .info-value {
+    color: #e6a23c;
+}
+
+.battery-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.battery-icon {
+    display: inline-flex;
+    align-items: center;
+    width: 28px;
+    height: 14px;
+    position: relative;
+}
+.battery-icon .battery-body {
+    width: 22px;
+    height: 12px;
+    border: 1.5px solid #333;
+    border-radius: 2px;
+    overflow: hidden;
+    background: #f0f0f0;
+}
+.battery-icon .battery-fill {
+    height: 100%;
+    min-width: 2px;
+    border-radius: 1px;
+    background: linear-gradient(180deg, #67c23a 0%, #85ce61 100%);
+    transition: width 0.3s ease;
+}
+.battery-icon .battery-fill.mid {
+    background: linear-gradient(180deg, #e6a23c 0%, #ebb563 100%);
+}
+.battery-icon .battery-fill.low,
+.battery-icon.low .battery-fill {
+    background: linear-gradient(180deg, #e6a23c 0%, #f56c6c 100%);
+}
+.battery-icon .battery-head {
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 6px;
+    background: #333;
+    border-radius: 0 2px 2px 0;
+}
+.battery-percent {
+    font-weight: 600;
+    color: inherit;
+    font-variant-numeric: tabular-nums;
+}
 
 .runtime-info-section.loading .runtime-info-item {
     opacity: 0.6;
