@@ -3,6 +3,7 @@ import modbus_wrapper from "./modbus_wrapper.js";
 export default async function (config_string) {
     let config = JSON.parse(config_string);
     let full_height = config.full_height; // 安装高度参数
+    let base_area = config.base_area;     // 底面积参数（用于计算体积）
     let get_level_info = async function () {
         let ret = {
             online: true,
@@ -19,6 +20,10 @@ export default async function (config_string) {
             } else {
                 ret.level = raw_level;
             }
+            // 配置了底面积时直接存为体积，readout 读出来的就是体积
+            if (base_area !== undefined && base_area !== null) {
+                ret.level = ret.level * base_area;
+            }
         } catch (error) {
             console.log(`get level info via modbus error: ${JSON.stringify(error)}`);
             ret.online = false;
@@ -31,11 +36,11 @@ export default async function (config_string) {
     let ret = {
         m_info: {},
         readout: async function () {
-            return this.m_info.level;
+            return this.m_info.level;  // 配置了 base_area 时已是体积
         },
         status_map: function () {
             let ret = [];
-            ret.push({ text: '当前液位值', func: 'readout' });
+            ret.push({ text: base_area != null ? '当前体积' : '当前液位值', func: 'readout' });
             return ret;
         },
         shutdown: async function () {

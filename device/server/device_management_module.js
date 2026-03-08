@@ -54,7 +54,7 @@ const driver_array = [
         driver: modbus_relay,
     },{
         name:'DistanceMeter',
-        config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, multiplier:<倍率>, poll_interval:<轮询间隔(ms)>, full_height:<安装高度(可选)>}',
+        config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, multiplier:<倍率>, poll_interval:<轮询间隔(ms)>, full_height:<安装高度(可选)>, base_area:<底面积(可选)>}',
         capability: [
             'readout', 'status_map', 'shutdown'],
         driver: XM9231B,
@@ -91,15 +91,17 @@ export async function get_driver(device_name, capability) {
             log_file: device.config_key,
             device_type: device.device_type || 'valve', // 默认阀门类型
             device_name: device_name,
-            full_height: device.full_height // 传递安装高度参数
+            full_height: device.full_height, // 传递安装高度参数
+            base_area: device.base_area    // 传递底面积参数（液位计计算体积）
         };
         let driver_arg = device.config_key;
         if (driver_config.name == 'virtualDevice') {
             driver_arg = driver_config_obj;
-        } else if (driver_config.name == 'DistanceMeter' && device.full_height !== undefined) {
+        } else if (driver_config.name == 'DistanceMeter' && (device.full_height !== undefined || device.base_area !== undefined)) {
             try {
                 let config = JSON.parse(device.config_key);
-                config.full_height = device.full_height;
+                if (device.full_height !== undefined) config.full_height = device.full_height;
+                if (device.base_area !== undefined) config.base_area = device.base_area;
                 driver_arg = JSON.stringify(config);
             } catch (e) {
                 console.error(`Failed to parse config_key for device ${device.device_name || device.device_sn}:`, e.message);
@@ -165,6 +167,7 @@ export default {
                 farm_name: { type: String, have_to: false, mean: '所属农场', example: '农场1' },
                 block_name: { type: String, have_to: false, mean: '所属区块', example: '区块1' },
                 full_height: { type: Number, have_to: false, mean: '安装高度（仅液位计有效）', example: 200 },
+                base_area: { type: Number, have_to: false, mean: '底面积（仅液位计有效，用于计算体积，单位与液位一致）', example: 100 },
             },
             result: {
                 result: { type: Boolean, mean: '添加结果', example: true }
@@ -207,6 +210,9 @@ export default {
                 }
                 if (body.full_height !== undefined) {
                     exist_device.full_height = body.full_height;
+                }
+                if (body.base_area !== undefined) {
+                    exist_device.base_area = body.base_area;
                 }
                 await get_driver(body.device_name);
                 return { result: true };
@@ -262,6 +268,7 @@ export default {
                         longitude: { type: Number, mean: '经度', example: 111.670801 },
                         latitude: { type: Number, mean: '纬度', example: 40.818311 },
                         full_height: { type: Number, mean: '安装高度（仅液位计有效）', example: 200 },
+                        base_area: { type: Number, mean: '底面积（仅液位计有效，用于计算体积）', example: 100 },
                         runtime_info: {
                             type: Array, mean: '运行时信息', explain: {
                                 title: { type: String, mean: '信息标题', example: '开关是否打开' },
@@ -342,7 +349,8 @@ export default {
                         block_name: device.block_name || '',
                         longitude: device.longitude || null,
                         latitude: device.latitude || null,
-                        full_height: device.full_height || null
+                        full_height: device.full_height || null,
+                        base_area: device.base_area || null
                     });
                 });
                 let pageNo = body.pageNo || 0;
