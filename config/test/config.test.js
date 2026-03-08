@@ -51,7 +51,7 @@ async function prepare_water_group_valve_config() {
 
 async function begin_policy_run() {
     await cli.run_cmd('policy');
-    await cli.run_cmd('scan period 200');
+    await cli.run_cmd('scan period 50');
     await wait_ms(60);
     await cli.run_cmd('return');
 }
