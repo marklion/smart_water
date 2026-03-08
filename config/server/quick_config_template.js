@@ -429,6 +429,7 @@ policy
       enter assignment 'false' '供水策略异常' 'false'
       enter assignment 'false' '施肥策略异常' 'false'
       enter crossAssignment 'false' '"${params.farm_name}-供水"' '需要启动' 'false'
+      enter crossAssignment 'false' 'prs.variables.get("当前轮灌组名称")' '需要启动' 'false'
       enter assignment 'false' '需要重置' 'false'
       enter assignment 'false' '当前轮灌组索引' '0-1'
       do assignment 'false' '今天已经自动启动过了' '(new Date().getDate() != prs.variables.get("今天日期"))?false:(prs.variables.get("今天已经自动启动过了"))'
@@ -463,6 +464,7 @@ policy
     state '工作'
       transformer 'next'
         rule 'false' '准备' 'prs.variables.get("当前轮灌组已启动") == false'
+        rule 'false' '空闲' 'prs.variables.get("需要启动") == false'
         rule 'false' '空闲' 'prs.variables.get("需要重置") == true'
       return
       transformer 'exp'

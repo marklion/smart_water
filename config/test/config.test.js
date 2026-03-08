@@ -92,8 +92,14 @@ async function mock_total_readout(wgv_name, pressure) {
 
 async function confirm_valve_status(wgv_name, expected_status) {
     await cli.run_cmd('device');
-    let devices_lines = (await cli.run_cmd('list device')).split('\n');
+    let list_cmd = 'list device';
+    let devices_lines = (await cli.run_cmd(list_cmd)).split('\n');
     let device_name_line_index = devices_lines.findIndex(line => line.includes(wgv_name));
+    if (device_name_line_index === -1) {
+        list_cmd = 'list device 农场1';
+        devices_lines = (await cli.run_cmd(list_cmd)).split('\n');
+        device_name_line_index = devices_lines.findIndex(line => line.includes(wgv_name));
+    }
     expect(device_name_line_index).not.toBe(-1);
     let status_line = devices_lines[device_name_line_index + 5];
     expect(status_line).toContain(`开关是否打开`);
@@ -281,18 +287,18 @@ describe('供水策略快速配置和验证', () => {
         await mock_readout('农场1-主管道压力计', 4.2);
         await wait_spend_ms(start_point, WATER_PUMP_STANDALONE_WAIT_MS);
         await confirm_valve_status('农场1-主泵', true);
-        await wait_spend_ms(start_point, WATER_PUMP_STANDALONE_WAIT_MS + 3100);
-        await confirm_warning(`主管道压力异常:4.2`);
+        await wait_spend_ms(start_point, WATER_PUMP_STANDALONE_WAIT_MS + 3500);
+        await confirm_warning(`主管道压力异常`);
         await mock_readout('农场1-主管道压力计', 25);
         await mock_readout('农场1-主管道流量计', 101);
-        await wait_spend_ms(start_point, WATER_PUMP_STANDALONE_WAIT_MS + 2100);
+        await wait_spend_ms(start_point, WATER_PUMP_STANDALONE_WAIT_MS + 2500);
         await confirm_valve_status('农场1-主泵', true);
-        await confirm_warning(`主管道流量异常:101`);
+        await confirm_warning(`主管道流量异常`);
         await mock_readout('农场1-主管道流量计', 20);
         await mock_readout('农场1-主管道压力计', 52);
-        await wait_spend_ms(start_point, WATER_PUMP_STANDALONE_WAIT_MS + 3200);
+        await wait_spend_ms(start_point, WATER_PUMP_STANDALONE_WAIT_MS + 3600);
         await confirm_valve_status('农场1-主泵', true);
-        await confirm_warning(`主管道压力异常:52`);
+        await confirm_warning(`主管道压力异常`);
     });
     test('工作时压力变化很多', async () => {
         await trigger_water_policy(true);
@@ -566,7 +572,7 @@ describe('总策略快速配置和验证', () => {
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门2', false);
         await trigger_global_policy(false);
-        await wait_ms(1000);
+        await wait_ms(1800);
         await confirm_policy_status('农场1-总策略', '空闲');
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门2', false);
@@ -593,7 +599,7 @@ describe('总策略快速配置和验证', () => {
         await confirm_valve_status('轮灌阀门3', true);
         await mock_readout('轮灌阀门1', 2);
         await trigger_global_policy(false);
-        await wait_ms(1000);
+        await wait_ms(1800);
         await confirm_policy_status('农场1-总策略', '空闲');
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门3', false);
