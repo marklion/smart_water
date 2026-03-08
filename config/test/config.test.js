@@ -538,6 +538,25 @@ async function reset_global_policy(is_open) {
     await cli.run_cmd('return');
 }
 
+/** 触发总策略并等到供水进入「等待阀门」，返回 start_point 供后续 wait_spend_ms 用 */
+async function trigger_global_and_wait_water_waiting_valve() {
+    await trigger_global_policy(true);
+    const start_point = Date.now();
+    await wait_spend_ms(start_point, 150);
+    await confirm_policy_status('农场1-供水', '等待阀门');
+    return start_point;
+}
+
+/** 断言总策略当前状态在 准备 或 工作 */
+async function confirm_total_policy_prepare_or_work() {
+    await cli.run_cmd('policy');
+    const totalLines = (await cli.run_cmd('list policy 农场1-总策略')).split('\n');
+    const totalIdx = totalLines.findIndex(l => l.startsWith('当前状态'));
+    const totalState = totalIdx >= 0 ? totalLines[totalIdx].split(':')[1].trim() : '';
+    expect(['准备', '工作']).toContain(totalState);
+    await cli.run_cmd('return');
+}
+
 describe('总策略快速配置和验证', () => {
     beforeEach(async () => {
         await cli.run_cmd('clear');
@@ -548,31 +567,13 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('农场1-施肥液位计', 50);
         await begin_policy_run();
     });
-    test('手动触发总策略', async () => {
-        // 模版流程：点运行 → 总策略 空闲→准备(给轮灌组1、供水 需要启动) → 供水 空闲→等待阀门 → 轮灌组1 空闲→阀门响应(开阀、上报当前轮灌组已启动) → 总策略 准备→工作
-        await trigger_global_policy(true);
-        let start_point = Date.now();
-        // 策略由 scan 每 50ms 执行，总策略→供水的状态传递依赖扫描顺序与时机，固定 wait 不稳定；改为轮询直到 供水 变为「等待阀门」（最多等 2s）
-        const pollTimeoutMs = 2000;
-        const pollIntervalMs = 50;
-        let status = '';
-        while (Date.now() - start_point < pollTimeoutMs) {
-            await cli.run_cmd('policy');
-            let policies_lines = (await cli.run_cmd(`list policy 农场1-供水`)).split('\n');
-            let status_line_index = policies_lines.findIndex(line => line.startsWith('当前状态'));
-            status = status_line_index >= 0 ? policies_lines[status_line_index].split(':')[1].trim() : '';
-            await cli.run_cmd('return');
-            if (status === '等待阀门') break;
-            await wait_ms(pollIntervalMs);
-        }
-        expect(status).toBe('等待阀门');
-        await cli.run_cmd('policy');
-        let totalLines = (await cli.run_cmd('list policy 农场1-总策略')).split('\n');
-        let totalIdx = totalLines.findIndex(l => l.startsWith('当前状态'));
-        let totalState = totalIdx >= 0 ? totalLines[totalIdx].split(':')[1].trim() : '';
-        expect(['准备', '工作']).toContain(totalState);
-        await cli.run_cmd('return');
-        // 模版：等待阀门 等 阀门反应时间 后 → 主泵工作；轮灌组 阀门响应 等 阀门反应时间 后 → 肥前。先 mock 阀门读数再等
+    test('总策略触发后供水到等待阀门且总策略到准备或工作', async () => {
+        await trigger_global_and_wait_water_waiting_valve();
+        await confirm_total_policy_prepare_or_work();
+    });
+    test('阀门响应后总策略工作、供水主泵工作、轮灌组1运行', async () => {
+        const start_point = await trigger_global_and_wait_water_waiting_valve();
+        await confirm_total_policy_prepare_or_work();
         await mock_readout('轮灌阀门1', 5);
         await mock_readout('轮灌阀门2', 5);
         await mock_readout('轮灌阀门3', 2);
@@ -580,22 +581,38 @@ describe('总策略快速配置和验证', () => {
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_policy_status('农场1-供水', '主泵工作');
         await cli.run_cmd('policy');
-        let g1Lines = (await cli.run_cmd('list policy 轮灌组1')).split('\n');
-        let g1Idx = g1Lines.findIndex(l => l.startsWith('当前状态'));
-        let g1State = g1Idx >= 0 ? g1Lines[g1Idx].split(':')[1].trim() : '';
+        const g1Lines = (await cli.run_cmd('list policy 轮灌组1')).split('\n');
+        const g1Idx = g1Lines.findIndex(l => l.startsWith('当前状态'));
+        const g1State = g1Idx >= 0 ? g1Lines[g1Idx].split(':')[1].trim() : '';
         expect(['肥前', '施肥', '肥后']).toContain(g1State);
         await cli.run_cmd('return');
         await confirm_valve_status('轮灌阀门1', true);
         await confirm_valve_status('轮灌阀门2', true);
         await confirm_valve_status('轮灌阀门3', false);
         await confirm_valve_status('农场1-主泵', true);
-        // 模版：轮灌组1 收尾后 总策略 准备→下一组 轮灌组2；轮灌组2 阀门响应 开阀3
+    });
+    test('轮灌组1收尾后总策略切到轮灌组2', async () => {
+        const start_point = await trigger_global_and_wait_water_waiting_valve();
+        await confirm_total_policy_prepare_or_work();
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+        await mock_readout('轮灌阀门3', 2);
+        await wait_spend_ms(start_point, VALVE_WAIT_MS);
+        await confirm_policy_status('农场1-总策略', '工作');
         await wait_spend_ms(start_point, 9500);
         await confirm_policy_status('农场1-总策略', '工作');
         await confirm_valve_status('轮灌阀门3', true);
         await confirm_valve_status('轮灌阀门1', false);
         await confirm_valve_status('轮灌阀门2', false);
-        // 模版：点停止 → 总策略 工作→空闲(给供水、当前轮灌组 需要启动 false) → 当前轮灌组 收尾关阀→空闲
+    });
+    test('停止总策略后全部空闲', async () => {
+        const start_point = await trigger_global_and_wait_water_waiting_valve();
+        await confirm_total_policy_prepare_or_work();
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+        await mock_readout('轮灌阀门3', 2);
+        await wait_spend_ms(start_point, VALVE_WAIT_MS);
+        await confirm_policy_status('农场1-总策略', '工作');
         await trigger_global_policy(false);
         await wait_ms(1800);
         await confirm_policy_status('农场1-总策略', '空闲');

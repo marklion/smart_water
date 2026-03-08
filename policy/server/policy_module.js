@@ -2702,6 +2702,9 @@ async function processPolicyExecution(policy) {
         return;
     }
     let runtimeState = policy_runtime_states.get(policy.name);
+    if (policy.name === '农场1-总策略' || policy.name === '农场1-供水') {
+        console.log(`[策略扫描] 开始执行策略 ${policy.name}, current_state=${runtimeState?.current_state ?? '无'}`);
+    }
     if (!runtimeState) {
         // 确定初始状态：必须使用设置的初始状态
         let initialStateName;
@@ -2836,6 +2839,18 @@ async function processPolicyExecution(policy) {
             }
         }
 
+        // 总策略 准备 依赖 所有轮灌组；若 init 时为空（如表达式未求值为数组），enter(准备) 会得到 当前轮灌组名称="" 并立刻 准备→空闲。此处兜底：从 policy_array 取轮灌组名列表写入 所有轮灌组。
+        if (policy.name && policy.name.endsWith('总策略')) {
+            let allGroups = runtimeState.variables.get('所有轮灌组');
+            if (!Array.isArray(allGroups) || allGroups.length === 0) {
+                const groupNames = policy_array
+                    .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
+                    .map(p => p.name);
+                runtimeState.variables.set('所有轮灌组', groupNames);
+                console.log(`[策略扫描] 策略 ${policy.name} 兜底设置 所有轮灌组: ${JSON.stringify(groupNames)}`);
+            }
+        }
+
         policy_runtime_states.set(policy.name, runtimeState);
         console.log(`策略 ${policy.name} 初始化，进入状态: ${runtimeState.current_state}`);
         await executeStateActions(policy, initialState, 'enter', runtimeState);
@@ -2847,8 +2862,20 @@ async function processPolicyExecution(policy) {
 
     const currentState = policy.states.find(s => s.name === runtimeState.current_state);
     if (!currentState) {
-        console.error(`策略 ${policy.name} 的当前状态 ${runtimeState.current_state} 不存在`);
+        console.error(`[策略扫描] 策略 ${policy.name} 的当前状态 ${runtimeState.current_state} 不存在，本周期跳过执行`);
         return;
+    }
+
+    // 总策略：每周期执行前若 所有轮灌组 仍为空则兜底，避免 准备 里 当前轮灌组名称="" 导致立刻 准备→空闲
+    if (policy.name && policy.name.endsWith('总策略')) {
+        let allGroups = runtimeState.variables.get('所有轮灌组');
+        if (!Array.isArray(allGroups) || allGroups.length === 0) {
+            const groupNames = policy_array
+                .filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0)
+                .map(p => p.name);
+            runtimeState.variables.set('所有轮灌组', groupNames);
+            console.log(`[策略扫描] 策略 ${policy.name} 本周期兜底设置 所有轮灌组: ${JSON.stringify(groupNames)}`);
+        }
     }
 
     // 使用封装的策略执行逻辑（吃饭形式）
@@ -2958,10 +2985,11 @@ async function performStateTransition(policy, fromState, toStateName, runtimeSta
         console.error(`目标状态 ${toStateName} 不存在`);
         return;
     }
-    console.log(`策略 ${policy.name} 状态转换: ${fromState.name} -> ${toStateName}`);
+    console.log(`[策略扫描] 策略 ${policy.name} 状态转换: ${fromState.name} -> ${toStateName}`);
     await executeStateActions(policy, fromState, 'exit', runtimeState);
     runtimeState.current_state = toStateName;
     runtimeState.last_execution_time = Date.now();
+    console.log(`[策略扫描] 策略 ${policy.name} current_state 已更新为: ${toStateName}`);
     await executeStateActions(policy, toState, 'enter', runtimeState);
 }
 
