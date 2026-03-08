@@ -639,10 +639,10 @@ function buildWateringGroup(policy, policy_runtime) {
         scheme_id: policy.scheme_id || null,
         area: getWaterGroupVariable(policy.watering_group_matrix, 'area', policy_runtime),
         method: getWaterGroupVariable(policy.watering_group_matrix, 'method', policy_runtime),
-        fert_rate: getWaterGroupVariable(policy.watering_group_matrix, 'fert_rate', policy_runtime),
         total_water: getWaterGroupVariable(policy.watering_group_matrix, 'total_water', policy_runtime),
         total_fert: getWaterGroupVariable(policy.watering_group_matrix, 'total_fert', policy_runtime),
         minute_left: getWaterGroupVariable(policy.watering_group_matrix, 'minute_left', policy_runtime),
+        valve_wait_time: getWaterGroupVariable(policy.watering_group_matrix, 'valve_wait_time', policy_runtime),
         valves: getValvesValue(policy.watering_group_matrix, policy_runtime),
         cur_state: policy_runtime ? policy_runtime.current_state : '未知',
     };
@@ -1858,7 +1858,6 @@ export default {
                         scheme_id: { type: String, mean: '方案ID', example: 'scheme_1' },
                         area: { type: Number, mean: '轮灌组面积', example: 100 },
                         method: { type: String, mean: '轮灌组灌溉方式', example: '滴灌' },
-                        fert_rate: { type: Number, mean: '轮灌组施肥率(L/亩)', example: 1.5 },
                         total_water: { type: Number, mean: '轮灌组总用水量(L)', example: 5000 },
                         total_fert: { type: Number, mean: '轮灌组总施肥量(L)', example: 50 },
                         minute_left: { type: Number, mean: '轮灌组剩余分钟数', example: 30 },
@@ -2064,6 +2063,7 @@ export default {
                         farm_name: body.farm_name,
                         wgv_array: groupConfig.valves.map(v => ({ name: v })),
                         area: groupConfig.area,
+                        valve_wait_time_ms: groupConfig.valve_wait_time_ms != null ? groupConfig.valve_wait_time_ms : 5000,
                     };
 
                     switch (groupConfig.method) {

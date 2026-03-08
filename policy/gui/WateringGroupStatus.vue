@@ -29,7 +29,6 @@
                 </el-table-column>
                 <el-table-column prop="area" label="面积/亩" width="100" align="center" />
                 <el-table-column prop="method" label="灌溉方式" width="100" align="center" />
-                <el-table-column prop="fert_rate" label="施肥率(L/亩)" width="120" align="center" />
                 <el-table-column prop="total_water" label="总用水量(L)" width="120" align="center" />
                 <el-table-column prop="total_fert" label="总施肥量(L)" width="120" align="center" />
                 <el-table-column prop="minute_left" label="剩余时间(分)" width="120" align="center" />
@@ -220,7 +219,6 @@ const transformGroups = (groups) => {
         name: group.name || '未命名',
         area: group.area ?? '-',
         method: group.method || '-',
-        fert_rate: group.fert_rate ?? '-',
         total_water: group.total_water ?? '-',
         total_fert: group.total_fert ?? '-',
         minute_left: group.minute_left ?? '-',

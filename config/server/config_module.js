@@ -350,6 +350,7 @@ export default {
                 pressure_shutdown_high_limit: { type: Number, mean: '压力停机上限', example: 80, have_to: true },
                 flow_check_interval: { type: Number, mean: '流量检查间隔(秒)', example: 10, have_to: true },
                 pressure_shutdown_check_interval: { type: Number, mean: '压力停机检查间隔(秒)', example: 10, have_to: true },
+                valve_wait_time_ms: { type: Number, mean: '阀门等待时间(毫秒)，首次启动时先等阀门再开主泵', example: 5000, have_to: false },
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -479,6 +480,7 @@ export default {
                 pre_fert_time: { type: Number, mean: '肥前时间(分钟)', example: 10, have_to: false },
                 fert_time: { type: Number, mean: '施肥时间(分钟)', example: 30, have_to: false },
                 post_fert_time: { type: Number, mean: '肥后时间(分钟)', example: 10, have_to: false },
+                valve_wait_time_ms: { type: Number, mean: '阀门等待时间(毫秒)，开阀后等待该时间再进入浇水/肥前', example: 5000, have_to: false },
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }

@@ -167,10 +167,6 @@
                                 <view class="meta-label">方式</view>
                                 <fui-text :text="group.method || '-'" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
-                            <view class="meta-item">
-                                <view class="meta-label">施肥率(L/亩)</view>
-                                <fui-text :text="formatNumber(group.fert_rate)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
-                            </view>
                         </view>
                         <view class="group-meta">
                             <view class="meta-item">
