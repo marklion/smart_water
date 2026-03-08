@@ -2702,13 +2702,6 @@ async function processPolicyExecution(policy) {
         return;
     }
     let runtimeState = policy_runtime_states.get(policy.name);
-    // 若 runtime_assignment 先于首次扫描创建了运行时状态（current_state 为 null 或缺少执行方法），则视为未初始化，删掉后按正常流程创建并保留已设变量
-    let savedVarsFromAssignment = null;
-    if (runtimeState && (runtimeState.current_state == null || typeof runtimeState.executePolicyCycle !== 'function')) {
-        savedVarsFromAssignment = runtimeState.variables && runtimeState.variables.size > 0 ? new Map(runtimeState.variables) : null;
-        policy_runtime_states.delete(policy.name);
-        runtimeState = null;
-    }
     if (!runtimeState) {
         // 确定初始状态：必须使用设置的初始状态
         let initialStateName;
@@ -2843,12 +2836,6 @@ async function processPolicyExecution(policy) {
             }
         }
 
-        if (savedVarsFromAssignment && savedVarsFromAssignment.size > 0) {
-            for (const [k, v] of savedVarsFromAssignment) {
-                runtimeState.variables.set(k, v);
-            }
-            console.log(`策略 ${policy.name} 补全运行时状态并保留赋值变量: ${[...savedVarsFromAssignment.keys()].join(', ')}`);
-        }
         policy_runtime_states.set(policy.name, runtimeState);
         console.log(`策略 ${policy.name} 初始化，进入状态: ${runtimeState.current_state}`);
         await executeStateActions(policy, initialState, 'enter', runtimeState);
