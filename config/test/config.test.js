@@ -1,9 +1,7 @@
 import test_utils, { wait_ms, wait_spend_ms } from "../../public/lib/test_utils.js";
 import { print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
 
-/** 供水/轮灌组 阀门反应时间(ms)，策略中默认 5000，测试多等一点再断言（含扫描周期延迟） */
 const VALVE_WAIT_MS = 5500;
-/** 单独供水时主泵直接打开，只需策略扫描周期延迟 */
 const WATER_PUMP_STANDALONE_WAIT_MS = 200;
 
 let cli;
@@ -114,6 +112,19 @@ async function confirm_warning(expected_warning) {
     const found = warnings_lines.some(line => line.includes(expected_warning));
     expect(found).toBe(true);
     await cli.run_cmd('return');
+}
+
+async function poll_for_warning(expected_warning, timeout_ms = 5000, interval_ms = 120) {
+    const start = Date.now();
+    while (Date.now() - start <= timeout_ms) {
+        await cli.run_cmd('warning');
+        const warnings_lines = (await cli.run_cmd('list warnings')).split('\n');
+        const found = warnings_lines.some(line => line.includes(expected_warning));
+        await cli.run_cmd('return');
+        if (found) return;
+        await wait_ms(interval_ms);
+    }
+    await confirm_warning(expected_warning);
 }
 
 async function confirm_policy_status(wgv_name, expected_status) {
