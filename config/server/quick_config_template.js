@@ -441,7 +441,6 @@ policy
       return
     return
     state '准备'
-      enter assignment 'false' '需要启动' 'false'
       enter assignment 'false' '今天已经自动启动过了' 'true'
       enter assignment 'false' '下次启动时间' '""'
       enter assignment 'false' '上一个轮灌组名称' 'prs.variables.get("当前轮灌组索引")>=prs.variables.get("所有轮灌组").length?"":(prs.variables.get("所有轮灌组")[prs.variables.get("当前轮灌组索引")])'
