@@ -1,6 +1,9 @@
 import test_utils from "../../public/lib/test_utils.js";
 import { print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
 import moment from "moment";
+import fs from "fs";
+import path from "path";
+
 let cli;
 beforeAll(async () => {
     print_test_log('device CRUD test begin', true)
@@ -85,5 +88,15 @@ describe('设备操作', () => {
         else {
             expect(online_status).toContain('(在线)');
         }
+    });
+
+    test('低电量时调用系统告警模块生成告警', async () => {
+        await cli.run_cmd(`add device '低电量测试设备' 'virtualDevice' 'vd_lowbat.log' 1 2`);
+        await cli.run_cmd('list device');
+        await cli.run_cmd('return');
+        await cli.run_cmd('warning');
+        const res = await cli.run_cmd('list warnings');
+        expect(res).toContain('低电量测试设备');
+        expect(res).toContain('电量不足');
     });
 });

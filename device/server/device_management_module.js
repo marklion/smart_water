@@ -6,6 +6,14 @@ import modbus_relay from './driver/modbus_relay.js';
 import mgg_znf from './driver/mgg_znf.js';
 import BCP8R from './driver/BCP8R.js';
 import XM9231B from './driver/XM9231B.js';
+import warning_module from '../../warning/server/warning_module.js';
+
+/** 电量低告警电压阈值（V），低于此值调用系统告警 */
+const LOW_BATTERY_VOLTAGE_THRESHOLD = 3.2;
+/** 同一设备低电量告警冷却时间（ms），避免重复刷告警 */
+const LOW_BATTERY_WARN_COOLDOWN_MS = 30 * 60 * 1000;
+const lowBatteryWarnedAt = new Map();
+
 const driver_array = [
     {
         name: 'virtualDevice',
@@ -360,6 +368,26 @@ export default {
                             device_info.runtime_info.push(tmp_runtime);
                         }
                         device_info.is_online = await single_driver.is_online();
+                        // 电量低时调用系统告警模块生成告警（带冷却，避免重复刷）
+                        const batItem = device_info.runtime_info.find(r => r.title === '电池电压');
+                        if (batItem) {
+                            const v = parseFloat(batItem.text);
+                            if (!Number.isNaN(v) && v <= LOW_BATTERY_VOLTAGE_THRESHOLD) {
+                                const name = device_info.device_name;
+                                const last = lowBatteryWarnedAt.get(name) || 0;
+                                if (Date.now() - last >= LOW_BATTERY_WARN_COOLDOWN_MS) {
+                                    try {
+                                        await warning_module.methods.generate_warning.func(
+                                            { content: `设备「${name}」电量不足（当前电压 ${v}V），请及时充电。` },
+                                            null
+                                        );
+                                        lowBatteryWarnedAt.set(name, Date.now());
+                                    } catch (err) {
+                                        console.error('生成低电量告警失败:', err);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 return {
