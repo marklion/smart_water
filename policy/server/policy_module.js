@@ -669,6 +669,46 @@ async function deleteExistingWateringGroupPolicies(token) {
     }
 }
 
+export async function resetPoliciesToIdleForFarm(farm_name) {
+    if (!farm_name) {
+        return { result: true, reset_policies: [] };
+    }
+    const policies = policy_array.filter(p => p.farm_name === farm_name);
+    const reset_policies = [];
+    const idleStateName = '空闲';
+
+    for (const policy of policies) {
+        try {
+            const hasIdleState = policy.states && policy.states.some(s => s.name === idleStateName);
+            const targetState = hasIdleState ? idleStateName : (policy.init_state || (policy.states && policy.states[0] && policy.states[0].name) || idleStateName);
+
+            let runtimeState = policy_runtime_states.get(policy.name);
+            if (!runtimeState) {
+                runtimeState = {
+                    current_state: targetState,
+                    variables: new Map(),
+                    last_execution_time: Date.now(),
+                    start_time: Date.now(),
+                    execution_count: 0,
+                    is_first_execution: true
+                };
+                policy_runtime_states.set(policy.name, runtimeState);
+            } else {
+                runtimeState.current_state = targetState;
+            }
+            runtimeState.variables.set('需要启动', false);
+            if (policy.name.includes('供水') || policy.name.includes('施肥')) {
+                runtimeState.variables.set('需要重置', true);
+            }
+            reset_policies.push(policy.name);
+            console.log(`策略 ${policy.name} 已恢复到空闲状态`);
+        } catch (err) {
+            console.error(`策略 ${policy.name} 恢复空闲失败:`, err);
+        }
+    }
+    return { result: true, reset_policies };
+}
+
 export default {
     name: 'policy',
     description: '策略管理',
@@ -1586,6 +1626,26 @@ export default {
                 }
                 scan_period_ms = 0;
                 return { result: true };
+            }
+        },
+        emergency_stop_policies: {
+            name: '紧急停止策略',
+            description: '将指定农场的总策略、供水、施肥及轮灌组策略全部恢复到空闲状态',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                farm_name: { type: String, mean: '农场名称', example: '温室1号', have_to: true }
+            },
+            result: {
+                result: { type: Boolean, mean: '操作结果', example: true },
+                reset_policies: {
+                    type: Array,
+                    mean: '已恢复空闲的策略名称列表',
+                    explain: { name: { type: String, mean: '策略名称', example: '农场1-总策略' } }
+                }
+            },
+            func: async function (body, token) {
+                return await resetPoliciesToIdleForFarm(body.farm_name);
             }
         },
         set_init_state: {

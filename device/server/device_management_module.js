@@ -540,7 +540,13 @@ export default {
                         device_name: { type: String, mean: '设备名称', example: '设备3' },
                         reason: { type: String, mean: '失败原因', example: '急停失败' }
                     }
-                }
+                },
+                reset_policies: {
+                    type: Array,
+                    mean: '已恢复空闲的策略名称列表（总策略、供水、施肥、轮灌组）',
+                    explain: { name: { type: String, mean: '策略名称', example: '农场1-总策略' } }
+                },
+                policy_reset_error: { type: String, mean: '策略恢复空闲时的错误信息（无则 null）', example: null }
             },
             func: async function (body, token) {
                 try {
@@ -577,10 +583,25 @@ export default {
 
                     console.log(`急停完成: 成功 ${stoppedDevices.length} 个，失败 ${failedDevices.length} 个`);
 
+                    // 紧急停止设备所在农场的策略：总策略、供水、施肥、轮灌组策略均恢复到空闲
+                    let policyReset = { result: true, reset_policies: [] };
+                    try {
+                        const { resetPoliciesToIdleForFarm } = await import('../../policy/server/policy_module.js');
+                        policyReset = await resetPoliciesToIdleForFarm(body.farm_name);
+                        if (policyReset.reset_policies && policyReset.reset_policies.length > 0) {
+                            console.log(`策略已恢复空闲: ${policyReset.reset_policies.join(', ')}`);
+                        }
+                    } catch (policyErr) {
+                        console.error('紧急停止时恢复策略空闲失败:', policyErr);
+                        policyReset = { result: false, reset_policies: [], error: policyErr.message };
+                    }
+
                     return {
                         result: true,
                         stopped_devices: stoppedDevices,
-                        failed_devices: failedDevices
+                        failed_devices: failedDevices,
+                        reset_policies: policyReset.reset_policies || [],
+                        policy_reset_error: policyReset.error || null
                     };
                 } catch (error) {
                     console.error('批量急停失败:', error);

@@ -44,7 +44,7 @@
                     </UnifiedButton>
                     <UnifiedButton variant="danger" @click="stopScheme" :loading="stopSchemeLoading"
                         :disabled="!selectedSchemeId" :icon="VideoPause">
-                        停止
+                        暂停方案
                     </UnifiedButton>
                 </div>
                 <!-- 显示定时运行时间 -->
@@ -743,17 +743,28 @@ const executeEmergencyStop = async () => {
         if (response.result) {
             const stoppedCount = response.stopped_devices ? response.stopped_devices.length : 0
             const failedCount = response.failed_devices ? response.failed_devices.length : 0
+            const resetPolicyCount = response.reset_policies ? response.reset_policies.length : 0
+            const policyErr = response.policy_reset_error
 
-            if (failedCount === 0) {
-                ElMessage.success(`急停操作成功，已停止 ${stoppedCount} 个设备`)
+            let msg = `急停操作成功，已停止 ${stoppedCount} 个设备`
+            if (resetPolicyCount > 0) msg += `，总策略/供水/施肥/轮灌组共 ${resetPolicyCount} 个策略已恢复空闲`
+            if (policyErr) msg += `（策略恢复有异常: ${policyErr}）`
+
+            if (failedCount === 0 && !policyErr) {
+                ElMessage.success(msg)
+            } else if (failedCount > 0 || policyErr) {
+                ElMessage.warning(msg)
             } else {
-                ElMessage.warning(`急停操作部分成功：成功 ${stoppedCount} 个，失败 ${failedCount} 个设备`)
+                ElMessage.success(msg)
             }
 
             emergencyStopDialogVisible.value = false
             selectedBlocks.value = []
 
             emit('deviceClick', null)
+            if (typeof checkRunningStatus === 'function') {
+                checkRunningStatus()
+            }
         } else {
             ElMessage.error('急停操作执行失败')
         }
