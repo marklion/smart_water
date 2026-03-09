@@ -4,7 +4,7 @@ import moment from 'moment';
 
 export default async function (config) {
     // 支持传入配置对象或直接传入日志文件路径（向后兼容）
-    let log_file_path, device_type, device_name, full_height;
+    let log_file_path, device_type, device_name, full_height, base_area;
 
     if (typeof config === 'string') {
         // 向后兼容：直接传入日志文件路径
@@ -12,12 +12,14 @@ export default async function (config) {
         device_type = 'valve'; // 默认类型
         device_name = 'unknown'; // 默认名称
         full_height = undefined;
+        base_area = undefined;
     } else {
         // 新方式：传入配置对象
         log_file_path = config.log_file;
         device_type = config.device_type || 'valve';
         device_name = config.device_name || 'unknown';
         full_height = config.full_height; // 安装高度参数
+        base_area = config.base_area;     // 底面积参数（液位计计算体积）
     }
 
     // 如果传入的是相对路径或简单文件名，则使用统一的日志目录
@@ -103,6 +105,10 @@ export default async function (config) {
                 if ((device_type === 'level' || device_name.includes('液位计') || device_name.includes('液位')) && full_height !== undefined && full_height !== null) {
                     finalValue = full_height - this.mock_value;
                 }
+                // 液位计且配置了底面积时，直接返回体积
+                if ((device_type === 'level' || device_name.includes('液位计') || device_name.includes('液位')) && base_area != null) {
+                    finalValue = finalValue * base_area;
+                }
                 const deviceType = this.getDeviceType();
                 const unit = this.getUnit();
                 const details = `当前${deviceType}: ${finalValue}${unit}`;
@@ -116,6 +122,10 @@ export default async function (config) {
             // 如果是液位计且配置了安装高度，应用计算：full_height - 读取值
             if ((device_type === 'level' || device_name.includes('液位计') || device_name.includes('液位')) && full_height !== undefined && full_height !== null) {
                 value = full_height - value;
+            }
+            // 液位计且配置了底面积时，直接返回体积（液位 × 底面积）
+            if ((device_type === 'level' || device_name.includes('液位计') || device_name.includes('液位')) && base_area != null) {
+                value = value * base_area;
             }
 
             // 记录读取操作
@@ -155,7 +165,7 @@ export default async function (config) {
             return null;
         },
         getUnit: function() {
-            // 根据设备类型返回对应的单位
+            // 根据设备类型返回对应的单位；液位计配置了底面积时读数为体积，单位 L
             const unitMap = {
                 'flowmeter': 'L/min',
                 'valve': '',
@@ -167,6 +177,9 @@ export default async function (config) {
                 'pressure': 'Pa',
                 'level': 'cm'
             };
+            if ((device_type === 'level' || device_name.includes('液位计') || device_name.includes('液位')) && base_area != null) {
+                return 'L';
+            }
             return unitMap[device_type] || '';
         },
         getDeviceName: function() {
@@ -186,7 +199,7 @@ export default async function (config) {
         status_map:function() {
             let ret = [];
             ret.push({text:'开关是否打开', func:'is_opened'});
-            ret.push({text:'当前仪表读数', func:'readout'});
+            ret.push({text:(device_type === 'level' || device_name.includes('液位计') || device_name.includes('液位')) && base_area != null ? '当前体积' : '当前仪表读数', func:'readout'});
             ret.push({text:'当前仪表累计读数', func:'total_readout'});
             if (device_name && device_name.includes('低电量测试')) {
                 ret.push({text:'电池电压', func:'battery_voltage'});
