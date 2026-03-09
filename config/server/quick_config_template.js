@@ -446,6 +446,7 @@ policy
       enter assignment 'false' '上一个轮灌组名称' 'prs.variables.get("当前轮灌组索引")>=prs.variables.get("所有轮灌组").length?"":(prs.variables.get("所有轮灌组")[prs.variables.get("当前轮灌组索引")])'
       enter assignment 'false' '当前轮灌组索引' 'prs.variables.get("当前轮灌组索引") + 1'
       enter assignment 'false' '当前轮灌组名称' 'prs.variables.get("当前轮灌组索引")>=prs.variables.get("所有轮灌组").length?"":(prs.variables.get("所有轮灌组")[prs.variables.get("当前轮灌组索引")])'
+      enter assignment 'false' '需要启动' 'prs.variables.get("当前轮灌组名称") == "" ? false : prs.variables.get("需要启动")'
       do crossAssignment 'false' 'prs.variables.get("当前轮灌组名称")' '需要启动' 'true'
       exit crossAssignment 'false' '"${params.farm_name}-供水"' '需要启动' 'true'
       enter crossAssignment 'false' '"${params.farm_name}-供水"' '是否由总策略启动' 'true'
