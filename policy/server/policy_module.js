@@ -23,8 +23,8 @@ let default_config_file = 'sw_cli_config.txt';
 const policy_array = []
 // 判断是否有正在运行的轮灌组（用于阻止切换/覆盖）
 function getRunningWateringGroups() {
-    // 轮灌组状态基于策略定义：空闲/浇水/肥前/施肥/肥后/收尾
-    const waitingStates = new Set(['空闲'])
+    // 轮灌组状态：空闲、阀门响应=等待中（不视为运行，总策略停止时只清 需要启动 不设 需要跳过）；浇水/肥前/施肥/肥后/收尾=运行中
+    const waitingStates = new Set(['空闲', '阀门响应'])
     const runningStates = new Set(['浇水', '肥前', '施肥', '肥后', '收尾'])
 
     const running = []
@@ -42,6 +42,22 @@ function getRunningWateringGroups() {
         running.push(policy.name)
     }
     return running
+}
+
+/** 总策略停止时：把所有轮灌组 需要启动 设为 false，仅对正在运行的组设 需要跳过=true */
+function syncWateringGroupsOnTotalPolicyStop() {
+    const runningNames = new Set(getRunningWateringGroups());
+    const wateringGroupPolicies = policy_array.filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0);
+    for (const p of wateringGroupPolicies) {
+        const rs = policy_runtime_states.get(p.name);
+        if (rs) {
+            rs.variables.set('需要启动', false);
+            if (runningNames.has(p.name)) {
+                rs.variables.set('需要跳过', true);
+                console.log(`[总策略停止] 已同步停止轮灌组: ${p.name}`);
+            }
+        }
+    }
 }
 
 // 辅助函数：获取传感器数据
@@ -673,7 +689,15 @@ export async function resetPoliciesToIdleForFarm(farm_name) {
     if (!farm_name) {
         return { result: true, reset_policies: [] };
     }
-    const policies = policy_array.filter(p => p.farm_name === farm_name);
+    // 收集需重置的策略：1) farm_name 匹配 2) 按名称匹配的总策略/供水/施肥 3) 所有轮灌组（保证急停后总策略能再次启动）
+    const byFarmName = policy_array.filter(p => p.farm_name === farm_name);
+    const byName = policy_array.filter(p =>
+        p.name === `${farm_name}-总策略` || p.name === `${farm_name}-供水` || p.name === `${farm_name}-施肥`
+    );
+    const wateringGroups = policy_array.filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0);
+    const policySet = new Set([...byFarmName, ...byName, ...wateringGroups].map(p => p.name));
+    const policies = Array.from(policySet).map(name => policy_array.find(p => p.name === name)).filter(Boolean);
+
     const reset_policies = [];
     const idleStateName = '空闲';
 
@@ -699,6 +723,16 @@ export async function resetPoliciesToIdleForFarm(farm_name) {
             runtimeState.variables.set('需要启动', false);
             if (policy.name.includes('供水') || policy.name.includes('施肥')) {
                 runtimeState.variables.set('需要重置', true);
+            }
+            // 总策略恢复空闲时重置轮灌相关变量，否则再次启动时可能卡在「当前轮灌组已启动」为 true
+            if (policy.name && policy.name.endsWith('总策略')) {
+                runtimeState.variables.set('当前轮灌组已启动', false);
+                runtimeState.variables.set('当前轮灌组名称', '');
+                runtimeState.variables.set('当前轮灌组索引', -1);
+            }
+            // 轮灌组恢复空闲时清掉 需要跳过，否则再次启动时可能误走跳过逻辑
+            if (policy.watering_group_matrix && policy.watering_group_matrix.length > 0) {
+                runtimeState.variables.set('需要跳过', false);
             }
             reset_policies.push(policy.name);
             console.log(`策略 ${policy.name} 已恢复到空闲状态`);
@@ -1808,6 +1842,13 @@ export default {
                     runtimeState.variables.set(body.variable_name, value);
                     console.log(`策略 ${body.policy_name} 运行时变量赋值: ${body.variable_name} = ${value}`);
 
+                    const isTotalPolicyStop = body.policy_name && body.policy_name.endsWith('总策略')
+                        && body.variable_name === '需要启动'
+                        && (value === false || value === 'false');
+                    if (isTotalPolicyStop) {
+                        syncWateringGroupsOnTotalPolicyStop();
+                    }
+
                     return { result: true };
                 } catch (error) {
                     throw {
@@ -2421,6 +2462,9 @@ export default {
                         // 如果是动态表达式，使用表达式求值器
                         await evaluateAssignmentExpression(action.expression, runtimeState);
                         console.log(`策略 ${body.policy_name} 执行快速操作 ${body.action_name}: ${action.expression}`);
+                    }
+                    if (body.policy_name && body.policy_name.endsWith('总策略') && body.action_name === '停止') {
+                        syncWateringGroupsOnTotalPolicyStop();
                     }
                     return { result: true };
                 } catch (error) {

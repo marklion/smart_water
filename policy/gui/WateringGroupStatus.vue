@@ -29,9 +29,31 @@
                 </el-table-column>
                 <el-table-column prop="area" label="面积/亩" width="100" align="center" />
                 <el-table-column prop="method" label="灌溉方式" width="100" align="center" />
-                <el-table-column prop="total_water" label="总用水量(L)" width="120" align="center" />
-                <el-table-column prop="total_fert" label="总施肥量(L)" width="120" align="center" />
-                <el-table-column prop="minute_left" label="剩余时间(分)" width="120" align="center" />
+                <el-table-column label="已用水量(L)" width="120" align="center">
+                    <template #header>
+                        <el-tooltip content="仅执行中显示本组当前已执行量，空闲时不显示避免与它组重复" placement="top">
+                            <span>已用水量(L)</span>
+                        </el-tooltip>
+                    </template>
+                    <template #default="{ row }">
+                        {{ formatExecutedAmount(row.total_water, row.cur_state) }}
+                    </template>
+                </el-table-column>
+                <el-table-column label="已施肥量(L)" width="120" align="center">
+                    <template #header>
+                        <el-tooltip content="仅执行中显示本组当前已执行量，空闲时不显示避免与它组重复" placement="top">
+                            <span>已施肥量(L)</span>
+                        </el-tooltip>
+                    </template>
+                    <template #default="{ row }">
+                        {{ formatExecutedAmount(row.total_fert, row.cur_state) }}
+                    </template>
+                </el-table-column>
+                <el-table-column label="剩余时间" width="120" align="center">
+                    <template #default="{ row }">
+                        {{ formatRemainingSeconds(row.minute_left) }}
+                    </template>
+                </el-table-column>
 
                 <el-table-column prop="cur_state" label="当前状态" width="120" align="center">
                     <template #default="{ row }">
@@ -79,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, inject, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, inject, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DataLine, Refresh } from '@element-plus/icons-vue'
 import UnifiedButton from '../../public/gui/src/components/UnifiedButton.vue'
@@ -105,6 +127,49 @@ const loading = ref(false)
 const quickActionLoading = ref({})
 const waterOnlyMode = ref({}) // 跟踪每个轮灌组的"只浇水"状态（只读展示）
 const selectedSchemeId = computed(() => injectedSelectedSchemeId.value || '')
+let refreshTimerId = null
+
+// 是否有任意轮灌组正在运行（非空闲）
+const hasAnyGroupRunning = computed(() => {
+    return irrigationGroups.value.some(row => {
+        const s = (row.cur_state || '').toString().trim()
+        return s && s !== '空闲'
+    })
+})
+
+// 已用水量/已施肥量：仅在执行中显示，空闲时显示 "-"，避免多行显示相同数值造成误解
+function formatExecutedAmount(value, curState) {
+    const status = (curState || '').toString().trim()
+    if (status === '空闲' || !status) {
+        return '-'
+    }
+    if (value === undefined || value === null || value === '') {
+        return '-'
+    }
+    const num = Number(value)
+    if (Number.isNaN(num)) {
+        return '-'
+    }
+    return num
+}
+
+// 将后端返回的剩余时间（分钟）格式化为秒级倒计时显示，如 "294秒" 或 "4分54秒"
+function formatRemainingSeconds(minuteLeft) {
+    if (minuteLeft === undefined || minuteLeft === null || minuteLeft === '-') {
+        return '-'
+    }
+    const min = Number(minuteLeft)
+    if (Number.isNaN(min) || min < 0) {
+        return '0秒'
+    }
+    const totalSeconds = Math.max(0, Math.ceil(min * 60))
+    if (totalSeconds >= 60) {
+        const m = Math.floor(totalSeconds / 60)
+        const s = totalSeconds % 60
+        return s > 0 ? `${m}分${s}秒` : `${m}分`
+    }
+    return `${totalSeconds}秒`
+}
 
 // 解析方案文件内容，提取轮灌组信息
 const parseWateringGroups = (content) => {
@@ -361,6 +426,26 @@ watch(selectedSchemeId, (newSchemeId, oldSchemeId) => {
         loadWateringGroups()
     }
 }, { immediate: false })
+
+// 组启动后每隔 1 秒刷新一次；全部空闲时停止定时刷新
+watch(hasAnyGroupRunning, (running) => {
+    if (refreshTimerId) {
+        clearInterval(refreshTimerId)
+        refreshTimerId = null
+    }
+    if (running) {
+        refreshTimerId = setInterval(() => {
+            loadWateringGroups()
+        }, 1000)
+    }
+}, { immediate: true })
+
+onUnmounted(() => {
+    if (refreshTimerId) {
+        clearInterval(refreshTimerId)
+        refreshTimerId = null
+    }
+})
 
 // 刷新数据
 const refresh = () => {
