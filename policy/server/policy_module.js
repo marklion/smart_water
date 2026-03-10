@@ -23,8 +23,8 @@ let default_config_file = 'sw_cli_config.txt';
 const policy_array = []
 // 判断是否有正在运行的轮灌组（用于阻止切换/覆盖）
 function getRunningWateringGroups() {
-    // 轮灌组状态基于策略定义：空闲/浇水/肥前/施肥/肥后/收尾
-    const waitingStates = new Set(['空闲'])
+    // 轮灌组状态：空闲、阀门响应=等待中（不视为运行，总策略停止时只清 需要启动 不设 需要跳过）；浇水/肥前/施肥/肥后/收尾=运行中
+    const waitingStates = new Set(['空闲', '阀门响应'])
     const runningStates = new Set(['浇水', '肥前', '施肥', '肥后', '收尾'])
 
     const running = []
@@ -1826,18 +1826,21 @@ export default {
                     runtimeState.variables.set(body.variable_name, value);
                     console.log(`策略 ${body.policy_name} 运行时变量赋值: ${body.variable_name} = ${value}`);
 
-                    // 总策略的「需要启动」被设为 false 时（界面点停止走的是 runtime_assignment），同步把所有轮灌组的 需要启动 设为 false，并设 需要跳过=true
+                    // 总策略的「需要启动」被设为 false 时，同步把所有轮灌组的 需要启动 设为 false；仅对正在运行的组设 需要跳过=true（空闲/阀门响应不设，避免下次启动直接收尾）
                     const isTotalPolicyStop = body.policy_name && body.policy_name.endsWith('总策略')
                         && body.variable_name === '需要启动'
                         && (value === false || value === 'false');
                     if (isTotalPolicyStop) {
+                        const runningNames = new Set(getRunningWateringGroups());
                         const wateringGroupPolicies = policy_array.filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0);
                         for (const p of wateringGroupPolicies) {
                             const rs = policy_runtime_states.get(p.name);
                             if (rs) {
                                 rs.variables.set('需要启动', false);
-                                rs.variables.set('需要跳过', true);
-                                console.log(`[总策略停止] 已同步停止轮灌组: ${p.name}`);
+                                if (runningNames.has(p.name)) {
+                                    rs.variables.set('需要跳过', true);
+                                    console.log(`[总策略停止] 已同步停止轮灌组: ${p.name}`);
+                                }
                             }
                         }
                     }
@@ -2456,15 +2459,18 @@ export default {
                         await evaluateAssignmentExpression(action.expression, runtimeState);
                         console.log(`策略 ${body.policy_name} 执行快速操作 ${body.action_name}: ${action.expression}`);
                     }
-                    // 总策略点「停止」时，同步把所有轮灌组的 需要启动 设为 false，并设 需要跳过=true 让正在浇水/施肥的组立即进入收尾再回空闲
+                    // 总策略点「停止」时，同步把所有轮灌组的 需要启动 设为 false；仅对正在运行的组设 需要跳过=true（空闲/阀门响应不设，避免下次启动直接收尾）
                     if (body.policy_name && body.policy_name.endsWith('总策略') && body.action_name === '停止') {
+                        const runningNames = new Set(getRunningWateringGroups());
                         const wateringGroupPolicies = policy_array.filter(p => p.watering_group_matrix && p.watering_group_matrix.length > 0);
                         for (const p of wateringGroupPolicies) {
                             const rs = policy_runtime_states.get(p.name);
                             if (rs) {
                                 rs.variables.set('需要启动', false);
-                                rs.variables.set('需要跳过', true);
-                                console.log(`[总策略停止] 已同步停止轮灌组: ${p.name}`);
+                                if (runningNames.has(p.name)) {
+                                    rs.variables.set('需要跳过', true);
+                                    console.log(`[总策略停止] 已同步停止轮灌组: ${p.name}`);
+                                }
                             }
                         }
                     }

@@ -6,8 +6,11 @@
             <text class="plus-icon">+</text>
         </view>
 
-        <!-- 主要内容区域 - 使用 scroll-view 支持滚动 -->
-        <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
+        <!-- 主要内容区域 - 使用 scroll-view 支持滚动，支持下拉刷新 -->
+        <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true"
+            refresher-enabled
+            :refresher-triggered="refreshing"
+            @refresherrefresh="onRefresh">
             <view class="content">
                 <!-- 当前方案运行状态 -->
                 <view class="current-scheme-card">
@@ -183,7 +186,7 @@
                             </view>
                             <view class="meta-item">
                                 <view class="meta-label">剩余时间(分)</view>
-                                <fui-text :text="formatNumber(group.minute_left)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
+                                <fui-text :text="formatMinuteLeft(group.minute_left)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
                         </view>
                         <view class="valves-row">
@@ -682,7 +685,7 @@ const scheduleDialogButtons = ref([
 ])
 const scheduleLoading = ref(false)
 const nextRunTime = ref('') // 方案下次运行时间
-let runningStatusTimer = null // 方案运行状态定时器
+let runningStatusTimer = null // 方案运行状态定时器（仅检查运行中/未运行）
 
 // 紧急停止相关
 const emergencyStopDialogVisible = ref(false)
@@ -772,6 +775,20 @@ const formatNumber = (val) => {
     if (val === undefined || val === null || val === '-') return '-'
     if (val === '') return '-'
     return String(val)
+}
+
+// 剩余时间(分)：后端为小数，格式化为 X分Y秒
+const formatMinuteLeft = (val) => {
+    if (val === undefined || val === null || val === '') return '-'
+    const num = Number(val)
+    if (!Number.isFinite(num)) return '-'
+    if (num < 0) return '0分0秒'
+    const totalSeconds = Math.max(0, Math.ceil(num * 60))
+    const m = Math.floor(totalSeconds / 60)
+    const s = totalSeconds % 60
+    if (m === 0) return `${s}秒`
+    if (s === 0) return `${m}分`
+    return `${m}分${s}秒`
 }
 
 const parseValves = (valveStr) => {
@@ -1723,7 +1740,7 @@ const startRunningStatusTimer = () => {
     }
     // 立即检查一次状态
     checkRunningStatus()
-    // 每5秒检查一次状态
+    // 每5秒仅检查方案运行状态（运行中/未运行角标）
     runningStatusTimer = setInterval(async () => {
         if (selectedSchemeId.value) {
             await checkRunningStatus()
