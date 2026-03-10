@@ -171,10 +171,6 @@
                                 <view class="meta-label">方式</view>
                                 <fui-text :text="group.method || '-'" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
                             </view>
-                            <view class="meta-item">
-                                <view class="meta-label">施肥率(L/亩)</view>
-                                <fui-text :text="formatNumber(group.fert_rate)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
-                            </view>
                         </view>
                         <view class="group-meta">
                             <view class="meta-item">
@@ -873,6 +869,8 @@ const statusClass = (state) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'info'
+        case '阀门响应':
+            return 'valve-response'
         case '浇水':
             return 'primary'
         case '肥前':
@@ -894,6 +892,8 @@ const getCardStatusClass = (state) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'status-idle'
+        case '阀门响应':
+            return 'status-valve-response'
         case '浇水':
             return 'status-watering'
         case '肥前':
@@ -2758,6 +2758,12 @@ onShow(async () => {
     color: #ffffff;
 }
 
+.group-card.status-valve-response {
+    background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%);
+    border-left: 4px solid #4d7c0f;
+    color: #ffffff;
+}
+
 .group-card.status-pre-fert {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     border-left: 4px solid #b45309;
@@ -2783,6 +2789,7 @@ onShow(async () => {
 }
 
 .group-card.status-idle,
+.group-card.status-valve-response,
 .group-card.status-watering,
 .group-card.status-pre-fert,
 .group-card.status-fertilizing,
@@ -2792,6 +2799,7 @@ onShow(async () => {
 }
 
 .group-card.status-idle .meta-label,
+.group-card.status-valve-response .meta-label,
 .group-card.status-watering .meta-label,
 .group-card.status-pre-fert .meta-label,
 .group-card.status-fertilizing .meta-label,
@@ -2846,6 +2854,10 @@ onShow(async () => {
 
 .group-state.info {
     background: #909399; /* 灰色 - 空闲 */
+}
+
+.group-state.valve-response {
+    background: #84cc16; /* 亮绿色 - 阀门响应 */
 }
 
 .group-state.primary {

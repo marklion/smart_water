@@ -59,7 +59,7 @@
         <!-- 当前状态 -->
         <el-descriptions :column="2" border class="runtime-descriptions">
           <el-descriptions-item label="当前状态">
-            <el-tag :type="getStateStatusType(selectedPolicyRuntime?.current_state)" size="large">
+            <el-tag :type="getStateStatusType(selectedPolicyRuntime?.current_state)" :class="getStateStatusClass(selectedPolicyRuntime?.current_state)" size="large">
               {{ getStateDisplayText(selectedPolicyRuntime?.current_state) }}
             </el-tag>
           </el-descriptions-item>
@@ -363,12 +363,22 @@ const getStateStatusType = (state) => {
   if (!state) return 'info'
 
   // 只有明确的运行状态才显示为成功（绿色）
-  if (state === 'work' || state === 'running' || state === 'active') {
+  if (
+    state === 'work' ||
+    state === 'running' ||
+    state === 'active' ||
+    state === '阀门响应'
+  ) {
     return 'success'
   }
 
   // 其他所有状态都显示为信息（灰色）
   return 'info'
+}
+
+const getStateStatusClass = (state) => {
+  if (!state) return ''
+  return state === '阀门响应' ? 'runtime-tag-valve-response' : ''
 }
 
 // 格式化时间
@@ -676,6 +686,12 @@ const getActionVariant = (actionName) => {
 
 .runtime-descriptions {
   margin-bottom: 20px;
+}
+
+:deep(.runtime-tag-valve-response.el-tag) {
+  background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%) !important;
+  border-color: #4d7c0f !important;
+  color: #ffffff !important;
 }
 
 .variables-section {

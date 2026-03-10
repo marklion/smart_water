@@ -79,7 +79,7 @@ export default {
                         }
                     }
                 }
-                cmd_this.log(`${line.name}|${line.area}|${line.method}|${line.fert_rate}|${line.total_water}|${line.total_fert}|${line.minute_left}|${valvesStr}|${line.cur_state}`);
+                cmd_this.log(`${line.name}|${line.area}|${line.method}|${line.total_water}|${line.total_fert}|${line.minute_left}|${valvesStr}|${line.cur_state}`);
             }
             return lines.length;
         });

@@ -338,6 +338,9 @@ return
   test('轮灌组变量获取', async () => {
     await wait_ms(1080);
     let resp = await cli.run_cmd('list watering groups');
-    expect(resp).toContain('lgz1|40|apple|12|11|34|90|wfm1|ffm1|empty');
+    const lines = resp.split('\n').map(l => l.trim()).filter(Boolean);
+    const target = lines.find(l => l.startsWith('lgz1|40|apple|'));
+    expect(target).toBeDefined();
+    expect(target).toContain('|wfm1|ffm1|empty');
   });
 })

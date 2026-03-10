@@ -29,14 +29,13 @@
                 </el-table-column>
                 <el-table-column prop="area" label="面积/亩" width="100" align="center" />
                 <el-table-column prop="method" label="灌溉方式" width="100" align="center" />
-                <el-table-column prop="fert_rate" label="施肥率(L/亩)" width="120" align="center" />
                 <el-table-column prop="total_water" label="总用水量(L)" width="120" align="center" />
                 <el-table-column prop="total_fert" label="总施肥量(L)" width="120" align="center" />
                 <el-table-column prop="minute_left" label="剩余时间(分)" width="120" align="center" />
 
                 <el-table-column prop="cur_state" label="当前状态" width="120" align="center">
                     <template #default="{ row }">
-                        <el-tag :type="getStatusTagType(row.cur_state)" size="default" effect="dark" round>
+                        <el-tag :type="getStatusTagType(row.cur_state)" :class="getStatusTagClass(row.cur_state)" size="default" effect="dark" round>
                             {{ row.cur_state || '未知' }}
                         </el-tag>
                     </template>
@@ -220,7 +219,6 @@ const transformGroups = (groups) => {
         name: group.name || '未命名',
         area: group.area ?? '-',
         method: group.method || '-',
-        fert_rate: group.fert_rate ?? '-',
         total_water: group.total_water ?? '-',
         total_fert: group.total_fert ?? '-',
         minute_left: group.minute_left ?? '-',
@@ -285,6 +283,8 @@ const tableRowClassName = ({ row }) => {
     // 根据固定状态返回对应的CSS类名
     if (status === '空闲') {
         return 'status-idle'
+    } else if (status === '阀门响应') {
+        return 'status-valve-response'
     } else if (status === '浇水') {
         return 'status-watering'
     } else if (status === '肥前') {
@@ -309,6 +309,8 @@ const getStatusTagType = (status) => {
     switch (statusTrimmed) {
         case '空闲':
             return 'info'      // 灰色
+        case '阀门响应':
+            return 'success'   // 绿色
         case '浇水':
             return 'primary'   // 蓝色
         case '肥前':
@@ -322,6 +324,12 @@ const getStatusTagType = (status) => {
         default:
             return 'info'      // 灰色
     }
+}
+
+const getStatusTagClass = (status) => {
+    if (!status) return ''
+    const statusTrimmed = status.toString().trim()
+    return statusTrimmed === '阀门响应' ? 'tag-valve-response' : ''
 }
 
 // 解析阀门字符串：将 "阀门1" "阀门2" 格式转换为数组
@@ -492,6 +500,19 @@ onMounted(() => {
     transform: translateY(-1px);
 }
 
+:deep(.status-valve-response) {
+    background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%) !important;
+    color: #ffffff !important;
+    transition: all 0.3s ease;
+    border-left: 4px solid #4d7c0f;
+}
+
+:deep(.status-valve-response:hover) {
+    background: linear-gradient(135deg, #65a30d 0%, #4d7c0f 100%) !important;
+    box-shadow: 0 4px 12px rgba(101, 163, 13, 0.4);
+    transform: translateY(-1px);
+}
+
 /* 3. 肥前状态 - 黄色/橙色渐变（准备阶段，科技感） */
 :deep(.status-pre-fert) {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
@@ -550,6 +571,7 @@ onMounted(() => {
 
 /* 确保文字在深色背景上清晰可见 */
 :deep(.status-watering td),
+:deep(.status-valve-response td),
 :deep(.status-pre-fert td),
 :deep(.status-fertilizing td),
 :deep(.status-post-fert td),
@@ -559,6 +581,7 @@ onMounted(() => {
 }
 
 :deep(.status-watering .el-tag),
+:deep(.status-valve-response .el-tag),
 :deep(.status-pre-fert .el-tag),
 :deep(.status-fertilizing .el-tag),
 :deep(.status-post-fert .el-tag),
@@ -572,6 +595,7 @@ onMounted(() => {
 
 /* 按钮在深色背景上的样式优化 */
 :deep(.status-watering .el-button),
+:deep(.status-valve-response .el-button),
 :deep(.status-pre-fert .el-button),
 :deep(.status-fertilizing .el-button),
 :deep(.status-post-fert .el-button),
@@ -581,6 +605,7 @@ onMounted(() => {
 }
 
 :deep(.status-watering .el-button--success),
+:deep(.status-valve-response .el-button--success),
 :deep(.status-pre-fert .el-button--success),
 :deep(.status-fertilizing .el-button--success),
 :deep(.status-post-fert .el-button--success),
@@ -591,6 +616,7 @@ onMounted(() => {
 }
 
 :deep(.status-watering .el-button--warning),
+:deep(.status-valve-response .el-button--warning),
 :deep(.status-pre-fert .el-button--warning),
 :deep(.status-fertilizing .el-button--warning),
 :deep(.status-post-fert .el-button--warning),
@@ -601,6 +627,7 @@ onMounted(() => {
 }
 
 :deep(.status-watering .el-button--danger),
+:deep(.status-valve-response .el-button--danger),
 :deep(.status-pre-fert .el-button--danger),
 :deep(.status-fertilizing .el-button--danger),
 :deep(.status-post-fert .el-button--danger),
@@ -608,6 +635,13 @@ onMounted(() => {
 :deep(.status-idle .el-button--danger) {
     background-color: rgba(239, 68, 68, 0.9) !important;
     border-color: #ef4444 !important;
+}
+
+/* 当前状态 tag 的独立阀门响应颜色 */
+:deep(.tag-valve-response.el-tag) {
+    background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%) !important;
+    border-color: #4d7c0f !important;
+    color: #ffffff !important;
 }
 
 .action-buttons {
