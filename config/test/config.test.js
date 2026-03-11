@@ -1,5 +1,5 @@
 import test_utils, { wait_ms, wait_spend_ms } from "../../public/lib/test_utils.js";
-import { print_test_log, start_server, close_server } from "../../public/lib/test_utils.js";
+import { print_test_log, start_server, close_server, call_api } from "../../public/lib/test_utils.js";
 
 const VALVE_WAIT_MS = 5500;
 const WATER_PUMP_STANDALONE_WAIT_MS = 200;
@@ -575,6 +575,17 @@ async function trigger_global_policy(is_open) {
     await wait_ms(60);
     await cli.run_cmd('return');
 }
+
+async function trigger_global_pause() {
+    await call_api('/policy/runtime_assignment', {
+        policy_name: '农场1-总策略',
+        variable_name: '需要启动',
+        expression: 'false',
+        is_constant: true,
+        pause_only: true
+    });
+    await wait_ms(80);
+}
 async function reset_global_policy(is_open) {
     await cli.run_cmd('policy');
     await cli.run_cmd(`runtime assignment 农场1-总策略 false '需要重置' '${is_open ? 'true' : 'false'}'`);
@@ -648,6 +659,37 @@ describe('总策略快速配置和验证', () => {
         await mock_readout('轮灌阀门1', 2);
         await trigger_global_policy(false);
         await wait_ms(1800);
+        await confirm_policy_status('农场1-总策略', '空闲');
+    });
+    test('总策略过程中有暂停', async () => {
+        await trigger_global_policy(true);
+        let start_point = Date.now();
+        await wait_ms(700);
+        await mock_readout('轮灌阀门1', 5);
+        await mock_readout('轮灌阀门2', 5);
+        await mock_readout('轮灌阀门3', 2);
+        await wait_spend_ms(start_point, VALVE_WAIT_MS);
+        await confirm_policy_status('农场1-总策略', '工作');
+        await confirm_policy_status_in('轮灌组1', ['阀门响应', '肥前', '施肥', '肥后']);
+        await trigger_global_pause();
+        await wait_ms(200);
+        await confirm_policy_status('农场1-总策略', '暂停');
+        await trigger_global_policy(true);
+        await wait_ms(200);
+        await confirm_policy_status('农场1-总策略', '工作');
+        await wait_spend_ms(start_point, VALVE_WAIT_MS + 1800);
+        await mock_readout('轮灌阀门2', 2);
+        await wait_spend_ms(start_point, VALVE_WAIT_MS + 3800);
+        await mock_readout('轮灌阀门3', 5);
+        await mock_readout('轮灌阀门1', 2);
+        await wait_ms(400);
+        await confirm_policy_status('农场1-总策略', '工作');
+        await confirm_policy_status('轮灌组1', '空闲');
+        await wait_ms(600);
+        const { status_line: group2Status } = await get_policy_snapshot('轮灌组2');
+        expect(['阀门响应', '肥前', '施肥', '肥后', '收尾', '空闲']).toContain(group2Status);
+        await trigger_global_policy(false);
+        await wait_ms(800);
         await confirm_policy_status('农场1-总策略', '空闲');
     });
     afterEach(async () => {

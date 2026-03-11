@@ -96,11 +96,17 @@
                 <el-tab-pane label="农场地图" name="map">
                   <div class="map-container">
                     <!-- 地图组件 -->
-                    <InteractiveMapComponent :devices="mapMarkers" :center="mapCenter" :zoom="mapZoom"
-                      @device-toggle="onDeviceToggle" />
+                    <InteractiveMapComponent
+                      :devices="mapMarkers"
+                      :center="mapCenter"
+                      :zoom="mapZoom"
+                      :show-control-panels="showControlPanels"
+                      @device-toggle="onDeviceToggle"
+                      @toggle-control-panels="showControlPanels = !showControlPanels"
+                    />
 
                     <!-- 右侧浮动搅拌策略面板 -->
-                    <div class="mixing-strategy-panel" v-if="selectedFarm">
+                    <div class="mixing-strategy-panel" v-if="selectedFarm && showControlPanels">
                       <div class="panel-header">
                         <el-icon class="panel-icon">
                           <Monitor />
@@ -486,6 +492,9 @@ const mixingScheduleLoading = ref(false) // 搅拌策略定时启动加载状态
 const mixingNextRunTime = ref('') // 搅拌策略下次运行时间
 const isMixingRunning = ref(false) // 搅拌策略是否正在运行
 let mixingStatusTimer = null // 搅拌策略状态定时器
+
+// 地图上控制面板与搅拌策略显隐开关
+const showControlPanels = ref(true)
 
 
 // Tab切换相关
@@ -3259,89 +3268,6 @@ html {
   display: none;
 }
 
-
-/* 急停对话框样式 */
-.emergency-stop-content {
-  padding: 20px;
-}
-
-.emergency-warning {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-  padding: 16px;
-  background: linear-gradient(135deg, #fff5f5, #ffe6e6);
-  border-radius: 8px;
-  border-left: 4px solid #f56c6c;
-  font-size: 16px;
-  font-weight: 600;
-  color: #d32f2f;
-}
-
-.block-selection {
-  margin-bottom: 24px;
-  max-height: 300px;
-  overflow-y: auto;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  padding: 16px;
-  background: #fafafa;
-}
-
-.block-checkbox {
-  display: block;
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #e4e7ed;
-  transition: all 0.2s ease;
-}
-
-.block-checkbox:hover {
-  background: #f5f7fa;
-  border-color: #409eff;
-}
-
-.block-checkbox:last-child {
-  margin-bottom: 0;
-}
-
-.emergency-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 16px;
-  border-top: 1px solid #e4e7ed;
-}
-
-/* 响应式急停对话框 */
-@media (max-width: 767px) {
-  .emergency-stop-content {
-    padding: 16px;
-  }
-
-  .emergency-warning {
-    font-size: 14px;
-    padding: 12px;
-  }
-
-  .block-selection {
-    max-height: 200px;
-    padding: 12px;
-  }
-
-  .block-checkbox {
-    padding: 6px 10px;
-    font-size: 14px;
-  }
-
-  .emergency-actions {
-    flex-direction: column;
-    gap: 8px;
-  }
-}
 
 /* 设备详情对话框样式 */
 .device-detail-content {

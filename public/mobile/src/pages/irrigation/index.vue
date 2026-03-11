@@ -17,8 +17,8 @@
                     <view class="scheme-row">
                         <view class="scheme-title">当前方案</view>
                         <view class="scheme-name">{{ selectedSchemeId || '未选择' }}</view>
-                        <view class="scheme-status" :class="isRunning ? 'running' : 'stopped'">
-                            {{ isRunning ? '运行中' : '未运行' }}
+                        <view class="scheme-status" :class="isRunning ? 'running' : (isPaused ? 'paused' : 'stopped')">
+                            {{ isRunning ? '运行中' : (isPaused ? '已暂停' : '未运行') }}
                         </view>
                     </view>
                     <view class="scheme-progress">
@@ -40,23 +40,19 @@
                             </view>
                         </view>
                         <view class="control-buttons-row">
-                            <view class="control-btn primary" @tap.stop="runSchemeNow" 
-                                :class="{ disabled: !selectedSchemeId || isRunning, loading: runNowLoading }">
-                                <fui-text :text="'立即运行'" :size="24" color="#fff"></fui-text>
+                            <view class="control-btn primary" @tap.stop="onMainRunButtonTap"
+                                :class="{ disabled: !selectedSchemeId, loading: runMainButtonLoading }">
+                                <fui-text :text="runMainButtonText" :size="24" color="#fff"></fui-text>
                             </view>
-                            <view class="control-btn warning" @tap.stop="showScheduleDialog" 
+                            <view class="control-btn warning" @tap.stop="showScheduleDialog"
                                 :class="{ disabled: !selectedSchemeId || isRunning }">
-                                <fui-text :text="'定时运行'" :size="24" color="#fff"></fui-text>
+                                <fui-text :text="'定时'" :size="24" color="#fff"></fui-text>
                             </view>
                         </view>
                         <view class="control-buttons-row">
                             <view class="control-btn danger" @tap.stop="stopScheme" 
                                 :class="{ disabled: !selectedSchemeId, loading: stopSchemeLoading }">
-                                <fui-text :text="'暂停方案'" :size="24" color="#fff"></fui-text>
-                            </view>
-                            <view class="control-btn danger" @tap.stop="showEmergencyStopDialog"
-                                :class="{ disabled: !currentFarmName, loading: emergencyStopLoading }">
-                                <fui-text :text="'设备紧急停止'" :size="24" color="#fff"></fui-text>
+                                <fui-text :text="'停止'" :size="24" color="#fff"></fui-text>
                             </view>
                         </view>
                         <!-- 显示定时运行时间 -->
@@ -127,6 +123,45 @@
                     <fui-text :text="'轮灌组运行状态'" :size="30" :fontWeight="600" color="#303133"></fui-text>
                 </view>
 
+                <!-- 当前方案进度（有方案且有条目时显示；执行完后保持 100% 便于后续查看） -->
+                <view v-if="selectedSchemeId && filteredGroups.length && showSchemeProgress" class="scheme-progress-detail-card">
+                    <view v-if="isPaused && currentPausedGroupName" class="paused-group-tip">
+                        <text class="paused-icon">⏸</text>
+                        <fui-text :text="'已暂停 · 当前组：' + currentPausedGroupName" :size="24" color="#e6a23c"></fui-text>
+                    </view>
+                    <view class="progress-detail-title">
+                        <fui-text :text="'当前方案进度'" :size="28" :fontWeight="600" color="#303133"></fui-text>
+                        <view class="progress-title-right">
+                            <view class="progress-ratio">
+                                <fui-text :text="`已完成 ${schemeProgressDisplay.completed} / ${schemeProgressDisplay.total} 组`" :size="26" :fontWeight="600" color="#409eff"></fui-text>
+                            </view>
+                            <view class="progress-toggle-btn" @tap.stop="showSchemeProgress = false">
+                                <text class="toggle-icon">－</text>
+                            </view>
+                        </view>
+                    </view>
+                    <view class="progress-detail-bar">
+                        <view class="progress-detail-fill" :style="{ width: schemeProgressDisplay.percent + '%' }"></view>
+                    </view>
+                    <view v-if="schemeProgressDetail.currentGroupName" class="progress-detail-rows">
+                        <view class="progress-detail-row">
+                            <text class="detail-label">当前组</text>
+                            <fui-text :text="schemeProgressDetail.currentGroupName" :size="24" color="#606266"></fui-text>
+                        </view>
+                        <view class="progress-detail-row">
+                            <text class="detail-label">当前阶段</text>
+                            <fui-text :text="schemeProgressDetail.currentState" :size="24" color="#606266"></fui-text>
+                        </view>
+                        <view class="progress-detail-row">
+                            <text class="detail-label">剩余时间</text>
+                            <fui-text :text="schemeProgressDetail.minuteLeftText" :size="24" color="#606266"></fui-text>
+                        </view>
+                    </view>
+                    <view v-else class="progress-detail-rows">
+                        <fui-text :text="'暂无运行中的轮灌组'" :size="24" color="#909399"></fui-text>
+                    </view>
+                </view>
+
                 <!-- 灌溉组搜索过滤 -->
                 <view class="filter-bar">
                     <view class="filter-input">
@@ -153,40 +188,40 @@
                     <fui-text :text="'暂无轮灌组，请先新增或在PC配置后刷新'" :size="26" color="#909399"></fui-text>
                 </view>
                 <view v-else class="group-list">
-                    <view v-for="group in filteredGroups" :key="group.name" class="group-card" :class="getCardStatusClass(group.cur_state)">
+                    <view v-for="group in filteredGroups" :key="group.name" class="group-card" :class="getCardStatusClass(displayGroupState(group))">
                         <view class="group-header">
                             <view class="group-title">
-                                <fui-text :text="group.name" :size="32" :fontWeight="600" :color="getTextColor(group.cur_state)"></fui-text>
+                                <fui-text :text="group.name" :size="32" :fontWeight="600" :color="getTextColor(displayGroupState(group))"></fui-text>
                                 <view class="view-config-btn" @click="viewPolicyConfig(group.name)">
                                     <text class="eye-icon">👁</text>
                                 </view>
                             </view>
-                            <view class="group-state" :class="statusClass(group.cur_state)">
-                                <fui-text :text="group.cur_state || '未知'" :size="22" color="#fff"></fui-text>
+                            <view class="group-state" :class="statusClass(displayGroupState(group))">
+                                <fui-text :text="displayGroupState(group)" :size="22" color="#fff"></fui-text>
                             </view>
                         </view>
                         <view class="group-meta">
                             <view class="meta-item">
                                 <view class="meta-label">面积(亩)</view>
-                                <fui-text :text="formatNumber(group.area)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
+                                <fui-text :text="formatNumber(group.area)" :size="24" :color="getTextColor(displayGroupState(group))"></fui-text>
                             </view>
                             <view class="meta-item">
                                 <view class="meta-label">方式</view>
-                                <fui-text :text="group.method || '-'" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
+                                <fui-text :text="group.method || '-'" :size="24" :color="getTextColor(displayGroupState(group))"></fui-text>
                             </view>
                         </view>
                         <view class="group-meta">
                             <view class="meta-item">
-                                <view class="meta-label">总水量(L)</view>
-                                <fui-text :text="formatNumber(group.total_water)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
+                                <view class="meta-label">已浇水量(L)</view>
+                                <fui-text :text="formatNumber(group.total_water)" :size="24" :color="getTextColor(displayGroupState(group))"></fui-text>
                             </view>
                             <view class="meta-item">
-                                <view class="meta-label">总肥量(L)</view>
-                                <fui-text :text="formatNumber(group.total_fert)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
+                                <view class="meta-label">已施肥量(L)</view>
+                                <fui-text :text="formatGroupFertDisplay(group)" :size="24" :color="getTextColor(displayGroupState(group))"></fui-text>
                             </view>
                             <view class="meta-item">
-                                <view class="meta-label">剩余时间(分)</view>
-                                <fui-text :text="formatMinuteLeft(group.minute_left)" :size="24" :color="getTextColor(group.cur_state)"></fui-text>
+                                <view class="meta-label">剩余时间</view>
+                                <fui-text :text="formatMinuteLeft(group.minute_left)" :size="24" :color="getTextColor(displayGroupState(group))"></fui-text>
                             </view>
                         </view>
                         <view class="valves-row">
@@ -481,31 +516,6 @@
             </view>
         </fui-dialog>
 
-        <!-- 紧急停止对话框 -->
-        <fui-dialog :show="emergencyStopDialogVisible" title="紧急停止" :buttons="emergencyStopDialogButtons"
-            :maskClosable="true" @click="handleEmergencyStopDialogClick" @close="closeEmergencyStopDialog">
-            <view class="emergency-stop-content">
-                <view class="emergency-warning">
-                    <fui-text :text="'请选择需要执行急停的地块：'" :size="26" color="#f56c6c"></fui-text>
-                </view>
-                <view v-if="emergencyStopBlocksLoading" class="emergency-loading">
-                    <fui-text :text="'加载地块中...'" :size="26" color="#909399"></fui-text>
-                </view>
-                <view v-else-if="emergencyStopAvailableBlocks.length === 0" class="emergency-empty">
-                    <fui-text :text="'当前农场下暂无地块设备'" :size="26" color="#909399"></fui-text>
-                </view>
-                <view v-else class="emergency-block-list">
-                    <view v-for="block in emergencyStopAvailableBlocks" :key="block.id"
-                        class="emergency-block-item"
-                        :class="{ selected: isEmergencyStopBlockSelected(block.id) }"
-                        @click="toggleEmergencyStopBlock(block.id)">
-                        <fui-text :text="block.name" :size="28" :color="isEmergencyStopBlockSelected(block.id) ? '#409eff' : '#303133'"></fui-text>
-                        <text class="emergency-block-check">{{ isEmergencyStopBlockSelected(block.id) ? '✓' : '' }}</text>
-                    </view>
-                </view>
-            </view>
-        </fui-dialog>
-
         <!-- 策略配置查看对话框 -->
         <fui-dialog :show="showPolicyConfigDialog" :title="policyConfigTitle" :buttons="policyConfigButtons"
             :maskClosable="true" @click="handlePolicyConfigDialogClick" @close="closePolicyConfigDialog">
@@ -673,8 +683,11 @@ const schemeDialogButtons = ref([
 ])
 const applySchemeLoading = ref(false)
 const runNowLoading = ref(false)
+const pauseSchemeLoading = ref(false)
 const stopSchemeLoading = ref(false)
 const isRunning = ref(false)
+const isPaused = ref(false) // 总策略已暂停（可继续运行）
+const currentPausedGroupName = ref('') // 暂停时正在运行的那一组，用于直观显示「哪组停了」
 const totalPolicyWarningShown = ref(false)
 const scheduleDialogVisible = ref(false)
 const scheduleDate = ref('')
@@ -683,20 +696,10 @@ const scheduleDialogButtons = ref([
     { text: '取消', color: '#909399' },
     { text: '确定', color: '#409eff' }
 ])
+const showSchemeProgress = ref(true) // 当前方案进度卡片显示/隐藏
 const scheduleLoading = ref(false)
 const nextRunTime = ref('') // 方案下次运行时间
 let runningStatusTimer = null // 方案运行状态定时器（仅检查运行中/未运行）
-
-// 紧急停止相关
-const emergencyStopDialogVisible = ref(false)
-const emergencyStopAvailableBlocks = ref([])
-const emergencyStopSelectedBlocks = ref([])
-const emergencyStopLoading = ref(false)
-const emergencyStopBlocksLoading = ref(false)
-const emergencyStopDialogButtons = ref([
-    { text: '取消', color: '#909399' },
-    { text: '执行急停', color: '#f56c6c' }
-])
 
 // 搅拌策略相关
 const mixingStartInterval = ref(60) // 启动间隔，默认60分钟
@@ -789,6 +792,14 @@ const formatMinuteLeft = (val) => {
     if (m === 0) return `${s}秒`
     if (s === 0) return `${m}分`
     return `${m}分${s}秒`
+}
+
+// 浇水/肥前/只浇水时不显示已施肥量，显示 -
+const formatGroupFertDisplay = (group) => {
+    if (waterOnlyMode[group.name]) return '-'
+    const state = displayGroupState(group)
+    if (['浇水', '肥前', '阀门响应', '空闲'].includes(state)) return '-'
+    return formatNumber(group.total_fert)
 }
 
 const parseValves = (valveStr) => {
@@ -898,6 +909,8 @@ const statusClass = (state) => {
             return 'success'
         case '收尾':
             return 'success'
+        case '暂停':
+            return 'warning'
         default:
             return 'info'
     }
@@ -921,6 +934,8 @@ const getCardStatusClass = (state) => {
             return 'status-post-fert'
         case '收尾':
             return 'status-finishing'
+        case '暂停':
+            return 'status-valve-response'
         default:
             return 'status-idle'
     }
@@ -1622,6 +1637,8 @@ const checkRunningStatus = async () => {
                 })
             }
             isRunning.value = false
+            isPaused.value = false
+            currentPausedGroupName.value = ''
             nextRunTime.value = ''
             return
         }
@@ -1633,7 +1650,13 @@ const checkRunningStatus = async () => {
         if (runtimeResponse && runtimeResponse.variables) {
             const variables = JSON.parse(runtimeResponse.variables)
             isRunning.value = variables['需要启动'] === true || variables['需要启动'] === 'true'
-            
+            isPaused.value = variables['已暂停'] === true || variables['已暂停'] === 'true'
+            let nameRaw = variables['当前轮灌组名称']
+            if (nameRaw != null && typeof nameRaw === 'string') {
+                nameRaw = nameRaw.trim().replace(/^"|"$/g, '')
+            }
+            currentPausedGroupName.value = (nameRaw && String(nameRaw).trim()) || ''
+
             // 获取下次启动时间
             const nextStartTime = variables['下次启动时间']
             if (nextStartTime && nextStartTime !== '' && nextStartTime !== '""') {
@@ -1656,14 +1679,59 @@ const checkRunningStatus = async () => {
             }
         } else {
             isRunning.value = false
+            isPaused.value = false
+            currentPausedGroupName.value = ''
             nextRunTime.value = ''
         }
     } catch (error) {
         console.warn('检查运行状态失败:', error)
         isRunning.value = false
+        isPaused.value = false
+        currentPausedGroupName.value = ''
         nextRunTime.value = ''
     }
 }
+
+// 仅当前被暂停的那一组显示「暂停」，其它组显示真实状态，便于直观看出哪组停了
+const displayGroupState = (group) => {
+    if (isPaused.value && group.name === currentPausedGroupName.value) return '暂停'
+    return group.cur_state || '未知'
+}
+
+// 当前方案进度详情（用于轮灌组页上的进度卡片，与 PC 地图一致：已完成数 = 当前组之前的组数 + 当前组是否已完成）
+const schemeProgressDetail = computed(() => {
+    const groups = filteredGroups.value
+    const total = groups.length
+    if (!total) return { completed: 0, total: 0, percent: 0, currentGroupName: '', currentState: '', minuteLeftText: '-' }
+    const curName = currentPausedGroupName.value
+    const idx = curName ? groups.findIndex(g => g.name === curName) : -1
+    const grp = idx >= 0 ? groups[idx] : null
+    let completed = 0
+    if (idx >= 0) {
+        const status = (grp?.cur_state || '').toLowerCase()
+        const hasWater = grp?.total_water && grp.total_water !== '-' && grp.total_water !== 0 && grp.total_water !== '0'
+        const hasFert = grp?.total_fert && grp.total_fert !== '-' && grp.total_fert !== 0 && grp.total_fert !== '0'
+        const currentDone = status.includes('完成') || status.includes('finished') || status.includes('done') || !!hasWater || !!hasFert
+        completed = idx + (currentDone ? 1 : 0)
+    } else {
+        groups.forEach(group => {
+            const status = (group.cur_state || '').toLowerCase()
+            const hasWater = group.total_water && group.total_water !== '-' && group.total_water !== 0 && group.total_water !== '0'
+            const hasFert = group.total_fert && group.total_fert !== '-' && group.total_fert !== 0 && group.total_fert !== '0'
+            if (status.includes('完成') || status.includes('finished') || status.includes('done') || hasWater || hasFert) completed += 1
+        })
+    }
+    completed = Math.min(completed, total)
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+    return {
+        completed,
+        total,
+        percent,
+        currentGroupName: grp ? grp.name : (curName || ''),
+        currentState: grp ? displayGroupState(grp) : '-',
+        minuteLeftText: grp ? formatMinuteLeft(grp.minute_left) : '-'
+    }
+})
 
 // 获取方案详情（包括轮灌组）
 const getSchemeDetails = async (schemeName) => {
@@ -1815,10 +1883,11 @@ const applyScheme = async () => {
     }
 }
 
-// 立即运行方案
+// 开始运行 / 继续运行方案（总策略 需要启动=true；继续时从上一次未完成处执行）
 const runSchemeNow = async () => {
     if (!selectedSchemeId.value || isRunning.value) return
 
+    const wasPaused = isPaused.value
     runNowLoading.value = true
     try {
         const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
@@ -1830,7 +1899,11 @@ const runSchemeNow = async () => {
             is_constant: true
         }, token)
         isRunning.value = true
-        uni.showToast({ title: `方案 ${selectedSchemeId.value} 已启动`, icon: 'success' })
+        isPaused.value = false
+        uni.showToast({
+            title: `方案 ${selectedSchemeId.value} ${wasPaused ? '已继续运行' : '已启动'}`,
+            icon: 'success'
+        })
         await loadGroups()
     } catch (error) {
         uni.showToast({ title: error.err_msg || '启动方案失败', icon: 'none' })
@@ -1839,7 +1912,33 @@ const runSchemeNow = async () => {
     }
 }
 
-// 停止方案
+// 暂停方案：关主泵、关当前轮灌组主泵标记，总策略与灌溉组均显示暂停，已浇/施肥量保留；点“继续运行”从断点接着执行
+const pauseScheme = async () => {
+    if (!selectedSchemeId.value || !isRunning.value) return
+
+    pauseSchemeLoading.value = true
+    try {
+        const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
+        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+        await call_remote('/policy/runtime_assignment', {
+            policy_name: totalPolicyName,
+            variable_name: '需要启动',
+            expression: 'false',
+            is_constant: true,
+            pause_only: true
+        }, token)
+        isRunning.value = false
+        isPaused.value = true
+        uni.showToast({ title: `方案 ${selectedSchemeId.value} 已暂停`, icon: 'success' })
+        await loadGroups()
+    } catch (error) {
+        uni.showToast({ title: error.err_msg || '暂停方案失败', icon: 'none' })
+    } finally {
+        pauseSchemeLoading.value = false
+    }
+}
+
+// 停止方案（总策略完全停止，轮灌组同步停止，下次需“开始运行”重新开始）
 const stopScheme = async () => {
     if (!selectedSchemeId.value) return
 
@@ -1854,6 +1953,7 @@ const stopScheme = async () => {
             is_constant: true
         }, token)
         isRunning.value = false
+        isPaused.value = false
         uni.showToast({ title: `方案 ${selectedSchemeId.value} 已停止`, icon: 'success' })
         await loadGroups()
     } catch (error) {
@@ -1863,96 +1963,21 @@ const stopScheme = async () => {
     }
 }
 
-// 紧急停止：显示对话框并加载当前农场下地块列表
-const showEmergencyStopDialog = async () => {
-    if (!currentFarmName.value) {
-        uni.showToast({ title: '请先选择农场', icon: 'none' })
-        return
-    }
-    emergencyStopDialogVisible.value = true
-    emergencyStopSelectedBlocks.value = []
-    emergencyStopBlocksLoading.value = true
-    try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-        let pageNo = 0
-        let hasMore = true
-        const blockSet = new Set()
-        while (hasMore) {
-            const result = await call_remote('/device_management/list_device', { pageNo, farm_name: currentFarmName.value }, token)
-            const devices = result?.devices || []
-            devices.forEach(d => {
-                const bn = d.block_name || d.blockName
-                if (bn) blockSet.add(bn)
-            })
-            hasMore = devices.length >= 20
-            pageNo++
-        }
-        emergencyStopAvailableBlocks.value = Array.from(blockSet).map(name => ({ id: name, name }))
-    } catch (error) {
-        console.error('加载地块列表失败', error)
-        uni.showToast({ title: '加载地块列表失败', icon: 'none' })
-        emergencyStopAvailableBlocks.value = []
-    } finally {
-        emergencyStopBlocksLoading.value = false
-    }
-}
-
-const toggleEmergencyStopBlock = (blockId) => {
-    const idx = emergencyStopSelectedBlocks.value.indexOf(blockId)
-    if (idx >= 0) {
-        emergencyStopSelectedBlocks.value = emergencyStopSelectedBlocks.value.filter(b => b !== blockId)
+// 主按钮（开始/暂停/继续）的文案与 loading 状态
+const runMainButtonText = computed(() => {
+    if (isRunning.value) return '暂停'
+    if (isPaused.value) return '继续'
+    return '开始'
+})
+const runMainButtonLoading = computed(() => {
+    if (isRunning.value) return pauseSchemeLoading.value
+    return runNowLoading.value
+})
+const onMainRunButtonTap = () => {
+    if (isRunning.value) {
+        pauseScheme()
     } else {
-        emergencyStopSelectedBlocks.value = [...emergencyStopSelectedBlocks.value, blockId]
-    }
-}
-
-const isEmergencyStopBlockSelected = (blockId) => emergencyStopSelectedBlocks.value.includes(blockId)
-
-const closeEmergencyStopDialog = () => {
-    emergencyStopDialogVisible.value = false
-    emergencyStopSelectedBlocks.value = []
-}
-
-const handleEmergencyStopDialogClick = (e) => {
-    if (e.index === 0) {
-        closeEmergencyStopDialog()
-    } else if (e.index === 1) {
-        executeEmergencyStop()
-    }
-}
-
-// 执行紧急停止：设备 + 策略（总策略/供水/施肥/轮灌组）恢复空闲
-const executeEmergencyStop = async () => {
-    if (emergencyStopSelectedBlocks.value.length === 0) {
-        uni.showToast({ title: '请选择至少一个地块', icon: 'none' })
-        return
-    }
-    emergencyStopLoading.value = true
-    try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-        const response = await call_remote('/device_management/emergency_stop', {
-            farm_name: currentFarmName.value,
-            block_names: emergencyStopSelectedBlocks.value
-        }, token)
-        if (response.result) {
-            const stoppedCount = response.stopped_devices ? response.stopped_devices.length : 0
-            const failedCount = response.failed_devices ? response.failed_devices.length : 0
-            const resetPolicyCount = response.reset_policies ? response.reset_policies.length : 0
-            const policyErr = response.policy_reset_error
-            let msg = `急停成功，已停止 ${stoppedCount} 个设备`
-            if (resetPolicyCount > 0) msg += `，${resetPolicyCount} 个策略已恢复空闲`
-            if (policyErr) msg += `（策略恢复异常）`
-            uni.showToast({ title: msg, icon: failedCount > 0 || policyErr ? 'none' : 'success' })
-            closeEmergencyStopDialog()
-            await loadGroups()
-        } else {
-            uni.showToast({ title: '急停执行失败', icon: 'none' })
-        }
-    } catch (error) {
-        console.error('执行急停失败', error)
-        uni.showToast({ title: error.err_msg || '执行急停失败', icon: 'none' })
-    } finally {
-        emergencyStopLoading.value = false
+        runSchemeNow()
     }
 }
 
@@ -2719,6 +2744,106 @@ onShow(async () => {
 
 .scheme-status.stopped {
     background: #c0c4cc;
+}
+
+.scheme-status.paused {
+    background: #e6a23c;
+}
+
+.paused-group-tip {
+    margin-top: 8rpx;
+    padding: 6rpx 12rpx;
+    background: rgba(230, 162, 60, 0.15);
+    border-radius: 8rpx;
+}
+
+.scheme-progress-detail-card {
+    margin-top: 16rpx;
+    margin-bottom: 16rpx;
+    padding: 20rpx 24rpx;
+    background: linear-gradient(135deg, #ecf5ff 0%, #f0f9ff 100%);
+    border-radius: 16rpx;
+    border: 1rpx solid #d9ecff;
+}
+
+.scheme-progress-detail-card .paused-group-tip {
+    display: flex;
+    align-items: center;
+    gap: 8rpx;
+    margin-bottom: 12rpx;
+    padding: 10rpx 14rpx;
+    background: rgba(230, 162, 60, 0.15);
+    border-radius: 10rpx;
+}
+
+.scheme-progress-detail-card .paused-icon {
+    font-size: 28rpx;
+}
+
+.progress-detail-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12rpx;
+}
+
+.progress-title-right {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+}
+
+.progress-ratio {
+    color: #409eff;
+}
+
+.progress-detail-bar {
+    height: 12rpx;
+    border-radius: 999rpx;
+    background: #e4e7ed;
+    overflow: hidden;
+    margin-bottom: 16rpx;
+}
+
+.progress-detail-fill {
+    height: 100%;
+    border-radius: 999rpx;
+    background: linear-gradient(90deg, #409eff, #66b1ff);
+    transition: width 0.3s ease;
+}
+
+.progress-detail-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+}
+
+.progress-toggle-btn {
+    width: 40rpx;
+    height: 40rpx;
+    border-radius: 20rpx;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.12);
+}
+
+.toggle-icon {
+    font-size: 26rpx;
+    color: #909399;
+}
+
+.progress-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+}
+
+.progress-detail-row .detail-label {
+    min-width: 120rpx;
+    font-size: 24rpx;
+    color: #909399;
 }
 
 .scheme-progress {
@@ -3543,44 +3668,6 @@ onShow(async () => {
     font-size: 26rpx;
     background: #f8fafc;
     margin-bottom: 12rpx;
-}
-
-/* 紧急停止对话框 */
-.emergency-stop-content {
-    max-height: 60vh;
-    overflow-y: auto;
-    padding: 20rpx 0;
-}
-.emergency-warning {
-    margin-bottom: 24rpx;
-}
-.emergency-loading,
-.emergency-empty {
-    padding: 40rpx 0;
-    text-align: center;
-}
-.emergency-block-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16rpx;
-}
-.emergency-block-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 24rpx;
-    border-radius: 12rpx;
-    border: 1px solid #e4e7ed;
-    background: #fafafa;
-}
-.emergency-block-item.selected {
-    border-color: #409eff;
-    background: #ecf5ff;
-}
-.emergency-block-check {
-    font-size: 32rpx;
-    color: #409eff;
-    font-weight: 600;
 }
 
 /* 搅拌策略样式 */
