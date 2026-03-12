@@ -2010,6 +2010,14 @@ export default {
                             syncWateringGroupsOnTotalPolicyStop();
                             runtimeState.variables.set('已暂停', false);
                             setFarmPauseStateByTotalPolicy(body.policy_name, false);
+                            // 先暂停后停止：总策略若在「暂停」状态，立即强制回到「空闲」并重置索引，保证再次「开始」从当前组起
+                            if (runtimeState.current_state === '暂停') {
+                                runtimeState.current_state = '空闲';
+                                runtimeState.variables.set('当前轮灌组已启动', false);
+                                runtimeState.variables.set('当前轮灌组名称', '');
+                                runtimeState.variables.set('当前轮灌组索引', -1);
+                                console.log(`[总策略停止] 已从暂停强制回到空闲，当前轮灌组索引=-1: ${body.policy_name}`);
+                            }
                         }
                         if (body.pause_only === true) {
                             setFarmPauseStateByTotalPolicy(body.policy_name, true);
