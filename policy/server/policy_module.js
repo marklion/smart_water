@@ -2848,7 +2848,10 @@ export default {
                         throw { err_msg: `方案文件 不存在，无法恢复（方案: ${schemeId}${farmName ? `, 农场: ${farmName}` : ''}）` };
                     }
 
-                    await cli_runtime_lib.restore_config(filename);
+                    // 清空策略运行时状态，避免上一方案的 总策略/所有轮灌组 等变量残留
+                    policy_runtime_states.clear();
+                    // 先清空配置再按方案文件恢复（排除 web 保留登录），保证后端执行的就是当前方案
+                    await cli_runtime_lib.clearAndRestoreConfig(filename);
                     await new Promise(resolve => setTimeout(resolve, 500));
                     
                     // 设置轮灌组的 scheme_id

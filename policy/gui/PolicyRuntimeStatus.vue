@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Monitor, Loading, Check, Close, Edit } from '@element-plus/icons-vue'
 import UnifiedButton from '../../public/gui/src/components/UnifiedButton.vue'
@@ -119,6 +119,9 @@ const props = defineProps({
     default: null
   }
 })
+
+// 从 MainLayout 获取当前选择的方案，方案切换时刷新策略列表（总策略及所有组）
+const injectedSelectedSchemeId = inject('selectedSchemeId', ref(''))
 
 // 响应式数据
 const policies = ref([])
@@ -495,6 +498,13 @@ watch(() => props.farmName, async (newFarmName) => {
     // 清空当前选中的策略
     selectedPolicy.value = null
     selectedPolicyRuntime.value = null
+  }
+}, { immediate: false })
+
+// 监听方案切换，刷新策略列表（总策略、供水、施肥及所有轮灌组）
+watch(injectedSelectedSchemeId, async (newSchemeId, oldSchemeId) => {
+  if (newSchemeId !== oldSchemeId && newSchemeId) {
+    await refresh()
   }
 }, { immediate: false })
 

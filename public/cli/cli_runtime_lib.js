@@ -162,6 +162,16 @@ export default {
         let content = fs.readFileSync(filename, 'utf-8');
         await this.do_config_batch(content);
     },
+    /** 先清空当前配置再从文件恢复，用于切换方案时保证后端与方案文件一致（总策略、轮灌组等不会残留上一方案）。
+     *  清空时排除 web 子配置，避免会话/登录被清除导致需要重新登录。 */
+    clearAndRestoreConfig: async function (filename) {
+        if (!filename) {
+            filename = default_config_file;
+        }
+        const vorpal = get_vorpal();
+        await cli_utils.clear_config(vorpal, { excludeCommands: ['web'] });
+        await this.restore_config(filename);
+    },
     destroy: function () {
         let vp = get_vorpal();
         let sub_clies = vp.sub_clies;

@@ -170,14 +170,20 @@ export default {
         }
         return ret;
     },
-    clear_config: async function (vorpal) {
+    /** @param {object} vorpal - vorpal 实例
+     *  @param {{ excludeCommands?: string[] }} options - excludeCommands: 不参与清空的子 CLI 命令名（如 ['web'] 可保留登录/会话） */
+    clear_config: async function (vorpal, options) {
+        const excludeCommands = (options && Array.isArray(options.excludeCommands)) ? new Set(options.excludeCommands) : new Set();
         let sub_clies = vorpal.sub_clies;
         if (sub_clies != undefined) {
             for (let sub_cli of sub_clies) {
+                if (excludeCommands.has(sub_cli.command)) {
+                    continue;
+                }
                 let view_name_array = await this.get_view_name_array(sub_cli);
                 for (let view_name of view_name_array) {
                     await this.do_config(vorpal, `${sub_cli.command} '${view_name}'`);
-                    await this.clear_config(sub_cli._vorpalInstance);
+                    await this.clear_config(sub_cli._vorpalInstance, options);
                     await this.do_config(sub_cli._vorpalInstance, 'return');
                     if (view_name != '') {
                         await this.do_config(vorpal, `undo ${sub_cli.command} '${view_name}'`);
