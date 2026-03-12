@@ -60,6 +60,68 @@ function syncWateringGroupsOnTotalPolicyStop() {
     }
 }
 
+function syncPauseTotalPolicy(totalPolicyName, totalRuntimeState) {
+    if (!totalPolicyName || !totalPolicyName.endsWith('总策略')) return;
+    const farmName = totalPolicyName.replace(/-总策略$/, '');
+    const supplyPolicyName = `${farmName}-供水`;
+    const supplyRs = policy_runtime_states.get(supplyPolicyName);
+    if (supplyRs) {
+        supplyRs.variables.set('需要启动', false);
+        console.log(`[总策略暂停] 已关主泵: ${supplyPolicyName}`);
+    }
+    const fertPolicyName = `${farmName}-施肥`;
+    const fertRs = policy_runtime_states.get(fertPolicyName);
+    if (fertRs) {
+        fertRs.variables.set('需要启动', false);
+        console.log(`[总策略暂停] 已关肥泵: ${fertPolicyName}`);
+    }
+    let groupNameRaw = totalRuntimeState.variables.get('当前轮灌组名称');
+    if (groupNameRaw != null && typeof groupNameRaw === 'string') {
+        groupNameRaw = groupNameRaw.trim().replace(/^"|"$/g, '');
+    }
+    const currentGroupName = (groupNameRaw && String(groupNameRaw).trim()) || '';
+    if (currentGroupName) {
+        const groupRs = policy_runtime_states.get(currentGroupName);
+        if (groupRs) {
+            groupRs.variables.set('主泵运行中', false);
+            console.log(`[总策略暂停] 已设轮灌组主泵运行中=false: ${currentGroupName}`);
+        }
+    }
+}
+
+function setFarmPauseStateByTotalPolicy(totalPolicyName, isPaused) {
+    if (!totalPolicyName || !totalPolicyName.endsWith('总策略')) return;
+    const farmName = totalPolicyName.replace(/-总策略$/, '');
+    setFarmPauseState(farmName, isPaused);
+}
+
+function setFarmPauseState(farmName, isPaused) {
+    if (!farmName) return;
+    const now = Date.now();
+    for (const policy of policy_array) {
+        if (!policy.name || !policy.name.startsWith(`${farmName}-`)) continue;
+        const rs = policy_runtime_states.get(policy.name);
+        if (!rs) continue;
+        if (!rs.pause_info) {
+            rs.pause_info = {
+                totalPausedMs: 0,
+                lastPauseStart: null
+            };
+        }
+        const info = rs.pause_info;
+        if (isPaused) {
+            if (!info.lastPauseStart) {
+                info.lastPauseStart = now;
+            }
+        } else {
+            if (info.lastPauseStart) {
+                info.totalPausedMs = (info.totalPausedMs || 0) + (now - info.lastPauseStart);
+                info.lastPauseStart = null;
+            }
+        }
+    }
+}
+
 // 辅助函数：获取传感器数据
 async function getSensorData() {
     // 返回空对象，避免运行时错误
@@ -87,6 +149,22 @@ function parseConstantExpression(expression) {
     return expression;
 }
 
+// 获取某个策略的逻辑当前时间（暂停期间不前进）
+function getLogicalNow(runtimeState) {
+    if (!runtimeState || !runtimeState.pause_info) {
+        return Date.now();
+    }
+    const now = Date.now();
+    const info = runtimeState.pause_info;
+    const totalPausedMs = info.totalPausedMs || 0;
+    if (info.lastPauseStart) {
+        // 正在暂停：当前时间减去累计暂停时长和本次暂停区间
+        return now - totalPausedMs - (now - info.lastPauseStart);
+    }
+    // 非暂停：当前时间减去已累计的暂停时长
+    return now - totalPausedMs;
+}
+
 // 辅助函数：解析动态表达式
 async function parseDynamicExpression(expression, runtimeState) {
     // 检查是否是简单的字符串字面量
@@ -102,11 +180,26 @@ async function parseDynamicExpression(expression, runtimeState) {
     // 使用表达式求值器
     try {
         const evaluator = (await import('../lib/ast_expression_evaluator.js')).default;
+        const variablesContext = runtimeState && runtimeState.variables
+            ? Object.fromEntries(runtimeState.variables)
+            : {};
+
+        // 针对每个策略维护「逻辑时间」：暂停期间 Date.now 不前进
+        const RealDate = Date;
+        function LogicalDate(...args) {
+            // 保持 Date 构造行为不变
+            return new RealDate(...args);
+        }
+        LogicalDate.now = () => getLogicalNow(runtimeState);
+        LogicalDate.UTC = RealDate.UTC;
+        LogicalDate.parse = RealDate.parse;
+        LogicalDate.prototype = RealDate.prototype;
+
         const context = {
-            ...Object.fromEntries(runtimeState.variables),
+            ...variablesContext,
             sensors: await getSensorData(),
             devices: await getDeviceStatus(),
-            Date: Date,
+            Date: LogicalDate,
             Math: Math,
             abs: Math.abs,
             max: Math.max,
@@ -706,20 +799,29 @@ export async function resetPoliciesToIdleForFarm(farm_name) {
             const hasIdleState = policy.states && policy.states.some(s => s.name === idleStateName);
             const targetState = hasIdleState ? idleStateName : (policy.init_state || (policy.states && policy.states[0] && policy.states[0].name) || idleStateName);
 
-            let runtimeState = policy_runtime_states.get(policy.name);
-            if (!runtimeState) {
-                runtimeState = {
-                    current_state: targetState,
-                    variables: new Map(),
-                    last_execution_time: Date.now(),
-                    start_time: Date.now(),
-                    execution_count: 0,
-                    is_first_execution: true
-                };
-                policy_runtime_states.set(policy.name, runtimeState);
-            } else {
-                runtimeState.current_state = targetState;
-            }
+        let runtimeState = policy_runtime_states.get(policy.name);
+        if (!runtimeState) {
+            runtimeState = {
+                current_state: targetState,
+                variables: new Map(),
+                last_execution_time: Date.now(),
+                start_time: Date.now(),
+                execution_count: 0,
+                is_first_execution: true,
+                pause_info: {
+                    totalPausedMs: 0,
+                    lastPauseStart: null
+                }
+            };
+            policy_runtime_states.set(policy.name, runtimeState);
+        } else {
+            runtimeState.current_state = targetState;
+            // 停止/复位时重置暂停信息
+            runtimeState.pause_info = {
+                totalPausedMs: 0,
+                lastPauseStart: null
+            };
+        }
             runtimeState.variables.set('需要启动', false);
             if (policy.name.includes('供水') || policy.name.includes('施肥')) {
                 runtimeState.variables.set('需要重置', true);
@@ -741,6 +843,45 @@ export async function resetPoliciesToIdleForFarm(farm_name) {
         }
     }
     return { result: true, reset_policies };
+}
+
+/**
+ * 用户手动关闭主泵或施肥泵时同步策略变量，避免下一轮策略扫描再次下发 open 导致“必须两个都点关闭才能关掉”。
+ * 将 供水/施肥 的 需要启动 置 false，并将当前轮灌组的 主泵运行中 置 false，
+ * 下一轮扫描会转入空闲并执行 close，两个泵都会关掉。
+ */
+export async function syncStrategyVarsOnPumpManualClose(deviceName) {
+    if (!deviceName || typeof deviceName !== 'string') return;
+    const match = deviceName.match(/^(.+)-(主泵|施肥泵)$/);
+    if (!match) return;
+    const farmName = match[1];
+    const supplyPolicyName = `${farmName}-供水`;
+    const fertPolicyName = `${farmName}-施肥`;
+    const totalPolicyName = `${farmName}-总策略`;
+
+    const supplyRs = policy_runtime_states.get(supplyPolicyName);
+    if (supplyRs) {
+        supplyRs.variables.set('需要启动', false);
+    }
+    const fertRs = policy_runtime_states.get(fertPolicyName);
+    if (fertRs) {
+        fertRs.variables.set('需要启动', false);
+    }
+    const totalRs = policy_runtime_states.get(totalPolicyName);
+    if (totalRs) {
+        let groupNameRaw = totalRs.variables.get('当前轮灌组名称');
+        if (groupNameRaw != null && typeof groupNameRaw === 'string') {
+            groupNameRaw = groupNameRaw.trim().replace(/^"|"$/g, '');
+        }
+        const currentGroupName = (groupNameRaw && String(groupNameRaw).trim()) || '';
+        if (currentGroupName) {
+            const groupRs = policy_runtime_states.get(currentGroupName);
+            if (groupRs) {
+                groupRs.variables.set('主泵运行中', false);
+            }
+        }
+    }
+    console.log(`[手动关泵] 已同步策略变量，设备=${deviceName}，供水/施肥 需要启动=false，当前轮灌组 主泵运行中=false`);
 }
 
 export default {
@@ -1808,7 +1949,8 @@ export default {
                 policy_name: { type: String, mean: '策略名称', example: '策略1', have_to: true },
                 variable_name: { type: String, mean: '变量名', example: 'temp', have_to: true },
                 expression: { type: String, mean: '赋值表达式', example: '30', have_to: true },
-                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true, have_to: false }
+                is_constant: { type: Boolean, mean: '是否为常量表达式', example: true, have_to: false },
+                pause_only: { type: Boolean, mean: '仅暂停（总策略：仅设需要启动=false不同步停止轮灌组，可后续继续运行）', example: false, have_to: false }
             },
             result: {
                 result: { type: Boolean, mean: '操作结果', example: true }
@@ -1828,9 +1970,18 @@ export default {
                             last_execution_time: Date.now(),
                             start_time: Date.now(),
                             execution_count: 0,
-                            is_first_execution: true
+                            is_first_execution: true,
+                            pause_info: {
+                                totalPausedMs: 0,
+                                lastPauseStart: null
+                            }
                         };
                         policy_runtime_states.set(body.policy_name, runtimeState);
+                    } else if (!runtimeState.pause_info) {
+                        runtimeState.pause_info = {
+                            totalPausedMs: 0,
+                            lastPauseStart: null
+                        };
                     }
 
                     // 计算表达式的值
@@ -1842,11 +1993,27 @@ export default {
                     runtimeState.variables.set(body.variable_name, value);
                     console.log(`策略 ${body.policy_name} 运行时变量赋值: ${body.variable_name} = ${value}`);
 
-                    const isTotalPolicyStop = body.policy_name && body.policy_name.endsWith('总策略')
-                        && body.variable_name === '需要启动'
-                        && (value === false || value === 'false');
+                    const isTotalPolicy = body.policy_name && body.policy_name.endsWith('总策略');
+                    const isNeedStartFalse = body.variable_name === '需要启动' && (value === false || value === 'false');
+                    const isNeedStartTrue = body.variable_name === '需要启动' && (value === true || value === 'true');
+
+                    if (isTotalPolicy && isNeedStartTrue) {
+                        runtimeState.variables.set('已暂停', false);
+                        setFarmPauseStateByTotalPolicy(body.policy_name, false);
+                    }
+                    const isTotalPolicyStop = isTotalPolicy && isNeedStartFalse;
                     if (isTotalPolicyStop) {
-                        syncWateringGroupsOnTotalPolicyStop();
+                        if (body.pause_only === true) {
+                            runtimeState.variables.set('已暂停', true);
+                            syncPauseTotalPolicy(body.policy_name, runtimeState);
+                        } else {
+                            syncWateringGroupsOnTotalPolicyStop();
+                            runtimeState.variables.set('已暂停', false);
+                            setFarmPauseStateByTotalPolicy(body.policy_name, false);
+                        }
+                        if (body.pause_only === true) {
+                            setFarmPauseStateByTotalPolicy(body.policy_name, true);
+                        }
                     }
 
                     return { result: true };
@@ -2419,6 +2586,10 @@ export default {
                         start_time: Date.now(),
                         execution_count: 0,
                         is_first_execution: true,
+                        pause_info: {
+                            totalPausedMs: 0,
+                            lastPauseStart: null
+                        },
                         getSource: async function (sourceName) {
                             try {
                                 if (!policy.sources || policy.sources.length === 0) {
@@ -2444,6 +2615,11 @@ export default {
                         }
                     };
                     policy_runtime_states.set(body.policy_name, runtimeState);
+                } else if (!runtimeState.pause_info) {
+                    runtimeState.pause_info = {
+                        totalPausedMs: 0,
+                        lastPauseStart: null
+                    };
                 }
 
                 // 执行表达式
@@ -2833,6 +3009,10 @@ async function processPolicyExecution(policy) {
             start_time: Date.now(),
             execution_count: 0,
             is_first_execution: true, // 标记是否为第一次执行
+            pause_info: {
+                totalPausedMs: 0,
+                lastPauseStart: null
+            },
             // 策略执行逻辑：先检查状态转换，需要转换就直接结束当前周期
             executePolicyCycle: async function (policy, currentState) {
                 console.log(`策略 ${policy.name} 执行第${this.execution_count}次，当前状态: ${this.current_state}，运行时间: ${this.runtime}`);
@@ -2961,7 +3141,7 @@ async function processPolicyExecution(policy) {
     }
     runtimeState.execution_count = (runtimeState.execution_count || 0) + 1;
     runtimeState.last_execution_time = Date.now();
-    const runtimeMinutes = Math.floor((Date.now() - runtimeState.start_time) / 60000);
+    const runtimeMinutes = Math.floor((getLogicalNow(runtimeState) - runtimeState.start_time) / 60000);
     runtimeState.runtime = `${runtimeMinutes}分钟`;
 
     const currentState = policy.states.find(s => s.name === runtimeState.current_state);
@@ -3095,6 +3275,16 @@ async function performStateTransition(policy, fromState, toStateName, runtimeSta
     runtimeState.last_execution_time = Date.now();
     console.log(`[策略扫描] 策略 ${policy.name} current_state 已更新为: ${toStateName}`);
     await executeStateActions(policy, toState, 'enter', runtimeState);
+    // 施肥策略进入空闲时兜底关肥泵，避免配置缺 enter action 时肥泵仍开
+    if (toStateName === '空闲' && policy.name && policy.name.endsWith('-施肥')) {
+        const fertPumpName = policy.name.slice(0, -2) + '施肥泵';
+        try {
+            await executeDeviceAction(fertPumpName, 'close');
+            console.log(`[策略扫描] 施肥策略进入空闲，已兜底关闭肥泵: ${fertPumpName}`);
+        } catch (err) {
+            console.error(`[策略扫描] 兜底关闭肥泵失败: ${fertPumpName}`, err);
+        }
+    }
 }
 
 async function executeDeviceAction(device, action) {

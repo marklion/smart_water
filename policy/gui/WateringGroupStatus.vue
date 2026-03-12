@@ -12,6 +12,12 @@
             </UnifiedButton>
         </div>
 
+        <!-- 已暂停时在轮灌组页面上显示当前停的是哪一组 -->
+        <div v-if="isPaused && currentPausedGroupName" class="paused-group-tip">
+            <el-icon><VideoPause /></el-icon>
+            <span>已暂停 · 当前组：{{ currentPausedGroupName }}</span>
+        </div>
+
         <div class="watering-groups-table">
             <el-table :data="irrigationGroups" border :loading="loading" empty-text="暂无轮灌组数据"
                 :row-class-name="tableRowClassName">
@@ -29,10 +35,10 @@
                 </el-table-column>
                 <el-table-column prop="area" label="面积/亩" width="100" align="center" />
                 <el-table-column prop="method" label="灌溉方式" width="100" align="center" />
-                <el-table-column label="已用水量(L)" width="120" align="center">
+                <el-table-column label="已浇水量(L)" width="120" align="center">
                     <template #header>
-                        <el-tooltip content="仅执行中显示本组当前已执行量，空闲时不显示避免与它组重复" placement="top">
-                            <span>已用水量(L)</span>
+                        <el-tooltip content="当前已浇水量，空闲时显示 -" placement="top">
+                            <span>已浇水量(L)</span>
                         </el-tooltip>
                     </template>
                     <template #default="{ row }">
@@ -41,12 +47,12 @@
                 </el-table-column>
                 <el-table-column label="已施肥量(L)" width="120" align="center">
                     <template #header>
-                        <el-tooltip content="仅执行中显示本组当前已执行量，空闲时不显示避免与它组重复" placement="top">
+                        <el-tooltip content="浇水/肥前/只浇水时无施肥量显示 -" placement="top">
                             <span>已施肥量(L)</span>
                         </el-tooltip>
                     </template>
                     <template #default="{ row }">
-                        {{ formatExecutedAmount(row.total_fert, row.cur_state) }}
+                        {{ formatFertDisplay(row) }}
                     </template>
                 </el-table-column>
                 <el-table-column label="剩余时间" width="120" align="center">
@@ -57,8 +63,8 @@
 
                 <el-table-column prop="cur_state" label="当前状态" width="120" align="center">
                     <template #default="{ row }">
-                        <el-tag :type="getStatusTagType(row.cur_state)" :class="getStatusTagClass(row.cur_state)" size="default" effect="dark" round>
-                            {{ row.cur_state || '未知' }}
+                        <el-tag :type="getStatusTagType(displayState(row))" :class="getStatusTagClass(displayState(row))" size="default" effect="dark" round>
+                            {{ displayState(row) || '未知' }}
                         </el-tag>
                     </template>
                 </el-table-column>
@@ -103,7 +109,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, inject, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { DataLine, Refresh } from '@element-plus/icons-vue'
+import { DataLine, Refresh, VideoPause } from '@element-plus/icons-vue'
 import UnifiedButton from '../../public/gui/src/components/UnifiedButton.vue'
 import call_remote from '../../public/lib/call_remote.js'
 
@@ -126,6 +132,8 @@ const irrigationGroups = ref([])
 const loading = ref(false)
 const quickActionLoading = ref({})
 const waterOnlyMode = ref({}) // 跟踪每个轮灌组的"只浇水"状态（只读展示）
+const isPaused = ref(false)
+const currentPausedGroupName = ref('')
 const selectedSchemeId = computed(() => injectedSelectedSchemeId.value || '')
 let refreshTimerId = null
 
@@ -151,6 +159,20 @@ function formatExecutedAmount(value, curState) {
         return '-'
     }
     return num
+}
+
+// 当前状态：暂停时仅当前组显示「暂停」
+function displayState(row) {
+    if (isPaused.value && row.name === currentPausedGroupName.value) return '暂停'
+    return row.cur_state || '未知'
+}
+
+// 浇水/肥前/只浇水时不显示已施肥量
+function formatFertDisplay(row) {
+    if (waterOnlyMode.value[row.name]) return '-'
+    const state = displayState(row)
+    if (['浇水', '肥前', '阀门响应', '空闲'].includes(state)) return '-'
+    return formatExecutedAmount(row.total_fert, row.cur_state)
 }
 
 // 将后端返回的剩余时间（分钟）格式化为秒级倒计时显示，如 "294秒" 或 "4分54秒"
@@ -203,6 +225,45 @@ const parseWateringGroups = (content) => {
         }
     }
     return Array.from(groups).sort()
+}
+
+// 拉取总策略运行时，用于显示「已暂停」和「当前组」
+const loadTotalPolicyState = async () => {
+    let totalPolicyName = null
+    if (props.farmName) {
+        totalPolicyName = `${props.farmName}-总策略`
+    }
+    if (!totalPolicyName && selectedSchemeId.value) {
+        try {
+            const res = await call_remote('/policy/get_scheme_content', { scheme_name: selectedSchemeId.value })
+            if (res?.content) {
+                const farmMatch = res.content.match(/add\s+farm\s+'([^']+)'/) || res.content.match(/policy\s+'([^']+)-总策略'/)
+                const farmName = farmMatch ? (farmMatch[1].endsWith('总策略') ? farmMatch[1].replace(/-总策略$/, '') : farmMatch[1]) : null
+                if (farmName) totalPolicyName = `${farmName}-总策略`
+            }
+        } catch (e) { /* ignore */ }
+    }
+    if (!totalPolicyName) {
+        isPaused.value = false
+        currentPausedGroupName.value = ''
+        return
+    }
+    try {
+        const rt = await call_remote('/policy/get_policy_runtime', { policy_name: totalPolicyName })
+        if (rt?.variables) {
+            const vars = typeof rt.variables === 'string' ? JSON.parse(rt.variables) : rt.variables
+            isPaused.value = vars['已暂停'] === true || vars['已暂停'] === 'true'
+            let nameRaw = vars['当前轮灌组名称']
+            if (nameRaw != null && typeof nameRaw === 'string') nameRaw = nameRaw.trim().replace(/^"|"$/g, '')
+            currentPausedGroupName.value = (nameRaw && String(nameRaw).trim()) || ''
+        } else {
+            isPaused.value = false
+            currentPausedGroupName.value = ''
+        }
+    } catch (e) {
+        isPaused.value = false
+        currentPausedGroupName.value = ''
+    }
 }
 
 // 加载当前方案中的轮灌组列表
@@ -332,6 +393,7 @@ const loadWateringGroups = async () => {
 
         irrigationGroups.value = transformGroups(filteredGroups)
         await loadWaterOnlyStates()
+        await loadTotalPolicyState()
     } catch (error) {
         ElMessage.error('加载轮灌组数据失败')
         irrigationGroups.value = []
@@ -341,11 +403,11 @@ const loadWateringGroups = async () => {
 }
 
 const tableRowClassName = ({ row }) => {
-    // 统一清洗状态，去除首尾空格
-    const statusRaw = row.cur_state || row.status || ''
-    const status = statusRaw.toString().trim()
-    
-    // 根据固定状态返回对应的CSS类名
+    const status = displayState(row).toString().trim()
+
+    if (status === '暂停') {
+        return 'status-paused'
+    }
     if (status === '空闲') {
         return 'status-idle'
     } else if (status === '阀门响应') {
@@ -370,7 +432,9 @@ const tableRowClassName = ({ row }) => {
 const getStatusTagType = (status) => {
     if (!status) return 'info'
     const statusTrimmed = status.toString().trim()
-    
+
+    if (statusTrimmed === '暂停') return 'warning'
+
     switch (statusTrimmed) {
         case '空闲':
             return 'info'      // 灰色
@@ -394,6 +458,7 @@ const getStatusTagType = (status) => {
 const getStatusTagClass = (status) => {
     if (!status) return ''
     const statusTrimmed = status.toString().trim()
+    if (statusTrimmed === '暂停') return 'tag-paused'
     return statusTrimmed === '阀门响应' ? 'tag-valve-response' : ''
 }
 
@@ -523,6 +588,22 @@ onMounted(() => {
     margin-bottom: 20px;
 }
 
+.paused-group-tip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(230, 162, 60, 0.12);
+    border-radius: 8px;
+    color: #e6a23c;
+    font-weight: 500;
+}
+
+.paused-group-tip .el-icon {
+    font-size: 16px;
+}
+
 .section-title {
     display: flex;
     align-items: center;
@@ -556,6 +637,19 @@ onMounted(() => {
 }
 
 /* 表格行样式 - 根据固定状态显示不同背景颜色 */
+
+/* 0. 暂停状态 - 橙色 */
+:deep(.status-paused) {
+    background: linear-gradient(135deg, #e6a23c 0%, #d48806 100%) !important;
+    transition: all 0.3s ease;
+    border-left: 4px solid #b8860b;
+    color: #ffffff !important;
+}
+:deep(.status-paused:hover) {
+    background: linear-gradient(135deg, #d48806 0%, #b8860b 100%) !important;
+    box-shadow: 0 3px 8px rgba(230, 162, 60, 0.35);
+    transform: translateY(-0.5px);
+}
 
 /* 1. 空闲状态 - 银灰色渐变（待机状态，科技感） */
 :deep(.status-idle) {
@@ -655,6 +749,7 @@ onMounted(() => {
 }
 
 /* 确保文字在深色背景上清晰可见 */
+:deep(.status-paused td),
 :deep(.status-watering td),
 :deep(.status-valve-response td),
 :deep(.status-pre-fert td),
@@ -665,6 +760,7 @@ onMounted(() => {
     color: #ffffff !important;
 }
 
+:deep(.status-paused .el-tag),
 :deep(.status-watering .el-tag),
 :deep(.status-valve-response .el-tag),
 :deep(.status-pre-fert .el-tag),

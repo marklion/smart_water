@@ -3,16 +3,50 @@
 
         <div id="amap-container" class="amap-container"></div>
 
-        <!-- 轮灌组进度卡片（左下角） -->
-        <div v-if="schemeProgress.total > 0" class="scheme-progress-card">
-            <div class="progress-header">
-                <span class="progress-title">当前方案进度</span>
-                <span class="progress-text">{{ schemeProgress.completed }} / {{ schemeProgress.total }}</span>
+        <!-- 轮灌组进度卡片：左侧进度+当前组详情，分割线，右侧各组执行情况（两列） -->
+        <div v-if="showSchemeProgressCard" class="scheme-progress-card">
+            <div class="scheme-progress-card-left">
+                <div class="progress-header">
+                    <span class="progress-title">当前方案进度</span>
+                    <span v-if="currentSchemeId && schemeProgress.total > 0" class="progress-text">已完成 {{ displayProgress.completed }} / {{ displayProgress.total }} 组</span>
+                    <span v-else-if="currentSchemeId" class="progress-text">暂无轮灌组</span>
+                    <span v-else class="progress-text">请选择方案</span>
+                </div>
+                <template v-if="currentSchemeId && schemeProgress.total > 0">
+                    <el-progress :percentage="displayProgress.percent" :stroke-width="12" :status="displayProgress.percent >= 100 ? 'success' : undefined" />
+                </template>
+                <div v-else class="progress-placeholder">{{ currentSchemeId ? '请运行方案后查看进度' : '在顶部选择当前运行方案' }}</div>
+                <div v-if="schemeProgressDetail.currentGroupName" class="progress-detail">
+                    <div class="progress-detail-row">
+                        <span class="detail-label">当前组</span>
+                        <span class="detail-value">{{ schemeProgressDetail.currentGroupName }}</span>
+                    </div>
+                    <div class="progress-detail-row">
+                        <span class="detail-label">当前阶段</span>
+                        <span class="detail-value" :class="{ 'state-paused': schemeProgressDetail.isPaused }">{{ schemeProgressDetail.currentState }}</span>
+                    </div>
+                    <div class="progress-detail-row">
+                        <span class="detail-label">剩余时间</span>
+                        <span class="detail-value">{{ schemeProgressDetail.minuteLeft }}</span>
+                    </div>
+                </div>
             </div>
-            <el-progress :percentage="schemeProgress.percent" :stroke-width="10" status="success" />
+            <div class="scheme-progress-card-divider"></div>
+            <div class="scheme-progress-card-right">
+                <div class="progress-groups-title">各组执行情况</div>
+                <template v-if="groupProgressList.length">
+                    <div class="progress-groups-grid">
+                        <div v-for="g in groupProgressList" :key="g.name" class="group-row">
+                            <span class="detail-value">{{ g.name }}</span>
+                            <span :class="g.done ? 'detail-done' : (g.running ? 'detail-running' : 'detail-undone')">{{ g.done ? '已执行' : (g.running ? '执行中' : '未执行') }}</span>
+                        </div>
+                    </div>
+                </template>
+                <div v-else class="progress-placeholder">暂无轮灌组数据</div>
+            </div>
         </div>
 
-        <UnifiedControlPanel :devices="devices" @open-wizard="showPolicyConfigWizard"
+        <UnifiedControlPanel v-if="showControlPanels" :devices="devices" @open-wizard="showPolicyConfigWizard"
             @device-click="handleDeviceClick" />
 
 
@@ -52,19 +86,20 @@
             </el-dropdown>
 
             <el-button-group class="control-group">
-                <el-button size="small" @click="zoomIn">
-                    <el-icon>
-                        <ZoomIn />
-                    </el-icon>
-                </el-button>
-                <el-button size="small" @click="zoomOut">
-                    <el-icon>
-                        <ZoomOut />
-                    </el-icon>
-                </el-button>
                 <el-button size="small" @click="resetView">
                     <el-icon>
                         <Refresh />
+                    </el-icon>
+                </el-button>
+                <el-button size="small" @click="toggleSchemeProgressCard" :title="showSchemeProgressCard ? '隐藏方案进度卡片' : '显示方案进度卡片'">
+                    <el-icon>
+                        <Grid />
+                    </el-icon>
+                </el-button>
+                <el-button size="small" @click="toggleControlPanels" :title="showControlPanels ? '隐藏控制面板与搅拌策略' : '显示控制面板与搅拌策略'">
+                    <el-icon>
+                        <Close v-if="showControlPanels" />
+                        <Grid v-else />
                     </el-icon>
                 </el-button>
             </el-button-group>
@@ -197,13 +232,12 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch, getCurrentInstance, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, Warning, CircleCheck, CircleClose, Setting, Plus, Delete, CopyDocument, ArrowLeft, ArrowRight, FullScreen, Check, View } from '@element-plus/icons-vue'
+import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
 import UnifiedControlPanel from './UnifiedControlPanel.vue'
 import {
     getDeviceType,
-    hasDeviceCapability,
     hasAnyDeviceCapability,
     formatRuntimeInfoDisplay,
     LOW_BATTERY_VOLTAGE_THRESHOLD,
@@ -235,11 +269,15 @@ const props = defineProps({
     zoom: {
         type: Number,
         default: mapConfig.defaultZoom
+    },
+    showControlPanels: {
+        type: Boolean,
+        default: true
     }
 })
 
 
-const emit = defineEmits(['device-click'])
+const emit = defineEmits(['device-click', 'toggle-control-panels'])
 
 // 轮灌组进度
 const schemeProgress = ref({
@@ -247,6 +285,25 @@ const schemeProgress = ref({
     total: 0,
     percent: 0
 })
+
+// 当前方案进度详情（当前组、阶段、剩余时间）
+const schemeProgressDetail = ref({
+    currentGroupName: '',
+    currentState: '',
+    minuteLeft: '',
+    isPaused: false
+})
+
+// 方案执行到 100% 后保持显示 100%，直到切换方案才清除
+const completedHundredSchemeId = ref('')
+// 各组执行状态（每次拉取后更新）：name + done
+const groupProgressList = ref([])
+// 是否显示「当前方案进度」卡片
+const showSchemeProgressCard = ref(true)
+
+const toggleSchemeProgressCard = () => {
+    showSchemeProgressCard.value = !showSchemeProgressCard.value
+}
 
 const currentSchemeId = computed(() => {
     if (injectedSelectedSchemeId && injectedSelectedSchemeId.value) return injectedSelectedSchemeId.value
@@ -261,10 +318,37 @@ const currentSchemeId = computed(() => {
     return ''
 })
 
+// 从方案内容解析农场名以得到总策略名
+const getTotalPolicyNameFromScheme = async (schemeName) => {
+    try {
+        const res = await call_remote('/policy/get_scheme_content', { scheme_name: schemeName })
+        if (!res?.content) return null
+        const farmMatch = res.content.match(/add\s+farm\s+'([^']+)'/) || res.content.match(/policy\s+'([^']+)-总策略'/)
+        const farmName = farmMatch ? (farmMatch[1].endsWith('总策略') ? farmMatch[1].replace(/-总策略$/, '') : farmMatch[1]) : null
+        return farmName ? `${farmName}-总策略` : null
+    } catch (e) {
+        return null
+    }
+}
+
+const formatMinuteLeft = (val) => {
+    if (val === undefined || val === null || val === '') return '-'
+    const num = Number(val)
+    if (!Number.isFinite(num)) return '-'
+    if (num < 0) return '0分0秒'
+    const totalSeconds = Math.max(0, Math.ceil(num * 60))
+    const m = Math.floor(totalSeconds / 60)
+    const s = totalSeconds % 60
+    if (m === 0) return `${s}秒`
+    if (s === 0) return `${m}分`
+    return `${m}分${s}秒`
+}
+
 const loadSchemeProgress = async () => {
     const schemeId = currentSchemeId.value
     if (!schemeId) {
         schemeProgress.value = { completed: 0, total: 0, percent: 0 }
+        schemeProgressDetail.value = { currentGroupName: '', currentState: '', minuteLeft: '', isPaused: false }
         return
     }
     try {
@@ -275,31 +359,111 @@ const loadSchemeProgress = async () => {
         if (response && response.groups) {
             const groups = response.groups
             const total = response.total || groups.length
+            const totalPolicyName = await getTotalPolicyNameFromScheme(schemeId)
+            let curName = ''
+            let isPaused = false
+            if (totalPolicyName) {
+                try {
+                    const rt = await call_remote('/policy/get_policy_runtime', { policy_name: totalPolicyName })
+                    if (rt?.variables) {
+                        const vars = typeof rt.variables === 'string' ? JSON.parse(rt.variables) : rt.variables
+                        let n = vars['当前轮灌组名称']
+                        if (n != null && typeof n === 'string') n = n.trim().replace(/^"|"$/g, '')
+                        curName = n || ''
+                        isPaused = vars['已暂停'] === true || vars['已暂停'] === 'true'
+                    }
+                } catch (e) {}
+            }
+            const found = (curName && groups.find(g => g.name === curName)) || null
+            schemeProgressDetail.value = {
+                currentGroupName: found ? found.name : (curName || ''),
+                currentState: found ? (isPaused ? '暂停' : (found.cur_state || '-')) : '-',
+                minuteLeft: found ? formatMinuteLeft(found.minute_left) : '-',
+                isPaused
+            }
+            // 仅用状态判断“真完成”（完成/空闲），不用水量肥量——进行中也会累加，会导致肥前就显示 100%
+            const isStateDone = (s) => {
+                const st = (s || '').toLowerCase()
+                return st.includes('完成') || st.includes('空闲') || st.includes('finished') || st.includes('done') || st.includes('idle')
+            }
             let completed = 0
-            groups.forEach(group => {
-                const status = (group.cur_state || '').toLowerCase()
-                const hasWater = group.total_water && group.total_water !== '-' && group.total_water !== 0 && group.total_water !== '0'
-                const hasFert = group.total_fert && group.total_fert !== '-' && group.total_fert !== 0 && group.total_fert !== '0'
-                if (status.includes('完成') || status.includes('finished') || status.includes('done') || hasWater || hasFert) {
-                    completed += 1
-                }
-            })
+            const idx = curName ? groups.findIndex(g => g.name === curName) : -1
+            if (idx >= 0) {
+                const currentDone = isStateDone(groups[idx].cur_state)
+                completed = idx + (currentDone ? 1 : 0)
+            } else {
+                groups.forEach(group => { if (isStateDone(group.cur_state)) completed += 1 })
+            }
+            completed = Math.min(completed, total)
             const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+            if (idx >= 0 && !isStateDone(groups[idx].cur_state) && completedHundredSchemeId.value === (schemeId || '').trim()) {
+                completedHundredSchemeId.value = ''
+            }
+            // 每组：按“当前组”位置判断；当前组之前的=已执行，当前组=看状态(执行中/已执行)，当前组之后的=未执行（不沿用后端旧状态）
+            const list = groups.map((g, i) => {
+                const pastBy = idx >= 0 && i < idx
+                const isCurrent = idx >= 0 && i === idx
+                const currentDone = isCurrent && isStateDone(g.cur_state)
+                const done = pastBy || currentDone
+                const running = isCurrent && !currentDone
+                return { name: g.name, done, running }
+            })
+            groupProgressList.value = list
+            if (percent >= 100 && total > 0) completedHundredSchemeId.value = (schemeId || '').trim()
             schemeProgress.value = { completed, total, percent }
         } else {
             schemeProgress.value = { completed: 0, total: 0, percent: 0 }
+            schemeProgressDetail.value = { currentGroupName: '', currentState: '', minuteLeft: '', isPaused: false }
+            groupProgressList.value = []
         }
     } catch (error) {
         console.warn('加载方案进度失败:', error)
         schemeProgress.value = { completed: 0, total: 0, percent: 0 }
+        schemeProgressDetail.value = { currentGroupName: '', currentState: '', minuteLeft: '', isPaused: false }
+        groupProgressList.value = []
     }
 }
 
+// 当前组若还在跑（非完成/空闲），不强制 100%
+const isCurrentGroupIdle = computed(() => {
+    const s = (schemeProgressDetail.value.currentState || '').toLowerCase()
+    return s.includes('完成') || s.includes('空闲') || s.includes('finished') || s.includes('idle') || !schemeProgressDetail.value.currentGroupName
+})
+
+// 展示用进度：执行完后保持 100%，但若当前组仍在执行则用实际进度
+const displayProgress = computed(() => {
+    const raw = schemeProgress.value
+    const schemeId = currentSchemeId.value
+    const keepHundred = schemeId && completedHundredSchemeId.value === schemeId && raw.total > 0 && isCurrentGroupIdle.value
+    return {
+        completed: keepHundred ? raw.total : raw.completed,
+        total: raw.total,
+        percent: keepHundred ? 100 : raw.percent
+    }
+})
+
+// 有当前方案时每 1 秒刷新进度
+let schemeProgressTimer = null
+watch(() => schemeProgress.value.total, (total) => {
+    if (schemeProgressTimer) {
+        clearInterval(schemeProgressTimer)
+        schemeProgressTimer = null
+    }
+    if (total > 0) {
+        schemeProgressTimer = setInterval(() => loadSchemeProgress(), 1000)
+    }
+}, { immediate: true })
+
 watch(currentSchemeId, async (newVal, oldVal) => {
+    if (newVal !== oldVal) {
+        completedHundredSchemeId.value = ''
+        groupProgressList.value = []
+    }
     if (newVal && newVal !== oldVal) {
         await loadSchemeProgress()
     } else if (!newVal) {
         schemeProgress.value = { completed: 0, total: 0, percent: 0 }
+        schemeProgressDetail.value = { currentGroupName: '', currentState: '', minuteLeft: '', isPaused: false }
     }
 })
 
@@ -316,6 +480,10 @@ const runtimeInfoAutoRefresh = createRuntimeInfoAutoRefresh(
     () => refreshRuntimeInfo(),
     30000
 )
+
+const toggleControlPanels = () => {
+    emit('toggle-control-panels')
+}
 
 // 运行时信息展示用（电池电压 -> 电量百分比）
 const formattedRuntimeInfo = computed(() =>
@@ -914,6 +1082,12 @@ watch(() => props.center, (newCenter) => {
 })
 
 
+const onSchemeStarted = () => {
+    completedHundredSchemeId.value = ''
+    groupProgressList.value = []
+    loadSchemeProgress()
+}
+
 onMounted(async () => {
     nextTick(() => {
         initMap()
@@ -921,11 +1095,16 @@ onMounted(async () => {
 
     checkScanStatus()
     await loadSchemeProgress()
+    window.addEventListener('schemeStarted', onSchemeStarted)
 })
 
 
 onUnmounted(() => {
-
+    window.removeEventListener('schemeStarted', onSchemeStarted)
+    if (schemeProgressTimer) {
+        clearInterval(schemeProgressTimer)
+        schemeProgressTimer = null
+    }
     stopRuntimeInfoAutoRefresh()
 
     if (map) {
@@ -962,41 +1141,10 @@ onUnmounted(() => {
 }
 
 
-.unified-control-panel {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 1000;
-    display: flex;
-    background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
-    border-radius: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.8);
-    box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.12),
-        0 2px 8px rgba(0, 0, 0, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    overflow: hidden;
-    min-width: 800px;
-    max-width: 1000px;
-}
-
-.unified-control-panel:hover {
-    border-color: rgba(64, 158, 255, 0.3);
-    box-shadow:
-        0 12px 40px rgba(0, 0, 0, 0.15),
-        0 4px 12px rgba(0, 0, 0, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.9);
-}
-
-
-.emergency-section {
-    padding: 20px 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-width: 200px;
-    border-right: 1px solid rgba(0, 0, 0, 0.06);
+/* 方案控制面板：仅缩短宽度 */
+:deep(.unified-control-panel) {
+    min-width: 520px;
+    max-width: 600px;
 }
 
 .section-header {
@@ -1018,47 +1166,12 @@ onUnmounted(() => {
     letter-spacing: 0.5px;
 }
 
-.emergency-stop-btn {
-    background: linear-gradient(135deg, #ff4757, #ff3742);
-    border: none;
-    box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
-    transition: all 0.3s ease;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    padding: 0 24px;
-    font-size: 14px;
-    height: 44px;
-    border-radius: 8px;
-}
-
-.emergency-stop-btn:hover {
-    background: linear-gradient(135deg, #ff3742, #ff2f3a);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
-}
-
-
 .control-divider {
     width: 1px;
     background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.1), transparent);
     margin: 16px 0;
 }
 
-
-.policy-section {
-    padding: 20px 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    flex: 1;
-}
-
-.policy-controls {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    flex-wrap: wrap;
-}
 
 .period-input-wrapper {
     display: flex;
@@ -1173,18 +1286,6 @@ onUnmounted(() => {
     letter-spacing: 0.5px;
 }
 
-.emergency-stop-btn:hover {
-    background: linear-gradient(135deg, #ff3742, #ff2f3a);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(255, 71, 87, 0.4);
-}
-
-.emergency-stop-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
-}
-
-
 .map-controls {
     position: absolute;
     top: 20px;
@@ -1200,10 +1301,11 @@ onUnmounted(() => {
     left: 20px;
     bottom: 20px;
     z-index: 10000;
-    min-width: 260px;
-    max-width: 320px;
-    padding: 12px 16px;
+    min-width: 280px;
+    max-width: 90%;
+    padding: 14px 18px;
     border-radius: 16px;
+    font-size: 14px;
     background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
     border: 2px solid rgba(255, 255, 255, 0.8);
     box-shadow:
@@ -1213,25 +1315,75 @@ onUnmounted(() => {
     backdrop-filter: blur(10px);
     color: #303133;
     display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+}
+
+.scheme-progress-card-left {
+    flex: 0 0 auto;
+    min-width: 172px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 14px;
+}
+
+.scheme-progress-card-divider {
+    width: 1px;
+    background: rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+}
+
+.scheme-progress-card-right {
+    flex: 1 1 auto;
+    min-width: 132px;
+    display: flex;
     flex-direction: column;
     gap: 8px;
+    padding-left: 14px;
+}
+
+.scheme-progress-card-right .progress-groups-title {
+    font-size: 14px;
+    color: #909399;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+/* 固定两行，按组数自动增加列数，组件横向拉长，不滚动 */
+.scheme-progress-card-right .progress-groups-grid {
+    display: grid;
+    grid-template-rows: repeat(2, auto);
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(78px, 1fr);
+    gap: 6px 12px;
 }
 
 .scheme-progress-card .progress-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 13px;
+    font-size: 15px;
 }
 
 .scheme-progress-card .progress-title {
     font-weight: 600;
     letter-spacing: 0.5px;
+    font-size: 15px;
 }
 
 .scheme-progress-card .progress-text {
-    font-size: 12px;
+    font-size: 14px;
     color: #909399;
+    font-weight: 500;
+}
+
+.scheme-progress-card .progress-placeholder {
+    font-size: 14px;
+    color: #909399;
+    padding: 8px 0;
+    min-height: 26px;
 }
 
 .scheme-progress-card :deep(.el-progress-bar__outer) {
@@ -1244,6 +1396,70 @@ onUnmounted(() => {
 
 .scheme-progress-card :deep(.el-progress__text) {
     color: #303133;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.scheme-progress-card-left .progress-detail {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.scheme-progress-card .progress-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.scheme-progress-card .detail-label {
+    min-width: 72px;
+    color: #909399;
+    font-size: 14px;
+}
+
+.scheme-progress-card .detail-value {
+    color: #303133;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.scheme-progress-card .detail-value.state-paused {
+    color: #e6a23c;
+}
+
+.scheme-progress-card .detail-value.detail-done {
+    color: #22c55e;
+}
+
+.scheme-progress-card .detail-value.detail-undone {
+    color: #909399;
+}
+
+.scheme-progress-card-right .group-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.scheme-progress-card .group-row .detail-done {
+    color: #22c55e;
+    font-weight: 600;
+}
+
+.scheme-progress-card .group-row .detail-undone {
+    color: #909399;
+}
+
+.scheme-progress-card .group-row .detail-running {
+    color: #409eff;
+    font-weight: 600;
 }
 
 .map-type-tag {
@@ -1751,58 +1967,4 @@ onUnmounted(() => {
 }
 
 
-.emergency-stop-content {
-    padding: 20px;
-}
-
-.emergency-warning {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 24px;
-    padding: 16px;
-    background: linear-gradient(135deg, #fff5f5, #ffe6e6);
-    border-radius: 8px;
-    border-left: 4px solid #f56c6c;
-    font-size: 16px;
-    font-weight: 600;
-    color: #d32f2f;
-}
-
-.block-selection {
-    margin-bottom: 24px;
-    max-height: 300px;
-    overflow-y: auto;
-    border: 1px solid #e4e7ed;
-    border-radius: 8px;
-    padding: 16px;
-    background: #fafafa;
-}
-
-.block-checkbox {
-    display: block;
-    margin-bottom: 12px;
-    padding: 8px 12px;
-    background: white;
-    border-radius: 6px;
-    border: 1px solid #e4e7ed;
-    transition: all 0.2s ease;
-}
-
-.block-checkbox:hover {
-    background: #f5f7fa;
-    border-color: #409eff;
-}
-
-.block-checkbox:last-child {
-    margin-bottom: 0;
-}
-
-.emergency-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    padding-top: 16px;
-    border-top: 1px solid #e4e7ed;
-}
 </style>
