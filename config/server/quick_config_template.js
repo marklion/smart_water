@@ -506,6 +506,7 @@ policy
       enter crossAssignment 'false' 'prs.variables.get("当前轮灌组名称")' '主泵运行中' 'false'
       transformer 'next'
         rule 'false' '工作' 'prs.variables.get("需要启动") == true'
+        rule 'false' '空闲' 'prs.variables.get("需要启动") == false && prs.variables.get("已暂停") == false'
       return
     return
     state '异常'
