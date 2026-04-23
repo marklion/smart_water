@@ -51,7 +51,6 @@
                         <view class="scheme-name-card">
                             <text class="form-label">方案名称</text>
                             <input class="scheme-input" v-model="schemeName" placeholder="请输入方案名称" />
-                            <text class="scheme-hint">最终会生成类似 plan_{{ schemeName || '方案名称' }}.txt 的方案文件</text>
                         </view>
                     </view>
 
