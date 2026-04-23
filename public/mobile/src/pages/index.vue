@@ -7,9 +7,6 @@
     <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
       <!-- 内容区域 -->
       <view class="content">
-        <!-- 天气卡片 - 第一个位置 -->
-        <WeatherCard />
-
         <!-- 基本信息卡片 -->
         <BasicInfoCard ref="basicInfoCardRef" :farmName="currentFarmName" />
 
@@ -29,13 +26,11 @@
 <script setup>
 import { ref, nextTick } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import call_remote from '../../../lib/call_remote.js'
 import PageHeader from '../components/PageHeader.vue'
 import Loading from '../components/Loading.vue'
 import BasicInfoCard from './monitoring/BasicInfoCard.vue'
 import RealtimeDataCard from './monitoring/RealtimeDataCard.vue'
 import DataPanelCard from './monitoring/DataPanelCard.vue'
-import WeatherCard from './monitoring/WeatherCard.vue'
 
 const refreshing = ref(false)
 const pageLoading = ref(false)

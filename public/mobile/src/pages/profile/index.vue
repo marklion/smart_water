@@ -7,6 +7,9 @@
         <scroll-view class="content-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="content">
                 <!-- 用户信息卡片 -->
+                <!-- 天气卡片 -->
+                <WeatherCard />
+
                 <view class="user-card">
                     <view class="user-avatar">
                         <fui-text :text="userInitial" :size="48" :fontWeight="700" color="#ffffff"></fui-text>
@@ -43,10 +46,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import call_remote from '../../../../lib/call_remote.js'
 import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
+import WeatherCard from '../monitoring/WeatherCard.vue'
 
 const refreshing = ref(false)
 const userInfo = ref('')

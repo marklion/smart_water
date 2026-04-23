@@ -7,9 +7,6 @@
         <scroll-view class="device-list-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="device-list">
                 <view class="filter-bar">
-                    <view class="filter-title">
-                        <fui-text :text="'设备类型筛选'" :size="26" color="#606266"></fui-text>
-                    </view>
                     <picker mode="selector" :range="deviceTypeOptions" range-key="label" @change="onTypeChange">
                         <view class="filter-pill">
                             <text class="filter-icon">🔍</text>
@@ -50,11 +47,6 @@
                                     <fui-text :text="device.device_name" :size="32" :fontWeight="600"
                                         color="#303133"></fui-text>
                                 </view>
-                                <view class="status-badge" :class="device.is_online ? 'online' : 'offline'">
-                                    <view class="status-dot"></view>
-                                    <fui-text :text="device.is_online ? '在线' : '离线'" :size="22"
-                                        :color="device.is_online ? '#67C23A' : '#909399'"></fui-text>
-                                </view>
                             </view>
                             <view class="device-meta">
                                 <view class="meta-item">
@@ -90,9 +82,7 @@
                                 <view v-if="device.is_online !== undefined" class="runtime-info-item online-status-item"
                                     :class="device.is_online ? 'online' : 'offline'">
                                     <view class="info-label">
-                                        <view class="status-icon" :class="device.is_online ? 'online' : 'offline'">
-                                        </view>
-                                        <fui-text :text="'设备在线状态：'" :size="24" color="#606266"></fui-text>
+                                        <fui-text :text="'是否在线：'" :size="24" color="#606266"></fui-text>
                                     </view>
                                     <view class="info-value" :class="device.is_online ? 'online' : 'offline'">
                                         <fui-text :text="device.is_online ? '在线' : '离线'" :size="24"
@@ -100,12 +90,14 @@
                                     </view>
                                 </view>
                                 <!-- 其他运行时信息 -->
-                                <view v-for="(info, idx) in device.runtime_info" :key="idx" class="runtime-info-item">
+                                <view v-for="(info, idx) in device.runtime_info" :key="idx" class="runtime-info-item"
+                                    :class="getRuntimeInfoItemClass(info)">
                                     <view class="info-label">
-                                        <fui-text :text="info.title + '：'" :size="24" color="#606266"></fui-text>
+                                        <fui-text :text="formatRuntimeTitle(info.title) + '：'" :size="24" color="#606266"></fui-text>
                                     </view>
-                                    <view class="info-value">
-                                        <fui-text :text="info.text" :size="24" color="#303133"></fui-text>
+                                    <view class="info-value" :class="getRuntimeInfoStateClass(info)">
+                                        <fui-text :text="getRuntimeInfoDisplayText(info)" :size="24"
+                                            :color="getRuntimeInfoValueColor(info)"></fui-text>
                                     </view>
                                 </view>
                             </view>
@@ -116,10 +108,15 @@
                             <view class="normal-control-section">
                                 <view class="section-header">
                                     <fui-text :text="'设备控制'" :size="26" :fontWeight="600" color="#303133"></fui-text>
+                                    <view v-if="getDeviceCapabilities(device).length > 0" class="toggle-capability-btn"
+                                        @click="toggleCapabilityVisible(device)">
+                                        <fui-text :text="isCapabilityVisible(device) ? '收起动作集' : '显示动作集'" :size="22"
+                                            color="#409eff"></fui-text>
+                                    </view>
                                 </view>
 
                                 <!-- 能力集显示 -->
-                                <view class="capability-section">
+                                <view v-if="isCapabilityVisible(device)" class="capability-section">
                                     <view class="capability-tags">
                                         <view v-for="cap in getDeviceCapabilities(device)" :key="cap"
                                             class="capability-tag">
@@ -269,6 +266,7 @@ const currentFarmName = ref('')
 const pageHeaderRef = ref(null)
 const pageLoading = ref(false)
 const isFirstLoad = ref(true) // 标记是否是首次加载
+const capabilityVisibleMap = ref({})
 
 // 添加轮灌阀门相关状态（与 Web 端接口一致）
 const showAddValveDialog = ref(false)
@@ -353,7 +351,7 @@ const getDeviceButtonConfig = (deviceCapabilities) => {
         }))
 }
 
-// 获取设备按钮分组（开启和关闭按钮放在同一行，其他按钮各自一行）
+// 获取设备按钮分组（开启/关闭/读取放在同一行，其他按钮各自一行）
 const getDeviceButtonGroups = (device) => {
     if (!device) return []
 
@@ -368,38 +366,22 @@ const getDeviceButtonGroups = (device) => {
     const buttonConfigs = getDeviceButtonConfig(capabilities)
     const groups = []
 
-    // 检查是否有开启和关闭按钮
-    const openButton = buttonConfigs.find(config => config.capability === 'open')
-    const closeButton = buttonConfigs.find(config => config.capability === 'close')
+    const primaryOrder = ['open', 'close', 'readout']
+    const primaryButtons = primaryOrder
+        .map(cap => buttonConfigs.find(config => config.capability === cap))
+        .filter(Boolean)
 
-    if (openButton && closeButton) {
-        // 开启和关闭按钮放在同一行
+    if (primaryButtons.length > 0) {
         groups.push({
-            key: 'open-close-group',
+            key: 'primary-control-group',
             containerClass: 'control-row',
-            buttons: [openButton, closeButton]
+            buttons: primaryButtons
         })
-    } else {
-        // 如果只有一个，单独显示
-        if (openButton) {
-            groups.push({
-                key: 'open-group',
-                containerClass: 'control-column',
-                buttons: [openButton]
-            })
-        }
-        if (closeButton) {
-            groups.push({
-                key: 'close-group',
-                containerClass: 'control-column',
-                buttons: [closeButton]
-            })
-        }
     }
 
     // 其他按钮各自一行
     const otherButtons = buttonConfigs.filter(config =>
-        config.capability !== 'open' && config.capability !== 'close'
+        !primaryOrder.includes(config.capability)
     )
 
     otherButtons.forEach(button => {
@@ -421,6 +403,15 @@ const getDeviceCapabilities = (device) => {
     } catch (e) {
         return []
     }
+}
+
+const isCapabilityVisible = (device) => {
+    return !!capabilityVisibleMap.value[device.device_name]
+}
+
+const toggleCapabilityVisible = (device) => {
+    const key = device.device_name
+    capabilityVisibleMap.value[key] = !capabilityVisibleMap.value[key]
 }
 
 // 空状态提示信息
@@ -445,6 +436,61 @@ const capabilityNameMap = {
 
 const getCapabilityName = (cap) => {
     return capabilityNameMap[cap] || cap
+}
+
+// 运行时信息标题显示映射
+const runtimeTitleMap = {
+    开关是否打开: '是否打开',
+    阀门是否打开: '是否打开',
+    当前仪表读数: '当前读数',
+    当前仪表累计读数: '累计读数',
+    当前压力值: '当前压力'
+}
+
+const formatRuntimeTitle = (title = '') => {
+    return runtimeTitleMap[title] || title
+}
+
+const isSwitchStatusInfo = (info) => {
+    return formatRuntimeTitle(info?.title || '') === '是否打开'
+}
+
+const normalizeRuntimeBoolean = (value) => {
+    const text = String(value ?? '').trim().toLowerCase()
+    if (['true', '1', 'yes', 'on', '打开', '在线'].includes(text)) return true
+    if (['false', '0', 'no', 'off', '关闭', '离线'].includes(text)) return false
+    return null
+}
+
+const getRuntimeInfoStateClass = (info) => {
+    if (!isSwitchStatusInfo(info)) return ''
+    const state = normalizeRuntimeBoolean(info?.text)
+    if (state === true) return 'online'
+    if (state === false) return 'offline'
+    return ''
+}
+
+const getRuntimeInfoItemClass = (info) => {
+    const stateClass = getRuntimeInfoStateClass(info)
+    return {
+        'online-status-item': isSwitchStatusInfo(info),
+        [stateClass]: !!stateClass
+    }
+}
+
+const getRuntimeInfoDisplayText = (info) => {
+    if (!isSwitchStatusInfo(info)) return info?.text
+    const state = normalizeRuntimeBoolean(info?.text)
+    if (state === true) return '打开'
+    if (state === false) return '关闭'
+    return info?.text
+}
+
+const getRuntimeInfoValueColor = (info) => {
+    const stateClass = getRuntimeInfoStateClass(info)
+    if (stateClass === 'online') return '#67C23A'
+    if (stateClass === 'offline') return '#F56C6C'
+    return '#303133'
 }
 
 // 设备类型名称映射
@@ -1014,6 +1060,10 @@ onShow(async () => {
 .filter-bar {
     padding: 8rpx 24rpx 0;
     box-sizing: border-box;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #f0f4f8;
 }
 
 .filter-title {
@@ -1166,76 +1216,32 @@ onShow(async () => {
     min-width: 0;
 }
 
-.status-badge {
-    display: flex;
-    align-items: center;
-    gap: 10rpx;
-    padding: 8rpx 18rpx;
-    border-radius: 24rpx;
-    background: rgba(103, 194, 58, 0.12);
-    border: 1px solid rgba(103, 194, 58, 0.25);
-    box-shadow: 0 2rpx 6rpx rgba(103, 194, 58, 0.15);
-    flex-shrink: 0;
-}
-
-.status-badge.offline {
-    background: rgba(144, 147, 153, 0.12);
-    border-color: rgba(144, 147, 153, 0.25);
-    box-shadow: 0 2rpx 6rpx rgba(144, 147, 153, 0.15);
-}
-
-.status-dot {
-    width: 14rpx;
-    height: 14rpx;
-    border-radius: 50%;
-    background: #67C23A;
-    box-shadow: 0 0 8rpx rgba(103, 194, 58, 0.6);
-    animation: pulse 2s ease-in-out infinite;
-}
-
-.status-badge.offline .status-dot {
-    background: #909399;
-    box-shadow: 0 0 6rpx rgba(144, 147, 153, 0.4);
-    animation: none;
-}
-
-@keyframes pulse {
-
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.7;
-        transform: scale(1.1);
-    }
-}
-
 .device-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 12rpx;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8rpx 12rpx;
     padding-left: 4rpx;
 }
 
 .meta-item {
     display: flex;
-    align-items: center;
-    gap: 16rpx;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6rpx;
+    min-width: 0;
 }
 
 .meta-label {
     font-size: 24rpx;
     color: #909399;
-    min-width: 80rpx;
+    min-width: 0;
     font-weight: 500;
 }
 
 .device-meta fui-text {
     line-height: 1.6;
-    flex: 1;
+    width: 100%;
+    word-break: break-all;
 }
 
 /* 运行时信息 */
@@ -1293,54 +1299,37 @@ onShow(async () => {
 }
 
 .runtime-info-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16rpx;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12rpx;
 }
 
 .runtime-info-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18rpx 20rpx;
+    gap: 8rpx;
+    padding: 16rpx 20rpx;
     background: #ffffff;
-    border-radius: 12rpx;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.06);
     box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.runtime-info-item::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4rpx;
-    background: linear-gradient(180deg, #409eff 0%, #67c23a 100%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.runtime-info-item:hover::before {
-    opacity: 1;
+    border-radius: 12rpx;
+    min-width: 0;
 }
 
 .runtime-info-item.online-status-item {
-    background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+    background: #ffffff;
     border-color: rgba(64, 158, 255, 0.15);
 }
 
 .runtime-info-item.online-status-item.online {
     background: linear-gradient(135deg, #f0f9ff 0%, #e8f5e9 100%);
-    border-color: rgba(103, 194, 58, 0.2);
+    border-color: rgba(103, 194, 58, 0.25);
 }
 
 .runtime-info-item.online-status-item.offline {
     background: linear-gradient(135deg, #fff5f5 0%, #ffeaea 100%);
-    border-color: rgba(245, 108, 108, 0.2);
+    border-color: rgba(245, 108, 108, 0.25);
 }
 
 .info-label {
@@ -1349,50 +1338,17 @@ onShow(async () => {
     gap: 12rpx;
     flex: 1;
     min-width: 0;
-}
-
-.status-icon {
-    width: 16rpx;
-    height: 16rpx;
-    border-radius: 50%;
-    flex-shrink: 0;
-    box-shadow: 0 0 8rpx currentColor;
-    animation: status-pulse 2s ease-in-out infinite;
-}
-
-.status-icon.online {
-    background: #67C23A;
-    color: #67C23A;
-}
-
-.status-icon.offline {
-    background: #F56C6C;
-    color: #F56C6C;
-    animation: none;
-}
-
-@keyframes status-pulse {
-
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.7;
-        transform: scale(1.2);
-    }
+    width: auto;
 }
 
 .info-value {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    flex: 0 0 auto;
-    margin-left: 16rpx;
-    padding-left: 16rpx;
-    min-width: 120rpx;
+    width: auto;
+    min-width: 80rpx;
+    margin-left: 12rpx;
+    padding-left: 0;
 }
 
 .info-value.online {
@@ -1411,6 +1367,7 @@ onShow(async () => {
 .info-label fui-text {
     color: #606266;
     font-weight: 500;
+    white-space: nowrap;
 }
 
 .info-value fui-text {
@@ -1427,7 +1384,17 @@ onShow(async () => {
 }
 
 .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 16rpx;
+}
+
+.toggle-capability-btn {
+    padding: 8rpx 16rpx;
+    border: 1px solid rgba(64, 158, 255, 0.45);
+    border-radius: 18rpx;
+    background: rgba(64, 158, 255, 0.08);
 }
 
 /* 普通控制区域 */
@@ -1483,8 +1450,8 @@ onShow(async () => {
 }
 
 .control-btn {
-    padding: 24rpx 40rpx;
-    border-radius: 20rpx;
+    padding: 16rpx 30rpx;
+    border-radius: 16rpx;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1593,12 +1560,8 @@ onShow(async () => {
         gap: 16rpx;
     }
 
-    .status-badge {
-        align-self: flex-start;
-    }
-
     .control-btn {
-        padding: 20rpx 24rpx;
+        padding: 14rpx 20rpx;
     }
 }
 </style>
