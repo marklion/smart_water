@@ -192,11 +192,10 @@ const loadBlocks = async () => {
         return
     }
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
         const result = await call_remote('/resource/list_block', {
             farm_name: addValveForm.value.farm_name,
             pageNo: 0
-        }, token)
+        })
         blocks.value = result?.blocks || []
     } catch (e) {
         blocks.value = []
@@ -264,7 +263,6 @@ const submitAddValve = async () => {
         configObj.pressure_alarm_config = pressureAlarmConfig
         addValveForm.value.valve_config_key = JSON.stringify(configObj)
 
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
         const payload = {
             farm_name: addValveForm.value.farm_name,
             block_name: addValveForm.value.block_name,
@@ -277,16 +275,16 @@ const submitAddValve = async () => {
             close_pressure_high_limit: addValveForm.value.close_pressure_high_limit,
             pressure_check_interval: addValveForm.value.pressure_check_interval
         }
-        await call_remote('/config/add_water_group_valve', payload, token)
+        await call_remote('/config/add_water_group_valve', payload)
         // 保存配置到文件
-        await call_remote('/config/save_config', {}, token)
-        
-        uni.showToast({ 
-            title: '添加成功', 
+        await call_remote('/config/save_config', {})
+
+        uni.showToast({
+            title: '添加成功',
             icon: 'success',
             duration: 1500
         })
-        
+
         // 等待 toast 显示完成后返回
         setTimeout(() => {
             uni.switchTab({

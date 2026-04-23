@@ -34,9 +34,9 @@
                         <view class="device-header">
                             <view class="device-name-row">
                                 <view class="device-icon-container">
-                                    <image 
-                                        :src="getDeviceIconPath(device.device_type, device.device_name)" 
-                                        class="device-icon" 
+                                    <image
+                                        :src="getDeviceIconPath(device.device_type, device.device_name)"
+                                        class="device-icon"
                                         mode="aspectFit"
                                         @error="handleImageError"
                                         @load="handleImageLoad"
@@ -583,11 +583,11 @@ const loadBlocks = async () => {
         return
     }
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const result = await call_remote('/resource/list_block', {
             farm_name: currentFarmName.value,
             pageNo: 0
-        }, token)
+        })
         blocks.value = result?.blocks || []
     } catch (error) {
         blocks.value = []
@@ -651,7 +651,7 @@ const submitAddValve = async () => {
             is_left: !!valveConfigForm.value.is_left
         })
 
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const payload = {
             farm_name: addValveForm.value.farm_name,
             block_name: addValveForm.value.block_name,
@@ -664,10 +664,10 @@ const submitAddValve = async () => {
             close_pressure_high_limit: addValveForm.value.close_pressure_high_limit,
             pressure_check_interval: addValveForm.value.pressure_check_interval
         }
-        const result = await call_remote('/config/add_water_group_valve', payload, token)
+        const result = await call_remote('/config/add_water_group_valve', payload)
         if (result && result.result) {
             // 保存配置到文件
-            await call_remote('/config/save_config', {}, token)
+            await call_remote('/config/save_config', {})
             uni.showToast({ title: '添加成功', icon: 'success' })
             showAddValveDialog.value = false
             await loadDeviceList()
@@ -747,11 +747,11 @@ const loadDeviceList = async () => {
 
     loading.value = true
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const result = await call_remote('/device_management/list_device', {
             pageNo: 0,
             farm_name: currentFarmName.value || undefined
-        }, token)
+        })
 
         deviceList.value = result.devices || []
     } catch (error) {
@@ -796,7 +796,7 @@ const handleDeviceAction = async (action, device) => {
 const executeDeviceAction = async (action, deviceName) => {
     controlLoading.value[deviceName] = true
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         let apiPath = ''
         let successMsg = ''
 
@@ -816,7 +816,7 @@ const executeDeviceAction = async (action, deviceName) => {
                 throw new Error('未知的操作类型')
         }
 
-        const result = await call_remote(apiPath, { device_name: deviceName }, token)
+        const result = await call_remote(apiPath, { device_name: deviceName })
 
         if (action === 'readDeviceStatus') {
             uni.showToast({
@@ -849,14 +849,6 @@ const executeDeviceAction = async (action, deviceName) => {
 // 页面显示时加载/刷新数据
 onShow(async () => {
     // 检查登录状态
-    const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null)
-    if (!token) {
-        uni.redirectTo({
-            url: '/pages/login'
-        })
-        return
-    }
-
     // 首次加载时显示全屏加载动画
     if (isFirstLoad.value) {
         pageLoading.value = true

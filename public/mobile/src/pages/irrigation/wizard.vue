@@ -19,7 +19,7 @@
                             <view :class="['step-label', wizardStep === 1 ? 'active' : '']">输入方案名称</view>
                         </view>
                         <view :class="['step-line', wizardStep > 1 ? 'completed' : '']"></view>
-                        
+
                         <view class="step-item">
                             <view :class="['step-dot', wizardStep === 2 ? 'active' : '', wizardStep > 2 ? 'completed' : '']">
                                 <text v-if="wizardStep > 2" class="step-check">✓</text>
@@ -28,7 +28,7 @@
                             <view :class="['step-label', wizardStep === 2 ? 'active' : '']">创建轮灌组</view>
                         </view>
                         <view :class="['step-line', wizardStep > 2 ? 'completed' : '']"></view>
-                        
+
                         <view class="step-item">
                             <view :class="['step-dot', wizardStep === 3 ? 'active' : '', wizardStep > 3 ? 'completed' : '']">
                                 <text v-if="wizardStep > 3" class="step-check">✓</text>
@@ -37,7 +37,7 @@
                             <view :class="['step-label', wizardStep === 3 ? 'active' : '']">分配设备</view>
                         </view>
                         <view :class="['step-line', wizardStep > 3 ? 'completed' : '']"></view>
-                        
+
                         <view class="step-item">
                             <view :class="['step-dot', wizardStep === 4 ? 'active' : '']">
                                 <text class="step-number">4</text>
@@ -486,7 +486,7 @@ const initWateringGroupsFromExisting = async () => {
             post_fert_time: 0,
             total_time: 0,
         }
-        
+
         // 确保阀门数据是数组格式，并去除重复项
         let valvesArray = []
         if (g.valves) {
@@ -702,7 +702,7 @@ const checkWaterGroupDriver = async () => {
         console.log('检查waterGroup驱动，农场名称:', currentFarmName.value)
 
         // 使用和loadValveDevices相同的接口
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         let allDevices = []
         let pageNo = 0
         let hasMore = true
@@ -711,7 +711,7 @@ const checkWaterGroupDriver = async () => {
             const result = await call_remote('/device_management/list_device', {
                 pageNo,
                 farm_name: currentFarmName.value || undefined
-            }, token)
+            })
 
             const devices = result.devices || []
             allDevices = allDevices.concat(devices)
@@ -808,14 +808,14 @@ const removeWateringGroup = (index) => {
 // 加载已配置的轮灌组
 const loadExistingGroups = async () => {
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const params = { pageNo: 0 }
         const currentSchemeId = selectedSchemeId.value ? String(selectedSchemeId.value) : ''
         // 编辑模式下，如果携带了方案ID，只加载当前方案下的轮灌组
         if (isEditMode.value && currentSchemeId) {
             params.scheme_id = currentSchemeId
         }
-        const response = await call_remote('/policy/list_watering_groups', params, token)
+        const response = await call_remote('/policy/list_watering_groups', params)
         if (response && response.groups) {
             let filteredGroups = response.groups
             if (currentSchemeId) {
@@ -827,7 +827,7 @@ const loadExistingGroups = async () => {
                         try {
                             const farmMatch = await call_remote('/policy/get_matched_farm', {
                                 policy_name: group.name
-                            }, token)
+                            })
                             return {
                                 group,
                                 farmName: farmMatch.farm_name
@@ -846,7 +846,7 @@ const loadExistingGroups = async () => {
                     .map(item => item.group)
             }
 
-            const policyListResponse = await call_remote('/policy/list_policy', { pageNo: 0 }, token)
+            const policyListResponse = await call_remote('/policy/list_policy', { pageNo: 0 })
             const allPolicies = policyListResponse?.policies || []
 
             // 解析单个轮灌组配置的辅助函数
@@ -1023,7 +1023,7 @@ const copyExistingGroup = (existingGroup) => {
 // 加载阀门设备
 const loadValveDevices = async () => {
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         let allDevices = []
         let pageNo = 0
         let hasMore = true
@@ -1032,7 +1032,7 @@ const loadValveDevices = async () => {
             const result = await call_remote('/device_management/list_device', {
                 pageNo,
                 farm_name: currentFarmName.value || undefined
-            }, token)
+            })
             const devices = result.devices || []
             allDevices = allDevices.concat(devices)
             hasMore = devices.length >= 20
@@ -1174,10 +1174,10 @@ const editExistingGroupValves = async (existingGroup) => {
 
     // 重新从后端获取最新的轮灌组数据，确保阀门数据是最新的
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-        const groupsResp = await call_remote('/policy/list_watering_groups', { pageNo: 0 }, token)
+
+        const groupsResp = await call_remote('/policy/list_watering_groups', { pageNo: 0 })
         const latestGroup = groupsResp?.groups?.find(g => g.name === existingGroup.name)
-        
+
         // 如果找到最新数据，使用最新的阀门数据
         if (latestGroup && latestGroup.valves && latestGroup.valves !== '-') {
             const latestValves = parseValvesFromGroup({ valves: latestGroup.valves })
@@ -1223,7 +1223,7 @@ const editExistingGroupValves = async (existingGroup) => {
 
     // 无论组是否已存在，都要更新阀门列表（确保使用最新数据）
     const configKey = wateringGroups.value[idx]?.configKey || existingGroup.name
-    
+
     // 确保阀门数据是数组格式，并去除重复项
     let valvesArray = []
     if (existingGroup.valves) {
@@ -1234,7 +1234,7 @@ const editExistingGroupValves = async (existingGroup) => {
             valvesArray = parseValvesFromGroup({ valves: existingGroup.valves })
         }
     }
-    
+
     // 去除重复项并过滤空值
     selectedValveDevices.value[configKey] = [...new Set(valvesArray.filter(v => v && v.trim()))]
 
@@ -1521,7 +1521,7 @@ const finishWizard = async () => {
     }
 
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const farm_name = currentFarmName.value || undefined
 
         if (!farm_name) {
@@ -1531,7 +1531,7 @@ const finishWizard = async () => {
 
         // 与 PC 端保持一致：下发前先确保供水/总策略/施肥等必要策略存在
         try {
-            await ensureRequiredPolicies(farm_name, token)
+            await ensureRequiredPolicies(farm_name)
         } catch (e) {
             console.error('确保必要策略失败:', e)
             uni.showToast({
@@ -1548,7 +1548,7 @@ const finishWizard = async () => {
             farm_name: farm_name,
             scheme_id: selectedSchemeId.value || undefined,
             scheme_name: schemeName.value?.trim() || undefined
-        }, token)
+        })
         console.log('接口返回:', resp)
 
         if (resp && resp.result) {
@@ -1568,25 +1568,25 @@ const finishWizard = async () => {
 }
 
 // 检查设备是否存在
-const checkDevicesExist = async (farm_name, requiredDevices, token) => {
+const checkDevicesExist = async (farm_name, requiredDevices) => {
     const deviceList = await call_remote('/device_management/list_device', {
         farm_name: farm_name,
         pageNo: 0
-    }, token)
+    })
     const existingDevices = deviceList?.devices || []
     const existingDeviceNames = new Set(existingDevices.map(d => d.device_name))
     return requiredDevices.filter(name => !existingDeviceNames.has(name))
 }
 
 // 创建供水策略
-const createWaterPolicy = async (farm_name, token) => {
+const createWaterPolicy = async (farm_name) => {
     const requiredDevices = [
         `${farm_name}-主泵`,
         `${farm_name}-主管道压力计`,
         `${farm_name}-主管道流量计`
     ]
 
-    const missingDevices = await checkDevicesExist(farm_name, requiredDevices, token)
+    const missingDevices = await checkDevicesExist(farm_name, requiredDevices)
     if (missingDevices.length > 0) {
         const errorMsg = `缺少必要设备：${missingDevices.join('、')}。请先配置这些设备，设备名称格式必须为"${farm_name}-设备名"`
         throw new Error(errorMsg + `。请先配置以下设备（设备名称格式必须为"${farm_name}-设备名"）：\n1. ${farm_name}-主泵\n2. ${farm_name}-主管道压力计\n3. ${farm_name}-主管道流量计`)
@@ -1602,19 +1602,19 @@ const createWaterPolicy = async (farm_name, token) => {
         pressure_shutdown_high_limit: 0.3,
         flow_check_interval: 60,
         pressure_shutdown_check_interval: 3
-    }, token)
+    })
 }
 
 // 创建总策略
-const createGlobalPolicy = async (farm_name, token) => {
+const createGlobalPolicy = async (farm_name) => {
     await call_remote('/config/init_global_policy', {
         farm_name: farm_name,
         start_hour: 8
-    }, token)
+    })
 }
 
 // 创建施肥策略（可选）
-const createFertPolicy = async (farm_name, token) => {
+const createFertPolicy = async (farm_name) => {
     const requiredFertDevices = [
         `${farm_name}-施肥泵`,
         `${farm_name}-施肥流量计`,
@@ -1622,7 +1622,7 @@ const createFertPolicy = async (farm_name, token) => {
     ]
 
     try {
-        const missingDevices = await checkDevicesExist(farm_name, requiredFertDevices, token)
+        const missingDevices = await checkDevicesExist(farm_name, requiredFertDevices)
         if (missingDevices.length > 0) {
             console.warn(`缺少施肥策略必要设备：${missingDevices.join('、')}，跳过创建施肥策略`)
             return
@@ -1636,19 +1636,19 @@ const createFertPolicy = async (farm_name, token) => {
             level_warning_limit: 0.8,
             level_shutdown_limit: 0.5,
             level_check_interval: 60
-        }, token)
+        })
     } catch (e) {
         console.warn('创建施肥策略失败:', e)
     }
 }
 
 // 确保必要的策略存在
-const ensureRequiredPolicies = async (farm_name, token) => {
+const ensureRequiredPolicies = async (farm_name) => {
     if (!farm_name) {
         throw new Error('请先选择农场')
     }
 
-    const policyList = await call_remote('/policy/list_policy', { pageNo: 0, farm_name: farm_name }, token)
+    const policyList = await call_remote('/policy/list_policy', { pageNo: 0, farm_name: farm_name })
     const existingPolicies = policyList?.policies || []
     const existingPolicyNames = new Set(existingPolicies.map(p => p.name))
 
@@ -1656,7 +1656,7 @@ const ensureRequiredPolicies = async (farm_name, token) => {
     const waterPolicyName = `${farm_name}-供水`
     if (!existingPolicyNames.has(waterPolicyName)) {
         try {
-            await createWaterPolicy(farm_name, token)
+            await createWaterPolicy(farm_name)
         } catch (e) {
             if (e?.err_msg && e.err_msg.includes('缺少必要设备')) {
                 throw e
@@ -1668,13 +1668,13 @@ const ensureRequiredPolicies = async (farm_name, token) => {
     // 检查并创建总策略
     const globalPolicyName = `${farm_name}-总策略`
     if (!existingPolicyNames.has(globalPolicyName)) {
-        await createGlobalPolicy(farm_name, token)
+        await createGlobalPolicy(farm_name)
     }
 
     // 检查并创建施肥策略（可选）
     const fertPolicyName = `${farm_name}-施肥`
     if (!existingPolicyNames.has(fertPolicyName)) {
-        await createFertPolicy(farm_name, token)
+        await createFertPolicy(farm_name)
     }
 }
 
@@ -1858,10 +1858,10 @@ const onFarmChange = async (farmName) => {
 
     // 重新加载农场面积参数
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null)
+
         const paramsResponse = await call_remote('/resource/get_farm_area_params', {
             farm_name: farmName || '默认农场'
-        }, token)
+        })
         if (paramsResponse) {
             farmAreaParams.value = {
                 system_flow: paramsResponse.system_flow !== undefined ? paramsResponse.system_flow : 1,
@@ -1959,12 +1959,6 @@ onShow(() => {
 })
 
 onMounted(async () => {
-    const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null)
-    if (!token) {
-        uni.redirectTo({ url: '/pages/login' })
-        return
-    }
-
     pageLoading.value = true
     try {
         if (pageHeaderRef.value && pageHeaderRef.value.refresh) {
@@ -1983,7 +1977,7 @@ onMounted(async () => {
         try {
             const paramsResponse = await call_remote('/resource/get_farm_area_params', {
                 farm_name: currentFarmName.value || '默认农场'
-            }, token)
+            })
             if (paramsResponse) {
                 farmAreaParams.value = {
                     system_flow: paramsResponse.system_flow !== undefined ? paramsResponse.system_flow : 1,

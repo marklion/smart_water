@@ -22,7 +22,7 @@
         <view class="form-card">
           <view class="form-title">欢迎登录舒德尔</view>
 
-          <view class="input-group">
+          <view class="input-group" v-if="!is_h5">
             <view class="input-label">服务器</view>
             <input
               v-model="loginForm.server"
@@ -101,6 +101,9 @@ import axios from 'axios'
 const systemName = ref('智能灌溉管理系统')
 const isLoading = ref(false)
 const errorMessage = ref('')
+const is_h5 = ref(false)
+
+
 
 const loginForm = reactive({
   username: '',
@@ -152,9 +155,6 @@ const handleLogin = async () => {
       // 保存 token 和用户名
       uni.setStorageSync('auth_token', response.token)
       uni.setStorageSync('username', loginForm.username)
-      localStorage.setItem('auth_token', response.token)
-      localStorage.setItem('username', loginForm.username)
-
       axios.defaults.headers.common['token'] = response.token
 
       // 跳转到首页
@@ -169,7 +169,7 @@ const handleLogin = async () => {
     if (error.err_msg) {
       errorMessage.value = error.err_msg
     } else {
-      errorMessage.value = '网络错误，请稍后重试'
+      errorMessage.value = '网络错误，请稍后重试:'+JSON.stringify(error)
     }
   } finally {
     isLoading.value = false
@@ -179,11 +179,7 @@ const handleLogin = async () => {
 // 获取系统名称
 const getSystemName = async () => {
   try {
-    const response = await fetch('/api/v1/get_sys_name', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    const response = await call_remote('/get_sys_name', {
     })
     const data = await response.json()
     if (data.err_msg === '' && data.result.sys_name && data.result.sys_name !== 'no name') {
@@ -196,6 +192,7 @@ const getSystemName = async () => {
 
 onMounted(() => {
   getSystemName()
+  is_h5.value = uni.getSystemInfoSync().uniPlatform === 'h5' || uni.getSystemInfoSync().uniPlatform === 'web'
 })
 </script>
 
