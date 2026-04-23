@@ -9,7 +9,7 @@
       <view class="water-wave wave-2"></view>
       <view class="water-wave wave-3"></view>
     </view>
-    
+
     <view class="login-container">
       <!-- Logo和标题 -->
       <view class="logo-section">
@@ -21,12 +21,21 @@
       <view class="form-container">
         <view class="form-card">
           <view class="form-title">欢迎登录舒德尔</view>
-          
+
+          <view class="input-group">
+            <view class="input-label">服务器</view>
+            <input
+              v-model="loginForm.server"
+              class="input-field"
+              placeholder="请输入服务器地址"
+              :disabled="isLoading"
+            />
+          </view>
           <view class="input-group">
             <view class="input-label">用户名</view>
-            <input 
-              v-model="loginForm.username" 
-              class="input-field" 
+            <input
+              v-model="loginForm.username"
+              class="input-field"
               placeholder="请输入用户名"
               :disabled="isLoading"
             />
@@ -34,9 +43,9 @@
 
           <view class="input-group">
             <view class="input-label">密码</view>
-            <input 
-              v-model="loginForm.password" 
-              class="input-field" 
+            <input
+              v-model="loginForm.password"
+              class="input-field"
               type="password"
               placeholder="请输入密码"
               :disabled="isLoading"
@@ -48,25 +57,25 @@
             {{ errorMessage }}
           </view>
 
-          <button 
-            class="login-btn" 
+          <button
+            class="login-btn"
             :class="{ 'loading': isLoading }"
             :disabled="isLoading"
             @click="handleLogin"
           >
             {{ isLoading ? '登录中...' : '登录' }}
           </button>
-          
+
           <!-- 分割线 -->
           <view class="divider">
             <view class="divider-line"></view>
             <text class="divider-text">或</text>
             <view class="divider-line"></view>
           </view>
-          
+
           <!-- 微信登录 -->
-          <button 
-            class="wechat-login-btn" 
+          <button
+            class="wechat-login-btn"
             @click="handleWechatLogin"
           >
             <text class="wechat-icon">微信</text>
@@ -87,6 +96,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import call_remote from '../../../lib/call_remote.js'
+import axios from 'axios'
 
 const systemName = ref('智能灌溉管理系统')
 const isLoading = ref(false)
@@ -94,7 +104,8 @@ const errorMessage = ref('')
 
 const loginForm = reactive({
   username: '',
-  password: ''
+  password: '',
+  server: '',
 })
 
 // 微信登录处理
@@ -131,6 +142,7 @@ const handleLogin = async () => {
   errorMessage.value = ''
 
   try {
+    uni.setStorageSync('app_server', loginForm.server)
     const response = await call_remote('/auth/login', {
       username: loginForm.username,
       password: loginForm.password
@@ -142,11 +154,9 @@ const handleLogin = async () => {
       uni.setStorageSync('username', loginForm.username)
       localStorage.setItem('auth_token', response.token)
       localStorage.setItem('username', loginForm.username)
-      
-      // 设置 axios headers
-      const axios = (await import('axios')).default
+
       axios.defaults.headers.common['token'] = response.token
-      
+
       // 跳转到首页
       uni.switchTab({
         url: '/pages/index'
@@ -200,7 +210,8 @@ onMounted(() => {
   justify-content: center;
   padding: calc(40rpx + env(safe-area-inset-top)) 32rpx calc(80rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  overflow-y: auto; /* 小屏可滚动，避免内容被遮挡 */
+  overflow-y: auto;
+  /* 小屏可滚动，避免内容被遮挡 */
   overflow-x: hidden;
 }
 
@@ -279,9 +290,12 @@ onMounted(() => {
 }
 
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-20px);
   }
@@ -292,10 +306,12 @@ onMounted(() => {
     transform: scale(0.8);
     opacity: 0.7;
   }
+
   50% {
     transform: scale(1.2);
     opacity: 0.3;
   }
+
   100% {
     transform: scale(0.8);
     opacity: 0.7;
@@ -329,7 +345,7 @@ onMounted(() => {
   font-weight: 700;
   color: #ffffff;
   margin: 0 0 10px 0;
-  text-shadow: 
+  text-shadow:
     2px 2px 4px rgba(0, 0, 0, 0.8),
     0 0 10px rgba(0, 0, 0, 0.5),
     0 0 20px rgba(0, 0, 0, 0.3);
@@ -503,4 +519,3 @@ onMounted(() => {
   color: rgba(255, 255, 255, 0.7);
 }
 </style>
-

@@ -2,14 +2,18 @@ import axios from 'axios';
 let err_handler = undefined;
 export default async function (url, body, token = '') {
     const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-    const url_prefix = isBrowser ? '' : 'http://localhost:47147'
+    let url_prefix = isBrowser ? '' : 'http://localhost:47147'
+    let app_server = uni.getStorageSync('app_server') || '';
+    if (app_server) {
+        url_prefix = app_server;
+    }
     if (!token && isBrowser) {
         token = localStorage.getItem('auth_token') || '';
         if (!token && axios.defaults.headers.common && axios.defaults.headers.common['token']) {
             token = axios.defaults.headers.common['token'];
         }
     }
-    
+
     const headers = {
         'Content-Type': 'application/json',
         'token': token
@@ -45,8 +49,7 @@ export async function find_by_list(list_fn, cmp_func, token) {
             }
             pageNo++;
         }
-        else
-        {
+        else {
             break;
         }
     }

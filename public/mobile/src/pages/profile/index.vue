@@ -50,6 +50,7 @@ import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
 import WeatherCard from '../monitoring/WeatherCard.vue'
+import axios from 'axios'
 
 const refreshing = ref(false)
 const userInfo = ref('')
@@ -107,7 +108,6 @@ const handleLogout = () => {
 
                 // 清除 axios headers
                 try {
-                    const axios = (await import('axios')).default
                     delete axios.defaults.headers.common['token']
                 } catch (e) {
                     console.error('清除 axios headers 失败:', e)
