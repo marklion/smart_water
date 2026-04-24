@@ -50,6 +50,7 @@ import fuiText from 'firstui-uni/firstui/fui-text/fui-text.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import Loading from '../../components/Loading.vue'
 import WeatherCard from '../monitoring/WeatherCard.vue'
+import axios from 'axios'
 
 const refreshing = ref(false)
 const userInfo = ref('')
@@ -107,7 +108,6 @@ const handleLogout = () => {
 
                 // 清除 axios headers
                 try {
-                    const axios = (await import('axios')).default
                     delete axios.defaults.headers.common['token']
                 } catch (e) {
                     console.error('清除 axios headers 失败:', e)
@@ -124,15 +124,6 @@ const handleLogout = () => {
 
 // 页面显示时加载/刷新数据
 onShow(async () => {
-    // 检查登录状态
-    const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null)
-    if (!token) {
-        uni.redirectTo({
-            url: '/pages/login'
-        })
-        return
-    }
-
     // 首次加载时显示全屏加载动画
     if (isFirstLoad.value) {
         pageLoading.value = true

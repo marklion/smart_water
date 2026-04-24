@@ -115,7 +115,7 @@ const onRefresh = async () => {
 // 页面显示时加载/刷新数据
 onShow(async () => {
   // 检查登录状态
-  const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null)
+  const token = uni.getStorageSync('auth_token')
   if (!token) {
     uni.redirectTo({
       url: '/pages/login'

@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import json2md from 'json2md';
 import dotenv from 'dotenv';
 import MarkdownIt from 'markdown-it';
@@ -12,6 +13,7 @@ dotenv.config({ path: envFile });
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors());
 app.help_info = [];
 import mkapi from './api_utils.js';
 async function module_install(app, module) {

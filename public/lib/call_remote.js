@@ -1,15 +1,57 @@
 import axios from 'axios';
 let err_handler = undefined;
-export default async function (url, body, token = '') {
-    const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-    const url_prefix = isBrowser ? '' : 'http://localhost:47147'
-    if (!token && isBrowser) {
-        token = localStorage.getItem('auth_token') || '';
-        if (!token && axios.defaults.headers.common && axios.defaults.headers.common['token']) {
-            token = axios.defaults.headers.common['token'];
+const request = (options) => {
+    return new Promise((resolve, reject) => {
+        const defaultOptions = {
+            url: '',
+            method: 'POST',
+            data: {},
+            header: {
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000
+        };
+
+        const requestOptions = { ...defaultOptions, ...options };
+
+        uni.request({
+            ...requestOptions,
+            success: (res) => {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    resolve(res);
+                } else {
+                    reject(new Error(`请求失败: ${res.statusCode}`));
+                }
+            },
+            fail: (err) => {
+                reject(err);
+            }
+        });
+    });
+};
+export default async function (url, body) {
+    let isBrowser = false;
+    let app_server = undefined;
+    let token = '';
+    try {
+        app_server = uni.getStorageSync('app_server') || '';
+        token = uni.getStorageSync('auth_token') || '';
+
+        isBrowser = true;
+    } catch (error) {
+    }
+    if (token == '') {
+        try {
+            token = localStorage.getItem('auth_token') || '';
+            isBrowser = true;
+        } catch (error) {
         }
     }
-    
+    let url_prefix = isBrowser ? '' : 'http://localhost:47147'
+    if (app_server) {
+        url_prefix = app_server;
+    }
+
     const headers = {
         'Content-Type': 'application/json',
         'token': token
@@ -18,9 +60,20 @@ export default async function (url, body, token = '') {
     if (!isBrowser) {
         headers['X-Request-Source'] = 'cli';
     }
-    let resp = await axios.post(url_prefix + '/api/v1' + url, body, {
-        headers: headers
-    });
+    let resp;
+    if (isBrowser && typeof uni !== 'undefined' && typeof uni.request === 'function') {
+        resp = await request({
+            url: url_prefix + '/api/v1' + url,
+            method: 'POST',
+            data: body,
+            header: headers
+        });
+    }
+    else {
+        resp = await axios.post(url_prefix + '/api/v1' + url, body, {
+            headers: headers
+        });
+    }
     if (resp.data.err_msg) {
         if (err_handler) {
             await err_handler(resp.data.err_msg);
@@ -28,6 +81,7 @@ export default async function (url, body, token = '') {
         throw { err_msg: resp.data.err_msg }; // Handle error from the server
     }
     let result = resp.data;
+
     return result.result; // Return the result part of the response
 }
 export function inject_err_handler(fn) {
@@ -45,8 +99,7 @@ export async function find_by_list(list_fn, cmp_func, token) {
             }
             pageNo++;
         }
-        else
-        {
+        else {
             break;
         }
     }

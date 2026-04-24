@@ -9,7 +9,7 @@
       <view class="water-wave wave-2"></view>
       <view class="water-wave wave-3"></view>
     </view>
-    
+
     <view class="login-container">
       <!-- Logo和标题 -->
       <view class="logo-section">
@@ -21,12 +21,21 @@
       <view class="form-container">
         <view class="form-card">
           <view class="form-title">欢迎登录舒德尔</view>
-          
+
+          <view class="input-group" v-if="!is_h5">
+            <view class="input-label">服务器</view>
+            <input
+              v-model="loginForm.server"
+              class="input-field"
+              placeholder="请输入服务器地址"
+              :disabled="isLoading"
+            />
+          </view>
           <view class="input-group">
             <view class="input-label">用户名</view>
-            <input 
-              v-model="loginForm.username" 
-              class="input-field" 
+            <input
+              v-model="loginForm.username"
+              class="input-field"
               placeholder="请输入用户名"
               :disabled="isLoading"
             />
@@ -34,9 +43,9 @@
 
           <view class="input-group">
             <view class="input-label">密码</view>
-            <input 
-              v-model="loginForm.password" 
-              class="input-field" 
+            <input
+              v-model="loginForm.password"
+              class="input-field"
               type="password"
               placeholder="请输入密码"
               :disabled="isLoading"
@@ -48,25 +57,25 @@
             {{ errorMessage }}
           </view>
 
-          <button 
-            class="login-btn" 
+          <button
+            class="login-btn"
             :class="{ 'loading': isLoading }"
             :disabled="isLoading"
             @click="handleLogin"
           >
             {{ isLoading ? '登录中...' : '登录' }}
           </button>
-          
+
           <!-- 分割线 -->
           <view class="divider">
             <view class="divider-line"></view>
             <text class="divider-text">或</text>
             <view class="divider-line"></view>
           </view>
-          
+
           <!-- 微信登录 -->
-          <button 
-            class="wechat-login-btn" 
+          <button
+            class="wechat-login-btn"
             @click="handleWechatLogin"
           >
             <text class="wechat-icon">微信</text>
@@ -87,14 +96,19 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import call_remote from '../../../lib/call_remote.js'
+import axios from 'axios'
 
 const systemName = ref('智能灌溉管理系统')
 const isLoading = ref(false)
 const errorMessage = ref('')
+const is_h5 = ref(false)
+
+
 
 const loginForm = reactive({
   username: '',
-  password: ''
+  password: '',
+  server: '',
 })
 
 // 微信登录处理
@@ -131,6 +145,7 @@ const handleLogin = async () => {
   errorMessage.value = ''
 
   try {
+    uni.setStorageSync('app_server', loginForm.server)
     const response = await call_remote('/auth/login', {
       username: loginForm.username,
       password: loginForm.password
@@ -140,13 +155,8 @@ const handleLogin = async () => {
       // 保存 token 和用户名
       uni.setStorageSync('auth_token', response.token)
       uni.setStorageSync('username', loginForm.username)
-      localStorage.setItem('auth_token', response.token)
-      localStorage.setItem('username', loginForm.username)
-      
-      // 设置 axios headers
-      const axios = (await import('axios')).default
       axios.defaults.headers.common['token'] = response.token
-      
+
       // 跳转到首页
       uni.switchTab({
         url: '/pages/index'
@@ -159,7 +169,7 @@ const handleLogin = async () => {
     if (error.err_msg) {
       errorMessage.value = error.err_msg
     } else {
-      errorMessage.value = '网络错误，请稍后重试'
+      errorMessage.value = '网络错误，请稍后重试:'+JSON.stringify(error)
     }
   } finally {
     isLoading.value = false
@@ -169,11 +179,7 @@ const handleLogin = async () => {
 // 获取系统名称
 const getSystemName = async () => {
   try {
-    const response = await fetch('/api/v1/get_sys_name', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    const response = await call_remote('/get_sys_name', {
     })
     const data = await response.json()
     if (data.err_msg === '' && data.result.sys_name && data.result.sys_name !== 'no name') {
@@ -186,6 +192,7 @@ const getSystemName = async () => {
 
 onMounted(() => {
   getSystemName()
+  is_h5.value = uni.getSystemInfoSync().uniPlatform === 'h5' || uni.getSystemInfoSync().uniPlatform === 'web'
 })
 </script>
 
@@ -200,7 +207,8 @@ onMounted(() => {
   justify-content: center;
   padding: calc(40rpx + env(safe-area-inset-top)) 32rpx calc(80rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  overflow-y: auto; /* 小屏可滚动，避免内容被遮挡 */
+  overflow-y: auto;
+  /* 小屏可滚动，避免内容被遮挡 */
   overflow-x: hidden;
 }
 
@@ -279,9 +287,12 @@ onMounted(() => {
 }
 
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-20px);
   }
@@ -292,10 +303,12 @@ onMounted(() => {
     transform: scale(0.8);
     opacity: 0.7;
   }
+
   50% {
     transform: scale(1.2);
     opacity: 0.3;
   }
+
   100% {
     transform: scale(0.8);
     opacity: 0.7;
@@ -329,7 +342,7 @@ onMounted(() => {
   font-weight: 700;
   color: #ffffff;
   margin: 0 0 10px 0;
-  text-shadow: 
+  text-shadow:
     2px 2px 4px rgba(0, 0, 0, 0.8),
     0 0 10px rgba(0, 0, 0, 0.5),
     0 0 20px rgba(0, 0, 0, 0.3);
@@ -503,4 +516,3 @@ onMounted(() => {
   color: rgba(255, 255, 255, 0.7);
 }
 </style>
-

@@ -50,7 +50,7 @@
                             </view>
                         </view>
                         <view class="control-buttons-row">
-                            <view class="control-btn danger" @tap.stop="stopScheme" 
+                            <view class="control-btn danger" @tap.stop="stopScheme"
                                 :class="{ disabled: !selectedSchemeId, loading: stopSchemeLoading }">
                                 <fui-text :text="'停止'" :size="24" color="#fff"></fui-text>
                             </view>
@@ -75,16 +75,16 @@
                                 <view class="input-label">
                                     <fui-text :text="'搅拌间隔'" :size="24" color="#606266"></fui-text>
                                 </view>
-                                <fui-input v-model="mixingStartInterval" 
-                                    type="number" placeholder="60" 
+                                <fui-input v-model="mixingStartInterval"
+                                    type="number" placeholder="60"
                                     :maxlength="4" :borderColor="'#e4e7ed'" />
                             </view>
                             <view class="mixing-input-item">
                                 <view class="input-label">
                                     <fui-text :text="'持续时间'" :size="24" color="#606266"></fui-text>
                                 </view>
-                                <fui-input v-model="mixingDuration" 
-                                    type="number" placeholder="6" 
+                                <fui-input v-model="mixingDuration"
+                                    type="number" placeholder="6"
                                     :maxlength="4" :borderColor="'#e4e7ed'" />
                             </view>
                         </view>
@@ -97,21 +97,21 @@
                         </view>
 
                         <view class="mixing-buttons-row">
-                            <view class="control-btn primary" @tap.stop="startMixing" 
+                            <view class="control-btn primary" @tap.stop="startMixing"
                                 :class="{ disabled: isMixingRunning, loading: mixingStartLoading }">
                                 <fui-text :text="'启动'" :size="24" color="#fff"></fui-text>
                             </view>
-                            <view class="control-btn warning" @tap.stop="showMixingScheduleDialog" 
+                            <view class="control-btn warning" @tap.stop="showMixingScheduleDialog"
                                 :class="{ disabled: isMixingRunning }">
                                 <fui-text :text="'定时启动'" :size="24" color="#fff"></fui-text>
                             </view>
                         </view>
                         <view class="mixing-buttons-row">
-                            <view class="control-btn danger" @tap.stop="stopMixing" 
+                            <view class="control-btn danger" @tap.stop="stopMixing"
                                 :class="{ disabled: !isMixingRunning, loading: mixingStopLoading }">
                                 <fui-text :text="'停止'" :size="24" color="#fff"></fui-text>
                             </view>
-                            <view class="control-btn success" @tap.stop="applyMixingPolicy" 
+                            <view class="control-btn success" @tap.stop="applyMixingPolicy"
                                 :class="{ loading: mixingSaving }">
                                 <fui-text :text="'保存'" :size="24" color="#fff"></fui-text>
                             </view>
@@ -464,8 +464,8 @@
                     <fui-text :text="'暂无方案，请先创建方案'" :size="28" color="#909399"></fui-text>
                 </view>
                 <view v-else class="scheme-list">
-                    <view v-for="scheme in schemeList" :key="scheme.name" 
-                        class="scheme-item" 
+                    <view v-for="scheme in schemeList" :key="scheme.name"
+                        class="scheme-item"
                         :class="{ 'is-selected': String(tempSelectedSchemeId) === String(scheme.name) }"
                         @click="selectSchemeInDialog(scheme.name)">
                         <view class="scheme-name">{{ scheme.name }}</view>
@@ -484,7 +484,7 @@
         </fui-dialog>
 
         <!-- 搅拌策略定时启动对话框 -->
-        <fui-dialog :show="mixingScheduleDialogVisible" title="搅拌策略定时启动设置" 
+        <fui-dialog :show="mixingScheduleDialogVisible" title="搅拌策略定时启动设置"
             :buttons="mixingScheduleDialogButtons"
             :maskClosable="true" @click="handleMixingScheduleDialogClick" @close="closeMixingScheduleDialog">
             <view class="schedule-dialog-content">
@@ -958,7 +958,7 @@ const getMethodLabel = (val) => {
 
 const openCreateForm = (isCopy, group = null) => {
     uni.removeStorageSync('edit_scheme_name')
-    
+
     if (isCopy && group) {
         uni.setStorageSync('irrigation_copy_group', group)
         uni.navigateTo({ url: '/pages/irrigation/wizard?mode=copy' })
@@ -982,7 +982,7 @@ const validateStep1 = () => {
         uni.showToast({ title: '面积需大于0', icon: 'none' })
         return false
     }
-    
+
     const method = formData.value.method
     if (method === 'WaterOnly') {
         if (!formData.value.total_time || Number(formData.value.total_time) <= 0) {
@@ -994,12 +994,12 @@ const validateStep1 = () => {
         const fertTime = method === 'Time' ? (Number(formData.value.fert_time) || 0) : 0
         const postTime = Number(formData.value.post_fert_time) || 0
         const totalTime = preTime + fertTime + postTime
-        
+
         if (totalTime <= 0) {
             uni.showToast({ title: '肥前时间、施肥时间、肥后时间总和需大于0', icon: 'none' })
             return false
         }
-        
+
         if (method === 'AreaBased') {
             if (!formData.value.AB_fert || Number(formData.value.AB_fert) <= 0) {
                 uni.showToast({ title: '亩定量需大于0', icon: 'none' })
@@ -1017,19 +1017,19 @@ const validateStep1 = () => {
             }
         }
     }
-    
+
     return true
 }
 
 const loadValveDevices = async () => {
     valveLoading.value = true
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         let pageNo = 0
         let hasMore = true
         const allDevices = []
         while (hasMore) {
-            const result = await call_remote('/device_management/list_device', { pageNo, farm_name: currentFarmName.value || undefined }, token)
+            const result = await call_remote('/device_management/list_device', { pageNo, farm_name: currentFarmName.value || undefined })
             const devices = result?.devices || []
             allDevices.push(...devices)
             hasMore = devices.length >= 20
@@ -1154,7 +1154,7 @@ const buildPayload = () => {
         }
         groupData.post_fert_time = postTime
         groupData.total_time = preTime + fertTime + postTime
-        
+
         if (method === 'AreaBased') {
             groupData.AB_fert = formData.value.AB_fert !== null ? Number(formData.value.AB_fert) : undefined
         } else if (method === 'Total') {
@@ -1191,8 +1191,8 @@ const submitForm = async () => {
     const payload = buildPayload()
     submitting.value = true
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-        await call_remote('/policy/apply_wizard_groups', payload, token)
+
+        await call_remote('/policy/apply_wizard_groups', payload)
         uni.showToast({ title: '下发成功', icon: 'success' })
         formVisible.value = false
         await loadGroups()
@@ -1234,7 +1234,7 @@ const loadGroups = async () => {
     if (loading.value) return
     loading.value = true
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         let pageNo = 0
         let hasMore = true
         const allGroups = []
@@ -1244,7 +1244,7 @@ const loadGroups = async () => {
             if (selectedSchemeId.value) {
                 params.scheme_id = selectedSchemeId.value
             }
-            const resp = await call_remote('/policy/list_watering_groups', params, token)
+            const resp = await call_remote('/policy/list_watering_groups', params)
             const list = resp && resp.groups ? resp.groups : []
             allGroups.push(...list)
             // 如果返回的数据少于20条，说明已经是最后一页了
@@ -1269,8 +1269,8 @@ const fetchSuggestedArea = async () => {
         return
     }
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-        const paramsResp = await call_remote('/resource/get_farm_area_params', { farm_name: currentFarmName.value }, token)
+
+        const paramsResp = await call_remote('/resource/get_farm_area_params', { farm_name: currentFarmName.value })
         if (paramsResp) {
             farmAreaParams.value = {
                 system_flow: Number(paramsResp.system_flow) || 0,
@@ -1312,12 +1312,12 @@ const useSuggestedArea = () => {
 }
 
 const loadWaterOnlyStates = async () => {
-    const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
     for (const group of groups.value) {
         try {
             const runtimeResult = await call_remote('/policy/get_policy_runtime', {
                 policy_name: group.name
-            }, token)
+            })
             if (runtimeResult && runtimeResult.variables) {
                 let variables = {}
                 try {
@@ -1340,11 +1340,11 @@ const handleQuickAction = async (policyName, actionName) => {
     const loadingKey = `${policyName}-${actionName}`
     try {
         quickActionLoading.value[loadingKey] = true
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const result = await call_remote('/policy/do_quick_action', {
             policy_name: policyName,
             action_name: actionName
-        }, token)
+        })
         if (result.result) {
             uni.showToast({ title: `快速操作 ${actionName} 执行成功`, icon: 'success' })
             // 重新加载轮灌组数据
@@ -1423,14 +1423,14 @@ const viewPolicyConfig = async (policyName) => {
     policyConfigData.value = null
 
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
 
         // 获取轮灌组列表
-        const groupsResp = await call_remote('/policy/list_watering_groups', { pageNo: 0 }, token)
+        const groupsResp = await call_remote('/policy/list_watering_groups', { pageNo: 0 })
         const group = groupsResp?.groups?.find(g => g.name === policyName)
 
         // 获取策略列表
-        const policyResp = await call_remote('/policy/list_policy', {}, token)
+        const policyResp = await call_remote('/policy/list_policy', {})
         const policy = policyResp?.policies?.find(p => p.name === policyName)
 
         if (!group || !policy) {
@@ -1586,10 +1586,10 @@ const parseFarmName = (content) => {
 // 获取总策略名称并验证存在性
 const getTotalPolicyName = async (schemeName) => {
     let totalPolicyName = null
-    const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
 
     try {
-        const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeName }, token)
+        const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeName })
         if (response && response.content) {
             const farmName = parseFarmName(response.content)
             if (farmName) {
@@ -1611,7 +1611,7 @@ const getTotalPolicyName = async (schemeName) => {
     try {
         await call_remote('/policy/get_policy_runtime', {
             policy_name: totalPolicyName
-        }, token)
+        })
         return totalPolicyName
     } catch (error) {
         return null
@@ -1642,10 +1642,10 @@ const checkRunningStatus = async () => {
             nextRunTime.value = ''
             return
         }
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const runtimeResponse = await call_remote('/policy/get_policy_runtime', {
             policy_name: totalPolicyName
-        }, token)
+        })
 
         if (runtimeResponse && runtimeResponse.variables) {
             const variables = JSON.parse(runtimeResponse.variables)
@@ -1736,8 +1736,8 @@ const schemeProgressDetail = computed(() => {
 // 获取方案详情（包括轮灌组）
 const getSchemeDetails = async (schemeName) => {
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-        const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeName }, token)
+
+        const response = await call_remote('/policy/get_scheme_content', { scheme_name: schemeName })
         if (response && response.content) {
             return parseWateringGroups(response.content)
         }
@@ -1751,19 +1751,19 @@ const getSchemeDetails = async (schemeName) => {
 const loadSchemeList = async () => {
     schemeListLoading.value = true
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
-        const response = await call_remote('/policy/list_schemes', {}, token)
+
+        const response = await call_remote('/policy/list_schemes', {})
         if (response?.schemes) {
             schemeList.value = response.schemes.map(scheme => ({
                 ...scheme,
                 wateringGroups: []
             }))
-            
+
             // 优先从后端“当前方案”接口同步（PC / mobile 共用）
             try {
                 const farmName = currentFarmName.value || (pageHeaderRef.value && pageHeaderRef.value.getCurrentFarmName && pageHeaderRef.value.getCurrentFarmName())
                 if (farmName) {
-                    const curResp = await call_remote('/policy/get_current_scheme', { farm_name: farmName }, token)
+                    const curResp = await call_remote('/policy/get_current_scheme', { farm_name: farmName })
                     if (curResp?.scheme_id && schemeList.value.find(s => s.name === curResp.scheme_id)) {
                         selectedSchemeId.value = curResp.scheme_id
                         uni.setStorageSync('selectedSchemeId', selectedSchemeId.value)
@@ -1785,7 +1785,7 @@ const loadSchemeList = async () => {
                     uni.setStorageSync('selectedSchemeId', selectedSchemeId.value)
                 }
             }
-            
+
             // 检查运行状态
             if (selectedSchemeId.value) {
                 await checkRunningStatus()
@@ -1850,19 +1850,19 @@ const applyScheme = async () => {
 
     applySchemeLoading.value = true
     try {
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         // 1) 恢复方案配置（真正切换 sw_cli_config）
         await call_remote('/policy/restore_scheme', {
             scheme_id: tempSelectedSchemeId.value,
             farm_name: currentFarmName.value || undefined
-        }, token)
+        })
 
         // 2) 显式设置后端“当前方案”，用于 PC / mobile 之间同步显示
         if (currentFarmName.value) {
             await call_remote('/policy/set_current_scheme', {
                 farm_name: currentFarmName.value,
                 scheme_id: tempSelectedSchemeId.value
-            }, token)
+            })
         }
 
         selectedSchemeId.value = tempSelectedSchemeId.value
@@ -1891,13 +1891,13 @@ const runSchemeNow = async () => {
     runNowLoading.value = true
     try {
         const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         await call_remote('/policy/runtime_assignment', {
             policy_name: totalPolicyName,
             variable_name: '需要启动',
             expression: 'true',
             is_constant: true
-        }, token)
+        })
         isRunning.value = true
         isPaused.value = false
         uni.showToast({
@@ -1919,14 +1919,14 @@ const pauseScheme = async () => {
     pauseSchemeLoading.value = true
     try {
         const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         await call_remote('/policy/runtime_assignment', {
             policy_name: totalPolicyName,
             variable_name: '需要启动',
             expression: 'false',
             is_constant: true,
             pause_only: true
-        }, token)
+        })
         isRunning.value = false
         isPaused.value = true
         uni.showToast({ title: `方案 ${selectedSchemeId.value} 已暂停`, icon: 'success' })
@@ -1945,13 +1945,13 @@ const stopScheme = async () => {
     stopSchemeLoading.value = true
     try {
         const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         await call_remote('/policy/runtime_assignment', {
             policy_name: totalPolicyName,
             variable_name: '需要启动',
             expression: 'false',
             is_constant: true
-        }, token)
+        })
         isRunning.value = false
         isPaused.value = false
         uni.showToast({ title: `方案 ${selectedSchemeId.value} 已停止`, icon: 'success' })
@@ -1999,13 +1999,13 @@ const setScheduledRun = async () => {
     try {
         const scheduledTime = `${scheduleDate.value} ${scheduleTime.value}`
         const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         await call_remote('/policy/runtime_assignment', {
             policy_name: totalPolicyName,
             variable_name: '下次启动时间',
             expression: `"${scheduledTime}"`,
             is_constant: true
-        }, token)
+        })
         uni.showToast({ title: `已设置定时运行: ${scheduledTime}`, icon: 'success' })
         scheduleDialogVisible.value = false
         // 设置后立即刷新状态
@@ -2099,13 +2099,13 @@ const cancelScheduledRun = async () => {
 
     try {
         const totalPolicyName = await getTotalPolicyName(selectedSchemeId.value)
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         await call_remote('/policy/runtime_assignment', {
             policy_name: totalPolicyName,
             variable_name: '下次启动时间',
             expression: '""',
             is_constant: true
-        }, token)
+        })
         uni.showToast({ title: '已撤销定时运行', icon: 'success' })
         // 立即刷新状态
         await checkRunningStatus()
@@ -2127,11 +2127,11 @@ const startMixing = async () => {
         }
         const policyName = `${currentFarmName.value}-搅拌`
         mixingStartLoading.value = true
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const resp = await call_remote('/policy/do_quick_action', {
             policy_name: policyName,
             action_name: '开始'
-        }, token)
+        })
         if (resp && resp.result) {
             isMixingRunning.value = true
             uni.showToast({ title: '搅拌已启动', icon: 'success' })
@@ -2160,11 +2160,11 @@ const stopMixing = async () => {
         }
         const policyName = `${currentFarmName.value}-搅拌`
         mixingStopLoading.value = true
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const resp = await call_remote('/policy/do_quick_action', {
             policy_name: policyName,
             action_name: '停止'
-        }, token)
+        })
         if (resp && resp.result) {
             isMixingRunning.value = false
             uni.showToast({ title: '搅拌已停止', icon: 'success' })
@@ -2265,13 +2265,13 @@ const setMixingScheduledStart = async () => {
 
         mixingScheduleLoading.value = true
         const policyName = `${currentFarmName.value}-搅拌`
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         await call_remote('/policy/runtime_assignment', {
             policy_name: policyName,
             variable_name: '下次运行时间',
             expression: `"${mixingScheduledTime.value}"`,
             is_constant: true
-        }, token)
+        })
         uni.showToast({ title: `已设置定时启动: ${mixingScheduledTime.value}`, icon: 'success' })
         mixingScheduleDialogVisible.value = false
         // 设置后立即刷新状态
@@ -2287,21 +2287,21 @@ const setMixingScheduledStart = async () => {
 // 加载搅拌策略状态（获取下次运行时间和运行状态）
 const loadMixingStatus = async () => {
     if (!currentFarmName.value) return
-    
+
     try {
         const policyName = `${currentFarmName.value}-搅拌`
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         const runtimeResponse = await call_remote('/policy/get_policy_runtime', {
             policy_name: policyName
-        }, token)
-        
+        })
+
         if (runtimeResponse && runtimeResponse.variables) {
             const variables = JSON.parse(runtimeResponse.variables)
-            
+
             // 检查运行状态
             const needStart = variables['需要启动']
             isMixingRunning.value = needStart === true || needStart === 'true'
-            
+
             // 获取下次运行时间
             const nextRunTime = variables['下次运行时间']
             if (nextRunTime && nextRunTime !== '' && nextRunTime !== '""') {
@@ -2365,13 +2365,13 @@ const cancelMixingScheduledRun = async () => {
         }
 
         const policyName = `${currentFarmName.value}-搅拌`
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         await call_remote('/policy/runtime_assignment', {
             policy_name: policyName,
             variable_name: '下次运行时间',
             expression: '""',
             is_constant: true
-        }, token)
+        })
         uni.showToast({ title: '已撤销定时运行', icon: 'success' })
         // 立即刷新状态
         await loadMixingStatus()
@@ -2390,35 +2390,35 @@ const applyMixingPolicy = async () => {
         }
 
         mixingSaving.value = true
-        const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : '')
+
         // 更新搅拌策略配置
         await call_remote('/config/init_fert_mixing_policy', {
             farm_name: currentFarmName.value,
             start_interval: mixingStartInterval.value || 60,
             duration: mixingDuration.value || 6
-        }, token)
-        
+        })
+
         // 保存当前配置到方案文件
-        await call_remote('/config/save_config', {}, token)
-        
+        await call_remote('/config/save_config', {})
+
         // 如果有选中的方案，保存到方案文件
         if (selectedSchemeId.value) {
             try {
                 const schemeContent = await call_remote('/policy/get_scheme_content', {
                     scheme_id: selectedSchemeId.value
-                }, token)
+                })
                 if (schemeContent && schemeContent.farm_name) {
                     await call_remote('/policy/restore_scheme', {
                         scheme_id: selectedSchemeId.value,
                         farm_name: schemeContent.farm_name
-                    }, token)
+                    })
                 }
             } catch (schemeError) {
                 console.warn('保存到方案文件失败:', schemeError)
                 // 即使保存到方案失败，也不影响搅拌策略的更新
             }
         }
-        
+
         uni.showToast({ title: '搅拌策略已保存', icon: 'success' })
     } catch (error) {
         console.error('保存搅拌策略失败:', error)
@@ -2446,10 +2446,10 @@ watch(mixingStartInterval, (newVal, oldVal) => {
     try {
         // 避免初始化时触发
         if (oldVal === undefined) return
-        
+
         // 如果值没有变化，不处理
         if (newVal === oldVal) return
-        
+
         if (newVal !== null && newVal !== undefined && newVal !== '') {
             const numValue = parseInt(String(newVal)) || 0
             if (numValue > 1440) {
@@ -2474,10 +2474,10 @@ watch(mixingDuration, (newVal, oldVal) => {
     try {
         // 避免初始化时触发
         if (oldVal === undefined) return
-        
+
         // 如果值没有变化，不处理
         if (newVal === oldVal) return
-        
+
         if (newVal !== null && newVal !== undefined && newVal !== '') {
             const numValue = parseInt(String(newVal)) || 0
             if (numValue > 1440) {
@@ -2498,15 +2498,6 @@ watch(mixingDuration, (newVal, oldVal) => {
 
 // 页面显示时加载/刷新数据
 onShow(async () => {
-    // 检查登录状态
-    const token = uni.getStorageSync('auth_token') || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null)
-    if (!token) {
-        uni.redirectTo({
-            url: '/pages/login'
-        })
-        return
-    }
-
     // 首次加载时显示全屏加载动画
     if (isFirstLoad.value) {
         pageLoading.value = true
