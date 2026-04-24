@@ -61,7 +61,7 @@ export default async function (url, body) {
         headers['X-Request-Source'] = 'cli';
     }
     let resp;
-    if (isBrowser) {
+    if (isBrowser && typeof uni !== 'undefined' && typeof uni.request === 'function') {
         resp = await request({
             url: url_prefix + '/api/v1' + url,
             method: 'POST',
