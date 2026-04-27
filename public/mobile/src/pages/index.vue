@@ -166,9 +166,9 @@ onShow(async () => {
   /* 改为在文档流内占满剩余空间，避免 H5 固定定位导致无法滚动 */
   flex: 1;
   position: relative;
-  margin-top: calc(168rpx + env(safe-area-inset-top));
-  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
-  overflow-y: auto;
+  margin-top: calc(var(--status-bar-height, 0px) + 96rpx);
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow: hidden;
   box-sizing: border-box;
   width: 100%;
   /* 移除默认间距 */
@@ -178,6 +178,18 @@ onShow(async () => {
   padding-right: 0;
 }
 
+/* #ifdef H5 */
+.content-scroll {
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+/* #endif */
+
+/* #ifdef H5 */
+.content-scroll {
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+/* #endif */
+
 /* 内容区域 */
 .content {
   padding: 32rpx;
@@ -185,7 +197,7 @@ onShow(async () => {
   flex-direction: column;
   gap: 32rpx;
   box-sizing: border-box;
-  padding-bottom: 32rpx;
+  padding-bottom: 0;
   /* 底部留出一些间距即可，不需要为 tabBar 留空间，因为 scroll-view 已经限制了底部 */
 }
 

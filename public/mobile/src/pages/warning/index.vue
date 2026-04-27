@@ -89,9 +89,9 @@ onShow(async () => {
 .content-scroll {
   flex: 1;
   position: relative;
-  margin-top: calc(168rpx + env(safe-area-inset-top));
-  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
-  overflow-y: auto;
+  margin-top: calc(var(--status-bar-height, 0px) + 96rpx);
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow: hidden;
   box-sizing: border-box;
   width: 100%;
   margin-left: 0;
@@ -100,13 +100,20 @@ onShow(async () => {
   padding-right: 0;
 }
 
+/* #ifdef H5 */
+.content-scroll {
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+/* #endif */
+
 .content {
   padding: 32rpx;
   display: flex;
   flex-direction: column;
   gap: 32rpx;
   box-sizing: border-box;
-  padding-bottom: 32rpx;
+  padding-bottom: 0;
 }
+
 </style>
 
