@@ -7,13 +7,21 @@
         <scroll-view class="device-list-scroll" scroll-y :enable-flex="true" :scroll-with-animation="true">
             <view class="device-list">
                 <view class="filter-bar">
-                    <picker mode="selector" :range="deviceTypeOptions" range-key="label" @change="onTypeChange">
-                        <view class="filter-pill">
-                            <text class="filter-icon">🔍</text>
-                            <fui-text :text="currentTypeLabel" :size="26" color="#303133"></fui-text>
-                            <text class="picker-arrow">▼</text>
+                    <view class="filter-main-row">
+                        <view class="filter-picker-wrap">
+                            <picker mode="selector" :range="deviceTypeOptions" range-key="label" @change="onTypeChange">
+                                <view class="filter-pill">
+                                    <text class="filter-icon">🔍</text>
+                                    <fui-text :text="currentTypeLabel" :size="26" color="#303133"></fui-text>
+                                    <text class="picker-arrow">▼</text>
+                                </view>
+                            </picker>
                         </view>
-                    </picker>
+                        <view class="filter-add-btn" @click="onAddDevice">
+                            <text class="filter-add-icon">＋</text>
+                            <text class="filter-add-text">添加设备</text>
+                        </view>
+                    </view>
                     <view class="filter-meta">
                         <fui-text :text="`当前: ${filteredDeviceList.length} / 总计: ${deviceList.length}`" :size="22"
                             color="#909399"></fui-text>
@@ -146,12 +154,6 @@
                 </view>
             </view>
         </scroll-view>
-
-        <!-- 悬浮添加设备按钮（移动端） -->
-        <view class="add-device-fab" @click="onAddDevice">
-            <text class="fab-icon">＋</text>
-            <text class="fab-text">添加设备</text>
-        </view>
 
         <!-- 添加轮灌阀门弹窗 -->
         <view v-if="showAddValveDialog" class="add-valve-mask">
@@ -886,33 +888,6 @@ onShow(async () => {
     position: relative;
 }
 
-/* 悬浮添加设备按钮 */
-.add-device-fab {
-    position: fixed;
-    right: 32rpx;
-    bottom: calc(140rpx + env(safe-area-inset-bottom));
-    z-index: 999;
-    display: flex;
-    align-items: center;
-    gap: 12rpx;
-    padding: 16rpx 28rpx;
-    border-radius: 999rpx;
-    background: linear-gradient(135deg, #409eff, #67c23a);
-    box-shadow: 0 8rpx 20rpx rgba(64, 158, 255, 0.4);
-}
-
-.fab-icon {
-    font-size: 32rpx;
-    color: #ffffff;
-    font-weight: 700;
-}
-
-.fab-text {
-    font-size: 26rpx;
-    color: #ffffff;
-    font-weight: 500;
-}
-
 /* 添加轮灌阀门弹窗样式 */
 .add-valve-mask {
     position: fixed;
@@ -1058,6 +1033,16 @@ onShow(async () => {
     background: #f0f4f8;
 }
 
+.filter-main-row {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+}
+
+.filter-picker-wrap {
+    flex: 1;
+}
+
 .filter-title {
     margin-bottom: 4rpx;
 }
@@ -1086,6 +1071,31 @@ onShow(async () => {
     margin-left: auto;
 }
 
+.filter-add-btn {
+    display: flex;
+    align-items: center;
+    gap: 8rpx;
+    padding: 14rpx 18rpx;
+    border-radius: 999rpx;
+    background: linear-gradient(135deg, #409eff, #67c23a);
+    box-shadow: 0 6rpx 14rpx rgba(64, 158, 255, 0.28);
+    flex-shrink: 0;
+}
+
+.filter-add-icon {
+    font-size: 28rpx;
+    color: #ffffff;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.filter-add-text {
+    font-size: 22rpx;
+    color: #ffffff;
+    font-weight: 500;
+    line-height: 1;
+}
+
 .filter-meta {
     margin-top: 8rpx;
 }
@@ -1094,9 +1104,9 @@ onShow(async () => {
 .device-list-scroll {
     flex: 1;
     position: relative;
-    margin-top: calc(168rpx + env(safe-area-inset-top));
-    padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
-    overflow-y: auto;
+    margin-top: calc(var(--status-bar-height, 0px) + 96rpx);
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow: hidden;
     box-sizing: border-box;
     width: 100%;
     margin-left: 0;
@@ -1105,11 +1115,17 @@ onShow(async () => {
     padding-right: 0;
 }
 
+/* #ifdef H5 */
+.device-list-scroll {
+    padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+/* #endif */
+
 /* 设备列表 */
 .device-list {
     padding: 8rpx 24rpx 32rpx;
     box-sizing: border-box;
-    padding-bottom: 32rpx;
+    padding-bottom: 0;
 }
 
 .loading-container,
