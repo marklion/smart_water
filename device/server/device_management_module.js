@@ -40,7 +40,7 @@ const driver_array = [
         name: 'FertFlowMeter',
         config_method: '{serial_path:<串口号>, baud_rate:<波特率>, device_id:<设备ID>, poll_interval:<轮询间隔(ms)>}',
         capability: [
-            'readout', 'status_map', 'shutdown', 'ava_readout', 'set_key_const_value'],
+            'readout', 'total_readout', 'clear_total_readout', 'status_map', 'shutdown', 'ava_readout', 'set_key_const_value'],
         driver: dijiang,
     },{
         name:'WaterFlowMeter',
@@ -483,12 +483,17 @@ export default {
                 device_name: { type: String, have_to: true, mean: '设备名称', example: 'virtualDevice1' }
             },
             result: {
-                readout: { type: Number, mean: '设备示数', example: 100 }
+                readout: { type: Number, mean: '设备示数', example: 100 },
+                total_readout: { type: Number, mean: '设备累计示数', example: 1000 }
             },
             func: async function (body, token) {
                 let driver = await get_driver(body.device_name, 'readout');
                 let readout = await driver.readout();
-                return { readout };
+                let result = { readout };
+                if (typeof driver.total_readout === 'function') {
+                    result.total_readout = await driver.total_readout();
+                }
+                return result;
             },
         },
         shutdown_device: {
@@ -631,6 +636,23 @@ export default {
                 if (driver) {
                     await driver.set_key_const_value(body.value);
                 }
+                return { result: true };
+            }
+        },
+        clear_total_readout: {
+            name: '清零累计读数',
+            description: '将流量计累计流量清零',
+            is_write: true,
+            is_get_api: false,
+            params: {
+                device_name: { type: String, have_to: true, mean: '设备名称', example: '农场1-施肥流量计' }
+            },
+            result: {
+                result: { type: Boolean, mean: '清零结果', example: true }
+            },
+            func: async function (body, token) {
+                let driver = await get_driver(body.device_name, 'clear_total_readout');
+                await driver.clear_total_readout();
                 return { result: true };
             }
         },

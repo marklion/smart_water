@@ -1,4 +1,4 @@
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import call_remote from '../../../lib/call_remote.js'
 
 /**
@@ -262,6 +262,34 @@ export async function setDeviceKeyValue(deviceName, value) {
   }
 }
 
+export async function clearTotalReadout(deviceName) {
+  try {
+    await ElMessageBox.confirm(
+      `确认将设备「${deviceName}」的累计流量清零吗？此操作不可恢复。`,
+      '清零累计流量',
+      {
+        confirmButtonText: '清零',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+
+  try {
+    const response = await call_remote('/device_management/clear_total_readout', { device_name: deviceName })
+    if (response.result) {
+      ElMessage.success(`设备 ${deviceName} 累计流量已清零`)
+    }
+  } catch (error) {
+    console.error('清零累计流量失败:', error)
+    const errorMessage = error?.err_msg || error?.message || (typeof error === 'string' ? error : '未知错误')
+    ElMessage.error(`清零累计流量失败: ${errorMessage}`)
+    throw error
+  }
+}
+
 /**
  * 刷新运行时信息
  */
@@ -349,6 +377,9 @@ export async function handleDeviceAction(action, deviceName, refreshRuntimeInfoF
         break
       case 'setDeviceKeyValue':
         await setDeviceKeyValue(deviceName, numericValue)
+        break
+      case 'clearTotalReadout':
+        await clearTotalReadout(deviceName)
         break
       default:
         console.warn('未知的设备操作:', action)

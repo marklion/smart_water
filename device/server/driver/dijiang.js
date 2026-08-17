@@ -1,16 +1,23 @@
 import modbus_wrapper from "./modbus_wrapper.js";
 
+function parseFlowValue(data, offset = 0) {
+    return data[offset] * 65536 + data[offset + 1] + data[offset + 2] / 100;
+}
+
 export default async function (config_string) {
     let config = JSON.parse(config_string);
     let get_flow = async function () {
         let ret = {
             online: true,
             flow: 0,
+            total_flow: 0,
         }
         let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
         try {
-            let resp = await connection.client.readHoldingRegisters(9, 3);
-            ret.flow = resp.data[0] * 65536 + resp.data[1] + resp.data[2] / 100;
+            // 0x0009 瞬时流量 + 0x000C 总流量，各占 3 个寄存器
+            let resp = await connection.client.readHoldingRegisters(9, 6);
+            ret.flow = parseFlowValue(resp.data, 0);
+            ret.total_flow = parseFlowValue(resp.data, 3);
         } catch (error) {
             console.log('error', error);
             ret.online = false;
@@ -24,6 +31,9 @@ export default async function (config_string) {
         m_readout_array: [],
         readout: async function () {
             return this.m_info.flow;
+        },
+        total_readout: async function () {
+            return this.m_info.total_flow;
         },
         ava_readout: async function () {
             if (this.m_readout_array.length == 0) {
@@ -53,9 +63,25 @@ export default async function (config_string) {
                 connection.unlock();
             }
         },
+        clear_total_readout: async function () {
+            // 说明书：0x000C 总流量可写，写 0 清零（与瞬时/系数相同：3 寄存器 / 整数+小数）
+            const buffer = Buffer.alloc(6);
+            let connection = await modbus_wrapper.fetchSerialConnection(config.serial_path, config.baud_rate, config.device_id);
+            try {
+                await connection.client.writeRegisters(0x0C, buffer);
+                this.m_info.total_flow = 0;
+            } catch (error) {
+                console.log('clear total_readout error', error);
+                this.m_info.online = false;
+                throw error;
+            } finally {
+                connection.unlock();
+            }
+        },
         status_map: function () {
             let ret = [];
             ret.push({ text: '当前流量值', func: 'readout' });
+            ret.push({ text: '累计流量值', func: 'total_readout' });
             return ret;
         },
         shutdown: async function () {

@@ -391,7 +391,7 @@
 <script setup>
 import { computed, reactive, ref, onMounted, onUnmounted, shallowRef, watch, inject, getCurrentInstance } from 'vue'
 import { useRoute } from 'vue-router'
-import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Plus, Setting, Clock } from '@element-plus/icons-vue'
+import { Refresh, House, Monitor, VideoPlay, VideoPause, Close, CircleCheck, CircleClose, Plus, Setting, Clock, Edit, RefreshLeft } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WeatherWeekly from '../../../../weather/gui/WeatherWeekly.vue'
 import InteractiveMapComponent from './InteractiveMapComponent.vue'
@@ -1049,7 +1049,9 @@ const getIconComponent = (iconName) => {
     'VideoPlay': VideoPlay,
     'VideoPause': VideoPause,
     'Monitor': Monitor,
-    'Close': Close
+    'Close': Close,
+    'Edit': Edit,
+    'RefreshLeft': RefreshLeft
   }
   return iconMap[iconName] || null
 }

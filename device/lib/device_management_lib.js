@@ -54,6 +54,9 @@ export default{
     mock_total_readout: async function (device_name, value, token) {
         return await call_remote('/device_management/mock_total_readout', { device_name, value }, token);
     },
+    clear_total_readout: async function (device_name, token) {
+        return await call_remote('/device_management/clear_total_readout', { device_name }, token);
+    },
     shutdown_device: async function (device_name, token) {
         return await call_remote('/device_management/shutdown_device', { device_name }, token);
     },

@@ -208,6 +208,8 @@
                                     <VideoPause v-else-if="buttonConfig.icon === 'VideoPause'" />
                                     <Monitor v-else-if="buttonConfig.icon === 'Monitor'" />
                                     <Close v-else-if="buttonConfig.icon === 'Close'" />
+                                    <Edit v-else-if="buttonConfig.icon === 'Edit'" />
+                                    <RefreshLeft v-else-if="buttonConfig.icon === 'RefreshLeft'" />
                                 </el-icon>
                                 {{ buttonConfig.buttonText }}
                             </el-button>
@@ -232,7 +234,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch, getCurrentInstance, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { ZoomIn, ZoomOut, Refresh, Close, Location, ArrowDown, Grid, Monitor, VideoPlay, VideoPause, CircleCheck, CircleClose, Edit, RefreshLeft } from '@element-plus/icons-vue'
 import call_remote from '../../../lib/call_remote.js'
 import { mapConfig, getAMapScriptUrl, getDeviceIcon, convertXYToLngLat } from '../config/mapConfig.js'
 import UnifiedControlPanel from './UnifiedControlPanel.vue'

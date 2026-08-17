@@ -315,6 +315,13 @@ const deviceCapabilityButtonMapping = {
         loadingText: '读取中...',
         description: '读取设备当前示数和状态'
     },
+    clear_total_readout: {
+        buttonText: '清零累计',
+        buttonClass: 'stop-btn',
+        action: 'clearTotalReadout',
+        loadingText: '清零中...',
+        description: '将流量计累计流量清零'
+    },
 }
 
 // 根据设备能力集获取按钮配置（直接使用接口返回的能力集）
@@ -328,7 +335,7 @@ const getDeviceButtonConfig = (deviceCapabilities) => {
     }
 
     // 定义按钮优先级顺序
-    const priorityOrder = ['open', 'close', 'readout', 'is_opened', 'status_map', 'mock_readout', 'ava_readout', 'total_readout', 'mock_total_readout']
+    const priorityOrder = ['open', 'close', 'readout', 'clear_total_readout', 'is_opened', 'status_map', 'mock_readout', 'ava_readout', 'total_readout', 'mock_total_readout']
 
     // 只保留有对应按钮配置的能力
     const availableCapabilities = deviceCapabilities.filter(cap =>
@@ -432,6 +439,7 @@ const capabilityNameMap = {
     status_map: '状态映射',
     mock_readout: '模拟读数',
     total_readout: '累计读数',
+    clear_total_readout: '清零累计',
     mock_total_readout: '模拟累计读数',
     ava_readout: '可用读数'
 }
@@ -814,6 +822,20 @@ const executeDeviceAction = async (action, deviceName) => {
             case 'readDeviceStatus':
                 apiPath = '/device_management/readout_device'
                 break
+            case 'clearTotalReadout': {
+                const confirmRes = await new Promise((resolve) => {
+                    uni.showModal({
+                        title: '清零累计流量',
+                        content: `确认将「${deviceName}」累计流量清零吗？`,
+                        success: (res) => resolve(res.confirm),
+                        fail: () => resolve(false)
+                    })
+                })
+                if (!confirmRes) return
+                apiPath = '/device_management/clear_total_readout'
+                successMsg = '累计流量已清零'
+                break
+            }
             default:
                 throw new Error('未知的操作类型')
         }
