@@ -100,6 +100,15 @@ const deviceCapabilityButtonMapping = {
     action: 'setDeviceKeyValue',
     description: '设置设备的关键参数值'
   },
+  clear_total_readout: {
+    buttonText: '清零累计流量',
+    buttonType: 'warning',
+    buttonSize: 'small',
+    buttonClass: 'full-width-button',
+    icon: 'RefreshLeft',
+    action: 'clearTotalReadout',
+    description: '将流量计累计流量清零'
+  },
 }
 
 // 设备能力集组合配置
@@ -112,9 +121,9 @@ const deviceCapabilityGroups = {
   },
   // 流量计类设备 - 主要支持读数
   flowmeter: {
-    capabilities: ['readout', 'shutdown', 'set_key_const_value'],
+    capabilities: ['readout', 'shutdown', 'set_key_const_value', 'clear_total_readout'],
     layout: 'column',
-    priority: ['readout', 'shutdown', 'set_key_const_value']
+    priority: ['readout', 'clear_total_readout', 'shutdown', 'set_key_const_value']
   },
   // 施肥机类设备 - 支持完整控制
   fertilizer: {
